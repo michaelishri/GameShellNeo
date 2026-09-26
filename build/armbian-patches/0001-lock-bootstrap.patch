@@ -1,0 +1,25 @@
+diff --git a/lib/functions/rootfs/rootfs-create.sh b/lib/functions/rootfs/rootfs-create.sh
+--- a/lib/functions/rootfs/rootfs-create.sh
++++ b/lib/functions/rootfs/rootfs-create.sh
+@@ -51,11 +51,11 @@
+ # setup and cleanup (policy diverts, qemu-binfmt handling, resolvconf,
+ # machine-id masking), and prepares the rootfs for packaging & caching.
+ function create_new_rootfs_cache_via_debootstrap() {
+-	declare mmdebstrap_branch="branch:main"
++	declare mmdebstrap_branch="commit:77ec9be5417ee44c96343d2347145585da1b1f94"
+ 	[[ ! -d "${SDCARD:?}" ]] && exit_with_error "create_new_rootfs_cache_via_debootstrap: ${SDCARD} is not a directory"
+ 
+ 	# this is different between debootstrap and regular apt-get; here we use acng as a prefix to the real repo
+-	declare debootstrap_apt_mirror="http://${APT_MIRROR}"
++	declare debootstrap_apt_mirror="https://${APT_MIRROR}"
+ 	case "${MANAGE_ACNG}" in
+ 		yes)
+ 			local debootstrap_apt_mirror="http://localhost:3142/${APT_MIRROR}"
+@@ -94,6 +94,7 @@
+ 	cd "${SDCARD}" || exit_with_error "cray-cray about SDCARD" "${SDCARD}" # this will prevent error sh: 0: getcwd() failed
+ 
+ 	declare -ga debootstrap_arguments=(
++		"'--aptopt=Acquire::Check-Valid-Until false'"
+ 		"--variant=minbase"                                         # minimal base variant. go ask Debian about it.
+ 		"--arch=${ARCH}"                                            # the arch
+ 		"'--include=${AGGREGATED_PACKAGES_DEBOOTSTRAP_COMMA}'"      # from aggregation.py

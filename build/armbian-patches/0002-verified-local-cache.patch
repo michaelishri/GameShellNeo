@@ -1,0 +1,30 @@
+diff --git a/lib/functions/artifacts/artifacts-obtain.sh b/lib/functions/artifacts/artifacts-obtain.sh
+--- a/lib/functions/artifacts/artifacts-obtain.sh
++++ b/lib/functions/artifacts/artifacts-obtain.sh
+@@ -490,6 +490,15 @@
+ }
+ 
+ function is_artifact_available_in_local_cache() {
++	# A GameShellNeo rootfs cache is accepted only by its recorded content hash.
++	if [[ "${NEO_LOCAL_CACHE_ONLY:-no}" == yes && "${artifact_type}" == tar.zst ]]; then
++		artifact_exists_in_local_cache=no
++		if [[ "${artifact_final_file_basename}" == "${NEO_ROOTFS_CACHE_NAME}" && -f "${artifact_final_file}" ]] &&
++			[[ "$(sha256sum "${artifact_final_file}" | cut -d' ' -f1)" == "${NEO_ROOTFS_CACHE_SHA}" ]]; then
++			artifact_exists_in_local_cache=yes
++		fi
++		return 0
++	fi
+ 	artifact_exists_in_local_cache="no" # outer scope
+ 
+ 	if [[ "${artifact_type}" == "deb-tar" ]]; then
+@@ -516,6 +525,10 @@
+ }
+ 
+ function is_artifact_available_in_remote_cache() {
++	if [[ "${NEO_LOCAL_CACHE_ONLY:-no}" == yes ]]; then
++		artifact_exists_in_remote_cache=no
++		return 0
++	fi
+ 	# check artifact_full_oci_target is set
+ 	if [[ -z "${artifact_full_oci_target}" ]]; then
+ 		exit_with_error "artifact_full_oci_target is not set"

@@ -44,8 +44,12 @@ Fetch source at exact revisions; verify Debian signatures as well as locked
 metadata hashes. Limit expiry overrides to dated snapshot sources. Record all
 applied patches and final kernel configuration. Use a unique project kernel
 patch directory and `EXTRAWIFI=no`, avoiding broad inherited sunxi patches.
-The custom configuration hook must neutralize Armbian's queued option changes
-before merging the fragment; assert final required and forbidden options.
+Implementation refinement: compile the kernel as a separate stage in the
+locked builder, then let Armbian assemble the image with `KERNELSOURCE=none`.
+This bypasses inherited kernel configuration changes and family patches
+entirely; assert the resolved configuration before compilation and installation.
+The project family has no inherited sunxi runtime tweaks. A small framework
+patch pins mmdebstrap and confines expiry overrides to snapshot bootstrapping.
 
 The output bundle contains the private image, SHA-256 checksums, source/patch
 and package manifests, resolved configuration, compiler inventory and logs.

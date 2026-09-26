@@ -53,7 +53,21 @@
     "sector_bytes": 512,
     "image_bytes": 4294967296,
     "table": "msdos",
-    "boot": {"start_sector": 32768, "sectors": 262144, "type": "0e", "filesystem": "fat16"},
-    "root": {"start_sector": 294912, "sectors": 8093696, "type": "83", "filesystem": "ext4"}
+    "boot": {
+      "start_sector": 32768,
+      "sectors": 262144,
+      "type": "0e",
+      "filesystem": "fat16"
+    },
+    "root": {
+      "start_sector": 294912,
+      "sectors": 8093696,
+      "type": "83",
+      "filesystem": "ext4"
+    }
+  },
+  "mmdebstrap": {
+    "url": "https://gitlab.mister-muffin.de/josch/mmdebstrap",
+    "commit": "77ec9be5417ee44c96343d2347145585da1b1f94"
   }
 }

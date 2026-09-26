@@ -1,12 +1,12 @@
 # GameShellNeo research
 
-**Implementation has started:** [the approved first-build specification](23-first-build-spec.md) freezes the diagnostic milestone and its inputs. Work is tracked as NEO-1 through NEO-5 in Kaneo. Historical research statements below describe their inspection dates; build and hardware results must be recorded separately.
+**The first diagnostic image has passed offline validation:** [the validation report](25-first-build-validation.md) records its exact artifact and completed checks. [The approved specification](23-first-build-spec.md) freezes the milestone, and [the build workflow](24-building-and-testing.md) describes its kernel and image stages. NEO-5 hardware qualification remains open in Kaneo. Historical research statements below describe their inspection dates.
 
 Research date: **2026-09-27**. Scope: the supplied repositories, original hardware and software, and primary online sources for subsequent development. This is the research baseline for further guidance; it does not select a new operating system or launcher.
 
 Subsequent discussion established [the initial base-image requirements](06-base-requirements.md), including a provisional minimal Armbian/Debian base and deferred features. Reports 01–05 remain the research record; document 06 records the owner's decisions. [Follow-up activities](../FOLLOW-UP.md) track remaining checks.
 
-**Start with [the implementation plan](20-base-implementation-plan.md)** for the latest conclusions and proposed sequence. The focused source investigation in reports 17–19 found relevant A33 DRAM operations, an existing ARMv7 PSCI/SCPI patch stack, and a concrete Linux USB current-limit setter defect. Deep suspend and sleeping-battery protection remain implementation and hardware-validation work. No image has been built or tested.
+**Start with [the implementation plan](20-base-implementation-plan.md)** for the research conclusions and proposed sequence. The focused source investigation in reports 17–19 found relevant A33 DRAM operations, an existing ARMv7 PSCI/SCPI patch stack, and a concrete Linux USB current-limit setter defect. Deep suspend and sleeping-battery protection remain implementation and hardware-validation work. No image had been built or tested at the end of that research phase.
 
 The first [read-only inspection of the owner's running GameShell](21-installed-hardware-baseline.md) now records the installed kernel/bootloader, memory, power settings, battery telemetry, preserved boot artifacts and development-access status. SSH works directly over Wi-Fi and through the Mac over both Wi-Fi and USB Ethernet. The owner has confirmed CPI v3.1 printed on the mainboard. [Serial-console preparation](22-serial-cable-and-console-preparation.md) records the recovered cable documentation and pending harness identification.
 
@@ -19,6 +19,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 | Report | Contents |
 | --- | --- |
 | [23 — First-build specification](23-first-build-spec.md) | Approved diagnostic scope, immutable inputs, boot/storage/access contract and acceptance gates |
+| [24 — Building and testing](24-building-and-testing.md) | Private provisioning, pinned build stages, offline checks and first hardware session |
+| [25 — First-build validation](25-first-build-validation.md) | Completed diagnostic image, exact hash, build evidence and remaining hardware qualification |
 | [01 — Repository map](01-repository-map.md) | Exact local snapshots, directory map, build assets, missing pieces and evidence boundaries |
 | [02 — Hardware](02-hardware.md) | Board architecture, schematics, display/graphics, power, input, audio, connectivity and revision discrepancies |
 | [03 — Original software](03-original-software.md) | Boot and desktop environment, Python and Go launchers, games, integration, update mechanisms and reuse constraints |
@@ -62,4 +64,4 @@ These are research gaps, not requests to choose an implementation now:
 - Which hardware functions work together on that build: accelerated rendering, LCD, HDMI where fitted, audio, wireless, USB networking, battery reporting and shutdown?
 - Which parts of the existing interface and game-launch conventions should GameShellNeo retain?
 
-The follow-up Python assessment includes the newly supplied local clone; the original historical analysis remains explicitly dated. Subsequent device inspection is recorded separately in report 21. No device was flashed, no original source checkout was changed, and no full multi-gigabyte OS image was downloaded or mounted. The device's boot region and boot partition were copied read-only for local reference.
+The follow-up Python assessment includes the newly supplied local clone; the original historical analysis remains explicitly dated. Subsequent device inspection is recorded separately in report 21. During that inspection, no device was flashed, no original source checkout was changed, and no full multi-gigabyte OS image was downloaded or mounted. The device's boot region and boot partition were copied read-only for local reference. The later GameShellNeo build and offline image inspection are recorded in report 25; the original physical card remains untouched.

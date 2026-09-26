@@ -7,8 +7,12 @@ standard device interfaces, and the bootloader already proven on the owner's
 board. Sleep, a launcher, OTA and other board revisions are later work.
 
 Start with the [first-build specification](docs/23-first-build-spec.md),
-[research index](docs/README.md) and [follow-up activities](FOLLOW-UP.md).
+[build workflow](docs/24-building-and-testing.md),
+[first-build results](docs/25-first-build-validation.md), [research index](docs/README.md)
+and [follow-up activities](FOLLOW-UP.md).
 Implementation is tracked in Kaneo's OpenSource / GameShellNeo (NEO) project.
+The first private image has passed offline validation; hardware qualification
+remains open under NEO-5.
 
 Credentials, captured firmware, personalized images, downloads and build
 outputs belong under ignored `.local/`. The existing `.env` is private.

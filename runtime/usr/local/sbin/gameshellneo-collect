@@ -1,0 +1,30 @@
+#!/bin/bash
+# Explicit collection only; never include Wi-Fi configuration or private keys.
+set -u
+if [[ $EUID != 0 ]]; then echo 'Run with sudo.' >&2; exit 1; fi
+umask 077
+directory=$(mktemp -d /var/tmp/gameshellneo-diagnostics.XXXXXXXX)
+cat /etc/gameshellneo/image.json > "$directory/image.json"
+uname -a > "$directory/uname.txt"
+cat /proc/cmdline /proc/uptime /proc/meminfo > "$directory/system.txt"
+cp /run/gameshellneo/*.json "$directory/" 2>/dev/null || true
+systemctl --failed --no-pager > "$directory/failed-units.txt"
+journalctl -b -k --no-pager > "$directory/kernel.log"
+systemd-analyze > "$directory/boot-time.txt"
+systemd-analyze critical-chain > "$directory/critical-chain.txt"
+lsusb > "$directory/usb.txt"
+ip -brief address > "$directory/addresses.txt"
+for area in power_supply backlight thermal cpufreq; do
+    case $area in
+        cpufreq) base=/sys/devices/system/cpu/cpufreq ;;
+        *) base=/sys/class/$area ;;
+    esac
+    find -L "$base" -maxdepth 2 -type f \( -name capacity -o -name status -o -name online \
+        -o -name present -o -name voltage_now -o -name current_now -o -name input_current_limit \
+        -o -name brightness -o -name actual_brightness -o -name max_brightness -o -name temp \
+        -o -name type -o -name scaling_cur_freq -o -name scaling_governor \) \
+        -exec sh -c 'for p do printf "%s=" "$p"; cat "$p"; done' sh {} + \
+        > "$directory/$area.txt" 2>&1
+done
+tar -czf "$directory.tar.gz" -C "$(dirname "$directory")" "$(basename "$directory")"
+printf '%s\n' "$directory.tar.gz"

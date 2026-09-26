@@ -1,0 +1,51 @@
+#!/bin/bash
+set -euo pipefail
+gadget=/sys/kernel/config/usb_gadget/gameshellneo
+
+stop_gadget() {
+    [[ -d $gadget ]] || return 0
+    if [[ -n $(cat "$gadget/UDC") ]]; then printf '\n' > "$gadget/UDC"; fi
+    rm -f "$gadget/configs/c.1/ecm.usb0"
+    for directory in "$gadget/functions/ecm.usb0" "$gadget/configs/c.1/strings/0x409" \
+        "$gadget/configs/c.1" "$gadget/strings/0x409" "$gadget"; do
+        [[ ! -d $directory ]] || rmdir "$directory"
+    done
+}
+
+case ${1:-} in
+    stop) stop_gadget; exit 0 ;;
+    start) ;;
+    *) echo 'Usage: gameshellneo-usb start|stop' >&2; exit 2 ;;
+esac
+modprobe libcomposite
+if ! mountpoint -q /sys/kernel/config; then mount -t configfs none /sys/kernel/config; fi
+if [[ -d $gadget ]]; then
+    [[ -n $(cat "$gadget/UDC") ]] && exit 0
+    stop_gadget
+fi
+mapfile -t controllers < <(find /sys/class/udc -mindepth 1 -maxdepth 1 -printf '%f\n')
+[[ ${#controllers[@]} == 1 ]] || { echo 'Expected one USB device controller' >&2; exit 1; }
+identity=$(cat /etc/machine-id)
+[[ $identity =~ ^[0-9a-f]{32}$ ]] || exit 1
+printf -v mac_tail ':%s:%s:%s:%s:%s' "${identity:0:2}" "${identity:2:2}" \
+    "${identity:4:2}" "${identity:6:2}" "${identity:8:2}"
+mkdir -p "$gadget"
+trap 'stop_gadget || true' ERR
+# Linux Foundation ECM development identity; production VID/PID is a later task.
+printf '0x1d6b' > "$gadget/idVendor"
+printf '0x0104' > "$gadget/idProduct"
+printf '0x0200' > "$gadget/bcdUSB"
+mkdir -p "$gadget/strings/0x409" "$gadget/configs/c.1/strings/0x409"
+printf '%s' "$identity" > "$gadget/strings/0x409/serialnumber"
+printf 'GameShellNeo' > "$gadget/strings/0x409/manufacturer"
+printf 'CPI v3.1 diagnostic ECM' > "$gadget/strings/0x409/product"
+printf 'USB maintenance' > "$gadget/configs/c.1/strings/0x409/configuration"
+printf '0x80' > "$gadget/configs/c.1/bmAttributes"
+printf '500' > "$gadget/configs/c.1/MaxPower"
+mkdir "$gadget/functions/ecm.usb0"
+printf '02%s' "$mac_tail" > "$gadget/functions/ecm.usb0/dev_addr"
+printf '06%s' "$mac_tail" > "$gadget/functions/ecm.usb0/host_addr"
+printf 'usb0' > "$gadget/functions/ecm.usb0/ifname"
+ln -s "$gadget/functions/ecm.usb0" "$gadget/configs/c.1/ecm.usb0"
+printf '%s' "${controllers[0]}" > "$gadget/UDC"
+trap - ERR

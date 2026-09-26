@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+"""Record local userspace readiness independently of radio/USB readiness."""
+import json
+from pathlib import Path
+import time
+
+directory = Path('/run/gameshellneo')
+directory.mkdir(exist_ok=True)
+state = {'local_userspace_ready': True, 'monotonic_seconds': time.monotonic(),
+         'display_devices': sorted(p.name for p in Path('/sys/class/drm').glob('card*')),
+         'input_devices': sorted(p.name for p in Path('/sys/class/input').glob('event*'))}
+(directory / 'ready.json').write_text(json.dumps(state) + '\n')
+print(json.dumps(state), flush=True)

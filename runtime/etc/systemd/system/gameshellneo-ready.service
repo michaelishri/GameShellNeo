@@ -1,0 +1,11 @@
+[Unit]
+Description=GameShellNeo local diagnostic readiness marker
+After=systemd-udev-trigger.service systemd-logind.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/gameshellneo-ready
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

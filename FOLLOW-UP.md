@@ -1,10 +1,10 @@
 # GameShellNeo follow-up activities
 
-Record deferred questions and activities here as they arise. The first diagnostic image has passed offline validation and has been flashed to the owner-confirmed Samsung spare, with full readback verification. First boot and hardware qualification are in progress; no sleep experiment has been performed.
+Record deferred questions and activities here as they arise. The first diagnostic image has booted on the owner-confirmed Samsung spare. Wi-Fi SSH works, and USB SSH works after the NEO-6 runtime correction. Hardware qualification remains in progress; no sleep experiment has been performed.
 
 **Implementation update, 27 September 2026:** the owner approved [the first-build specification](docs/23-first-build-spec.md) and authorized implementation. Kaneo NEO-1 through NEO-5 track source locks, kernel support, diagnostic runtime, image assembly and hardware qualification. This authorization does not identify a physical card to overwrite. Sleep remains disabled for the first image; short power presses shut down, and Wi-Fi is privately preconfigured. Historical completion statements below remain evidence of their respective research stages.
 
-**Build and flash result:** [report 25](docs/25-first-build-validation.md) records the completed 4 GiB private image and offline checks. [Report 26](docs/26-first-card-and-boot-validation.md) records the verified spare-card write and first-boot progress. NEO-5 remains open; the new kernel has not yet been observed running on the physical GameShell.
+**Build and first-boot result:** [report 25](docs/25-first-build-validation.md) records the completed 4 GiB private image and offline checks. [Report 26](docs/26-first-card-and-boot-validation.md) records the verified spare-card write, successful physical boot, observed hardware and USB fix. NEO-5 remains open for repeated tests and recovery preparation; NEO-7 tracks integration follow-ups and a refreshed image.
 
 Agreed scope and policies are recorded in [the initial base requirements](docs/06-base-requirements.md).
 
@@ -14,7 +14,10 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 - [x] Identify the spare microSD and reader. The owner confirmed the Samsung 64 GB card appearing on the Mac as `NO NAME` and explicitly authorized erasing it. See [report 26](docs/26-first-card-and-boot-validation.md); the disk identifier must be rechecked for each write.
 - [ ] NEO-5: make and verify an offline backup of the separate original card. It remains the recovery card; spare-card write authorization does not complete this backup.
-- [x] Flash and verify the Samsung spare. After the owner enabled Remote Login disk access, all 4 GiB were written and read back with the exact source SHA-256; the Mac safely ejected the card. This does not yet establish a successful boot.
+- [x] Flash and verify the Samsung spare. After the owner enabled Remote Login disk access, all 4 GiB were written and read back with the exact source SHA-256; the Mac safely ejected the card.
+- [x] Observe the first physical boot: new kernel/identity verified, login console visible, Wi-Fi SSH working, and USB SSH working after NEO-6. See report 26 for exact evidence and limits.
+- [x] NEO-6: fix ECM interface naming (`usb%d` allocation template), apply it to the diagnostic card and verify USB SSH through the Mac. Source is committed and pushed; the old image artifact still contains the defect.
+- [ ] NEO-7: resolve observed integration gaps (regulatory database, ext4 journal ACLs, DHCP hostname policy and boot warnings), then rebuild the image with the USB fix before the next fresh flash.
 - [ ] Perform the first-image hardware acceptance sequence in report 23, including ten cold starts and ten USB reconnections. Host build checks do not qualify hardware.
 - [ ] Confirm the Wi-Fi regulatory country before power/range comparisons. Do not infer it from the developer's timezone.
 - [ ] Qualify a production USB VID/PID before distributing a product image; the first private image uses the Linux gadget development identity.
@@ -52,7 +55,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [x] Audit the installed USB-network configuration and controller state. `g_ether` is bound, `usb0` is up, DHCP/SSH are active, and read-only register checks confirm peripheral mode and enabled software connection/PHY pull-up controls. No missing enable setting was found. Initial enumeration failed; the subsequent cable/approval test succeeded without a configuration fix. See [report 21](docs/21-installed-hardware-baseline.md).
 - [x] Complete the intended access path: Intel → Mac → USB Ethernet → GameShell. After another cable change and the appearance of the Mac's accessory-approval screen, USB enumerated using CDC ECM at high speed. SSH through the Mac to `192.168.10.1` succeeded with the known GameShell host key; session endpoints and routing confirmed USB. The Mac received `192.168.10.21` on `en7`. No network configuration change was required. Cable, approval and a new boot were not isolated as separate variables; reconnect reliability remains a follow-up.
 - [ ] If the GameShell needs Internet access through the Mac, assess Internet Sharing separately from SSH jump-host access; confirm available interfaces and avoid conflicting DHCP configurations.
-- [ ] Validate USB networking reconnection after reboot and sleep. Use Wi-Fi SSH as a fallback when available; revisit the deferred serial console for failures before either network path starts. Run battery endurance tests unplugged from USB power.
+- [ ] Validate USB networking reconnection after reboot and sleep. The first diagnostic boot exposed an ECM naming bug, now fixed and checked with a service restart and USB SSH. Repeated physical reconnects and post-fix cold boots remain open. Use Wi-Fi SSH as fallback and run battery endurance tests unplugged from USB power.
 - [ ] Provide Wi-Fi setup instructions over USB/SSH for the initial image. On-device Wi-Fi configuration is deferred until launcher work.
 
 ## Technical feasibility and acceptance criteria

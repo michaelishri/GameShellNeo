@@ -89,8 +89,87 @@ The first image has a fixed root partition and does not expand to use 64 GB.
 
 ## First boot and acceptance
 
-Awaiting the owner's physical card swap. After the successful verified write
-and eject, the owner was given this sequence:
+**The first physical boot succeeded.** The owner reported the console banner
+and then confirmed `gameshellneo login:`. Wi-Fi SSH authenticated against the
+new per-device host key, and the installed image identity and kernel matched
+the build. After the USB fix below, SSH also worked through Intel → Mac → USB.
+
+| Check | First-boot observation | Remaining qualification |
+| --- | --- | --- |
+| System | Debian 13, `6.18.54-gameshellneo1`, Samsung card with fixed 128 MiB boot and roughly 3.9 GiB root partitions | Repeated cold starts and recovery |
+| CPU and memory | Four CPUs online; 1001 MiB reported usable RAM; about 68 MiB used in the initial sample | CPU/memory load and long-run stability |
+| Display | Owner sees login console; sun4i DRM framebuffer active at 320×240 | Visual quality, transitions and initialization independently of the old bootloader |
+| Backlight | OCP8178 driver bound; brightness/actual brightness 1 of 31 | Levels, physical off and restoration |
+| Input | USB keypad (`4242:e131`, `rancidbacon.com UsbKeyboard`) and AXP power key registered | Every press/release and orderly power-button shutdown |
+| Wi-Fi | Provisioned network and authenticated SSH work with the captured BCM43430/0 firmware | Reconnection, unavailable-AP behavior, regulatory configuration and power |
+| USB | After NEO-6, ECM configured at high speed; Mac `en8` received a lease; authenticated USB SSH succeeded | Ten physical reconnects and post-fix cold boot |
+| Battery | Valid readable telemetry, 100%, charging; reported voltage varied from approximately 4.256 V to 4.202 V during inspection | Calibration, pack specifications, charging transitions and endurance |
+| CPU power management | `cpufreq-dt`, `schedutil`, advertised 120–1008 MHz OPPs; sampled frequency changes from 648 to 1008 MHz | Full OPP/voltage stability and representative idle efficiency |
+| Temperature | CPU thermal zone read approximately 42–43°C | Sensor calibration and sustained-load behavior |
+| Filesystem policy | Actual ext4 options include `data=ordered`, barriers and `commit=5` | Storage load and interrupted-power qualification |
+| Runtime health | After USB correction, required services active/successful, USB restart count zero, kernel taint zero | Longer observation and repeated starts |
+
+The captured kernel log contains no observed panic, oops or storage I/O fault.
+Firmware filename fallback messages and the warnings listed below remain;
+this is not a claim that the log is warning-free. Battery values are software
+readings, not physical voltage/current measurements or proof of a calibrated
+percentage. No charger, gauge or current-limit setting was changed.
+
+`systemd-analyze` reported **2.456 s kernel + 19.783 s userspace = 22.239 s**
+for this first boot. The local readiness marker was written at approximately
+**17.166 s** on the monotonic clock. These omit pre-kernel/bootloader time and
+do not establish power-button-to-visible-readiness latency. The first boot
+included setup work and the USB retry defect; record subsequent boots
+separately rather than treating this as an optimized result.
+
+### USB startup correction — NEO-6
+
+The initial `systemctl --failed` snapshot showed no failed units, but the USB
+service was actually cycling through automatic retries. Explicit service-state
+and journal inspection found `EINVAL` when writing literal `usb0` to the ECM
+configfs `ifname` attribute. Linux's `gether_set_ifname()` requires an allocation
+template containing exactly one `%d`.
+
+Commit `64c5c43` changes the runtime to write literal `usb%d`, then verifies
+that the allocated name is `usb0` to match networkd. An unexpected allocation
+is cleaned up. Bash syntax and ShellCheck passed. The corrected script was
+installed on the diagnostic card over Wi-Fi; the original was preserved, and
+`/etc/gameshellneo/neo6-runtime-change.json` records both hashes. Initial start
+and a subsequent stop/start completed successfully. USB SSH used the expected
+new host key, and the observed connection endpoints confirmed the USB route.
+
+The installed script SHA-256 is
+`872b775781f36bc02644013e6666492ac4ca29ffb978567cd6a2097193a02daa`, matching
+the repository source. **The original `750fb8829d41` image artifact has not
+been rebuilt and still contains the old script.** Rebuild from the corrected
+source before a future fresh flash; the existing card already has the fix.
+These software restarts do not count as physical USB reconnects or cold boots.
+
+### Remaining integration findings — NEO-7
+
+- The image lacks `regulatory.db`. Confirm the owner's country and add the
+  appropriate signed database; do not infer location from timezone.
+- The kernel lacks `CONFIG_EXT4_FS_POSIX_ACL`, and journald reports inability
+  to set its user-journal ACL. Root diagnostic collection still works.
+- DHCP attempted to change the fixed hostname and was denied. Review the
+  explicit networkd hostname policy.
+- Review unused distro sysrq/ALSA rules, duplicate global/interface
+  wpa_supplicant processes and the BPF firewall support warning.
+- Classify clock-frequency, GPIO-supply, DMA-mask and USB-PHY warnings against
+  the actual driver requirements and board schematics before changing them.
+- Preserve the working firmware fallback while checking optional CLM/txcap
+  data and redistribution provenance; the missing optional-file messages did
+  not prevent the observed Wi-Fi connection.
+
+Private evidence is under `.local/hardware-validation/2026-09-27/`, including
+the original boot log, service states, CPU/power/input/display observations,
+USB deployment and SSH checks, and a post-fix diagnostic archive. NEO-7 tracks
+the remaining integration work and a refreshed image; NEO-5 remains open for
+hardware acceptance and the original-card backup.
+
+### Physical preparation record
+
+After the successful verified write and eject, the owner was given this sequence:
 
 1. Shut down the GameShell normally and disconnect USB power.
 2. Remove the original card and put it in the Mac's reader for a read-only
@@ -101,7 +180,9 @@ and eject, the owner was given this sequence:
 5. Capture the boot log, bound drivers, failed units, display/input observations,
    battery data, and frequency/temperature readings before changing settings.
 
-Ten cold boots, ten USB reconnections, control/display checks, CPU/storage
-stability, supervised power tests and the offline original-card backup remain
-open. Serial remains deferred. A verified flash establishes bytes on the card,
-not successful boot or hardware compatibility.
+One cold boot is observed. The ten-boot and ten-USB-reconnection acceptance
+sequences, complete control/display checks, CPU/storage stability, supervised
+power tests and offline original-card backup remain open. No external card was
+visible on the Mac during this check, so that backup did not start. Serial
+remains deferred. This establishes an initial working system, not reliability,
+sleep/resume behavior or battery-life targets.

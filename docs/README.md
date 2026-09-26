@@ -1,6 +1,6 @@
 # GameShellNeo research
 
-**The first diagnostic image has passed offline validation:** [the validation report](25-first-build-validation.md) records its exact artifact and completed checks. [The approved specification](23-first-build-spec.md) freezes the milestone, and [the build workflow](24-building-and-testing.md) describes its kernel and image stages. NEO-5 hardware qualification remains open in Kaneo. Historical research statements below describe their inspection dates.
+**The first diagnostic image has booted on the owner's CPI v3.1:** [report 26](26-first-card-and-boot-validation.md) records hardware observations, working Wi-Fi/USB SSH and the live USB correction. [The build validation report](25-first-build-validation.md) records the original artifact and offline checks. [The approved specification](23-first-build-spec.md) freezes the milestone, and [the build workflow](24-building-and-testing.md) describes its stages. NEO-5 hardware qualification and NEO-7 integration follow-ups remain open in Kaneo. Historical research statements below describe their inspection dates.
 
 Research date: **2026-09-27**. Scope: the supplied repositories, original hardware and software, and primary online sources for subsequent development. This is the research baseline for further guidance; it does not select a new operating system or launcher.
 

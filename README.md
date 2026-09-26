@@ -11,8 +11,10 @@ Start with the [first-build specification](docs/23-first-build-spec.md),
 [first-build results](docs/25-first-build-validation.md), [research index](docs/README.md)
 and [follow-up activities](FOLLOW-UP.md).
 Implementation is tracked in Kaneo's OpenSource / GameShellNeo (NEO) project.
-The first private image has passed offline validation; hardware qualification
-remains open under NEO-5.
+The first private image has booted on the owner's board; Wi-Fi and USB SSH are
+verified. [First-boot results](docs/26-first-card-and-boot-validation.md) record
+the live USB correction and remaining NEO-5/NEO-7 qualification work. The
+original image artifact predates that correction; rebuild before a fresh flash.
 
 Credentials, captured firmware, personalized images, downloads and build
 outputs belong under ignored `.local/`. The existing `.env` is private.

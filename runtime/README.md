@@ -32,6 +32,12 @@ Foundation gadget identity is for this development image; a production USB
 identity requires separate qualification. Configuring MaxPower does not program
 or measure the PMIC's actual input current.
 
+The ECM configfs `ifname` is the allocation template `usb%d`, as required by
+Linux's `gether_set_ifname()`. After binding, the script verifies that the
+allocated interface is `usb0`, matching the maintenance network configuration.
+Writing a literal `usb0` is rejected by the kernel even though it looks like a
+valid network name; this was found and corrected during the first board boot.
+
 `tools/provision.py` converts one selected existing Wicd WPA-PSK profile to
 wpa_supplicant format without printing credentials. It creates stable per-device
 machine and SSH identities, plus a fingerprint record. Treat the output and

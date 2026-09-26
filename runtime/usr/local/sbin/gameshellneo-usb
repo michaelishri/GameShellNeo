@@ -45,7 +45,13 @@ printf '500' > "$gadget/configs/c.1/MaxPower"
 mkdir "$gadget/functions/ecm.usb0"
 printf '02%s' "$mac_tail" > "$gadget/functions/ecm.usb0/dev_addr"
 printf '06%s' "$mac_tail" > "$gadget/functions/ecm.usb0/host_addr"
-printf 'usb0' > "$gadget/functions/ecm.usb0/ifname"
+# gether_set_ifname() requires exactly one %d for safe name allocation.
+printf '%s' 'usb%d' > "$gadget/functions/ecm.usb0/ifname"
 ln -s "$gadget/functions/ecm.usb0" "$gadget/configs/c.1/ecm.usb0"
 printf '%s' "${controllers[0]}" > "$gadget/UDC"
+if [[ $(cat "$gadget/functions/ecm.usb0/ifname") != usb0 ]]; then
+    echo 'Expected usb0 for the maintenance network configuration' >&2
+    stop_gadget
+    exit 1
+fi
 trap - ERR

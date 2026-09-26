@@ -1,0 +1,2 @@
+# Unified diffs contain intentional context-prefix spaces; validate their applied source.
+*.patch -whitespace

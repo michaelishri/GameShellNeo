@@ -1,0 +1,14 @@
+diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sun4i-a10-pinctrl.yaml b/Documentation/devicetree/bindings/pinctrl/allwinner,sun4i-a10-pinctrl.yaml
+--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sun4i-a10-pinctrl.yaml
++++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sun4i-a10-pinctrl.yaml
+@@ -95,6 +95,10 @@
+     maxItems: 8
+ 
+ patternProperties:
++  "-hog$":
++    type: object
++    $ref: /schemas/gpio/gpio-hog.yaml#
++
+   # It's pretty scary, but the basic idea is that:
+   #   - One node name can start with either s- or r- for PRCM nodes,
+   #   - Then, the name itself can be any repetition of <string>- (to

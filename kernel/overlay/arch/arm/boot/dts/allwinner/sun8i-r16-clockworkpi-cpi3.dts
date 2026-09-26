@@ -1,0 +1,251 @@
+// SPDX-License-Identifier: (GPL-2.0-or-later OR MIT)
+/*
+ * CPI v3.1 diagnostic board description, GameShellNeo contributors, 2026.
+ * Electrical facts derived from Clockwork's CPI3 schematic and 2018 DTS.
+ * Copyright (c) 2018 Clockwork; see kernel/README.md for provenance.
+ */
+/dts-v1/;
+#include "sun8i-a33.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "ClockworkPi GameShell CPI v3.1 (GameShellNeo diagnostic)";
+	compatible = "clockwork,clockworkpi-cpi3", "allwinner,sun8i-a33";
+
+	aliases {
+		serial0 = &uart0;
+		mmc0 = &mmc0;
+		mmc1 = &mmc1;
+	};
+
+	chosen { stdout-path = "serial0:115200n8"; };
+
+	backlight: backlight {
+		compatible = "ocs,ocp8178";
+		ctrl-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+		default-brightness = <1>;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		led-0 {
+			label = "gameshell:status";
+			gpios = <&pio 1 7 GPIO_ACTIVE_LOW>; /* PB7 */
+			default-state = "off";
+		};
+	};
+
+	/* RGB carries pixels; this bus carries only 16-bit control pairs. */
+	spi {
+		compatible = "spi-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		sck-gpios = <&pio 2 2 GPIO_ACTIVE_HIGH>;
+		mosi-gpios = <&pio 2 0 GPIO_ACTIVE_HIGH>;
+		cs-gpios = <&pio 2 3 GPIO_ACTIVE_LOW>;
+		num-chipselects = <1>;
+
+		panel@0 {
+			compatible = "clockwork,cpi3-lcd";
+			reg = <0>;
+			spi-max-frequency = <100000>;
+			spi-cpol;
+			spi-cpha;
+			reset-gpios = <&pio 1 2 GPIO_ACTIVE_LOW>; /* PB2 */
+			power-supply = <&reg_dcdc1>; /* LCD connector VDD: VCC-3V0 */
+			backlight = <&backlight>;
+			port {
+				panel_in: endpoint {
+					remote-endpoint = <&tcon0_out_rgb>;
+				};
+			};
+		};
+	};
+
+	reg_usb1_vbus: regulator-keypad {
+		compatible = "regulator-fixed";
+		regulator-name = "keypad-vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
+		enable-active-high;
+	};
+
+	wifi_pwrseq: pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		reset-gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* WL_REG_ON */
+	};
+};
+
+&cpu0 { cpu-supply = <&reg_dcdc3>; };
+&de { status = "okay"; };
+&ehci0 { status = "okay"; };
+&ohci0 { status = "okay"; };
+
+&mmc0 {
+	vmmc-supply = <&reg_dcdc1>;
+	bus-width = <4>;
+	cd-gpios = <&pio 1 3 GPIO_ACTIVE_LOW>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc0_pins>, <&card_detect_pin>;
+	status = "okay";
+};
+
+&mmc1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc1_pg_pins>;
+	vmmc-supply = <&reg_aldo1>;
+	mmc-pwrseq = <&wifi_pwrseq>;
+	bus-width = <4>;
+	non-removable;
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	wifi@1 {
+		compatible = "brcm,bcm4329-fmac";
+		reg = <1>;
+		brcm,board-type = "clockwork,clockworkpi-cpi3";
+	};
+};
+
+&pio {
+	vcc-pb-supply = <&reg_aldo1>;
+	vcc-pc-supply = <&reg_aldo1>;
+	vcc-pd-supply = <&reg_aldo1>;
+	vcc-pg-supply = <&reg_aldo1>;
+	vcc-ph-supply = <&reg_aldo1>;
+	card_detect_pin: card-detect-pin {
+		pins = "PB3";
+		function = "gpio_in";
+		bias-pull-up;
+	};
+};
+
+&r_pio {
+	amplifier-disable-hog {
+		gpio-hog;
+		gpios = <0 3 GPIO_ACTIVE_HIGH>;
+		output-low;
+		line-name = "audio-amplifier-off";
+	};
+	bt-reset-hog {
+		gpio-hog;
+		gpios = <0 10 GPIO_ACTIVE_LOW>;
+		output-high; /* Assert BT_RST_N; leave shared Wi-Fi supplies up. */
+		line-name = "bluetooth-reset";
+	};
+};
+
+&r_rsb {
+	status = "okay";
+	axp22x: pmic@3a3 {
+		compatible = "x-powers,axp223";
+		reg = <0x3a3>;
+		interrupt-parent = <&r_intc>;
+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_LOW>;
+		/* External USB is a peripheral; never drive its VBUS. */
+	};
+};
+
+#include "axp223.dtsi"
+
+&reg_aldo1 {
+	regulator-name = "vcc-io";
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3000000>;
+	regulator-always-on;
+};
+&reg_aldo2 {
+	regulator-name = "vdd-dll";
+	regulator-min-microvolt = <2500000>;
+	regulator-max-microvolt = <2500000>;
+	regulator-always-on;
+};
+&reg_aldo3 {
+	regulator-name = "vcc-pll-avcc";
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3000000>;
+	regulator-always-on;
+};
+&reg_dc5ldo {
+	regulator-name = "vdd-cpus";
+	regulator-min-microvolt = <1100000>;
+	regulator-max-microvolt = <1100000>;
+	regulator-always-on;
+};
+&reg_dcdc1 {
+	regulator-name = "vcc-3v0";
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3000000>;
+	regulator-always-on;
+};
+&reg_dcdc2 {
+	regulator-name = "vdd-sys";
+	regulator-min-microvolt = <1100000>;
+	regulator-max-microvolt = <1100000>;
+	regulator-always-on;
+};
+&reg_dcdc3 {
+	regulator-name = "vdd-cpu";
+	regulator-min-microvolt = <1040000>;
+	regulator-max-microvolt = <1200000>;
+	regulator-always-on;
+};
+&reg_dcdc5 {
+	regulator-name = "vcc-dram";
+	regulator-min-microvolt = <1500000>;
+	regulator-max-microvolt = <1500000>;
+	regulator-always-on;
+};
+
+/* Three physically joined outputs supply the radio. Retain all three. */
+&reg_dldo1 {
+	regulator-name = "vcc-wifi0";
+	regulator-min-microvolt = <3300000>;
+	regulator-max-microvolt = <3300000>;
+	regulator-always-on;
+};
+&reg_dldo2 {
+	regulator-name = "vcc-wifi1";
+	regulator-min-microvolt = <3300000>;
+	regulator-max-microvolt = <3300000>;
+	regulator-always-on;
+};
+&reg_dldo4 {
+	regulator-name = "vcc-wifi2";
+	regulator-min-microvolt = <3300000>;
+	regulator-max-microvolt = <3300000>;
+	regulator-always-on;
+};
+
+&battery_power_supply { status = "okay"; };
+&usb_power_supply { status = "okay"; };
+&ac_power_supply { status = "okay"; };
+
+&tcon0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&lcd_rgb666_pins>;
+	status = "okay";
+};
+&tcon0_out {
+	tcon0_out_rgb: endpoint@0 {
+		reg = <0>;
+		remote-endpoint = <&panel_in>;
+	};
+};
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0_pb_pins>;
+	status = "okay";
+};
+&usb_otg {
+	dr_mode = "peripheral";
+	status = "okay";
+};
+&usbphy {
+	usb0_vbus_power-supply = <&usb_power_supply>;
+	usb1_vbus-supply = <&reg_usb1_vbus>;
+	status = "okay";
+};

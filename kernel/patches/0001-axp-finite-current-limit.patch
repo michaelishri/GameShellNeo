@@ -1,0 +1,65 @@
+diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -22,6 +22,8 @@
+ #include <linux/slab.h>
+ #include <linux/iio/consumer.h>
+ #include <linux/workqueue.h>
++
++#include "axp20x_usb_current_limit.h"
+ 
+ #define DRVNAME "axp20x-usb-power-supply"
+ 
+@@ -444,40 +446,24 @@
+ static int axp20x_usb_power_set_input_current_limit(struct axp20x_usb_power *power,
+ 						    int intval)
+ {
+-	int ret;
+-	unsigned int reg;
+-	const unsigned int max = power->axp_data->curr_lim_table_size;
+-
+-	if (intval == -1)
+-		return -EINVAL;
+-
+-	if (power->max_input_cur && (intval > power->max_input_cur)) {
+-		dev_warn(power->dev,
+-			 "requested current %d clamped to max current %d\n",
+-			 intval, power->max_input_cur);
+-		intval = power->max_input_cur;
+-	}
+-
+-	/*
+-	 * BC1.2 detection can cause a race condition if we try to set a current
+-	 * limit while it's in progress. When it finishes it will overwrite the
+-	 * current limit we just set.
+-	 */
++	int ret, reg;
++
++	/* Validate before disabling BC1.2 or changing any register. */
++	reg = axp20x_usb_current_limit_select(power->axp_data->curr_lim_table,
++					power->axp_data->curr_lim_table_size,
++					intval, power->max_input_cur);
++	if (reg < 0)
++		return reg;
++
++	/* BC1.2 detection would otherwise overwrite the selected limit. */
+ 	if (power->usb_bc_en_bit) {
+-		dev_dbg(power->dev,
+-			"disabling BC1.2 detection because current limit was set");
+ 		ret = regmap_field_write(power->usb_bc_en_bit, 0);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+-	for (reg = max - 1; reg > 0; reg--)
+-		if (power->axp_data->curr_lim_table[reg] <= intval)
+-			break;
+-
+-	dev_dbg(power->dev, "setting input current limit reg to %d (%d uA), requested %d uA",
+-		reg, power->axp_data->curr_lim_table[reg], intval);
+-
++	dev_dbg(power->dev, "input limit %d uA, selector %d, requested %d uA\n",
++		power->axp_data->curr_lim_table[reg], reg, intval);
+ 	return regmap_field_write(power->curr_lim_fld, reg);
+ }
+ 

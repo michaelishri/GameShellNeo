@@ -21,6 +21,16 @@ tasks:
     desc: Check the Intel Linux build host and optional remote-access dependency
     cmds: [bash tools/doctor.sh]
 
+  setup:
+    desc: Prepare private workspace and pull/verify the locked Docker build environment
+    cmds:
+      - task: doctor
+      - bash tools/run-logged.sh setup python3 tools/setup.py
+
+  setup:host:
+    desc: Install missing Debian/Ubuntu host packages with sudo (including Docker if absent)
+    cmds: [bash tools/setup-host.sh]
+
   prepare:
     desc: Verify inputs and synchronize the locked Armbian source and project hooks
     cmds:

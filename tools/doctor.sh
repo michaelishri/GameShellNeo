@@ -5,10 +5,15 @@ cd "$(dirname "$0")/.."
     echo 'Image builds currently require the Intel/amd64 Linux Docker host.' >&2; exit 1;
 }
 for program in bash python3 docker git curl tar cc flock ssh-keygen; do
-    command -v "$program" >/dev/null || { echo "Missing prerequisite: $program" >&2; exit 1; }
+    command -v "$program" >/dev/null || {
+        echo "Missing prerequisite: $program. On Debian/Ubuntu, run task setup:host." >&2; exit 1;
+    }
 done
 python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11+ required"'
-docker info >/dev/null
+docker info >/dev/null || {
+    echo 'Docker is unavailable. Start the engine and configure access for this account; see README.' >&2
+    exit 1
+}
 umask 077
 mkdir -p .local/build
 chmod 700 .local

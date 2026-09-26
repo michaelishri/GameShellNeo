@@ -29,6 +29,7 @@ Use [Taskfile.yml](Taskfile.yml) for repeatable work, from this directory:
 
 ```sh
 task                       # List commands
+task setup                 # Pull and verify the pinned build environment
 task doctor                # Check this build host
 task check                 # Host tests and shell lint
 task build:image           # Rebuild userspace/image using the completed kernel
@@ -42,12 +43,49 @@ operation is needed, extend the Taskfile and its checked-in `tools/` helpers.
 ### Prerequisites
 
 Build on the **Intel x86-64 Linux host**. Install [Go Task v3](https://taskfile.dev/docs/installation)
-(tested with 3.53.1), Docker with access for your account, Python 3.11+, Bash,
-Git, curl, tar, a C compiler, `flock` and `ssh-keygen`. `task lint` needs
-ShellCheck; it also accepts the existing builder's cached ShellCheck 0.11.0.
-Device/Mac commands additionally require Paramiko (tested with 4.0.0), installed
-for the Python interpreter running Task, for example Ubuntu's `python3-paramiko`
-package. The pinned Docker builder supplies the ARM toolchain and image tools.
+first (tested with 3.53.1), then use:
+
+```sh
+task setup:host             # Once on a new Debian/Ubuntu host; uses sudo
+task setup                 # Pull and validate the exact locked Docker image
+```
+
+`setup:host` installs missing native packages: certificates, build-essential,
+curl, Git, Python, Paramiko, OpenSSH client, util-linux, xz, tar and ShellCheck.
+It installs distribution Docker (`docker.io`) only if the `docker` command is
+absent, and starts/enables that new engine on systemd hosts. It preserves an
+existing Docker installation and does not upgrade already installed packages.
+Repeated runs skip package installation when everything is present. Host package
+versions come from the host's configured repositories; the builder is pinned.
+
+Docker must be running and accessible to your normal account. For a newly
+installed system Docker engine, an administrator can grant access with
+`sudo usermod -aG docker "$USER"`; log out and back in before `task setup`.
+For an existing Docker installation, use its normal account-access setup.
+Image assembly requires privileged containers and loop devices on the Linux
+host. Setup does not change account groups or run the project as root.
+
+On other Linux distributions, install Docker, Python **3.11+**, Bash, Git,
+curl, tar, a C compiler, `flock`, `ssh-keygen`, ShellCheck and Paramiko manually.
+`setup:host` cannot supply a newer Python than the host's repositories provide;
+`setup` checks the version. Paramiko is only needed for device/Mac operations
+(tested with 4.0.0). Lint also accepts the existing builder's cached ShellCheck.
+
+`task setup` checks host prerequisites, creates private workspace directories,
+and creates `.env` from `.env.example` **only if absent**. It preserves existing
+secrets and sets `.env` permissions to `0600`. It then pulls the single builder
+image by digest and platform from [sources.lock.json](build/sources.lock.json),
+verifies its identity and architecture, and runs a disposable container to
+compile/execute a small ARM program and check the image/device-tree tools.
+The smoke test runs without network access, host mounts or privileged mode.
+That image supplies both the kernel and image build environments.
+
+Setup is safe to repeat, including after a lock-file change. Docker reuses
+cached layers; setup still checks the registry's pinned reference. Progress is
+in `.local/build/setup.log`, and `.local/build/setup.json` records the last
+successful verification. A failure returns a nonzero status. Setup does not
+download private firmware, provision device identities, compile Linux or build
+an OS image; continue with the steps below.
 
 The Mac is the USB bridge/card-writing host; run Task on Linux. Enable Remote
 Login on the Mac, keep it awake, and approve the attached USB accessory if macOS
@@ -91,7 +129,7 @@ has these inputs. Provisioning prepares files locally and preserves the board's
 existing generated identity across rebuilds:
 
 ```sh
-task doctor
+task setup
 task prepare
 task provision
 task build
@@ -114,6 +152,8 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 
 | Task | When to use it |
 | --- | --- |
+| `task setup` | New checkout or changed builder lock; prepare and verify the build environment |
+| `task setup:host` | Install missing native prerequisites on Debian/Ubuntu |
 | `task build:image` | Runtime/image changes; reuses the completed, verified kernel stage |
 | `task build:kernel` | Kernel source/configuration work; preserves incremental build outputs |
 | `task kernel:reset` | After changing the patch queue; archives old kernel source/output under `.local/previous-kernels/`, then run `task build` |

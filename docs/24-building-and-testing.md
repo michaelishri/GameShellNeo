@@ -21,6 +21,12 @@ or runtime tuning. `KERNELSOURCE=none` is intentional in the image stage.
 All commands below run from the GameShellNeo directory. Keep `.local/` private.
 The original sibling repositories are reference inputs and are never modified.
 
+Run `task setup` first to pull and smoke-test the Docker image pinned in the
+lock file. On a new Debian/Ubuntu host, `task setup:host` installs missing host
+packages; configure Docker account access before running setup. Neither command
+replaces existing `.env` contents. The [README](../README.md#prerequisites)
+covers prerequisites, logs and repeat runs.
+
 1. Supply the exact bootloader and owner's radio files from the recorded
    baseline. Paths are arguments, not hard-coded machine dependencies:
 

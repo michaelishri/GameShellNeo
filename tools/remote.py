@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""Reusable SSH operations for the diagnostic GameShell and the owner's Mac."""
+import argparse
+import base64
+from contextlib import ExitStack, contextmanager
+from datetime import datetime, timezone
+import json
+import os
+from pathlib import Path
+import posixpath
+import re
+import shlex
+import sys
+
+import paramiko
+from private_config import load_env
+
+ROOT = Path(__file__).resolve().parents[1]
+LOCAL = ROOT / '.local'
+STATUS_COMMAND = '''
+uname -r; hostname; uptime; nproc; free -m
+systemctl show gameshellneo-usb gameshellneo-battery gameshellneo-ready ssh systemd-networkd wpa_supplicant@wlan0 -p Id -p ActiveState -p SubState -p Result -p NRestarts
+systemctl --failed --no-pager
+cat /run/gameshellneo/ready.json /run/gameshellneo/battery.json
+ip -brief address
+cat /sys/class/udc/*/state /sys/class/udc/*/current_speed
+cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor /sys/devices/system/cpu/cpufreq/policy0/scaling_cur_freq /sys/class/thermal/thermal_zone0/temp
+cat /proc/sys/kernel/tainted
+systemd-analyze
+'''
+
+
+def private_path(value, default):
+    return Path(value or default).expanduser().resolve()
+
+
+def connect_mac(config):
+    client = paramiko.SSHClient()
+    client.load_system_host_keys()
+    known = LOCAL / 'ssh/known_hosts'
+    if known.exists():
+        client.load_host_keys(str(known))
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    client.connect(config['M2_MACBOOK_AIR_IP'], username=config['M2_MACBOOK_AIR_USERNAME'],
+                   password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
+                   key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
+                   timeout=10, auth_timeout=10, banner_timeout=10)
+    return client
+
+
+@contextmanager
+def device(config, route):
+    with ExitStack() as stack:
+        address = config.get('GAMESHELL_USB_IP', '192.168.10.1') if route == 'usb' else config['GAMESHELL_IP']
+        sock = None
+        if route == 'usb':
+            mac = stack.enter_context(connect_mac(config))
+            sock = mac.get_transport().open_channel('direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10)
+            stack.callback(sock.close)
+        public = private_path(config.get('NEO_HOST_PUBLIC_KEY'), LOCAL / 'provisioning/device/ssh_host_ed25519_key.pub')
+        fields = public.read_text().split()
+        if fields[0] != 'ssh-ed25519':
+            raise ValueError('Expected the provisioned Ed25519 device host key')
+        client = stack.enter_context(paramiko.SSHClient())
+        client.get_host_keys().add(address, fields[0], paramiko.Ed25519Key(data=base64.b64decode(fields[1])))
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        key = private_path(config.get('NEO_SSH_KEY'), LOCAL / 'ssh/id_ed25519')
+        client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
+                       sock=sock, look_for_keys=False, allow_agent=False,
+                       timeout=10, auth_timeout=10, banner_timeout=10)
+        yield client
+
+
+def run(client, command, password=None, output=None, display=True):
+    """Drain one combined channel to avoid stdout/stderr deadlocks."""
+    channel = client.get_transport().open_session(timeout=10)
+    channel.settimeout(300)
+    channel.set_combine_stderr(True)
+    try:
+        channel.exec_command(command)
+        if password is not None:
+            channel.sendall((password + '\n').encode())
+        channel.shutdown_write()
+        data = bytearray()
+        while True:
+            chunk = channel.recv(65536)
+            if not chunk:
+                break
+            data.extend(chunk)
+            if output:
+                output.write(chunk)
+                output.flush()
+            if display:
+                sys.stdout.buffer.write(chunk)
+                sys.stdout.buffer.flush()
+        code = channel.recv_exit_status()
+        if code:
+            raise RuntimeError('Remote command failed (exit {})'.format(code))
+        return bytes(data)
+    finally:
+        channel.close()
+
+
+def evidence_directory():
+    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
+    directory = LOCAL / 'diagnostics' / stamp
+    directory.mkdir(mode=0o700, parents=True)
+    return directory
+
+
+def device_action(config, action, route):
+    with device(config, route) as client:
+        if action == 'exec':
+            arguments = shlex.split(os.environ.get('NEO_COMMAND', ''))
+            if not arguments:
+                raise ValueError('Supply a command after --, e.g. task device:exec -- uname -r')
+            run(client, shlex.join(arguments))
+            return
+        directory = evidence_directory()
+        if action == 'status':
+            with (directory / 'status.txt').open('wb') as output:
+                run(client, STATUS_COMMAND, output=output)
+        else:
+            archive = run(client, 'sudo -n gameshellneo-collect', display=False).decode().strip()
+            if not re.fullmatch(r'/var/tmp/gameshellneo-diagnostics\.[A-Za-z0-9]+\.tar\.gz', archive):
+                raise ValueError('Unexpected diagnostic archive path')
+            # Keep stderr separate from the binary archive and propagate errors.
+            stdin, stdout, stderr = client.exec_command('sudo -n cat ' + shlex.quote(archive), timeout=60)
+            stdin.close()
+            with (directory / 'device.tar.gz.part').open('wb') as output:
+                while chunk := stdout.read(1024 * 1024):
+                    output.write(chunk)
+            error = stderr.read().decode()
+            if stdout.channel.recv_exit_status():
+                raise RuntimeError('Diagnostic download failed: ' + error)
+            (directory / 'device.tar.gz.part').replace(directory / 'device.tar.gz')
+            stdout.close()
+            stderr.close()
+        print('Private capture:', directory)
+
+
+def upload(sftp, source, destination):
+    sftp.put(str(source), destination + '.part')
+    sftp.chmod(destination + '.part', 0o600)
+    sftp.posix_rename(destination + '.part', destination)
+
+
+def sudo(config, arguments):
+    password = config.get('M2_MACBOOK_AIR_SUDO_PASSWORD', config.get('M2_MACBOOK_AIR_PASSWORD'))
+    flags = ['sudo', '-S', '-p', ''] if password else ['sudo', '-n']
+    return shlex.join(flags + arguments), password
+
+
+def staged_arguments(sftp, directory):
+    with sftp.open(directory + '/transfer.json') as stream:
+        manifest = json.load(stream)
+    name = manifest['compressed_file']
+    if posixpath.basename(name) != name or not name.endswith('.img.gz'):
+        raise ValueError('Unexpected transfer filename')
+    return ['/usr/bin/python3', '-u', directory + '/flash-macos.py',
+            '--image', directory + '/' + name, '--manifest', directory + '/transfer.json',
+            '--target', directory + '/target.json']
+
+
+def mac_action(config, action, disk):
+    if action in ('inspect', 'flash') and not re.fullmatch(r'disk[1-9][0-9]*', disk):
+        raise ValueError('Supply the inspected external whole disk as DISK=diskN')
+    with connect_mac(config) as client, client.open_sftp() as sftp:
+        if action == 'status':
+            run(client, 'sw_vers; diskutil list external physical; route -n get 192.168.10.1')
+            return
+        directory = posixpath.join(sftp.normalize('.'), '.local/share/GameShellNeo')
+        run(client, 'umask 077; mkdir -p {0}; chmod 700 {0}'.format(shlex.quote(directory)), display=False)
+        upload(sftp, ROOT / 'tools/flash-macos.py', directory + '/flash-macos.py')
+        if action == 'stage':
+            manifest = json.loads((LOCAL / 'flash/transfer.json').read_text())
+            name = manifest['compressed_file']
+            if Path(name).name != name:
+                raise ValueError('Unexpected transfer filename')
+            print('Uploading private image to the Mac...', flush=True)
+            upload(sftp, LOCAL / 'flash' / name, directory + '/' + name)
+            upload(sftp, LOCAL / 'flash/transfer.json', directory + '/transfer.json')
+            # Verify the transferred source even when no card is inserted.
+            args = staged_arguments(sftp, directory) + ['--source-only']
+            run(client, shlex.join(args))
+        elif action == 'inspect':
+            run(client, shlex.join(['/usr/bin/python3', directory + '/flash-macos.py',
+                                    '--inspect', disk, '--target', directory + '/target.json']))
+            (LOCAL / 'flash').mkdir(mode=0o700, parents=True, exist_ok=True)
+            sftp.get(directory + '/target.json', str(LOCAL / 'flash/target.json'))
+        elif action == 'preflight':
+            run(client, shlex.join(staged_arguments(sftp, directory)))
+        else:
+            with sftp.open(directory + '/target.json') as stream:
+                target = json.load(stream)
+            if target['device'] != disk:
+                raise ValueError('DISK differs from the recorded inspection; inspect the intended spare again')
+            capture = evidence_directory()
+            report = directory + '/flash-' + capture.name + '.json'
+            arguments = staged_arguments(sftp, directory) + ['--write', '--report', report]
+            command, password = sudo(config, arguments)
+            with (capture / 'flash.log').open('wb') as output:
+                run(client, command, password, output)
+            command, password = sudo(config, ['/bin/cat', report])
+            (capture / 'flash-result.json').write_bytes(run(client, command, password, display=False))
+            print('Private flash evidence:', capture)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest='host', required=True)
+    target = sub.add_parser('device')
+    target.add_argument('action', choices=['status', 'logs', 'exec'])
+    target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
+    mac = sub.add_parser('mac')
+    mac.add_argument('action', choices=['status', 'stage', 'inspect', 'preflight', 'flash'])
+    mac.add_argument('--disk', default=os.environ.get('NEO_DISK', ''))
+    args = parser.parse_args()
+    os.umask(0o077)
+    config = load_env()
+    if args.host == 'device':
+        if args.route not in ('wifi', 'usb'):
+            parser.error('ROUTE must be wifi or usb')
+        device_action(config, args.action, args.route)
+    else:
+        mac_action(config, args.action, args.disk)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, RuntimeError, KeyError, paramiko.SSHException) as error:
+        print('Operation failed: {}'.format(error), file=sys.stderr)
+        sys.exit(1)

@@ -140,9 +140,10 @@ new host key, and the observed connection endpoints confirmed the USB route.
 
 The installed script SHA-256 is
 `872b775781f36bc02644013e6666492ac4ca29ffb978567cd6a2097193a02daa`, matching
-the repository source. **The original `750fb8829d41` image artifact has not
-been rebuilt and still contains the old script.** Rebuild from the corrected
-source before a future fresh flash; the existing card already has the fix.
+the repository source. **The original `750fb8829d41` image artifact still
+contains the old script.** The NEO-8 task-runner rebuild includes the correction;
+use the current verified bundle for a future fresh flash. The existing card
+already has the fix.
 These software restarts do not count as physical USB reconnects or cold boots.
 
 ### Remaining integration findings — NEO-7
@@ -164,7 +165,7 @@ These software restarts do not count as physical USB reconnects or cold boots.
 Private evidence is under `.local/hardware-validation/2026-09-27/`, including
 the original boot log, service states, CPU/power/input/display observations,
 USB deployment and SSH checks, and a post-fix diagnostic archive. NEO-7 tracks
-the remaining integration work and a refreshed image; NEO-5 remains open for
+the remaining integration fixes and their subsequent rebuild; NEO-5 remains open for
 hardware acceptance and the original-card backup.
 
 ### Physical preparation record
@@ -186,3 +187,33 @@ power tests and offline original-card backup remain open. No external card was
 visible on the Mac during this check, so that backup did not start. Serial
 remains deferred. This establishes an initial working system, not reliability,
 sleep/resume behavior or battery-life targets.
+
+## Shared workflow validation — NEO-8
+
+The [Taskfile workflow](../README.md#shared-task-commands) was exercised on
+2026-09-27 using Go Task 3.53.1. Provisioning read the owner's Wi-Fi settings
+from the private `.env` and retained the existing device identity. A real
+`task build:image` rebuilt and verified the 4 GiB image with the USB fix;
+`.local/artifacts/verification.json` identifies the current bundle. This is a
+new artifact, separate from the first physically tested `750fb8829d41` image.
+
+The final NEO-8 bundle is
+`GameShellNeo-0.1.0-diagnostic.1-cpi31-8e3551bcc08d.img`, SHA-256
+`8e3551bcc08d6bdd0b4dbfbfea2307cc0f5fda01e5591c602bb9b009d1fcf5e9`.
+Its recorded hashes match all 63 current project inputs, including the Taskfile.
+
+Validation passed: 16 Python tests, compiled current-selector regressions,
+Bash syntax/ShellCheck, the 125 kernel configuration assertions and 13-file
+kernel manifest, and device-tree binding/DTB validation. The command wrapper
+preserves build failures and keeps previous logs. Argument handling preserved
+spaces and literal shell syntax in a device command. Invalid disk identifiers
+were rejected before connecting to a host or accessing a disk.
+
+The new commands reached the running board over Wi-Fi and over USB through
+the Mac. Required services were active/successful with zero restarts, no failed
+units and zero kernel taint. Diagnostic collection downloaded a private archive
+to `.local/diagnostics/`. `task mac:stage` uploaded the compressed image and
+verified both compressed and decompressed checksums on the Mac without a card.
+No additional physical write, reboot, cold start or reconnect test was made.
+The new inspection/write guards have host regression coverage; a future spare
+card session must validate the complete Taskfile flashing path on hardware.

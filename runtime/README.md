@@ -38,11 +38,12 @@ allocated interface is `usb0`, matching the maintenance network configuration.
 Writing a literal `usb0` is rejected by the kernel even though it looks like a
 valid network name; this was found and corrected during the first board boot.
 
-`tools/provision.py` converts one selected existing Wicd WPA-PSK profile to
-wpa_supplicant format without printing credentials. It creates stable per-device
+`task provision` reads Wi-Fi credentials from the ignored `.env` and writes
+wpa_supplicant configuration without printing credentials. The underlying
+`tools/provision.py` also supports legacy Wicd import. It creates stable per-device
 machine and SSH identities, plus a fingerprint record. Treat the output and
 every resulting image as private. Do not reuse one provision directory for
 multiple devices. The build never includes `.env` or the original host keys.
 
-Run policy regressions with `python3 -m unittest discover -s runtime/tests -v`.
+Run host regressions with `task check` from the project root.
 USB enumeration, actual shutdown and power readings require NEO-5 hardware tests.

@@ -1,10 +1,12 @@
 import importlib.util
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
 source = Path(__file__).resolve().parents[2] / 'tools/provision.py'
+sys.path.insert(0, str(source.parent))
 spec = importlib.util.spec_from_file_location('provision', source)
 provision = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(provision)
@@ -38,6 +40,21 @@ class ProvisionTests(unittest.TestCase):
                             '[b]\nessid=ssid\nenctype=wpa-psk\napsk=password2\n')
             with self.assertRaises(ValueError):
                 provision.wifi_config(path, 'ssid')
+
+    def test_env_provisioning_matches_legacy_wifi_without_printing_secrets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            secret = 'private # literal $(no-command)'
+            env = root / '.env'
+            env.write_text('GAMESHELL_WIFI_SSID="example network"\nGAMESHELL_WIFI_PSK=' + repr(secret) + '\n')
+            key = root / 'key'
+            subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(key)], check=True)
+            result = subprocess.run(['python3', str(source), '--env', str(env), '--authorized-key',
+                                     str(key) + '.pub', '--output', str(root / 'device')],
+                                    check=True, capture_output=True, text=True)
+            self.assertNotIn(secret, result.stdout + result.stderr)
+            self.assertEqual((root / 'device/wpa_supplicant-wlan0.conf').read_text(),
+                             provision.wifi_config_from_key('example network', secret))
 
 
 if __name__ == '__main__':

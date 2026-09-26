@@ -6,3 +6,4 @@ allwinner/*
 __pycache__/
 *.pyc
 .pytest_cache/
+.task/

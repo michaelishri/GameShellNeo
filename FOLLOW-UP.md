@@ -4,7 +4,7 @@ Record deferred questions and activities here as they arise. The first diagnosti
 
 **Implementation update, 27 September 2026:** the owner approved [the first-build specification](docs/23-first-build-spec.md) and authorized implementation. Kaneo NEO-1 through NEO-5 track source locks, kernel support, diagnostic runtime, image assembly and hardware qualification. This authorization does not identify a physical card to overwrite. Sleep remains disabled for the first image; short power presses shut down, and Wi-Fi is privately preconfigured. Historical completion statements below remain evidence of their respective research stages.
 
-**Build and first-boot result:** [report 25](docs/25-first-build-validation.md) records the completed 4 GiB private image and offline checks. [Report 26](docs/26-first-card-and-boot-validation.md) records the verified spare-card write, successful physical boot, observed hardware and USB fix. NEO-5 remains open for repeated tests and recovery preparation; NEO-7 tracks integration follow-ups and a refreshed image.
+**Build and first-boot result:** [report 25](docs/25-first-build-validation.md) records the completed 4 GiB private image and offline checks. [Report 26](docs/26-first-card-and-boot-validation.md) records the verified spare-card write, successful physical boot, observed hardware and USB fix. NEO-8 adds the [shared task workflow](README.md#shared-task-commands) and validates a refreshed image with that fix. NEO-5 remains open for repeated tests and recovery preparation; NEO-7 tracks the remaining integration fixes.
 
 Agreed scope and policies are recorded in [the initial base requirements](docs/06-base-requirements.md).
 
@@ -16,8 +16,9 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] NEO-5: make and verify an offline backup of the separate original card. It remains the recovery card; spare-card write authorization does not complete this backup.
 - [x] Flash and verify the Samsung spare. After the owner enabled Remote Login disk access, all 4 GiB were written and read back with the exact source SHA-256; the Mac safely ejected the card.
 - [x] Observe the first physical boot: new kernel/identity verified, login console visible, Wi-Fi SSH working, and USB SSH working after NEO-6. See report 26 for exact evidence and limits.
-- [x] NEO-6: fix ECM interface naming (`usb%d` allocation template), apply it to the diagnostic card and verify USB SSH through the Mac. Source is committed and pushed; the old image artifact still contains the defect.
-- [ ] NEO-7: resolve observed integration gaps (regulatory database, ext4 journal ACLs, DHCP hostname policy and boot warnings), then rebuild the image with the USB fix before the next fresh flash.
+- [x] NEO-6: fix ECM interface naming (`usb%d` allocation template), apply it to the diagnostic card and verify USB SSH through the Mac. The original image artifact still contains the defect; the NEO-8 Taskfile rebuild includes the fix and passes offline checks.
+- [x] NEO-8: provide documented tasks for builds, provisioning from `.env`, tests, device diagnostics, Mac staging and explicit spare-card flashing. Verify the rebuild and transfer without another physical write or reboot.
+- [ ] NEO-7: resolve observed integration gaps (regulatory database, ext4 journal ACLs, DHCP hostname policy and boot warnings), then rebuild and qualify the updated image. The NEO-8 rebuild alone does not resolve these gaps.
 - [ ] Perform the first-image hardware acceptance sequence in report 23, including ten cold starts and ten USB reconnections. Host build checks do not qualify hardware.
 - [ ] Confirm the Wi-Fi regulatory country before power/range comparisons. Do not infer it from the developer's timezone.
 - [ ] Qualify a production USB VID/PID before distributing a product image; the first private image uses the Linux gadget development identity.

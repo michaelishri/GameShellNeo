@@ -41,8 +41,10 @@ def apt_sources(root):
 
 def input_manifest():
     names = ['build', 'kernel', 'runtime', 'tools']
-    return {str(p.relative_to(ROOT)): sha(p) for name in names for p in sorted((ROOT / name).rglob('*'))
-            if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc'}
+    paths = [p for name in names for p in sorted((ROOT / name).rglob('*'))
+             if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc']
+    paths.append(ROOT / 'Taskfile.yml')
+    return {str(p.relative_to(ROOT)): sha(p) for p in paths}
 
 
 def finalize(root, loop):

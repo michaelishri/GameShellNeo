@@ -9,6 +9,7 @@ from pathlib import Path
 import secrets
 import shutil
 import subprocess
+from private_config import load_env
 
 
 def wifi_config(wicd, ssid):
@@ -21,6 +22,10 @@ def wifi_config(wicd, ssid):
     if len(keys) != 1:
         raise ValueError('Matching profiles disagree on credentials')
     key = keys.pop()
+    return wifi_config_from_key(ssid, key)
+
+
+def wifi_config_from_key(ssid, key):
     encoded_ssid = ssid.encode('utf-8')
     if not 1 <= len(encoded_ssid) <= 32:
         raise ValueError('Invalid SSID length')
@@ -36,15 +41,26 @@ def wifi_config(wicd, ssid):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--wicd', required=True, type=Path)
-    parser.add_argument('--ssid-file', required=True, type=Path)
+    parser.add_argument('--env', type=Path, help='Read GAMESHELL_WIFI_SSID and GAMESHELL_WIFI_PSK privately')
+    parser.add_argument('--wicd', type=Path, help='Legacy Wicd import alternative to --env')
+    parser.add_argument('--ssid-file', type=Path)
     parser.add_argument('--authorized-key', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
     os.umask(0o077)
     args.output.mkdir(parents=True, exist_ok=True, mode=0o700)
     args.output.chmod(0o700)
-    wifi = wifi_config(args.wicd, args.ssid_file.read_text().rstrip('\n'))
+    if args.env:
+        if args.wicd or args.ssid_file:
+            parser.error('--env and legacy Wicd import are alternatives')
+        config = load_env(args.env)
+        if not config.get('GAMESHELL_WIFI_SSID') or not config.get('GAMESHELL_WIFI_PSK'):
+            parser.error('Set GAMESHELL_WIFI_SSID and GAMESHELL_WIFI_PSK in .env')
+        wifi = wifi_config_from_key(config['GAMESHELL_WIFI_SSID'], config['GAMESHELL_WIFI_PSK'])
+    else:
+        if not args.wicd or not args.ssid_file:
+            parser.error('Supply --env, or both --wicd and --ssid-file')
+        wifi = wifi_config(args.wicd, args.ssid_file.read_text().rstrip('\n'))
     subprocess.run(['ssh-keygen', '-l', '-f', str(args.authorized_key)], check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     (args.output / 'wpa_supplicant-wlan0.conf').write_text(wifi)

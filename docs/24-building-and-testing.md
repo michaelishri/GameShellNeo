@@ -4,9 +4,13 @@ This is the CPI v3.1 development workflow. Hardware acceptance remains NEO-5;
 successful compilation and filesystem checks cannot establish boot, charging,
 display or sleep behavior. Preserve the original card.
 
+The [README task workflow](../README.md#shared-task-commands) is the shared
+entry point for routine work. The commands below use that Taskfile; `tools/`
+contains the underlying implementation.
+
 ## Build stages
 
-Use the Intel Linux host with Docker, Bash, Python 3, Git, curl, tar and a C
+Use the Intel Linux host with Go Task v3, Docker, Bash, Python 3.11+, Git, curl, tar and a C
 compiler. The wrappers obtain the builder by the digest in
 [`sources.lock.json`](../build/sources.lock.json). Compilation uses one job and
 disk-backed storage. The kernel and Armbian image stages are separate: kernel
@@ -21,22 +25,16 @@ The original sibling repositories are reference inputs and are never modified.
    baseline. Paths are arguments, not hard-coded machine dependencies:
 
    ```sh
-   python3 tools/prepare-build.py \
-     --bootloader ../GameShell/Code/Kernel/v0.2/u-boot-sunxi-with-spl.bin \
-     --radio-directory .local/hardware-baseline/2026-09-27/radio-reference
+   task prepare
    ```
 
-2. Prepare private access. `current-ssid` contains only the chosen existing
-   network name; `wireless-settings.conf` is the private Wicd reference. The
-   helper accepts matching WPA-PSK profiles, rejects conflicting credentials,
-   and writes no credentials to stdout. Never pass passwords in command lines.
+2. Prepare private access using `GAMESHELL_WIFI_SSID` and
+   `GAMESHELL_WIFI_PSK` in the ignored `.env`. The helper writes no credentials
+   to stdout. Never pass passwords in command lines. Direct Wicd import remains
+   available in `tools/provision.py` for legacy migration.
 
    ```sh
-   python3 tools/provision.py \
-     --wicd .local/provisioning/wireless-settings.conf \
-     --ssid-file .local/provisioning/current-ssid \
-     --authorized-key .local/ssh/id_ed25519.pub \
-     --output .local/provisioning/device
+   task provision
    ```
 
    The device directory contains a new SSH host key, its fingerprint record,
@@ -47,11 +45,13 @@ The original sibling repositories are reference inputs and are never modified.
 3. Build and record the kernel stage:
 
    ```sh
-   tools/build-kernel.sh > .local/build/kernel.log 2>&1
+   task build:kernel
+   task check:dt
    ```
 
    The helper verifies the Linux archive and applies only the project's patch
-   queue. If patches change, use a fresh scratch source extraction; it rejects
+   queue. If patches change, run `task kernel:reset` to archive the previous
+   scratch source/output before rebuilding; the builder rejects
    an already patched tree with a different patch manifest. The resolved config
    is asserted before compiling. The completed-stage manifest binds patch and
    configuration inputs to the installed modules, kernel and DTB.
@@ -59,7 +59,7 @@ The original sibling repositories are reference inputs and are never modified.
 4. Build the image:
 
    ```sh
-   tools/build-image.sh > .local/build/image.log 2>&1
+   task build:image
    ```
 
    The container uses privileges for ARM emulation and loop devices backed by
@@ -72,7 +72,7 @@ The original sibling repositories are reference inputs and are never modified.
    inputs match. Published remote cache images are disabled. A missing or stale
    ledger forces a fresh rootfs build.
 
-   `tools/build-image.sh rootfs` exercises the userspace bootstrap separately.
+   `task build:rootfs` exercises the userspace bootstrap separately.
    Assembly first writes `.local/sources/armbian/output/images/`. The wrapper
    then runs offline filesystem/content verification and collects a private
    image, checksums, manifests, logs and package inventory in `.local/artifacts/`. The image
@@ -81,17 +81,13 @@ The original sibling repositories are reference inputs and are never modified.
 ## Checks
 
 ```sh
-python3 -m unittest discover -s runtime/tests -v
-cc -std=c11 -Wall -Wextra -Werror \
-  -Ikernel/overlay/drivers/power/supply kernel/tests/current_limit_test.c \
-  -o .local/build/current_limit_test
-.local/build/current_limit_test
-python3 tools/check-kernel-config.py .local/build/kernel/.config
-python3 tools/kernel-artifacts.py check
-python3 tools/image.py verify PATH_TO_PRIVATE_IMAGE
+task check
+task check:kernel
+task check:dt
+task image:verify
 ```
 
-`tools/check-devicetree.sh` uses the pinned builder's bundled dtschema 2026.9
+`task check:dt` uses the pinned builder's bundled dtschema 2026.9
 against the patched kernel bindings and records the validator package versions.
 It validates the modified bindings, processes the full schema set and checks
 the project DTB. Emitted diagnostics fail the check even if the validator exits

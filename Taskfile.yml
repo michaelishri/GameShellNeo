@@ -1,0 +1,135 @@
+version: '3'
+
+# Values are passed as environment data, never interpolated into shell code.
+# Credentials in .env are read by Python helpers, not imported/echoed by Task.
+silent: true
+env:
+  NEO_BOOTLOADER: '{{.BOOTLOADER | default "../GameShell/Code/Kernel/v0.2/u-boot-sunxi-with-spl.bin"}}'
+  NEO_RADIO_DIR: '{{.RADIO_DIR | default ".local/hardware-baseline/2026-09-27/radio-reference"}}'
+  NEO_AUTHORIZED_KEY: '{{.AUTHORIZED_KEY | default ".local/ssh/id_ed25519.pub"}}'
+  NEO_IMAGE: '{{.IMAGE | default ""}}'
+  NEO_ROUTE: '{{.ROUTE | default "wifi"}}'
+  NEO_DISK: '{{.DISK | default ""}}'
+  NEO_COMMAND: '{{.CLI_ARGS}}'
+
+tasks:
+  default:
+    desc: List the shared project commands
+    cmds: [task --list]
+
+  doctor:
+    desc: Check the Intel Linux build host and optional remote-access dependency
+    cmds: [bash tools/doctor.sh]
+
+  prepare:
+    desc: Verify inputs and synchronize the locked Armbian source and project hooks
+    cmds:
+      - bash tools/run-logged.sh prepare python3 tools/prepare-build.py --bootloader "$NEO_BOOTLOADER" --radio-directory "$NEO_RADIO_DIR"
+
+  provision:
+    desc: Prepare stable private device identity and Wi-Fi using secrets in .env
+    cmds:
+      - python3 tools/provision.py --env .env --authorized-key "$NEO_AUTHORIZED_KEY" --output .local/provisioning/device
+
+  build:
+    desc: Build kernel, validate device tree, assemble and verify image (sequential)
+    cmds:
+      - task: doctor
+      - task: build:kernel
+      - task: check:dt
+      - task: build:image
+
+  build:kernel:
+    desc: Compile the locked kernel and modules; preserve incremental build outputs
+    cmds: [bash tools/run-logged.sh kernel tools/build-kernel.sh]
+
+  build:image:
+    desc: Rebuild and verify userspace/image using the completed kernel stage
+    cmds:
+      - task: prepare
+      - bash tools/run-logged.sh image tools/build-image.sh
+
+  build:rootfs:
+    desc: Bootstrap the signed Debian rootfs separately
+    cmds:
+      - task: prepare
+      - bash tools/run-logged.sh rootfs tools/build-image.sh rootfs
+
+  kernel:reset:
+    desc: Archive only kernel scratch/output state before a changed patch queue
+    cmds: [bash tools/run-logged.sh kernel-reset bash tools/reset-kernel.sh]
+
+  check:
+    desc: Run host regression tests and shell lint; no device access
+    cmds:
+      - task: test
+      - task: lint
+
+  test:
+    desc: Run runtime/tool regressions and the compiled AXP current-selector tests
+    cmds:
+      - python3 -m unittest discover -s runtime/tests -v
+      - python3 -m unittest discover -s tools/tests -v
+      - mkdir -p .local/build
+      - cc -std=c11 -Wall -Wextra -Werror -Ikernel/overlay/drivers/power/supply kernel/tests/current_limit_test.c -o .local/build/current_limit_test
+      - .local/build/current_limit_test
+
+  lint:
+    desc: Check Bash syntax and ShellCheck (system install or pinned builder cache)
+    cmds: [bash tools/lint.sh]
+
+  check:kernel:
+    desc: Check resolved Kconfig and the completed kernel artifact manifest
+    cmds:
+      - python3 tools/check-kernel-config.py .local/build/kernel/.config
+      - python3 tools/kernel-artifacts.py check
+
+  check:dt:
+    desc: Validate the project's bindings and built DTB in the pinned container
+    cmds: [bash tools/run-logged.sh devicetree tools/check-devicetree.sh]
+
+  image:verify:
+    desc: Verify the current bundled image, or IMAGE=path, without writing it
+    cmds: [python3 tools/pack-image.py verify]
+
+  image:pack:
+    desc: Compress and hash the current verified image for transfer to the Mac
+    cmds: [python3 tools/pack-image.py pack]
+
+  device:status:
+    desc: Capture kernel, service, power and access status (ROUTE=wifi or usb)
+    cmds: [python3 tools/remote.py device status]
+
+  device:logs:
+    desc: Collect and download a private diagnostic archive (ROUTE=wifi or usb)
+    cmds: [python3 tools/remote.py device logs]
+
+  device:exec:
+    desc: Run an explicit device command, e.g. task device:exec -- uname -r
+    cmds: [python3 tools/remote.py device exec]
+
+  mac:status:
+    desc: Show Mac connectivity and physical external disks without changing them
+    cmds: [python3 tools/remote.py mac status]
+
+  mac:stage:
+    desc: Pack and upload the current verified image and flash helper; no disk write
+    cmds:
+      - task: image:pack
+      - python3 tools/remote.py mac stage
+
+  mac:inspect:
+    desc: Record a fresh target identity after identifying the spare (DISK=diskN)
+    requires:
+      vars: [DISK]
+    cmds: [python3 tools/remote.py mac inspect]
+
+  mac:preflight:
+    desc: Verify staged image and recorded card identity; no disk write
+    cmds: [python3 tools/remote.py mac preflight]
+
+  mac:flash:
+    desc: ERASE the explicitly identified spare, verify all written bytes and eject
+    requires:
+      vars: [DISK]
+    cmds: [python3 tools/remote.py mac flash]

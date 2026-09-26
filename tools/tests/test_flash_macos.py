@@ -57,6 +57,15 @@ class TargetSafety(unittest.TestCase):
                 flash.validate_target(self.expected, 4294967296)
             query.assert_not_called()
 
+    def test_source_only_cannot_reach_a_disk(self):
+        with patch.object(flash.sys, 'argv', ['flash-macos.py', '--source-only', '--write',
+                                            '--image', 'image.gz', '--manifest', 'transfer.json',
+                                            '--target', 'target.json']), \
+             patch.object(flash.sys, 'platform', 'darwin'), \
+             patch.object(flash, 'disk_info') as query, self.assertRaises(RuntimeError):
+            flash.main()
+        query.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()

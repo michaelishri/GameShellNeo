@@ -31,6 +31,27 @@ def disk_info(device):
         ['/usr/sbin/diskutil', 'info', '-plist', device]))
 
 
+def inspect_target(device):
+    require(re.fullmatch(r'disk[1-9][0-9]*', device), 'Expected a nonzero whole-disk identifier')
+    info = disk_info(device)
+    listing = plistlib.loads(subprocess.check_output(
+        ['/usr/sbin/diskutil', 'list', '-plist', device]))
+    volumes = []
+    for disk in listing['AllDisksAndPartitions']:
+        if disk['DeviceIdentifier'] == device:
+            for part in disk.get('Partitions', []):
+                details = disk_info(part['DeviceIdentifier'])
+                if details.get('VolumeUUID'):
+                    volumes.append(details)
+    require(volumes, 'A recognizable existing volume UUID is required for target identification')
+    volume = volumes[0]
+    expected = {key: info[key] for key in ('TotalSize', 'DeviceBlockSize', 'MediaName', 'DeviceTreePath')}
+    expected.update(device=device, partition=volume['DeviceIdentifier'],
+                    volume_uuid=volume['VolumeUUID'], volume_name=volume.get('VolumeName', ''))
+    validate_target(expected, info['DeviceBlockSize'])
+    return expected
+
+
 def validate_target(expected, image_bytes):
     disk = expected['device']
     partition = expected['partition']
@@ -134,17 +155,30 @@ def flash(image, expected, manifest):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--image', required=True, type=Path)
-    parser.add_argument('--manifest', required=True, type=Path)
+    parser.add_argument('--image', type=Path)
+    parser.add_argument('--manifest', type=Path)
     parser.add_argument('--target', required=True, type=Path)
     parser.add_argument('--write', action='store_true')
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--inspect', metavar='diskN', help='Record current external-card identity without writing')
+    parser.add_argument('--source-only', action='store_true', help='Verify the transfer without accessing a card')
     args = parser.parse_args()
     require(sys.platform == 'darwin', 'This tool is for macOS')
     os.umask(0o077)
+    if args.inspect:
+        require(not args.write and not args.source_only, '--inspect cannot write or verify an image')
+        expected = inspect_target(args.inspect)
+        args.target.write_text(json.dumps(expected, indent=2) + '\n')
+        print(json.dumps(expected, indent=2), flush=True)
+        print('Identity recorded only. Confirm the physical spare before a separate write command.')
+        return
+    require(args.image is not None and args.manifest is not None, 'Image and transfer manifest required')
+    require(not (args.source_only and args.write), '--source-only cannot write')
     manifest = json.loads(args.manifest.read_text())
-    expected = json.loads(args.target.read_text())
     verify_source(args.image, manifest)
+    if args.source_only:
+        return
+    expected = json.loads(args.target.read_text())
     raw = validate_target(expected, manifest['image_bytes'])
     print('Verified target: {} ({} bytes)'.format(raw, expected['TotalSize']), flush=True)
     if not args.write:

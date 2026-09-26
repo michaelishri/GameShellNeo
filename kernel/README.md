@@ -47,3 +47,7 @@ Debian/systemd features, and disables deferred functionality, system suspend,
 hibernation and PSCI deep idle. CPU DVFS uses upstream operating points with
 the CPU supply correctly linked. Timings, voltage behavior and peripheral
 compatibility still require physical qualification.
+
+A33 temperature sensing uses `SUN4I_GPADC`, despite the misleading older-family
+name. `SUN8I_THERMAL` alone does not bind the A33 sensor. Both the A33 ADC and
+the IIO hwmon bridge are explicitly enabled and asserted in the fragment.

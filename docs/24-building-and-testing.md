@@ -104,6 +104,11 @@ verified backup of the original. Do not infer a disk path. Flash only the spare,
 then attempt first boot on the owner's CPI v3.1. Compare the new SSH fingerprint
 with `.local/provisioning/device/identity.json` before accepting it.
 
+[Report 26](26-first-card-and-boot-validation.md) records the identified Samsung
+spare, the owner's explicit write authorization while the original-card backup
+remains outstanding, and the macOS flash helper. It tracks physical results
+separately from the build checks above; the recovery-backup gate remains open.
+
 The USB address is `192.168.10.1`; the Mac gets a maintenance-link lease without
 a router or DNS offer. The existing Wi-Fi configuration provides fallback.
 Use user `cpi` with the corresponding development private key. Direct SSH from

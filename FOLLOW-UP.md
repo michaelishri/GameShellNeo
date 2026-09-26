@@ -1,10 +1,10 @@
 # GameShellNeo follow-up activities
 
-Record deferred questions and activities here as they arise. The first diagnostic image has been implemented and passed offline validation, following research and the owner's authorized read-only hardware baseline. Flashing and power-state experiments have not started.
+Record deferred questions and activities here as they arise. The first diagnostic image has passed offline validation and has been flashed to the owner-confirmed Samsung spare, with full readback verification. First boot and hardware qualification are in progress; no sleep experiment has been performed.
 
 **Implementation update, 27 September 2026:** the owner approved [the first-build specification](docs/23-first-build-spec.md) and authorized implementation. Kaneo NEO-1 through NEO-5 track source locks, kernel support, diagnostic runtime, image assembly and hardware qualification. This authorization does not identify a physical card to overwrite. Sleep remains disabled for the first image; short power presses shut down, and Wi-Fi is privately preconfigured. Historical completion statements below remain evidence of their respective research stages.
 
-**Build result:** [report 25](docs/25-first-build-validation.md) records the completed 4 GiB private image and offline checks. NEO-5 is the next gate; no new kernel or image has yet run on the physical GameShell.
+**Build and flash result:** [report 25](docs/25-first-build-validation.md) records the completed 4 GiB private image and offline checks. [Report 26](docs/26-first-card-and-boot-validation.md) records the verified spare-card write and first-boot progress. NEO-5 remains open; the new kernel has not yet been observed running on the physical GameShell.
 
 Agreed scope and policies are recorded in [the initial base requirements](docs/06-base-requirements.md).
 
@@ -12,7 +12,9 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 ## Diagnostic implementation follow-up
 
-- [ ] NEO-5: identify the spare microSD and reader, then make and verify an offline backup of the original card before flashing the spare. No physical write target has been identified.
+- [x] Identify the spare microSD and reader. The owner confirmed the Samsung 64 GB card appearing on the Mac as `NO NAME` and explicitly authorized erasing it. See [report 26](docs/26-first-card-and-boot-validation.md); the disk identifier must be rechecked for each write.
+- [ ] NEO-5: make and verify an offline backup of the separate original card. It remains the recovery card; spare-card write authorization does not complete this backup.
+- [x] Flash and verify the Samsung spare. After the owner enabled Remote Login disk access, all 4 GiB were written and read back with the exact source SHA-256; the Mac safely ejected the card. This does not yet establish a successful boot.
 - [ ] Perform the first-image hardware acceptance sequence in report 23, including ten cold starts and ten USB reconnections. Host build checks do not qualify hardware.
 - [ ] Confirm the Wi-Fi regulatory country before power/range comparisons. Do not infer it from the developer's timezone.
 - [ ] Qualify a production USB VID/PID before distributing a product image; the first private image uses the Linux gadget development identity.
@@ -44,7 +46,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [x] Collect the installed OS/kernel/DT, memory, boot logs, power configuration, input/display enumeration and current partition map over Wi-Fi SSH. See [report 21](docs/21-installed-hardware-baseline.md). The software model does not replace checking PCB markings.
 - [x] Copy and hash the first 4 MiB of the current card, its full FAT16 boot partition and its running DTB without mounting or writing the card. These are local boot references, not a complete installation backup.
 - [ ] Before future image testing, preserve the full current working installation and identify the spare microSD card as the development target. The user has confirmed a spare card is available. The inspected original card is nominally 16 GB; its root filesystem and user data have not been backed up.
-- [ ] Document a repeatable reflash/recovery procedure for that development card. The user is comfortable reflashing when required.
+- [x] Document the repeatable macOS flash procedure and target guards in [report 26](docs/26-first-card-and-boot-validation.md). Recovery remains return to the preserved original card; its full offline backup is still required.
 - [x] Verify SSH to the Mac and an SSH-forwarded connection from Intel → Mac → GameShell's Wi-Fi address. Mac version 26.5.1 (25F80), arm64, is now directly confirmed. Credentials remain in the ignored `.env`; this forwarding test does not establish USB operation.
 - [x] Check the Mac port/USB-A-to-C adapter with another USB device. The owner confirmed a USB flash drive works. Unlocking/reconnecting the GameShell did not resolve enumeration; no approval prompt appeared.
 - [x] Audit the installed USB-network configuration and controller state. `g_ether` is bound, `usb0` is up, DHCP/SSH are active, and read-only register checks confirm peripheral mode and enabled software connection/PHY pull-up controls. No missing enable setting was found. Initial enumeration failed; the subsequent cable/approval test succeeded without a configuration fix. See [report 21](docs/21-installed-hardware-baseline.md).

@@ -21,6 +21,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 | [23 — First-build specification](23-first-build-spec.md) | Approved diagnostic scope, immutable inputs, boot/storage/access contract and acceptance gates |
 | [24 — Building and testing](24-building-and-testing.md) | Private provisioning, pinned build stages, offline checks and first hardware session |
 | [25 — First-build validation](25-first-build-validation.md) | Completed diagnostic image, exact hash, build evidence and remaining hardware qualification |
+| [26 — First card and boot validation](26-first-card-and-boot-validation.md) | Owner-confirmed spare, private transfer, flashing procedure and physical test results as they become available |
 | [01 — Repository map](01-repository-map.md) | Exact local snapshots, directory map, build assets, missing pieces and evidence boundaries |
 | [02 — Hardware](02-hardware.md) | Board architecture, schematics, display/graphics, power, input, audio, connectivity and revision discrepancies |
 | [03 — Original software](03-original-software.md) | Boot and desktop environment, Python and Go launchers, games, integration, update mechanisms and reuse constraints |

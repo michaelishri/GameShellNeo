@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "board": "gameshellneo-cpi31",
+  "image_version": "0.1.0-diagnostic.1",
+  "architecture": "armhf",
+  "armbian": {
+    "url": "https://github.com/armbian/build.git",
+    "commit": "488dc40c493ba7633e379dbcf5606d7d58ee4575"
+  },
+  "linux": {
+    "url": "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git",
+    "tag": "v6.18.54",
+    "commit": "1b357ecb321392158d507b04672ffee57bfa071d",
+    "tarball_url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.54.tar.xz",
+    "tarball_sha256": "9df30b02dd8102bbd0be52556288ef6889ddbe7f1ddb96fbf847d0becf3eacac",
+    "defconfig_sha256": "6cb5056a979ba0d9eb00aa8d4ab1142a518797b720380f0d83d04aa107afe1e9"
+  },
+  "builder": {
+    "platform": "linux/amd64",
+    "image": "ghcr.io/armbian/docker-armbian-build@sha256:ff2c7d163155cfea0257ffce102ebb4c10eed2dd1c99cd48fcbe82a7cce8650d",
+    "cross_compile": "arm-linux-gnueabihf-",
+    "jobs": 1
+  },
+  "debian": {
+    "release": "trixie",
+    "snapshot": "20260926T202543Z",
+    "inrelease_sha256": "0584fba32e13e0ab8285fb16c27adea1ec03a73669c18702821094fd6ca86675",
+    "security_snapshot": "20260926T174359Z",
+    "security_inrelease_sha256": "07731db874e977c02ed7da0a721ec9c53ed793f1360beb1e19dab65194b2edb7"
+  },
+  "bootloader": {
+    "version": "2018.01-rc1-00118-gd19ddc958a",
+    "filename": "u-boot-sunxi-with-spl.bin",
+    "reference_repository": "https://github.com/clockworkpi/GameShell.git",
+    "reference_commit": "523cf591e2f955d001d257d7c850406f9fd917eb",
+    "reference_path": "Code/Kernel/v0.2/u-boot-sunxi-with-spl.bin",
+    "sha256": "d7154f264edfed57fe00e2dcbfe30c0c876b3e6a8a6e2ae5bcf7b84d470a208c",
+    "size_bytes": 548864,
+    "offset_bytes": 8192
+  },
+  "radio": {
+    "firmware": {
+      "filename": "brcmfmac43430a0-sdio.bin",
+      "sha256": "bb2bd00ede1fe04c74d3684e76ef58d9f2acd54d6759894b934bbefb159668e9"
+    },
+    "nvram": {
+      "filename": "brcmfmac43430a0-sdio.txt",
+      "sha256": "5f977a2a3916ef795ceb184cf928231d587249606d1750dacecb5f16ed941ae6"
+    },
+    "distribution": "private owner-supplied assets; redistribution not qualified"
+  },
+  "layout": {
+    "sector_bytes": 512,
+    "image_bytes": 4294967296,
+    "table": "msdos",
+    "boot": {"start_sector": 32768, "sectors": 262144, "type": "0e", "filesystem": "fat16"},
+    "root": {"start_sector": 294912, "sectors": 8093696, "type": "83", "filesystem": "ext4"}
+  }
+}

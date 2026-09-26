@@ -1,0 +1,8 @@
+allwinner/*
+.env
+.env.*
+!.env.example
+.local/
+__pycache__/
+*.pyc
+.pytest_cache/

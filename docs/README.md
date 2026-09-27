@@ -18,6 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [33 — NKMP clock-search optimization](33-nkmp-clock-search-optimization.md) | Selection-preserving exact-match exit, native/ARM32 equivalence, candidate build and opportunities for deeper refactoring |
 | [32 — Governor-rate comparison and function attribution](32-governor-rate-comparison.md) | Live original/slower/original comparison, restoration, modest estimated power savings, directly sampled NKMP cost and reusable perf workflow |
 | [31 — Awake-power profile](31-awake-power-profile.md) | CPU/interrupt/radio captures, substantial governor-worker activity, instrumentation limits and prioritized follow-ups |
 | [30 — BL-5C battery identification](30-bl5c-battery-identification.md) | Owner-supplied replacement-pack listing, primary-source charging examples and unresolved exact-pack limits |

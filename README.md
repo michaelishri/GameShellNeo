@@ -14,7 +14,7 @@ Implementation is tracked in Kaneo's OpenSource / GameShellNeo (NEO) project.
 The first private image has booted on the owner's board; Wi-Fi and USB SSH are
 verified. [First-boot results](docs/26-first-card-and-boot-validation.md) record
 the live USB correction and initial qualification findings. The
-[latest refresh](docs/27-diagnostic-integration-refresh.md), `0.1.0-diagnostic.2`,
+[installed refresh](docs/27-diagnostic-integration-refresh.md), `0.1.0-diagnostic.2`,
 includes that correction, explicit New Zealand provisioning and the kernel/
 userspace integration fixes. Its first boot, USB/Wi-Fi access and live integration
 checks passed on the owner's accepted AU-advertising access point. Repeated
@@ -31,7 +31,10 @@ priorities, instrumentation limits and reusable capture task.
 [Governor comparison and function profiling](docs/32-governor-rate-comparison.md)
 records a reversible halving of governor-worker CPU time, only a 2–3% estimated
 power reduction, and directly sampled NKMP clock-search cost. Original settings
-are restored; the driver optimization remains the next implementation step.
+are restored. The [clock-search optimization](docs/33-nkmp-clock-search-optimization.md)
+preserves the selected clock factors in native and ARM32 comparisons. Candidate
+`0.1.0-diagnostic.3` has built and passed offline verification; its hardware
+performance is not yet measured.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a
@@ -156,7 +159,7 @@ task provision
 task build
 ```
 
-`task build` compiles the kernel, validates the device tree, then builds and
+`task build` tests the NKMP optimization, compiles the kernel, validates the device tree, then builds and
 verifies the image **in sequence**. It does not provision credentials implicitly.
 Run `task provision` again after editing Wi-Fi settings, country or the authorized key,
 then rebuild. This changes the next image, not the running board.
@@ -183,6 +186,7 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task kernel:reset` | After changing the patch queue; archives old kernel source/output under `.local/previous-kernels/`, then run `task build` |
 | `task build:rootfs` | Exercise Debian bootstrap/cache preparation independently |
 | `task check` | Python and C regressions, Bash syntax and ShellCheck |
+| `task test:nkmp` | Compare original/patched clock searches natively and under ARM32 emulation; also runs before the kernel in `task build` |
 | `task check:kernel` | Resolved Kconfig assertions and kernel artifact manifest |
 | `task check:dt` | Binding and compiled device-tree validation in the pinned container |
 | `task image:verify` | Repeat filesystem/content checks on the current bundled image |
@@ -200,6 +204,16 @@ and `image.log`. For example, use `tail -f .local/build/image.log` while buildin
 Older logs are retained under `.local/build/logs/`. A failed stage returns a
 failure and prints the log tail. The wrappers reject overlapping build stages;
 run build tasks sequentially on this memory-constrained host.
+
+`test:nkmp` verifies (or downloads and verifies) the locked Linux archive, applies
+the clock-search patch to a separate test copy, and compiles the actual old/new
+functions. It compares the resulting rates and all selected factors at output
+boundaries, neighboring requests, rounding gaps and the A33 CPU operating points.
+The pinned builder supplies the ARM32 compiler and QEMU. Results and input hashes
+are in `.local/build/nkmp-tests/`, with the task log in `.local/build/nkmp.log`.
+These are correctness and search-work checks; emulation does not measure board
+performance. Ordinary `task check` remains independent of Docker/downloads for
+this test; run `test:nkmp` explicitly when working only on the clock patch.
 
 ### Routine device work
 

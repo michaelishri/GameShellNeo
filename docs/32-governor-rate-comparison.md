@@ -278,3 +278,7 @@ it was not deliberately induced on the GameShell.
 
 NEO-12 remains in progress. A temporary reduction in measured activity is
 established; a deployed efficiency fix and battery-endurance improvement are not.
+
+Subsequent implementation and native/ARM32 equivalence checks are recorded in
+[report 33](33-nkmp-clock-search-optimization.md). Hardware qualification of
+that candidate remains a separate step.

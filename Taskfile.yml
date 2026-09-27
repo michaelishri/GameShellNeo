@@ -50,9 +50,10 @@ tasks:
       - python3 tools/provision.py --env .env --authorized-key "$NEO_AUTHORIZED_KEY" --output .local/provisioning/device
 
   build:
-    desc: Build kernel, validate device tree, assemble and verify image (sequential)
+    desc: Test clock search, build kernel, validate device tree, assemble and verify image (sequential)
     cmds:
       - task: doctor
+      - task: test:nkmp
       - task: build:kernel
       - task: check:dt
       - task: build:image
@@ -103,6 +104,10 @@ tasks:
   test:governor-recovery:
     desc: Verify rollback through user-systemd with temporary files; no device access or sudo
     cmds: [NEO_SYSTEMD_TESTS=1 python3 -m unittest discover -s tools/tests -p test_governor_compare.py -v]
+
+  test:nkmp:
+    desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
+    cmds: [bash tools/run-logged.sh nkmp python3 tools/check-nkmp.py]
 
   check:kernel:
     desc: Check resolved Kconfig and the completed kernel artifact manifest

@@ -1,0 +1,22 @@
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -55,6 +55,10 @@
+ 						best_k = _k;
+ 						best_m = _m;
+ 						best_p = _p;
++
++						/* Keep the first exact match. */
++						if (best_rate == rate)
++							goto out;
+ 					}
+ 				}
+ 			}
+@@ -62,6 +66,7 @@
+ 		}
+ 	}
+ 
++out:
+ 	nkmp->n = best_n;
+ 	nkmp->k = best_k;
+ 	nkmp->m = best_m;

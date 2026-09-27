@@ -15,6 +15,7 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 | 0002 | Wire project drivers, board DT and root compatible into Kbuild/schema | Remove corresponding hunks when support reaches the selected upstream release |
 | 0003 (generated) | Fresh CPI3 DTS, panel/backlight implementations, bindings and current-limit helper | Compile/DT checks establish software integration only; hardware tests remain NEO-5 |
 | 0004 | Describe GPIO hog children already supported by the sunxi GPIO driver | Remove when the upstream pinctrl schema accepts these standard GPIO nodes |
+| 0005 | Stop NKMP factor search at its first exact match, preserving selected factors | Actual original/patched functions pass native and ARM32 equivalence tests; hardware performance remains NEO-12. Remove when an equivalent upstream optimization is verified |
 
 ## Provenance and limits
 
@@ -51,3 +52,10 @@ compatibility still require physical qualification.
 A33 temperature sensing uses `SUN4I_GPADC`, despite the misleading older-family
 name. `SUN8I_THERMAL` alone does not bind the A33 sensor. Both the A33 ADC and
 the IIO hwmon bridge are explicitly enabled and asserted in the fragment.
+
+`task test:nkmp` checks patch 0005 against the actual functions extracted from
+the hash-verified Linux archive. It compares rates and all four selected factors
+on native Linux and emulated ARM32, including every output boundary and its
+neighbors for the tested constraints, plus the A33 CPU operating points.
+The arithmetic shim models `do_div`'s quotient, not its kernel implementation
+or timing. See [report 33](../docs/33-nkmp-clock-search-optimization.md).

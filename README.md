@@ -39,6 +39,9 @@ recorded governor CPU time fell about 92% (35.5% → 2.7% of one core), supporte
 by separate function samples. Estimated battery power was 2.7% lower; differing
 charge state and uncalibrated readings limit that comparison. Final checks
 passed and the original governor setting is restored.
+[USB status polling](docs/34-usb-status-polling-investigation.md) traces the
+next optimization candidate. The PMIC can miss interrupts in some power-path
+modes; reducing its polling requires board-specific detection tests first.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a

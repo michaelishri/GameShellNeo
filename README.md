@@ -13,12 +13,12 @@ and [follow-up activities](FOLLOW-UP.md).
 Implementation is tracked in Kaneo's OpenSource / GameShellNeo (NEO) project.
 The first private image has booted on the owner's board; Wi-Fi and USB SSH are
 verified. [First-boot results](docs/26-first-card-and-boot-validation.md) record
-the live USB correction and remaining NEO-5/NEO-7 qualification work. The
+the live USB correction and initial qualification findings. The
 [latest refresh](docs/27-diagnostic-integration-refresh.md), `0.1.0-diagnostic.2`,
 includes that correction, explicit New Zealand provisioning and the kernel/
-userspace integration fixes. It passes offline verification and is flashed to
-the DEV card with a matching full-image readback; its first boot remains pending.
-The original card has a
+userspace integration fixes. Its first boot, USB/Wi-Fi access and live integration
+checks passed on the owner's accepted AU-advertising access point. Repeated
+hardware tests remain under NEO-5. The original card has a
 [verified recovery backup](docs/28-original-card-recovery-backup.md) on both hosts.
 
 Passwords, Wi-Fi credentials and private connection settings belong in the
@@ -193,6 +193,7 @@ task device:logs
 task device:exec -- uname -r
 task device:status ROUTE=usb
 task device:logs ROUTE=usb
+task device:check ROUTE=usb
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
 ```
 
@@ -201,6 +202,21 @@ USB address, so the Intel host needs no route to that USB subnet. Status and
 diagnostic archives are retained privately in `.local/diagnostics/<timestamp>/`.
 `device:exec` runs the explicitly supplied command and returns its failure
 status. Shell operators require an explicit `sh -c '...'` command.
+
+`device:check` compares the running kernel/image with the source lock, verifies
+required services, the journal's effective user ACL, selected regdb files and
+the configured/active country. It also creates a temporary IPv4 loopback listener
+and three disposable systemd services to test a control connection, BPF denial,
+and a localhost allow exception. Those filters apply only to the test services;
+the task does not reconfigure Wi-Fi, restart production services or reboot.
+The uploaded helper is removed afterwards. Results remain in a private
+`integration.json`; any failed assertion returns a nonzero task status.
+
+The active country normally must match `GAMESHELL_WIFI_COUNTRY` in `.env`.
+For the owner's explicitly accepted AU access-point announcement while the
+device is provisioned for NZ, use `task device:check ROUTE=usb ACTIVE_COUNTRY=AU`.
+That verifies the declared test setup and records both values; it does not
+qualify NZ operation or the radio firmware's country mapping.
 
 ### Backing up the original card
 

@@ -11,6 +11,7 @@ env:
   NEO_ROUTE: '{{.ROUTE | default "wifi"}}'
   NEO_DISK: '{{.DISK | default ""}}'
   NEO_COMMAND: '{{.CLI_ARGS}}'
+  NEO_ACTIVE_COUNTRY: '{{.ACTIVE_COUNTRY | default ""}}'
 
 tasks:
   default:
@@ -113,6 +114,10 @@ tasks:
   device:logs:
     desc: Collect and download a private diagnostic archive (ROUTE=wifi or usb)
     cmds: [python3 tools/remote.py device logs]
+
+  device:check:
+    desc: Check running image, services, journal ACLs, country and temporary BPF loopback policies
+    cmds: [python3 tools/remote.py device check]
 
   device:exec:
     desc: Run an explicit device command, e.g. task device:exec -- uname -r

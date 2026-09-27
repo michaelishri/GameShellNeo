@@ -119,7 +119,36 @@ def device_action(config, action, route):
             run(client, shlex.join(arguments))
             return
         directory = evidence_directory()
-        if action == 'status':
+        if action == 'check':
+            country = config.get('GAMESHELL_WIFI_COUNTRY', '')
+            active_country = os.environ.get('NEO_ACTIVE_COUNTRY') or country
+            if not all(re.fullmatch(r'[A-Z]{2}', value) for value in (country, active_country)):
+                raise ValueError('Set a valid GAMESHELL_WIFI_COUNTRY; ACTIVE_COUNTRY is optional')
+            lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
+            remote_dir = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-check.XXXXXXXX',
+                             display=False).decode().strip()
+            if not re.fullmatch(r'/tmp/gameshellneo-check\.[A-Za-z0-9]+', remote_dir):
+                raise ValueError('Unexpected temporary check directory')
+            script = remote_dir + '/check-device.py'
+            with client.open_sftp() as sftp:
+                try:
+                    upload(sftp, ROOT / 'tools/check-device.py', script)
+                    arguments = ['sudo', '-n', '/usr/bin/python3', script,
+                                 '--kernel', lock['linux']['tag'][1:] + lock['linux']['localversion'],
+                                 '--version', lock['image_version'], '--country', country,
+                                 '--active-country', active_country]
+                    with (directory / 'integration.json').open('wb') as output:
+                        run(client, shlex.join(arguments), output=output)
+                finally:
+                    for path in (script, script + '.part'):
+                        try:
+                            sftp.remove(path)
+                        except FileNotFoundError:
+                            pass
+                    sftp.rmdir(remote_dir)
+                    print('Private integration evidence:', directory)
+            return
+        elif action == 'status':
             with (directory / 'status.txt').open('wb') as output:
                 run(client, STATUS_COMMAND, output=output)
         else:
@@ -253,7 +282,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='host', required=True)
     target = sub.add_parser('device')
-    target.add_argument('action', choices=['status', 'logs', 'exec'])
+    target.add_argument('action', choices=['status', 'logs', 'exec', 'check'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])

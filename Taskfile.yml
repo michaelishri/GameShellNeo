@@ -13,6 +13,7 @@ env:
   NEO_COMMAND: '{{.CLI_ARGS}}'
   NEO_ACTIVE_COUNTRY: '{{.ACTIVE_COUNTRY | default ""}}'
   NEO_USB_CYCLES: '{{.CYCLES | default "4"}}'
+  NEO_BOOT_CYCLES: '{{.CYCLES | default "4"}}'
 
 tasks:
   default:
@@ -135,6 +136,10 @@ tasks:
   device:stability:
     desc: Check a temporary 128 MiB file and run five minutes of CPU/memory load; keep USB connected
     cmds: [python3 tools/remote.py device stability]
+
+  device:boot-cycles:
+    desc: Observe CYCLES=4 physical power cycles; keep USB connected (CYCLES=0 captures current boot only)
+    cmds: [python3 tools/check-boot-cycles.py]
 
   mac:status:
     desc: Show Mac connectivity and physical external disks without changing them

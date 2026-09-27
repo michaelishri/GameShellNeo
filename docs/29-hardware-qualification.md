@@ -13,7 +13,8 @@ The owner operated the controls while input events were collected over USB
 SSH through the Mac. The internal keypad is USB HID `4242:e131`, named
 `rancidbacon.com UsbKeyboard`, currently `/dev/input/event1`. The separate
 `axp20x-pek` power key is currently `/dev/input/event0` and was not grabbed
-or exercised in this session. Event numbers must be rediscovered after boot.
+during keypad capture. Its later shutdown test is recorded below. Event numbers
+must be rediscovered after boot.
 
 `evtest --grab` isolated the keypad from the login console during capture.
 Each successful ordinary-key test included `EV_KEY` value 1 (press) followed
@@ -251,11 +252,75 @@ passed Python compilation and the existing `task check` suite passed. This
 short run supports basic diagnostic-image stability; it does not establish
 long-duration reliability, battery endurance or suspend behavior.
 
+## Power-button shutdown and second cold start
+
+The owner briefly pressed power with USB connected and confirmed that the
+screen went dark and stayed dark. USB SSH became unavailable. The live SSH
+journal stream ended without capturing the shutdown messages, so that stream
+alone was not counted as proof of orderly shutdown.
+
+After the owner powered on again and confirmed the login console, the saved
+journal of boot `d363e3cf-8abb-4e69-a99d-1f0affc166da` showed:
+
+- `Power key pressed short.` followed by logind's power-off request.
+- Services stopping, `/boot` unmounting and `poweroff.target` being reached.
+- `systemd-shutdown` syncing filesystems/block devices before journald stopped.
+
+This supports **a successful supervised button-triggered orderly shutdown**,
+combined with the owner's physical observation and the subsequent successful
+start. The journal ends before the final PMIC action; no electrical power-off
+measurement or exact button-to-darkness timing is available.
+
+One shutdown diagnostic remains open: a UDC event requested
+`usb-gadget.target/start` while the power-off transaction was queued. Systemd
+rejected that start request and shutdown continued. Record this ordering
+warning for investigation; it did not prevent this observed power-off. An SSH
+preauthentication child was also terminated by SIGTERM during shutdown.
+
+The new boot ID is `f98ef69c-47cd-4fac-9427-81a5552a4ef7`. On 27 September
+2026 at 04:32 UTC, USB SSH returned, all six expected services were active with
+zero restarts, no units were failed and kernel taint was zero. Four CPUs and
+1,000 MiB RAM were present; reported memory use was about 68 MiB. Both input
+devices enumerated again and backlight brightness returned to 1, unblanked.
+The current kernel journal contains no ext4 recovery/error report; this is
+not an offline filesystem check (the root fsck unit was skipped because root
+was already mounted read/write).
+
+Local readiness was recorded at 14.658 seconds; systemd reported 2.542 seconds
+kernel plus 12.429 seconds userspace, total 14.972 seconds. These software
+timestamps exclude bootloader time and do not establish button-to-usable-display
+latency or the five-second aspiration. **Two cold starts are now observed**
+for this candidate; eight remain.
+
+Private evidence:
+
+- `.local/diagnostics/neo5-powerkey.wEHCpmx3/journal.txt`: incomplete live stream.
+- `previous-boot.txt` and `new-boot.txt` in the same directory: saved shutdown
+  sequence, new boot identity/kernel journal and input/backlight reads.
+- `.local/diagnostics/20260927T043247.288841Z/status.txt`: post-start services,
+  memory, readiness and power status.
+
+`task device:boot-cycles CYCLES=4` now provides the repeatable batch recorder;
+its operator steps and evidence limits are in the [README](../README.md).
+`CYCLES=0` captures a baseline without adding cycle credit. Each counted new
+boot must follow the previously recorded boot, pass the software checks and
+return both USB and direct Wi-Fi SSH. Physical off/console observations remain
+necessary; software capture alone does not confirm a cold start.
+
+The current-boot capture passed over both USB and direct Wi-Fi SSH in
+`.local/diagnostics/20260927T043802.488053Z/`, including the local getty service.
+Two earlier recorder development attempts failed before completing collection
+because `journalctl` does not accept `--no-legend`; that option was removed.
+Those attempts involved no power operation and add no cycle credit. Python
+compilation, `git diff --check`, all 25 existing Python tests, the C selector
+regressions and shell lint passed. The four-cycle workflow still needs its
+physical batch test.
+
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
-- Nine more cold starts to reach ten for this candidate.
-- Local operation without an access point and supervised orderly shutdown.
+- Eight more cold starts to reach ten for this candidate.
+- Local operation without an access point.
 - Charging/unplugging and battery-policy hardware checks, timed awake-idle
   measurements and separate readiness timings with their uncertainty.
 

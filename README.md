@@ -199,6 +199,8 @@ task device:check ROUTE=usb
 task device:backlight ROUTE=usb # Watch the screen during this test
 task device:usb-reconnects CYCLES=4 # Wait for ready, then operate the USB cable
 task device:stability ROUTE=usb # Keep the board connected throughout
+task device:boot-cycles CYCLES=4 # Wait for ready, then operate the power button
+task device:boot-cycles CYCLES=0 # Capture/check this boot without starting a batch
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
 ```
 
@@ -249,6 +251,27 @@ A transient service runs at reduced scheduling priority with a seven-minute
 limit. Results are private `stability.jsonl`; collect `device:status` and
 `device:logs` afterwards to inspect services and kernel messages. This bounded
 check does not qualify long-term endurance or idle power consumption.
+
+`device:boot-cycles CYCLES=4` observes physical shutdown/startup cycles over
+USB SSH through the Mac and checks direct Wi-Fi SSH on every captured boot.
+It issues no power commands. Start with the device running, USB connected and
+Wi-Fi available; wait for the `ready` message. For each cycle, briefly press
+power to shut down, wait ten seconds after the screen goes dark, power on
+normally, then wait for the login screen and leave it there for another
+60 seconds. Repeat four times, leaving the final boot running. Stop the batch
+if the screen fails to turn off or the login screen fails to return.
+
+The recorder checks image/kernel identity, four CPUs and expected memory,
+services, input enumeration, backlight state, battery monitoring and USB/Wi-Fi
+access. Each new boot must follow the previously captured boot in the saved
+journal and contain evidence that the previous short power press reached
+systemd power-off and filesystem syncing. It saves private per-boot JSON,
+kernel/shutdown journals and a summary under `.local/diagnostics/`. It retries
+transient SSH failures and rejects missed boots; a default 15-minute timeout
+bounds the batch. Physical darkness and the visible console still need owner
+confirmation. Software logs do not measure rail current or exact power-off
+time, and readiness timestamps exclude bootloader time. `CYCLES=0` checks only
+the current boot and adds no power-cycle credit. This task needs no image rebuild.
 
 `device:check` compares the running kernel/image with the source lock, verifies
 required services, the journal's effective user ACL, selected regdb files and

@@ -173,6 +173,28 @@ def device_action(config, action, route):
                          '--backlight', backlight]
             with (directory / 'idle-sample.jsonl').open('wb') as output:
                 run(client, shlex.join(arguments), output=output, timeout=90)
+        elif action == 'power-profile':
+            seconds = int(os.environ.get('NEO_PROFILE_SECONDS', '120'))
+            if not 30 <= seconds <= 300 or seconds % 30:
+                raise ValueError('SECONDS must be a multiple of 30 in 30..300')
+            arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
+                         '--collect', '--unit=gameshellneo-power-profile',
+                         '--description=GameShellNeo awake-power counter profile',
+                         '--property=RuntimeMaxSec=' + str(seconds + 90),
+                         '--property=TimeoutStopSec=10', '--property=Nice=10',
+                         '/usr/bin/python3', '-B', '-u', '-c',
+                         (ROOT / 'tools/profile-power.py').read_text(), '--seconds', str(seconds)]
+            path = directory / 'power-profile.jsonl'
+            print('Capturing private profile:', path, flush=True)
+            with path.open('wb') as output:
+                run(client, shlex.join(arguments), output=output, display=False, timeout=seconds + 90)
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+            if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
+                raise ValueError('Incomplete power profile; inspect the private capture')
+            result = records[-1]
+            for key in ('interrupts', 'softirqs', 'processes'):
+                result[key] = result[key][:10]
+            print(json.dumps(result, indent=2))
         elif action == 'stability':
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-stability-test',
@@ -323,7 +345,7 @@ def main():
     sub = parser.add_subparsers(dest='host', required=True)
     target = sub.add_parser('device')
     target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
-                                          'stability', 'battery-check', 'idle-sample'])
+                                          'stability', 'battery-check', 'idle-sample', 'power-profile'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])

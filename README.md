@@ -23,6 +23,9 @@ records ten cold starts, ten USB reconnections, basic keypad/backlight and load
 checks, power transitions, installed battery-policy simulations, two consistent
 awake-idle power estimates, the backlight-off comparison and the remaining
 Lightkey/charging findings.
+[Awake-power profiling](docs/31-awake-power-profile.md) identifies substantial
+CPU time in the frequency-governor worker and records the next optimization
+priorities, instrumentation limits and reusable capture task.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a
@@ -207,6 +210,7 @@ task device:stability ROUTE=usb # Keep the board connected throughout
 task device:battery-check ROUTE=wifi # Isolated simulation; no real power-off or charger writes
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
+task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
 task device:boot-cycles CYCLES=4 # Wait for ready, then operate the power button
 task device:boot-cycles CYCLES=0 # Capture/check this boot without starting a batch
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
@@ -307,6 +311,40 @@ value using `device:exec` over Wi-Fi. The display controller/panel, Wi-Fi and CP
 settings stay unchanged: this measures backlight savings while awake, not full
 display power-down or sleep. Leave USB unplugged and controls alone for the
 entire run, including the automatic return to the original brightness.
+
+`device:power-profile ROUTE=wifi SECONDS=120` collects an awake activity profile
+after thirty seconds settling. Keep USB unplugged, Wi-Fi connected and controls
+untouched; avoid concurrent diagnostics. It preserves display, CPU, radio and
+charger settings. The existing battery guard continues, and the profiler checks
+its health every thirty seconds. A changed boot/CPU set/brightness/governor,
+external power, invalid/stale monitoring, reported capacity at or below 20%,
+excessive temperature or kernel taint fails the run. Failure ends profiling,
+not the running system.
+
+The private `power-profile.jsonl` contains before/after CPU accounting,
+interrupts, softirqs, process CPU ticks, Wi-Fi packet counters/power-save state,
+available idle/frequency counters and peripheral runtime-PM state. Clock,
+regulator and timer debug snapshots are read after the measurement. Twenty
+best-effort kernel-stack snapshots of up to three busiest surviving processes
+are also taken afterward; they are diagnostic clues, not statistical samples.
+Missing optional instrumentation is recorded as unavailable; the task does not mount
+tracing filesystems or enable tracers. It retains process names but avoids
+command lines, environment values, SSIDs and BSSIDs. Raw endpoint snapshots stay
+in memory until collection ends to reduce SSH traffic; the terminal shows a
+shortened summary and all records remain in the private capture.
+
+CPU percentages use accounting ticks, not clock-frequency samples; aggregate
+CPU busy percentage is across all online CPUs, while each process percentage
+uses one CPU as 100%. Accounting coverage compares recorded CPU ticks with
+elapsed wall time; inspect any shortfall before treating percentages as precise.
+Guest time is not double-counted, PID reuse is excluded, and decreasing counters
+fail rather than produce misleading rates. Process
+deltas cover processes present at both endpoints; short-lived work can be
+missing. Interrupt/softirq counts are not unique wakeups or energy attribution.
+Snapshots are sequential and include the observer's overhead. This diagnostic
+profile complements the idle-power samples; it is not another power/endurance
+measurement. `SECONDS` accepts multiples of thirty in 30..300, with the settling
+period extra and a transient-service limit of `SECONDS + 90` seconds.
 
 `device:boot-cycles CYCLES=4` observes physical shutdown/startup cycles over
 USB SSH through the Mac and checks direct Wi-Fi SSH on every captured boot.

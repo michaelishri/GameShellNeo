@@ -16,6 +16,7 @@ env:
   NEO_BOOT_CYCLES: '{{.CYCLES | default "4"}}'
   NEO_IDLE_SECONDS: '{{.SECONDS | default "600"}}'
   NEO_IDLE_BACKLIGHT: '{{.BACKLIGHT | default "keep"}}'
+  NEO_PROFILE_SECONDS: '{{.SECONDS | default "120"}}'
 
 tasks:
   default:
@@ -146,6 +147,10 @@ tasks:
   device:idle-sample:
     desc: Sample battery idle for SECONDS=600 with BACKLIGHT=keep or off; leave controls alone
     cmds: [python3 tools/remote.py device idle-sample]
+
+  device:power-profile:
+    desc: Profile awake CPU/interrupt/radio counters for SECONDS=120; USB unplugged, controls untouched
+    cmds: [python3 tools/remote.py device power-profile]
 
   device:boot-cycles:
     desc: Observe CYCLES=4 physical power cycles; keep USB connected (CYCLES=0 captures current boot only)

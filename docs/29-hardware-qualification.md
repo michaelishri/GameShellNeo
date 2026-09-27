@@ -289,8 +289,8 @@ was already mounted read/write).
 Local readiness was recorded at 14.658 seconds; systemd reported 2.542 seconds
 kernel plus 12.429 seconds userspace, total 14.972 seconds. These software
 timestamps exclude bootloader time and do not establish button-to-usable-display
-latency or the five-second aspiration. **Two cold starts are now observed**
-for this candidate; eight remain.
+latency or the five-second aspiration. At this stage, **two cold starts were
+observed** for this candidate; eight remained.
 
 Private evidence:
 
@@ -319,8 +319,8 @@ regressions and shell lint passed. The physical batch result follows.
 
 The owner completed four shutdown/startup cycles with USB connected, waiting
 ten seconds after darkness and sixty seconds after each login console. The
-recorder verified all four, with no missed boot IDs. **The candidate now has
-six observed consecutive cold starts; four remain.**
+recorder verified all four, with no missed boot IDs. At this stage, **the
+candidate had six observed consecutive cold starts; four remained.**
 
 | Candidate boot | Boot ID | Local readiness (seconds) | Systemd startup total (seconds) |
 | --- | --- | --- | --- |
@@ -351,10 +351,59 @@ plus four per-boot JSON files containing checks and kernel/shutdown journals.
 The recorder exited successfully. Readiness times retain the exclusions
 described above; software polling during this batch is not an idle-power test.
 
+## Final batch and completed cold-start check
+
+The owner completed another four physical shutdown/startup cycles using the
+same procedure. The recorder verified all four and exited successfully, with
+an unbroken previous-boot chain. **Ten consecutive cold starts are now
+observed for this candidate: the initial start, the supervised power-button
+restart, and two recorded batches of four. The cold-start count gate passed.**
+
+| Candidate boot | Boot ID | Local readiness (seconds) | Systemd startup total (seconds) |
+| --- | --- | --- | --- |
+| 7 | `429ef585-cdb3-48b4-9d1c-936a1eb829f5` | 14.748 | 14.958 |
+| 8 | `4fc3d255-cc3a-437c-9323-cf8738b3d0b4` | 14.671 | 15.123 |
+| 9 | `72d37e63-fec3-43b8-84b2-449e5aad8fec` | 14.851 | 15.356 |
+| 10 | `b82a951a-31a3-4e7f-b4db-69a4fc5aa894` | 14.755 | 14.998 |
+
+Every new boot passed the same identity, CPU/memory, service, getty, input,
+backlight, battery-monitor and USB/direct Wi-Fi SSH checks as the first batch.
+There were no failed units or kernel taint. Every preceding saved shutdown
+contained the short power-button event, power-off target and filesystem sync.
+The same UDC/USB-target shutdown warning recurred; its investigation remains
+open. Kernel warning/error matches remained the inherited `/init` and optional
+radio firmware/CLM lookups, with no oops, timeout or ext4 recovery/error report
+in these captures.
+
+During startup the observer again encountered missing routes, refusals,
+timeouts and SSH banner/session errors before successful connections. Each
+cycle ultimately passed both routes; these results qualify recovery in this
+setup, not uninterrupted first-attempt SSH success or network-ready latency.
+The eight batch readiness markers range from 14.169 to 14.994 seconds and
+exclude bootloader time; they do not meet or measure the complete five-second
+boot aspiration.
+
+Private evidence is `.local/diagnostics/20260927T044812.372580Z/`, containing
+the successful four-of-four `summary.json`, `boot-cycles.jsonl` and baseline
+plus four per-boot captures. All boot monitors have finished. This completes
+the repeated-start subcheck, not the remaining NEO-5 hardware qualification.
+
+## Battery-transition preflight
+
+After the tenth start, direct Wi-Fi SSH remained usable with all six services
+active, no restarts/failed units and zero kernel taint. At 04:59:06 UTC the
+connected-power snapshot reported battery present, `Charging`, 100% and
+4,199,800 µV; the awake battery guard reported valid monitoring. Both USB and
+AC supply inputs reported present/online. No charging or input-limit setting
+was changed. These are software readings, not calibrated charge/endurance or
+electrical current measurements. The unplugged comparison is pending.
+
+Private evidence is `.local/diagnostics/20260927T045838.887394Z/status.txt`
+and `.local/diagnostics/neo5-battery.JREzc0bg/connected-before.txt`.
+
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
-- Four more cold starts to reach ten for this candidate.
 - Local operation without an access point.
 - Charging/unplugging and battery-policy hardware checks, timed awake-idle
   measurements and separate readiness timings with their uncertainty.

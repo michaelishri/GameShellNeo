@@ -457,8 +457,9 @@ The largest observed voltage was 55.9 mV above the reported target. **This is
 an unresolved software-measurement/configuration discrepancy, not confirmed
 physical overcharge or an established driver bug.** `health=Good` is the
 driver's limited PMIC status interpretation, not independent validation of
-the cell or charge voltage. The replacement pack's specified limits and
-physical voltage are not yet known.
+the cell or charge voltage. The owner has since identified an aftermarket
+BL-5C advertised as 3.7 V / 1020 mAh; its specified charge limits and physical
+voltage remain unverified. See [report 30](30-bl5c-battery-identification.md).
 
 The read-only trace used the locked Linux 6.18.54 source and supplied AXP223
 datasheet:
@@ -493,14 +494,26 @@ specified charge voltage/current and independent validation options. The owner
 has no external measurement equipment. Extended charging/termination tests
 are deferred while this discrepancy is unresolved; battery-only investigation
 can continue. Do not apply a guessed ADC offset or change charger limits to
-hide the observation. Pack identification has been requested without asking
-the owner to open the running device.
+hide the observation. The owner subsequently supplied the BL-5C purchase
+listing and its advertised specifications without opening the running device.
+This answers the model/listing question, but does not establish the exact
+manufacturer's permitted charging current or prove the advertised capacity.
+The owner also confirmed that the pack has no printed manufacturer/brand;
+it is an unbranded generic BL-5C. Repeat label requests are not a next step.
 
 Additional private evidence in `.local/diagnostics/neo5-battery.JREzc0bg/`:
 `charger-readback.txt`, `adc-readback.txt` and `disconnected-again.txt`.
 The IIO probe found no optional `name` file for the PMIC ADC; its raw/scale
 attributes were present and readable. The channel identity above comes from
 the driver mapping, not that missing name attribute.
+
+At 05:13:57 UTC, a further Wi-Fi read after pack identification reached the
+same boot with USB power offline and valid Discharging monitoring. The gauge
+reported 99%; the direct sample reported 3,993,000 µV and -347,000 µA. The
+guard's separate sample was 4,022,700 µV. This confirms the gauge value can
+change, not percentage accuracy or a discharge curve. Evidence is
+`identified-pack-status.txt` in the same private directory; the check made no
+charger or gauge writes.
 
 ## Remaining hardware gates
 

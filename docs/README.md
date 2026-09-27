@@ -18,7 +18,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
-| [29 — Hardware qualification](29-hardware-qualification.md) | Main-keypad press/release results, unresolved rear Lightkey behavior and remaining diagnostic-image hardware gates |
+| [30 — BL-5C battery identification](30-bl5c-battery-identification.md) | Owner-supplied replacement-pack listing, primary-source charging examples and unresolved exact-pack limits |
+| [29 — Hardware qualification](29-hardware-qualification.md) | Ten cold starts and USB reconnections, keypad/backlight and load results, power transitions, Lightkey issue and charging-voltage discrepancy |
 | [28 — Original-card recovery backup](28-original-card-recovery-backup.md) | Read-only whole-card recovery workflow, private copies, integrity checks and recovery limits |
 | [27 — Diagnostic integration refresh](27-diagnostic-integration-refresh.md) | New Zealand provisioning, regulatory database load/signature fixes, kernel/userspace corrections, remaining warning classification and post-flash checks |
 | [23 — First-build specification](23-first-build-spec.md) | Approved diagnostic scope, immutable inputs, boot/storage/access contract and acceptance gates |

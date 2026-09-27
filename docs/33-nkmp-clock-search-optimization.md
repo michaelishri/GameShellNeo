@@ -1,6 +1,7 @@
 # NKMP clock-search optimization
 
-Date: **2026-09-27**. Ticket: **NEO-12**, in progress. Target: CPI v3.1.
+Date: **2026-09-27 UTC** (27–28 September in New Zealand).
+Ticket: **NEO-12**, completed. Target: CPI v3.1.
 
 ## Purpose and current status
 
@@ -18,7 +19,13 @@ programming. Native and ARM32 equivalence checks passed. A separately versioned
 `0.1.0-diagnostic.3` image with `6.18.54-gameshellneo3` has built and passed
 offline verification.
 It has been flashed to the Samsung DEV card with a matching full-image
-readback. Boot and performance qualification on the owner's board are pending.
+readback. The owner observed the login screen; USB/Wi-Fi and live integration
+checks passed on the new kernel. Storage and five-minute CPU/memory load/recovery
+checks also passed. At the unchanged governor setting, recorded worker CPU
+time fell about **92.3%**, from 35.5% to 2.7% of one CPU. Separate function
+samples support the reduced search cost. Estimated battery power was 2.66%
+lower, with charge-state and measurement limitations detailed below. The
+original 366 µs setting is restored and postchecks passed.
 
 ## Change and reasoning
 
@@ -138,7 +145,7 @@ kernel/DTB/module/radio hashes, private identity permissions and service policy.
 | Raw bytes | 4,294,967,296 |
 | SHA-256 | `64f092d5770ef344cb2e9d22b16780aebe94a5501732130f6b22c21910554523` |
 | Kernel release | `6.18.54-gameshellneo3` |
-| Hardware qualification | Pending |
+| Hardware qualification | NEO-12 checks passed; overall NEO-5 qualification remains open |
 
 The raw image and evidence remain private in `.local/artifacts/`. The old
 diagnostic.2 image was hashed again after assembly and still matches
@@ -160,17 +167,53 @@ Fresh inspection identified the external physical USB card as `disk16`,
 all 4,294,967,296 bytes, read back the same complete range and matched the raw
 image SHA-256 above. The card was ejected successfully. Private flash log and
 result: `.local/diagnostics/20260927T105524.449111Z/`.
-The owner has been asked to reinsert the card, reconnect USB and boot; this
-readback is not yet a successful boot. The original card and recovery backup
-remain available.
+The owner reinserted the card, reconnected USB and reported the login screen.
+The original card and recovery backup remain available.
 
-After flashing, check the new release, USB/Wi-Fi access, services, display,
-battery policy and kernel health. Exercise CPU load and recovery across the
-supported policy before capturing quiet-window worker activity, function
-samples and battery power. Retain the original 366 µs governor limit for the
-primary comparison. Match brightness, radio state, USB disconnection and
-sampling overhead; record signal, temperature and battery state. A different
-boot and battery trajectory limit direct before/after power comparisons.
+### First boot
+
+USB SSH confirmed `6.18.54-gameshellneo3` and image `0.1.0-diagnostic.3`.
+Boot ID: `6c2112b6-84d5-479c-a29b-a067df545be3`. Direct Wi-Fi SSH also passed.
+All six checked services were active with zero restarts; there were no failed
+units or kernel taint. The live integration task passed image identity,
+regulatory-database selection, single Wi-Fi-daemon ownership, journal ACLs,
+loopback BPF control/deny/allow-exception behavior and the agreed country state
+(configured NZ, access point's accepted AU global announcement).
+
+The installed battery guard retained SHA-256
+`834c5b6c1b834b22752ec21ed7088fc8e1eea10f35cd164edaaac45fea42a6f0`;
+all nine isolated on-device battery-test methods passed without changing the
+live guard or requesting a real shutdown. Initial telemetry was 72% Charging,
+**4.1712 V** at 10:59:12 UTC and 4.1833 V at 10:59:48.
+Charger/gauge programming is unchanged.
+
+The ready marker was 16.859 seconds after the kernel started. Systemd reported
+2.520 seconds kernel + 19.497 seconds userspace, with graphical.target after
+14.472 seconds of userspace. These first-boot observations do not measure total
+power-button-to-ready time or establish a startup improvement/regression.
+
+Private first-boot evidence:
+
+- `.local/diagnostics/20260927T105906.948531Z/status.txt`: USB status.
+- `.local/diagnostics/20260927T105936.714373Z/`: integration checks.
+- `.local/diagnostics/20260927T105948.426612Z/status.txt`: direct Wi-Fi status.
+- `.local/diagnostics/20260927T105951.053321Z/`: installed battery-guard tests.
+- `.local/diagnostics/20260927T110027.708373Z/stability.jsonl`: successful load/recovery test.
+
+### Load and recovery
+
+`task device:stability ROUTE=usb` ran from 11:00:33 to 11:06:09 UTC. Its 128 MiB
+temporary storage file passed SHA-256 verification using a direct read. Four
+CPU workers and one 256 MiB memory worker then ran for five minutes with
+verification enabled: all five passed, none failed, and the tool reported no
+untrustworthy metrics. Every sampled load frequency was 1,008 MHz; peak sampled
+temperature was 65.772 °C. The three subsequent recovery samples were 240 MHz,
+with temperature falling to 55.890 °C. Kernel taint remained zero and boot
+identity was unchanged. Temporary files were removed.
+
+This is a load/recovery check, not exhaustive electrical/OPP qualification.
+After the owner disconnected USB, the board cooled to 42.768 °C before the
+battery-only comparison started. No further stress workload ran during it.
 
 While the host compiled the kernel, the owner reconnected USB to recharge.
 The 10:21:36 UTC status check reached diagnostic.2 through the Mac's USB link:
@@ -179,6 +222,118 @@ valid battery monitoring, 19% Charging and a reported 3.9248 V. This confirms
 access and current software status, not charging qualification. No comparative
 power measurement ran during charging. Private capture:
 `.local/diagnostics/20260927T102131.296892Z/status.txt`.
+
+### Battery-only governor comparison
+
+The same command as diagnostic.2 ran from approximately 11:13 to 11:21 UTC:
+`task device:governor-compare ROUTE=wifi SECONDS=120 RATE_US=10000`.
+Each phase had thirty seconds to settle, followed by thirteen battery samples
+over 120 seconds. The owner confirmed USB disconnected, controls untouched and
+the device resting in the same location. No concurrent SSH diagnostics or
+function sampling ran in these windows.
+
+The boot ID remained unchanged throughout, as did worker PID 67/start tick 135,
+four online CPUs, schedutil, the 120–1,008 MHz policy, brightness 1, backlight
+power state 0 and Wi-Fi power saving off. Both external-power inputs remained
+offline; the battery guard was valid and kernel taint zero. The task passed and
+verified restoration of **366 µs**, including its independent stop hook.
+
+| Diagnostic.3 measurement | Original before, 366 µs | Slower, 10,000 µs | Original after, 366 µs |
+| --- | ---: | ---: | ---: |
+| Counter window, seconds | 120.383 | 120.351 | 120.418 |
+| Governor-worker CPU seconds | 3.40 | 3.45 | 3.17 |
+| Governor-worker % of one CPU | 2.824 | 2.867 | 2.632 |
+| Estimated battery power, W | 1.00733 | 1.02237 | 1.01278 |
+| Estimated battery current, mA | 261.17 | 265.96 | 264.08 |
+| Timer IRQs/second | 108.64 | 121.22 | 104.59 |
+| RSB IRQs/second | 23.98 | 23.28 | 23.56 |
+| IRQ-work IPIs/second | 15.19 | 15.77 | 14.23 |
+| Context switches/second | 231.27 | 305.32 | 219.76 |
+| Wi-Fi MMC IRQs/second | 27.18 | 43.46 | 26.26 |
+| Peak sampled temperature, °C | 40.986 | 39.528 | 39.042 |
+| Battery voltage range, V | 3.8522–3.8621 | 3.8390–3.8500 | 3.8280–3.8390 |
+| Reported charge, start → end | 80% → 78% | 78% → 77% | 76% → 75% |
+| Endpoint Wi-Fi signal, dBm | −80 → −78 | −85 → −79 | −80 → −82 |
+
+At the unchanged 366 µs setting, diagnostic.2 recorded **35.474% and 35.581%**
+of one CPU in the governor worker. Diagnostic.3 recorded **2.824% and 2.632%**.
+Comparing the two pairs' means gives a **92.32% reduction in recorded worker
+CPU time** (35.528% → 2.728%). Context-switch rates fell from an average
+495.85/s to 225.51/s, and timer IRQ rates roughly halved. These are observed
+whole-system rates in the test, not a direct count of PLL transitions or an
+isolated per-call benchmark. The equivalence tests, unchanged configuration,
+specific code change and live observations together support retaining the fix.
+
+The two unchanged-policy power windows averaged **1.01005 W**, versus
+**1.03761 W** previously: a **27.55 mW / 2.66% lower software estimate**.
+This is a useful direction to track, not a calibrated saving or endurance
+prediction. The images ran in different boots after charging: the earlier
+windows reported 42% and 3.706–3.764 V; these reported 75–80% and 3.828–3.862 V.
+Temperature was still settling and radio signal varied. These conditions and
+the uncalibrated current sensor prevent attributing the exact difference to
+this patch. Current alone is also insufficient because voltage changed.
+
+Slowing governor updates on diagnostic.3 gave no CPU or power advantage in this
+run. Its radio interrupt rate was higher and signal briefly weaker, so it does
+not isolate the effect of the interval. Keep **366 µs** as the normal policy;
+the earlier large slowdown benefit has not persisted after the search fix.
+
+The CPU-accounting issue is smaller but remains unresolved. Aggregate
+`/proc/stat` coverage was 98.68–98.88%; CPU0 covered 95.94–96.64% of elapsed
+time, while other CPUs were near 99.5–99.7%. Aggregate busy time was only
+0.81–0.83% of four CPUs, inconsistent with the summed process observations.
+Do not describe these as exact overall utilization or claim the accounting
+bug is fixed. Process-counter and instruction-sampling evidence have their
+own limits, recorded here and in report 32.
+
+Private raw capture:
+`.local/diagnostics/20260927T111327.916104Z/governor-comparison.jsonl`.
+The six old/new phase summaries used for the comparisons above are retained in
+`.local/diagnostics/neo12-comparison/diagnostic3-comparison-summary.json`.
+
+### Separate function profile and final checks
+
+`task device:governor-profile ROUTE=wifi SECONDS=30` then sampled the same
+worker using the same perf 6.18.54 binary, kernel-only `cpu-clock:k` event,
+requested 99 Hz rate, 64-page buffer and no callchains. The original 366 µs
+setting remained unchanged. The profile passed, retained worker identity and
+reported **155 samples, zero lost**, with resolved kernel symbols.
+
+| Symbol | Diagnostic.2 samples / share | Diagnostic.3 samples / share |
+| --- | ---: | ---: |
+| `ccu_nkmp_find_best.constprop.0` | 315 / 29.61% | 18 / 11.61% |
+| `ccu_nkmp_calc_rate` | 147 / 13.82% | 8 / 5.16% |
+| `__udivsi3` | 323 / 30.36% | 21 / 13.55% |
+| `finish_task_switch` | 164 / 15.41% | 49 / 31.61% |
+| `_raw_spin_unlock_irqrestore` | 26 / 2.44% | 16 / 10.32% |
+| All symbols | 1,064 / 100% | 155 / 100% |
+
+Direct search/calculation samples fell from **462 to 26**, and their share
+from 43.42% to 16.77%. This supports the attribution made before the patch.
+A larger percentage in scheduling does not imply more scheduling work: its
+sample count also fell. The remaining search/division samples show room for
+further investigation, but 155 samples are too few to rank small differences
+precisely. Division callers were not captured, and software timer sampling can
+miss execution with interrupts disabled. The two-second health checks and perf
+itself add work; these samples are separate from the power windows and do not
+measure exact function time or energy.
+
+Private evidence: `.local/diagnostics/20260927T112137.586275Z/`, containing
+`governor-profile.jsonl`, `perf.data`, record/report text and the boot's symbol
+map. The optional missing `tips.txt` notice did not affect capture/reporting.
+
+Final Wi-Fi status at 11:23 UTC confirmed all six checked services active with
+zero restarts, no failed units, valid battery monitoring, 74% Discharging,
+3.7928 V and no kernel taint. Root-read kernel logs had no new entries since
+the load test ended. A final readback confirmed 366 µs; the restoration record
+was absent and both transient comparison/profile units were inactive and
+unloaded. Captured status: `.local/diagnostics/20260927T112311.086017Z/status.txt`.
+All temporary test workloads have finished.
+
+Retain patch 0005 and close NEO-12's bounded optimization work. Precise energy
+savings, endurance, CPU accounting, exhaustive board qualification and charger
+limits remain separate follow-ups. No permanent governor policy, OPP, voltage,
+charger or battery-gauge change was introduced.
 
 ## Opportunities for deeper refactoring
 

@@ -15,7 +15,7 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 | 0002 | Wire project drivers, board DT and root compatible into Kbuild/schema | Remove corresponding hunks when support reaches the selected upstream release |
 | 0003 (generated) | Fresh CPI3 DTS, panel/backlight implementations, bindings and current-limit helper | Compile/DT checks establish software integration only; hardware tests remain NEO-5 |
 | 0004 | Describe GPIO hog children already supported by the sunxi GPIO driver | Remove when the upstream pinctrl schema accepts these standard GPIO nodes |
-| 0005 | Stop NKMP factor search at its first exact match, preserving selected factors | Actual original/patched functions pass native and ARM32 equivalence tests; hardware performance remains NEO-12. Remove when an equivalent upstream optimization is verified |
+| 0005 | Stop NKMP factor search at its first exact match, preserving selected factors | Native/ARM32 equivalence and NEO-12 hardware checks passed; about 92% lower recorded governor CPU time at unchanged policy (report 33). Remove when an equivalent upstream optimization is verified |
 
 ## Provenance and limits
 

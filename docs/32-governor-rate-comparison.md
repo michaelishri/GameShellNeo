@@ -276,9 +276,11 @@ it was not deliberately induced on the GameShell.
 3. Investigate the accounting shortfall; do not claim precise aggregate CPU
    utilization or electrical savings from these counters.
 
-NEO-12 remains in progress. A temporary reduction in measured activity is
-established; a deployed efficiency fix and battery-endurance improvement are not.
+At this report's measurement stage, NEO-12 remained in progress. A temporary
+reduction in measured activity was established; a deployed fix was still pending.
 
-Subsequent implementation and native/ARM32 equivalence checks are recorded in
-[report 33](33-nkmp-clock-search-optimization.md). Hardware qualification of
-that candidate remains a separate step.
+Subsequent implementation, native/ARM32 equivalence, diagnostic.3 installation
+and successful NEO-12 hardware checks are recorded in
+[report 33](33-nkmp-clock-search-optimization.md). It records about 92% lower
+governor CPU time with the original timing restored. Precise battery savings
+and endurance remain unqualified.

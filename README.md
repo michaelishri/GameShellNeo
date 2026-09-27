@@ -33,8 +33,12 @@ records a reversible halving of governor-worker CPU time, only a 2–3% estimate
 power reduction, and directly sampled NKMP clock-search cost. Original settings
 are restored. The [clock-search optimization](docs/33-nkmp-clock-search-optimization.md)
 preserves the selected clock factors in native and ARM32 comparisons. Candidate
-`0.1.0-diagnostic.3` has built and passed offline verification; its hardware
-performance is not yet measured.
+`0.1.0-diagnostic.3` has been flashed and booted, with passing integration,
+storage and CPU/memory load/recovery checks. With the original governor timing,
+recorded governor CPU time fell about 92% (35.5% → 2.7% of one core), supported
+by separate function samples. Estimated battery power was 2.7% lower; differing
+charge state and uncalibrated readings limit that comparison. Final checks
+passed and the original governor setting is restored.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a

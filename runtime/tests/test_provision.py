@@ -22,12 +22,14 @@ class ProvisionTests(unittest.TestCase):
             key = root / 'development'
             subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(key)], check=True)
             args = ['python3', str(source), '--wicd', str(root / 'wicd'), '--ssid-file',
-                    str(root / 'ssid'), '--authorized-key', str(key) + '.pub', '--output', str(root / 'device')]
+                    str(root / 'ssid'), '--country', 'NZ', '--authorized-key', str(key) + '.pub', '--output', str(root / 'device')]
             subprocess.run(args, check=True, stdout=subprocess.DEVNULL)
             before = (root / 'device/identity.json').read_bytes()
+            args[args.index('--country') + 1] = 'AU'
             subprocess.run(args, check=True, stdout=subprocess.DEVNULL)
             self.assertEqual(before, (root / 'device/identity.json').read_bytes())
             wifi = (root / 'device/wpa_supplicant-wlan0.conf').read_text()
+            self.assertIn('country=AU\n', wifi)
             self.assertIn('ssid=' + ssid.encode().hex(), wifi)
             self.assertNotIn('private password', wifi)
             self.assertEqual((root / 'device/ssh_host_ed25519_key').stat().st_mode & 0o777, 0o600)
@@ -39,14 +41,14 @@ class ProvisionTests(unittest.TestCase):
             path.write_text('[a]\nessid=ssid\nenctype=wpa-psk\napsk=password1\n'
                             '[b]\nessid=ssid\nenctype=wpa-psk\napsk=password2\n')
             with self.assertRaises(ValueError):
-                provision.wifi_config(path, 'ssid')
+                provision.wifi_config(path, 'ssid', 'NZ')
 
     def test_env_provisioning_matches_legacy_wifi_without_printing_secrets(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             secret = 'private # literal $(no-command)'
             env = root / '.env'
-            env.write_text('GAMESHELL_WIFI_SSID="example network"\nGAMESHELL_WIFI_PSK=' + repr(secret) + '\n')
+            env.write_text('GAMESHELL_WIFI_COUNTRY=NZ\nGAMESHELL_WIFI_SSID="example network"\nGAMESHELL_WIFI_PSK=' + repr(secret) + '\n')
             key = root / 'key'
             subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(key)], check=True)
             result = subprocess.run(['python3', str(source), '--env', str(env), '--authorized-key',
@@ -54,7 +56,12 @@ class ProvisionTests(unittest.TestCase):
                                     check=True, capture_output=True, text=True)
             self.assertNotIn(secret, result.stdout + result.stderr)
             self.assertEqual((root / 'device/wpa_supplicant-wlan0.conf').read_text(),
-                             provision.wifi_config_from_key('example network', secret))
+                             provision.wifi_config_from_key('example network', secret, 'NZ'))
+
+    def test_country_is_explicit_and_cannot_inject_configuration(self):
+        for country in ('', 'nz', 'N', 'NZ\nnetwork={', '00'):
+            with self.subTest(country=country), self.assertRaises(ValueError):
+                provision.wifi_config_from_key('example', 'private password', country)
 
 
 if __name__ == '__main__':

@@ -14,8 +14,11 @@ Implementation is tracked in Kaneo's OpenSource / GameShellNeo (NEO) project.
 The first private image has booted on the owner's board; Wi-Fi and USB SSH are
 verified. [First-boot results](docs/26-first-card-and-boot-validation.md) record
 the live USB correction and remaining NEO-5/NEO-7 qualification work. The
-refreshed image includes that correction and passes offline verification;
-it has not yet been flashed or booted.
+[latest refresh](docs/27-diagnostic-integration-refresh.md), `0.1.0-diagnostic.2`,
+includes that correction, explicit New Zealand provisioning and the kernel/
+userspace integration fixes. It passes offline verification and has not yet
+been flashed or booted. The original card now has a
+[verified recovery backup](docs/28-original-card-recovery-backup.md) on both hosts.
 
 Passwords, Wi-Fi credentials and private connection settings belong in the
 ignored **`.env`** file. Generated keys, captured firmware, personalized images,
@@ -101,6 +104,7 @@ to `.env`, set its permissions to `0600`, and fill the blank values locally:
 | Settings | Purpose |
 | --- | --- |
 | `GAMESHELL_WIFI_SSID`, `GAMESHELL_WIFI_PSK` | Image Wi-Fi network and passphrase or 64-digit hexadecimal PSK |
+| `GAMESHELL_WIFI_COUNTRY` | Confirmed two-letter operating country; `NZ` for the owner's New Zealand device |
 | `GAMESHELL_IP`, `GAMESHELL_USERNAME` | Running board's Wi-Fi address and SSH account |
 | `GAMESHELL_USB_IP` | Board's USB address; defaults to `192.168.10.1` |
 | `M2_MACBOOK_AIR_IP`, `M2_MACBOOK_AIR_USERNAME`, `M2_MACBOOK_AIR_PASSWORD` | Mac SSH connection |
@@ -137,8 +141,11 @@ task build
 
 `task build` compiles the kernel, validates the device tree, then builds and
 verifies the image **in sequence**. It does not provision credentials implicitly.
-Run `task provision` again after editing Wi-Fi settings or the authorized key,
+Run `task provision` again after editing Wi-Fi settings, country or the authorized key,
 then rebuild. This changes the next image, not the running board.
+Country is explicit and is never inferred from timezone. A future launcher
+region setting is tracked in [FOLLOW-UP.md](FOLLOW-UP.md); it is not implemented
+in the diagnostic image.
 
 The preparation defaults use the sibling GameShell bootloader and the private
 radio baseline recorded on 2026-09-27. Override paths when needed; pass the same

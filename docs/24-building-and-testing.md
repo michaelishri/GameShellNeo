@@ -35,7 +35,8 @@ covers prerequisites, logs and repeat runs.
    ```
 
 2. Prepare private access using `GAMESHELL_WIFI_SSID` and
-   `GAMESHELL_WIFI_PSK` in the ignored `.env`. The helper writes no credentials
+   `GAMESHELL_WIFI_PSK` and the confirmed `GAMESHELL_WIFI_COUNTRY` in the ignored
+   `.env`. The helper writes no credentials
    to stdout. Never pass passwords in command lines. Direct Wicd import remains
    available in `tools/provision.py` for legacy migration.
 

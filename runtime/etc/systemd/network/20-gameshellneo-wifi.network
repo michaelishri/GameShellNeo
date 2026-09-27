@@ -6,3 +6,9 @@ RequiredForOnline=no
 
 [Network]
 DHCP=yes
+
+[DHCPv4]
+UseHostname=no
+
+[DHCPv6]
+UseHostname=no

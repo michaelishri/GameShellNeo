@@ -4,7 +4,11 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
+import ssl
 import struct
+import subprocess
+import tempfile
 import zlib
 
 
@@ -26,6 +30,29 @@ def uboot_payload(path, image_type):
     return payload, fields
 
 
+def verify_regulatory(root, project, sources):
+    firmware = root / 'usr/lib/firmware'
+    for suffix in ('', '.p7s'):
+        name = 'regulatory.db' + suffix
+        require((firmware / name).readlink() == Path('/etc/alternatives') / name,
+                'Regulatory database must use the package alternatives')
+        require((root / 'etc/alternatives' / name).readlink() == Path('/lib/firmware') / (name + '-upstream'),
+                'Regulatory database/signature must use the upstream signing key')
+        require((firmware / (name + '-upstream')).is_file(), 'Missing signed upstream regulatory database')
+    certs = project / '.local/sources' / ('linux-' + sources['linux']['tag'][1:]) / 'net/wireless/certs'
+    with tempfile.TemporaryDirectory() as directory:
+        trusted = Path(directory) / 'regdb-keys.pem'
+        trusted.write_text(''.join(ssl.DER_cert_to_PEM_cert(bytes(int(value, 16) for value in
+                            re.findall(r'0x([0-9a-fA-F]{2})', path.read_text())))
+                            for path in sorted(certs.glob('*.hex'))))
+        # Use only keys shipped in the locked kernel, never a signer supplied
+        # by the signature itself. No external CA chain is involved.
+        subprocess.run(['openssl', 'cms', '-verify', '-binary', '-inform', 'DER',
+                        '-in', str(firmware / 'regulatory.db.p7s-upstream'),
+                        '-content', str(firmware / 'regulatory.db-upstream'),
+                        '-certfile', str(trusted), '-nointern', '-noverify', '-out', '/dev/null'], check=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('root', type=Path)
@@ -35,6 +62,8 @@ def main():
     identity = json.loads((root / 'etc/gameshellneo/image.json').read_text())
     project = Path(__file__).resolve().parents[1]
     built = json.loads((project / '.local/build/kernel-completed.json').read_text())
+    require(identity['kernel'] == identity['sources']['linux']['tag'][1:] + identity['sources']['linux']['localversion'],
+            'Kernel release differs from the image source lock')
     require(identity['hardware_qualified'] is False, 'Image must be marked unqualified')
     payload, fields = uboot_payload(boot / 'uImage', 2)
     require(fields[4:6] == (0x40008000, 0x40008000), 'Unexpected kernel load/entry')
@@ -65,14 +94,23 @@ def main():
                 f'Installed device identity differs: {name}')
     require((root / 'etc/wpa_supplicant/wpa_supplicant-wlan0.conf').stat().st_mode & 0o777 == 0o600,
             'Wi-Fi configuration permissions are too broad')
+    wifi = root / 'etc/wpa_supplicant/wpa_supplicant-wlan0.conf'
+    require(wifi.read_bytes() == (project / '.local/provisioning/device/wpa_supplicant-wlan0.conf').read_bytes(),
+            'Wi-Fi settings differ from private provisioning')
+    require(re.search(r'^country=[A-Z]{2}$', wifi.read_text(), re.M), 'Explicit Wi-Fi country is missing')
+    verify_regulatory(root, project, identity['sources'])
     require((root / 'etc/ssh/ssh_host_ed25519_key').stat().st_mode & 0o777 == 0o600,
             'Host private key permissions are too broad')
     require('data=ordered,commit=5' in (root / 'etc/fstab').read_text(), 'Incorrect root mount policy')
     for name in ('gameshellneo-usb', 'gameshellneo-battery', 'gameshellneo-ready'):
         require((root / 'etc/systemd/system/multi-user.target.wants' / (name + '.service')).is_symlink(),
                 f'Service not enabled: {name}')
-    for name in ('sleep.target', 'suspend.target', 'hibernate.target'):
-        require((root / 'etc/systemd/system' / name).readlink() == Path('/dev/null'), f'Sleep is not masked: {name}')
+    for name in ('sleep.target', 'suspend.target', 'hibernate.target',
+                 'wpa_supplicant.service', 'dbus-fi.w1.wpa_supplicant1.service'):
+        require((root / 'etc/systemd/system' / name).readlink() == Path('/dev/null'), f'Unit is not masked: {name}')
+    require((root / 'etc/systemd/system/multi-user.target.wants/wpa_supplicant@wlan0.service').is_symlink(),
+            'Interface-specific Wi-Fi service must remain enabled')
+    require(not (root / 'usr/lib/udev/rules.d/90-alsa-restore.rules').exists(), 'Unused ALSA restore rules remain')
     require(not (root / '.env').exists() and not (root / 'home/cpi/.env').exists(), 'Unexpected credential source')
     require(not list((root / 'usr/bin').glob('qemu-arm*')), 'Builder QEMU binaries remain in the image')
     print('Offline contents: kernel/DTB/modules/boot CRCs, identity permissions and service policies passed')

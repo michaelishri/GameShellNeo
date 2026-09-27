@@ -148,6 +148,11 @@ These software restarts do not count as physical USB reconnects or cold boots.
 
 ### Remaining integration findings — NEO-7
 
+The list below records the initial assessment. [Report 27](27-diagnostic-integration-refresh.md)
+corrects the regulatory-database diagnosis: the package was already installed,
+but cfg80211 requested it before root was mounted and its selected signing key
+did not match this upstream kernel. The owner has since confirmed `NZ`.
+
 - The image lacks `regulatory.db`. Confirm the owner's country and add the
   appropriate signed database; do not infer location from timezone.
 - The kernel lacks `CONFIG_EXT4_FS_POSIX_ACL`, and journald reports inability

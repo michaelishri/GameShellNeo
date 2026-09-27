@@ -19,7 +19,8 @@ MASKED = ['sleep.target', 'suspend.target', 'hibernate.target', 'hybrid-sleep.ta
           'armbian-hardware-monitor.service', 'armbian-led-state.service',
           'armbian-disable-autologin.service', 'armbian-disable-autologin.timer',
           'cron.service', 'rsyslog.service', 'apt-daily.timer', 'apt-daily-upgrade.timer',
-          'man-db.timer', 'fstrim.timer', 'e2scrub_all.timer']
+          'man-db.timer', 'fstrim.timer', 'e2scrub_all.timer',
+          'wpa_supplicant.service', 'dbus-fi.w1.wpa_supplicant1.service']
 
 
 def main():
@@ -41,6 +42,10 @@ def main():
     (target / 'etc/hostname').write_text('gameshellneo\n')
     (target / 'etc/hosts').write_text('127.0.0.1 localhost\n127.0.1.1 gameshellneo\n::1 localhost ip6-localhost ip6-loopback\n')
     chroot = ['chroot', str(target)]
+    # Custom upstream kernels trust the upstream regdb key, not Debian's key.
+    # This also selects the matching detached signature through its slave link.
+    subprocess.run(chroot + ['update-alternatives', '--set', 'regulatory.db',
+                            '/lib/firmware/regulatory.db-upstream'], check=True)
     if subprocess.run(chroot + ['id', 'cpi'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         subprocess.run(chroot + ['useradd', '-m', '-s', '/bin/bash', '-G', 'sudo,input,video', 'cpi'], check=True)
     subprocess.run(chroot + ['passwd', '-l', 'root'], check=True, stdout=subprocess.DEVNULL)
@@ -77,6 +82,8 @@ def main():
     for name in SERVICES:
         subprocess.run(['systemctl', '--root', str(target), 'enable', name], check=True,
                        stdout=subprocess.DEVNULL)
+    subprocess.run(['systemctl', '--root', str(target), 'disable', 'wpa_supplicant.service'],
+                   check=True, stdout=subprocess.DEVNULL)
     for name in MASKED:
         subprocess.run(['systemctl', '--root', str(target), 'mask', '--force', name], check=True,
                        stdout=subprocess.DEVNULL)

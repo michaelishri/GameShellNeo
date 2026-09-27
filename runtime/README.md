@@ -45,5 +45,15 @@ machine and SSH identities, plus a fingerprint record. Treat the output and
 every resulting image as private. Do not reuse one provision directory for
 multiple devices. The build never includes `.env` or the original host keys.
 
+Provisioning requires `GAMESHELL_WIFI_COUNTRY` (the owner's confirmed value is
+`NZ`) and writes wpa_supplicant's `country=` setting. Changing region retains
+the existing machine/SSH identity. Future launcher-based selection is deferred.
+The image selects the upstream-signed wireless-regdb alternative to match the
+upstream kernel keys; cfg80211 loads as a module after the root filesystem is
+available. Offline verification checks the signature against those kernel keys.
+Only `wpa_supplicant@wlan0` is enabled; the unused global/D-Bus daemon is masked.
+DHCP cannot replace the fixed hostname. Audio remains deferred and `alsa-utils`
+is excluded. A sysctl override tolerates the deliberately absent SysRq facility.
+
 Run host regressions with `task check` from the project root.
 USB enumeration, actual shutdown and power readings require NEO-5 hardware tests.

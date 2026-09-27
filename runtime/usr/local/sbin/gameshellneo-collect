@@ -10,6 +10,11 @@ cat /proc/cmdline /proc/uptime /proc/meminfo > "$directory/system.txt"
 cp /run/gameshellneo/*.json "$directory/" 2>/dev/null || true
 systemctl --failed --no-pager > "$directory/failed-units.txt"
 journalctl -b -k --no-pager > "$directory/kernel.log"
+journalctl -b -p warning --no-pager > "$directory/warnings.log"
+iw reg get > "$directory/wifi-regulatory.txt" 2>&1 || true
+systemctl show gameshellneo-usb gameshellneo-battery gameshellneo-ready ssh \
+    systemd-networkd wpa_supplicant@wlan0 wpa_supplicant \
+    -p Id -p ActiveState -p SubState -p Result -p NRestarts > "$directory/service-states.txt"
 systemd-analyze > "$directory/boot-time.txt"
 systemd-analyze critical-chain > "$directory/critical-chain.txt"
 lsusb > "$directory/usb.txt"

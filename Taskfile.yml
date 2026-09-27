@@ -17,6 +17,7 @@ env:
   NEO_IDLE_SECONDS: '{{.SECONDS | default "600"}}'
   NEO_IDLE_BACKLIGHT: '{{.BACKLIGHT | default "keep"}}'
   NEO_PROFILE_SECONDS: '{{.SECONDS | default "120"}}'
+  NEO_GOVERNOR_RATE_US: '{{.RATE_US | default "10000"}}'
 
 tasks:
   default:
@@ -94,6 +95,10 @@ tasks:
     desc: Check Bash syntax and ShellCheck (system install or pinned builder cache)
     cmds: [bash tools/lint.sh]
 
+  test:governor-recovery:
+    desc: Verify rollback through user-systemd with temporary files; no device access or sudo
+    cmds: [NEO_SYSTEMD_TESTS=1 python3 -m unittest discover -s tools/tests -p test_governor_compare.py -v]
+
   check:kernel:
     desc: Check resolved Kconfig and the completed kernel artifact manifest
     cmds:
@@ -151,6 +156,10 @@ tasks:
   device:power-profile:
     desc: Profile awake CPU/interrupt/radio counters for SECONDS=120; USB unplugged, controls untouched
     cmds: [python3 tools/remote.py device power-profile]
+
+  device:governor-compare:
+    desc: Compare original/slower/original schedutil rates, then restore; SECONDS=120 per phase, RATE_US=10000
+    cmds: [python3 tools/remote.py device governor-compare]
 
   device:boot-cycles:
     desc: Observe CYCLES=4 physical power cycles; keep USB connected (CYCLES=0 captures current boot only)

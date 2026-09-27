@@ -26,6 +26,9 @@ Lightkey/charging findings.
 [Awake-power profiling](docs/31-awake-power-profile.md) identifies substantial
 CPU time in the frequency-governor worker and records the next optimization
 priorities, instrumentation limits and reusable capture task.
+[Governor comparison preparation](docs/32-governor-rate-comparison.md) records
+the reversible comparison task and host-tested recovery; live measurements are
+pending restoration of device connectivity.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a
@@ -211,6 +214,7 @@ task device:battery-check ROUTE=wifi # Isolated simulation; no real power-off or
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
+task device:governor-compare ROUTE=wifi SECONDS=120 RATE_US=10000 # Three phases; automatically restore
 task device:boot-cycles CYCLES=4 # Wait for ready, then operate the power button
 task device:boot-cycles CYCLES=0 # Capture/check this boot without starting a batch
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
@@ -311,6 +315,55 @@ value using `device:exec` over Wi-Fi. The display controller/panel, Wi-Fi and CP
 settings stay unchanged: this measures backlight savings while awake, not full
 display power-down or sleep. Leave USB unplugged and controls alone for the
 entire run, including the automatic return to the original brightness.
+
+`device:governor-compare ROUTE=wifi SECONDS=120 RATE_US=10000` compares the saved
+schedutil update interval, the requested slower interval, and the saved interval
+again. `SECONDS` is **per phase**, with thirty seconds settling before each:
+the default takes about 7½ minutes. Allowed durations are multiples of thirty
+in 60–300 seconds; `RATE_US` is 1,000–100,000 microseconds and must exceed the
+current value. This is a temporary diagnostic setting, not a production policy.
+
+Leave USB unplugged, controls untouched and other diagnostics stopped. The task
+requires valid discharging battery monitoring above 20%, Wi-Fi connectivity,
+schedutil, no kernel taint and temperature below 80 °C. It checks every ten
+seconds and aborts on changes to the boot, CPU set, display, governor, frequency
+limits or Wi-Fi power-save setting. Only `rate_limit_us` is written; no OPP,
+voltage, charger, gauge or radio setting is changed. The live battery guard
+continues throughout. Counter snapshots and software current/voltage samples
+are retained in private `governor-comparison.jsonl`; the console prints a short
+summary afterward. The readings remain uncalibrated, and the sampling itself
+adds work at the same cadence in all phases. Compare the three phases with each other;
+their observer differs from the earlier counter-only profile.
+
+The original value is saved in `/run/gameshellneo-governor-comparison.json`
+before any setting change. Normal completion and handled signals restore it
+with readback. The transient `gameshellneo-governor-comparison.service` also
+uses `ExecStopPost` to run restoration independently after a crash or forced
+kill, with a bounded runtime. This requires a functioning kernel/systemd; it
+cannot repair a hung kernel. No value is persisted across boots.
+
+If SSH drops, let the bounded service finish or stop it after reconnecting:
+
+```sh
+task device:exec ROUTE=wifi -- sudo -n systemctl stop gameshellneo-governor-comparison.service
+task device:exec ROUTE=wifi -- cat /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us
+```
+
+Verify the **saved** original value (366 µs on the previously inspected boot).
+The task prints a temporary helper directory and retains it on failure so the
+cleanup hook can still run. If restoration itself failed, inspect the retained
+JSON and run `sudo -n /usr/bin/python3 -B <printed-directory>/compare-governor.py
+--restore` through `device:exec`, after the service has stopped. Do not delete
+the helper directory or restoration record until recovery is verified. A
+failed restoration keeps its record; a successful one removes it. Missing
+measurement output or an unsuccessful service is never a passing comparison.
+
+`task test:governor-recovery` checks this recovery with temporary files and
+user-systemd units on the Intel host, including forced termination and timeout.
+It needs a working user service manager, uses no sudo and never touches CPU
+settings. The ordinary host checks include the rollback tests but skip the
+real-systemd case. [Report 32](docs/32-governor-rate-comparison.md) records which
+checks have actually run; the new task is not yet qualified on the GameShell.
 
 `device:power-profile ROUTE=wifi SECONDS=120` collects an awake activity profile
 after thirty seconds settling. Keep USB unplugged, Wi-Fi connected and controls

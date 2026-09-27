@@ -110,6 +110,21 @@ def evidence_directory():
     return directory
 
 
+def governor_command(remote_dir, seconds, rate):
+    if not re.fullmatch(r'/tmp/gameshellneo-governor\.[A-Za-z0-9]+', remote_dir):
+        raise ValueError('Unexpected temporary governor comparison directory')
+    if not 60 <= seconds <= 300 or seconds % 30 or not 1000 <= rate <= 100000:
+        raise ValueError('SECONDS must be a multiple of 30 in 60..300; RATE_US must be 1000..100000')
+    script = remote_dir + '/compare-governor.py'
+    return ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+            '--unit=gameshellneo-governor-comparison',
+            '--description=GameShellNeo temporary schedutil rate comparison',
+            '--property=RuntimeMaxSec=' + str(3 * (seconds + 30) + 60),
+            '--property=TimeoutStopSec=15', '--property=Nice=10',
+            '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
+            '/usr/bin/python3', '-B', '-u', script, '--seconds', str(seconds), '--rate-us', str(rate)]
+
+
 def device_action(config, action, route):
     with device(config, route) as client:
         if action == 'exec':
@@ -194,6 +209,38 @@ def device_action(config, action, route):
             result = records[-1]
             for key in ('interrupts', 'softirqs', 'processes'):
                 result[key] = result[key][:10]
+            print(json.dumps(result, indent=2))
+        elif action == 'governor-compare':
+            seconds = int(os.environ.get('NEO_PROFILE_SECONDS', '120'))
+            rate = int(os.environ.get('NEO_GOVERNOR_RATE_US', '10000'))
+            governor_command('/tmp/gameshellneo-governor.validation', seconds, rate)
+            if route != 'wifi':
+                raise ValueError('Governor comparison requires ROUTE=wifi and USB unplugged')
+            remote_dir = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-governor.XXXXXXXX',
+                             display=False).decode().strip()
+            arguments = governor_command(remote_dir, seconds, rate)
+            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py')
+            with client.open_sftp() as sftp:
+                for name in names:
+                    upload(sftp, ROOT / 'tools' / name, remote_dir + '/' + name)
+            path = directory / 'governor-comparison.jsonl'
+            print('Capturing private comparison:', path, flush=True)
+            print('Device helper directory (retain on failure for recovery):', remote_dir, flush=True)
+            # Do not remove helpers after a transport error: ExecStopPost may still need them.
+            with path.open('wb') as output:
+                run(client, shlex.join(arguments), output=output, display=False,
+                    timeout=3 * (seconds + 30) + 90)
+            with client.open_sftp() as sftp:
+                for name in names:
+                    sftp.remove(remote_dir + '/' + name)
+                sftp.rmdir(remote_dir)
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+            if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
+                raise ValueError('Incomplete governor comparison; inspect the private capture')
+            result = records[-1]
+            for phase in result['phases']:
+                for key in ('interrupts', 'softirqs', 'processes'):
+                    phase['counters'][key] = phase['counters'][key][:10]
             print(json.dumps(result, indent=2))
         elif action == 'stability':
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
@@ -345,7 +392,8 @@ def main():
     sub = parser.add_subparsers(dest='host', required=True)
     target = sub.add_parser('device')
     target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
-                                          'stability', 'battery-check', 'idle-sample', 'power-profile'])
+                                          'stability', 'battery-check', 'idle-sample', 'power-profile',
+                                          'governor-compare'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])

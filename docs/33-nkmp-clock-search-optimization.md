@@ -17,7 +17,8 @@ the original update interval, CPU operating points, voltages and register
 programming. Native and ARM32 equivalence checks passed. A separately versioned
 `0.1.0-diagnostic.3` image with `6.18.54-gameshellneo3` has built and passed
 offline verification.
-It has not yet been flashed or qualified on the owner's board.
+It has been flashed to the Samsung DEV card with a matching full-image
+readback. Boot and performance qualification on the owner's board are pending.
 
 ## Change and reasoning
 
@@ -150,12 +151,18 @@ armhf` succeeded, and the target's installation and verification completed.
 compressed checksum and complete decompressed image checksum passed there.
 The gzip transfer contains 264,318,562 bytes, SHA-256
 `524531a99acdf24e08b8fe9f5284369ec7da0db01e49a1c0a6efd23c0cb30696`.
-The owner has been asked to shut down and move the Samsung DEV card to the
-Mac; physical flashing and boot qualification are pending.
+The owner confirmed shutdown and moved the Samsung DEV card to the Mac.
+Fresh inspection identified the external physical USB card as `disk16`,
+64,013,467,648 bytes, 512-byte sectors, media `Micro SD/M2`, existing FAT volume
+`armbi_boot`, UUID `756E795A-FA10-319A-8161-7149A8C7F640`.
 
-Physical qualification requires moving the Samsung development card to the
-Mac, identifying it afresh, flashing through the shared task, then booting it
-in the GameShell. The original card and its recovery backup remain available.
+`task mac:preflight` passed before `task mac:flash DISK=disk16`. The flash wrote
+all 4,294,967,296 bytes, read back the same complete range and matched the raw
+image SHA-256 above. The card was ejected successfully. Private flash log and
+result: `.local/diagnostics/20260927T105524.449111Z/`.
+The owner has been asked to reinsert the card, reconnect USB and boot; this
+readback is not yet a successful boot. The original card and recovery backup
+remain available.
 
 After flashing, check the new release, USB/Wi-Fi access, services, display,
 battery policy and kernel health. Exercise CPU load and recovery across the

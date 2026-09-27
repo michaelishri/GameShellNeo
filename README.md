@@ -16,8 +16,9 @@ verified. [First-boot results](docs/26-first-card-and-boot-validation.md) record
 the live USB correction and remaining NEO-5/NEO-7 qualification work. The
 [latest refresh](docs/27-diagnostic-integration-refresh.md), `0.1.0-diagnostic.2`,
 includes that correction, explicit New Zealand provisioning and the kernel/
-userspace integration fixes. It passes offline verification and has not yet
-been flashed or booted. The original card now has a
+userspace integration fixes. It passes offline verification and is flashed to
+the DEV card with a matching full-image readback; its first boot remains pending.
+The original card has a
 [verified recovery backup](docs/28-original-card-recovery-backup.md) on both hosts.
 
 Passwords, Wi-Fi credentials and private connection settings belong in the

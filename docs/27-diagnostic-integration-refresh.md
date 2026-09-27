@@ -1,8 +1,9 @@
 # Diagnostic image integration refresh — NEO-7
 
-Date: 27 September 2026. Target: the owner's CPI v3.1. This work prepares
-`0.1.0-diagnostic.2` with Linux `6.18.54-gameshellneo2`; physical verification
-remains pending until the development card is reflashed and booted.
+Date: 27 September 2026. Target: the owner's CPI v3.1. This work produces
+`0.1.0-diagnostic.2` with Linux `6.18.54-gameshellneo2`. The development card
+is now flashed with a matching full-image readback; its first boot and physical
+integration checks remain pending.
 
 ## Baseline and implemented corrections
 
@@ -117,7 +118,7 @@ private artifact is:
 | Compressed transfer bytes | 264,295,865 |
 | Compressed SHA-256 | `0a4f1317e749b107a511baec5e91b93545e078aebbd714667e47ef703cf1a2a2` |
 | Kernel | `6.18.54-gameshellneo2` |
-| Hardware qualification | Pending; image has not yet been flashed or booted |
+| Hardware qualification | Pending; DEV-card flash/readback passed, first boot remains pending |
 
 Checks covered the partition boundaries and bootloader readback, FAT16/ext4
 integrity, U-Boot image CRCs/addresses, kernel/DTB/module/radio hashes, private
@@ -134,7 +135,29 @@ image sizes/hashes. The private image and `transfer.json` are staged under
 `~/.local/share/GameShellNeo/`. No card was written by that task. These checks
 do not establish physical behavior.
 
-After flashing and booting the candidate, compare against the saved baseline:
+### Verified DEV-card flash
+
+After the owner moved the DEV card into the Mac reader, `task mac:status` and
+`task mac:inspect DISK=disk16` freshly identified the 64,013,467,648-byte
+external physical USB card with its existing `armbi_boot` FAT16 volume and
+diagnostic Linux partition. The separate original card had already been backed
+up and ejected. The temporary `disk16` identifier must be rechecked for any
+future write.
+
+`task mac:preflight` passed the source checksums and recorded-card identity.
+`task mac:flash DISK=disk16` then unmounted and revalidated the target, wrote
+all 4,294,967,296 image bytes, flushed them, and read back the full image range.
+The readback SHA-256 exactly matched
+`d3458c373a4281f12e424b8e3448da2f55c21309d34f2fa70b4a90b4b5eb21d8`.
+The Mac successfully ejected the card. Private evidence is under
+`.local/diagnostics/20260927T014027.581733Z/`: `flash.log`, `flash-result.json`,
+`target-before-flash.json` and `transfer.json`.
+
+This verifies the written image bytes, not a boot or the behavior of the new
+kernel and services. The next owner action is to return the DEV card to the
+powered-off GameShell, reconnect USB to the Mac, and boot it.
+
+After booting the candidate, compare against the saved baseline:
 
 1. Confirm image identity, `6.18.54-gameshellneo2`, display, USB and Wi-Fi SSH.
 2. Check that cfg80211 loads its signed database and the requested global

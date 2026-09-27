@@ -15,6 +15,7 @@ env:
   NEO_USB_CYCLES: '{{.CYCLES | default "4"}}'
   NEO_BOOT_CYCLES: '{{.CYCLES | default "4"}}'
   NEO_IDLE_SECONDS: '{{.SECONDS | default "600"}}'
+  NEO_IDLE_BACKLIGHT: '{{.BACKLIGHT | default "keep"}}'
 
 tasks:
   default:
@@ -143,7 +144,7 @@ tasks:
     cmds: [python3 tools/remote.py device battery-check]
 
   device:idle-sample:
-    desc: Sample battery-powered idle for SECONDS=600 after one minute settling; leave controls alone
+    desc: Sample battery idle for SECONDS=600 with BACKLIGHT=keep or off; leave controls alone
     cmds: [python3 tools/remote.py device idle-sample]
 
   device:boot-cycles:

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Read-only, bounded battery-powered idle sample; values remain uncalibrated."""
+"""Bounded battery-powered idle sample; optional backlight-off comparison."""
 import argparse
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import re
+import signal
 import statistics
 import subprocess
 import sys
@@ -16,6 +18,33 @@ def read(path):
 
 def emit(event, **values):
     print(json.dumps({'event': event, **values}), flush=True)
+
+
+@contextmanager
+def backlight_mode(mode, directory=Path('/sys/class/backlight/ocp8178')):
+    if mode == 'keep':
+        yield
+        return
+    previous = int(read(directory / 'brightness'))
+    if (mode != 'off' or not 0 < previous <= int(read(directory / 'max_brightness')) or
+            int(read(directory / 'bl_power')) != 0):
+        raise ValueError('Backlight-off comparison requires a lit, unblanked display')
+    try:
+        (directory / 'brightness').write_text('0\n')
+        if int(read(directory / 'actual_brightness')) != 0:
+            raise ValueError('Backlight did not report off')
+        emit('backlight_off', previous_brightness=previous)
+        yield
+    finally:
+        (directory / 'brightness').write_text(str(previous) + '\n')
+        if int(read(directory / 'actual_brightness')) != previous:
+            raise ValueError('Backlight restoration readback failed')
+        emit('backlight_restored', brightness=previous)
+
+
+def interrupted(signum, _frame):
+    # Let the context manager restore brightness before leaving the process.
+    raise InterruptedError('Idle sample interrupted by signal ' + str(signum))
 
 
 def wifi_signal():
@@ -87,27 +116,17 @@ def summarize(samples):
     }
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--seconds', type=int, default=600)
-    args = parser.parse_args()
-    if not 60 <= args.seconds <= 3600 or args.seconds % 10:
-        parser.error('seconds must be a multiple of 10 in 60..3600')
-    supplies = list(Path('/sys/class/power_supply').iterdir())
-    batteries = [p for p in supplies if read(p / 'type') == 'Battery']
-    inputs = [p for p in supplies if read(p / 'type') != 'Battery' and (p / 'online').is_file()]
-    if len(batteries) != 1 or not inputs:
-        raise ValueError('Expected one battery and identifiable external-power inputs')
-    initial = sample(batteries[0], inputs)
+def measure(battery, inputs, seconds, mode):
+    initial = sample(battery, inputs)
     fixed = ('boot_id', 'brightness', 'bl_power', 'governor')
 
     def checked_sample():
-        value = sample(batteries[0], inputs)
+        value = sample(battery, inputs)
         if any(value[key] != initial[key] for key in fixed):
             raise ValueError('Boot, brightness or governor changed during sampling')
         return value
 
-    emit('ready', seconds=args.seconds, settle_seconds=60, interval_seconds=10,
+    emit('ready', seconds=seconds, backlight_mode=mode, settle_seconds=60, interval_seconds=10,
          wifi_signal_dbm=wifi_signal(), initial=initial,
          conditions='No controls or other diagnostic tasks. Quiet Wi-Fi SSH stays connected; '
                     'one JSON sample is sent every ten seconds. Battery guard remains active.')
@@ -117,7 +136,7 @@ def main():
         emit('settling', remaining_seconds=remaining)
     samples = []
     started = time.monotonic()
-    for index in range(args.seconds // 10 + 1):
+    for index in range(seconds // 10 + 1):
         target = started + 10 * index
         time.sleep(max(0, target - time.monotonic()))
         value = checked_sample()
@@ -126,7 +145,28 @@ def main():
             raise ValueError('Sampling gap exceeded twenty seconds')
         samples.append(value)
         emit('sample', **value)
-    emit('complete', passed=True, wifi_signal_dbm=wifi_signal(), **summarize(samples))
+    return dict(wifi_signal_dbm=wifi_signal(), **summarize(samples))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--seconds', type=int, default=600)
+    parser.add_argument('--backlight', choices=('keep', 'off'), default='keep')
+    args = parser.parse_args()
+    if not 60 <= args.seconds <= 3600 or args.seconds % 10:
+        parser.error('seconds must be a multiple of 10 in 60..3600')
+    supplies = list(Path('/sys/class/power_supply').iterdir())
+    batteries = [p for p in supplies if read(p / 'type') == 'Battery']
+    inputs = [p for p in supplies if read(p / 'type') != 'Battery' and (p / 'online').is_file()]
+    if len(batteries) != 1 or not inputs:
+        raise ValueError('Expected one battery and identifiable external-power inputs')
+    sample(batteries[0], inputs)  # Check battery/health before an optional display write.
+    for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
+        signal.signal(signum, interrupted)
+    with backlight_mode(args.backlight):
+        result = measure(batteries[0], inputs, args.seconds, args.backlight)
+    # Success includes restoration, not just collection of the last sample.
+    emit('complete', passed=True, backlight_mode=args.backlight, **result)
 
 
 if __name__ == '__main__':

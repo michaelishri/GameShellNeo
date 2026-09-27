@@ -1,6 +1,9 @@
 import importlib.util
 from pathlib import Path
+import signal
+import tempfile
 import unittest
+from unittest.mock import patch
 
 source = Path(__file__).resolve().parents[1] / 'sample-idle.py'
 spec = importlib.util.spec_from_file_location('idle_sample', source)
@@ -32,3 +35,36 @@ class IdleUnits(unittest.TestCase):
     def test_nonincreasing_time_is_rejected(self):
         with self.assertRaises(ValueError):
             idle.summarize([self.reading(10, -100000), self.reading(10, -100000)])
+
+
+class BacklightRestoration(unittest.TestCase):
+    def test_restore_after_success_failure_or_termination(self):
+        for outcome in ('success', 'failure', 'termination'):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                for name, value in dict(brightness='1', max_brightness='31', bl_power='0').items():
+                    (root / name).write_text(value)
+                # Model hardware that immediately reports the requested brightness.
+                (root / 'actual_brightness').symlink_to(root / 'brightness')
+                with patch.object(idle, 'emit'):
+                    try:
+                        with idle.backlight_mode('off', root):
+                            self.assertEqual((root / 'brightness').read_text().strip(), '0')
+                            if outcome == 'failure':
+                                raise OSError('Lost sampling input')
+                            if outcome == 'termination':
+                                idle.interrupted(signal.SIGTERM, None)
+                    except OSError:
+                        self.assertNotEqual(outcome, 'success')
+                self.assertEqual((root / 'brightness').read_text().strip(), '1')
+
+    def test_failed_off_readback_restores_original(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name, value in dict(brightness='1', actual_brightness='1',
+                                    max_brightness='31', bl_power='0').items():
+                (root / name).write_text(value)
+            with patch.object(idle, 'emit'), self.assertRaisesRegex(ValueError, 'did not report off'):
+                with idle.backlight_mode('off', root):
+                    self.fail('Must not begin measurement after failed off readback')
+            self.assertEqual((root / 'brightness').read_text().strip(), '1')

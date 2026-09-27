@@ -20,8 +20,8 @@ userspace integration fixes. Its first boot, USB/Wi-Fi access and live integrati
 checks passed on the owner's accepted AU-advertising access point. Repeated
 hardware tests remain under NEO-5. [Hardware qualification](docs/29-hardware-qualification.md)
 records ten cold starts, ten USB reconnections, basic keypad/backlight and load
-checks, power transitions, installed battery-policy simulations, the first
-awake-idle power estimate and the remaining Lightkey/charging findings.
+checks, power transitions, installed battery-policy simulations, two consistent
+awake-idle power estimates and the remaining Lightkey/charging findings.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a
@@ -205,6 +205,7 @@ task device:usb-reconnects CYCLES=4 # Wait for ready, then operate the USB cable
 task device:stability ROUTE=usb # Keep the board connected throughout
 task device:battery-check ROUTE=wifi # Isolated simulation; no real power-off or charger writes
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
+task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:boot-cycles CYCLES=4 # Wait for ready, then operate the power button
 task device:boot-cycles CYCLES=0 # Capture/check this boot without starting a batch
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
@@ -275,7 +276,8 @@ shutdown reserve, percentage accuracy or charging limits. It needs no image rebu
 `device:idle-sample ROUTE=wifi SECONDS=600` records a repeatable awake-idle
 scenario after one minute of settling. Unplug USB, keep Wi-Fi associated and
 leave the controls alone; avoid other diagnostics during the run. The task
-preserves brightness and governor settings and samples every ten seconds.
+preserves brightness and governor settings by default (`BACKLIGHT=keep`) and
+samples every ten seconds.
 It stops sampling if external power returns, brightness/governor changes,
 Wi-Fi disconnects, the guard becomes invalid/stale, capacity reaches 20%,
 temperature reaches 80 °C or the kernel is tainted. These stops do not request
@@ -290,8 +292,20 @@ one transmitted sample per ten seconds and the ordinary ten-second battery
 guard; it is not an observer-free idle measurement. The temporary service has
 a runtime bound of the requested sample duration plus two minutes. `SECONDS`
 accepts multiples of ten from 60 to 3600; the initial settling minute is extra.
-A complete result is required before interpreting the run. No charger, gauge,
-radio, display or CPU setting is written, and no image rebuild is needed.
+A complete result is required before interpreting the run. With the default
+`BACKLIGHT=keep`, no charger, gauge, radio, display or CPU setting is written.
+No image rebuild is needed.
+
+Use `BACKLIGHT=off` for the backlight comparison. Start with a lit, unblanked
+display; the task checks battery/health first, saves brightness, sets it to
+zero and verifies the driver's `actual_brightness` before settling. It restores
+and verifies the original brightness on completion, sampling errors or handled
+HUP/INT/TERM termination. A successful final result requires restoration to
+succeed. A forced SIGKILL cannot run cleanup; if necessary, restore the original
+value using `device:exec` over Wi-Fi. The display controller/panel, Wi-Fi and CPU
+settings stay unchanged: this measures backlight savings while awake, not full
+display power-down or sleep. Leave USB unplugged and controls alone for the
+entire run, including the automatic return to the original brightness.
 
 `device:boot-cycles CYCLES=4` observes physical shutdown/startup cycles over
 USB SSH through the Mac and checks direct Wi-Fi SSH on every captured boot.

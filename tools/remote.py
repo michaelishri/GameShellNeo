@@ -159,14 +159,18 @@ def device_action(config, action, route):
                 run(client, shlex.join(arguments), output=output, timeout=90)
         elif action == 'idle-sample':
             seconds = int(os.environ.get('NEO_IDLE_SECONDS', '600'))
+            backlight = os.environ.get('NEO_IDLE_BACKLIGHT', 'keep')
             if not 60 <= seconds <= 3600 or seconds % 10:
                 raise ValueError('SECONDS must be a multiple of 10 in 60..3600')
+            if backlight not in ('keep', 'off'):
+                raise ValueError('BACKLIGHT must be keep or off')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-idle-sample',
                          '--property=RuntimeMaxSec=' + str(seconds + 120),
                          '--property=TimeoutStopSec=10', '--property=Nice=10',
                          '/usr/bin/python3', '-B', '-u', '-c',
-                         (ROOT / 'tools/sample-idle.py').read_text(), '--seconds', str(seconds)]
+                         (ROOT / 'tools/sample-idle.py').read_text(), '--seconds', str(seconds),
+                         '--backlight', backlight]
             with (directory / 'idle-sample.jsonl').open('wb') as output:
                 run(client, shlex.join(arguments), output=output, timeout=90)
         elif action == 'stability':

@@ -550,7 +550,7 @@ shutdown reserve, percentage accuracy and charging limits remain open.
 ## Awake-idle baseline
 
 `task device:idle-sample ROUTE=wifi SECONDS=600` now provides a bounded,
-read-only measurement: one minute settling, then ten minutes of software
+measurement that is read-only by default: one minute settling, then ten minutes of software
 readings at ten-second intervals. It preserves the existing brightness and
 CPU governor and checks that battery-only operation, Wi-Fi association and
 valid battery monitoring continue. It stops sampling on changed conditions,
@@ -611,16 +611,66 @@ Private evidence:
 `postcheck.txt` in the same directory, and
 `.local/diagnostics/20260927T054541.151942Z/status.txt`.
 
-A second run with unchanged settings is the next check, to assess repeatability
-before changing display or power settings. This first run passes capture and
-continuity checks; repeatability, endurance and electrical accuracy remain open.
+### Repeat dim-screen run
+
+The second run also completed successfully with 61 samples over 600.003
+seconds on the same boot. Brightness 1/31, `bl_power=0`, `schedutil`, battery-only
+operation and associated Wi-Fi remained unchanged. The signal readings were
+-79 dBm initially and -78 dBm at completion. The guard remained valid, kernel
+taint stayed zero, maximum sample interval was 10.008 seconds and maximum
+lateness was below 9 ms.
+
+| Software-derived quantity | First run | Repeat |
+| --- | ---: | ---: |
+| Time-weighted discharge current | 263.52 mA | 267.52 mA |
+| Time-weighted battery power | 1.042 W | 1.049 W |
+| Integrated charge estimate | 43.92 mAh | 44.59 mAh |
+| Integrated energy estimate | 173.68 mWh | 174.83 mWh |
+| Reported capacity, measurement start → end | 92% → 90% | 89% → 87% |
+| Peak sampled temperature | 39.852 °C | 40.014 °C |
+
+The repeat's average power was 6.91 mW (0.66%) higher, and its average current
+was 4.01 mA (1.52%) higher. Sampled voltage had fallen to 3.9116–3.9325 V;
+power accounts for that change whereas current alone does not. These two nearby
+windows show a consistent initial baseline of approximately 1.04–1.05 W for
+this scenario. Their agreement does not calibrate the sensor, prove gauge
+accuracy or quantify uncertainty across battery levels, radio conditions or
+days. No third identical run is needed before a controlled comparison.
+
+The repeat service exited successfully and was collected, reporting 3.237
+seconds CPU time and a 5.3 MiB memory peak. The postcheck at 05:59–06:00 UTC
+reached the same boot with all six expected services active, zero restarts,
+no failed units, zero taint and no new kernel messages since the repeat began.
+USB remained offline and monitoring was valid at 86% Discharging.
+
+Private evidence:
+`.local/diagnostics/20260927T054649.351148Z/idle-sample.jsonl`,
+`postcheck.txt` in the same directory, and
+`.local/diagnostics/20260927T055939.897642Z/status.txt`.
+
+### Prepared backlight-off comparison
+
+The same task now accepts `BACKLIGHT=off`. It checks battery-only health before
+changing brightness, saves the current value, requests zero brightness and
+checks `actual_brightness`. Sampling and settling are identical to the default
+run. A `finally` cleanup restores and verifies brightness on completion, errors
+and handled HUP/INT/TERM signals; the final successful result follows restoration.
+Host regressions cover successful collection, an input failure, termination and
+failed off readback. `task check` passed all 36 Python tests, the current-selector
+C regression, shell syntax and ShellCheck.
+
+This comparison isolates the requested backlight change while keeping the panel
+unblanked, the system awake and Wi-Fi associated. It does not test full display
+power-down or suspend. The existing guard and charger/gauge settings are
+unchanged. The hardware result remains pending until collection and restoration
+finish successfully.
 
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
 - Local operation without an access point.
 - Charging-voltage discrepancy and replacement-pack limits (NEO-10).
-- Physical low-battery reserve, awake-idle repeatability/comparisons and separate
+- Physical low-battery reserve, awake-idle power comparisons and separate
   readiness timings with their uncertainty.
 
 Sleep remains disabled. A short power-button press still requests shutdown;

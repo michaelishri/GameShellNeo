@@ -328,6 +328,11 @@ trace validation or cleanup cannot be verified. Failed runs are not reported
 as successful results. [Report 35](docs/35-usb-detection-capture.md) records
 preparation, hardware evidence and measurement limits.
 
+[Report 36](docs/36-usb-polling-policy.md) defines the next experimental USB
+polling policy: a slower fallback only for confirmed absence in this fixed
+peripheral configuration, retaining interrupt notifications and fast checks
+for uncertainty. It is a design; diagnostic.3 still uses the existing policy.
+
 `device:stability ROUTE=usb` writes a new temporary 128 MiB random file, flushes
 it to storage and checks its SHA-256 with a direct read that bypasses the file
 data cache. It then runs five minutes of `stress-ng` with four CPU workers,

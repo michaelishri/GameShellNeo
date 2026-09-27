@@ -18,6 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [35 — USB detection capture](35-usb-detection-capture.md) | Shared IRQ/uevent/controller recorder, read-only PMIC configuration, test coverage and instrumented cable cycles |
 | [34 — USB status polling investigation](34-usb-status-polling-investigation.md) | AXP223 polling rationale, USB detection deadlines, board wiring, live attached state and requirements for reducing unnecessary work |
 | [33 — NKMP clock-search optimization](33-nkmp-clock-search-optimization.md) | Exact-match exit, native/ARM32 equivalence, verified diagnostic.3 installation, 92% lower recorded governor CPU time and power measurement limits |
 | [32 — Governor-rate comparison and function attribution](32-governor-rate-comparison.md) | Live original/slower/original comparison, restoration, modest estimated power savings, directly sampled NKMP cost and reusable perf workflow |

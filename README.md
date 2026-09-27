@@ -233,6 +233,8 @@ task device:logs ROUTE=usb
 task device:check ROUTE=usb
 task device:backlight ROUTE=usb # Watch the screen during this test
 task device:usb-reconnects CYCLES=4 # Wait for ready, then operate the USB cable
+task device:usb-detect CYCLES=0 SECONDS=8 # Unplugged smoke capture; no cable actions
+task device:usb-detect CYCLES=4 # Start unplugged; detailed IRQ/events over Wi-Fi
 task device:stability ROUTE=usb # Keep the board connected throughout
 task device:battery-check ROUTE=wifi # Isolated simulation; no real power-off or charger writes
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
@@ -281,6 +283,50 @@ private capture prints the retained device path.
 Use batches of four, four and two for ten cycles. The default overall wait is
 ten minutes; `CYCLES` accepts 1–10. This task always uses USB and ignores `ROUTE`.
 It does not qualify idle power while a temporary recorder is running.
+
+`device:usb-detect CYCLES=4` is the detailed CPI v3.1 diagnostic, using Wi-Fi
+for control and the Mac's USB route for a separate SSH check on each attachment.
+Start with USB **unplugged**, the board running and battery monitoring valid
+above 20%. Wait for `ready`, then repeat four times: connect USB for 20 seconds,
+disconnect it for 10 seconds. Finish unplugged. Each cycle requires USB SSH on
+the same boot followed by a stable disconnected observation; an unchecked or
+overlapping cycle fails. `CYCLES=0 SECONDS=8` checks the recorder without cable
+actions. This task always uses Wi-Fi for control and ignores `ROUTE`.
+
+The temporary on-device recorder samples cached controller/OTG/extcon state
+and PMIC IRQ counters every nominal 20 ms. It also receives kernel power-supply
+uevents and reads supply properties about once a second or when sampled state
+changes. It records monotonic read windows, gaps, CPU overhead and separate
+Mac/USB SSH checks. These are software observation times: there is no physical
+cable-edge timestamp, and 20 ms scheduling is not guaranteed. A successful test
+does **not** certify the 100 ms hardware detection deadline or measure energy.
+The fast sampler adds substantial observer work; use it only for bounded
+detection tests, never concurrently with idle-power measurements.
+
+At startup it reads only PMIC registers `00`, `30`, `40` and `8f` through the
+locked debugfs layout, plus live DT/regulator configuration. Control values
+`30`/`8f` may be cached; these are not independent pin-voltage measurements.
+No IRQ-status registers or hardware settings are written. Trace sequence/boot
+changes, counter resets, malformed data, netlink truncation/receive errors and
+missing completion fail the task. Captures remain private under `.local/diagnostics/`
+as `device-trace.jsonl`, `usb-detection.jsonl` and `summary.json`.
+
+`SECONDS` defaults to 600 (5–900 accepted); the recorder has its own duration
+and a systemd runtime cap. The host fetches only newly appended trace bytes in
+bounded SFTP reads and reconnects once after a stale Wi-Fi transport. Startup
+mutations are not automatically replayed. It stops the recorder and removes
+staged files after a clean capture. On failure, inspect the printed temporary
+directory and captured journal if retained; the automatic runtime cap still
+applies if Wi-Fi is lost. To stop a running recorder explicitly:
+
+```sh
+task device:exec ROUTE=wifi -- sudo -n systemctl stop gameshellneo-usb-detection.service
+```
+
+Local evidence is retained on failure; remote staged files remain when final
+trace validation or cleanup cannot be verified. Failed runs are not reported
+as successful results. [Report 35](docs/35-usb-detection-capture.md) records
+preparation, hardware evidence and measurement limits.
 
 `device:stability ROUTE=usb` writes a new temporary 128 MiB random file, flushes
 it to storage and checks its SHA-256 with a direct read that bypasses the file

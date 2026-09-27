@@ -13,6 +13,7 @@ env:
   NEO_COMMAND: '{{.CLI_ARGS}}'
   NEO_ACTIVE_COUNTRY: '{{.ACTIVE_COUNTRY | default ""}}'
   NEO_USB_CYCLES: '{{.CYCLES | default "4"}}'
+  NEO_USB_DETECT_SECONDS: '{{.SECONDS | default "600"}}'
   NEO_BOOT_CYCLES: '{{.CYCLES | default "4"}}'
   NEO_IDLE_SECONDS: '{{.SECONDS | default "600"}}'
   NEO_IDLE_BACKLIGHT: '{{.BACKLIGHT | default "keep"}}'
@@ -150,6 +151,10 @@ tasks:
   device:usb-reconnects:
     desc: Record CYCLES=4 cable removals on the board and verify USB SSH after each return
     cmds: [python3 tools/check-usb-reconnects.py]
+
+  device:usb-detect:
+    desc: Capture detailed USB IRQ/state events over Wi-Fi; start unplugged, CYCLES=4 (0 for smoke)
+    cmds: [python3 tools/check-usb-detection.py]
 
   device:stability:
     desc: Check a temporary 128 MiB file and run five minutes of CPU/memory load; keep USB connected

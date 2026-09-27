@@ -547,7 +547,7 @@ The postcheck above confirmed the live service remained healthy. This
 qualifies the installed software's simulated behavior; physical low-battery
 shutdown reserve, percentage accuracy and charging limits remain open.
 
-## Prepared awake-idle baseline
+## Awake-idle baseline
 
 `task device:idle-sample ROUTE=wifi SECONDS=600` now provides a bounded,
 read-only measurement: one minute settling, then ten minutes of software
@@ -562,16 +562,65 @@ frequency, signal context and actual sample times. Its summary integrates
 current and power over elapsed time. Estimates remain uncalibrated and
 include an open Wi-Fi SSH connection, transmitted samples and the existing
 battery guard. Host regression tests verify charge/energy units and
-nonuniform sampling integration. No on-device idle result is claimed here
-until a run completes successfully; this does not establish true capacity
-or extrapolated endurance.
+nonuniform sampling integration. A complete run is required before interpreting
+its results; this does not establish true capacity or extrapolated endurance.
+
+### First dim-screen run
+
+The first run completed successfully on 27 September 2026. The temporary
+service ran from 05:33:07 to 05:44:08 UTC, including its settling minute.
+All 61 measurement samples covered 599.996 seconds on boot
+`b82a951a-31a3-4e7f-b4db-69a4fc5aa894`. The owner confirmed leaving the
+device alone for the requested interval.
+
+Conditions remained constant: USB/AC offline, battery present and Discharging,
+brightness 1/31 with `bl_power=0`, Wi-Fi associated and `schedutil` active.
+The guard remained valid with samples 5.34–6.95 seconds old; kernel taint
+stayed zero. The largest sampling interval was 10.007 seconds and maximum
+lateness was below 10 ms. Wi-Fi signal was -76 dBm initially and -77 dBm
+at completion.
+
+| Software-derived quantity | First run |
+| --- | ---: |
+| Time-weighted discharge current | 263.52 mA |
+| Time-weighted battery power | 1.042 W |
+| Sampled power range | 0.995–1.079 W |
+| Integrated charge estimate | 43.92 mAh |
+| Integrated energy estimate | 173.68 mWh |
+| Reported capacity, measurement start → end | 92% → 90% |
+| Sampled battery voltage range | 3.9413–3.9655 V |
+| Sampled temperature range | 38.394–39.852 °C |
+
+The readings provide an initial comparison point for this particular awake
+scenario, not a calibrated electrical measurement. The two-percentage-point
+gauge movement must not be used to infer pack capacity or reconcile the
+integrated estimate. Frequency samples ranged from 240 to 1008 MHz; reading
+them wakes software, so they do not establish idle residency or a persistent
+minimum frequency. Weak Wi-Fi signal and the SSH/sampling observer remain
+part of the recorded conditions.
+
+The service exited successfully and was collected. Its reported CPU time
+was 3.016 seconds with a 5.7 MiB memory peak; that accounts for this service,
+not all SSH, driver or battery-monitor overhead. The postcheck at 05:45 UTC
+reached the same boot with all six expected services active, zero restarts,
+no failed units, zero taint and no new kernel entries since the run began.
+USB remained disconnected and the guard remained valid at 90% Discharging.
+
+Private evidence:
+`.local/diagnostics/20260927T053302.905042Z/idle-sample.jsonl`,
+`postcheck.txt` in the same directory, and
+`.local/diagnostics/20260927T054541.151942Z/status.txt`.
+
+A second run with unchanged settings is the next check, to assess repeatability
+before changing display or power settings. This first run passes capture and
+continuity checks; repeatability, endurance and electrical accuracy remain open.
 
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
 - Local operation without an access point.
 - Charging-voltage discrepancy and replacement-pack limits (NEO-10).
-- Physical low-battery reserve, timed awake-idle measurements and separate
+- Physical low-battery reserve, awake-idle repeatability/comparisons and separate
   readiness timings with their uncertainty.
 
 Sleep remains disabled. A short power-button press still requests shutdown;

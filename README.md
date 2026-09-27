@@ -20,7 +20,8 @@ userspace integration fixes. Its first boot, USB/Wi-Fi access and live integrati
 checks passed on the owner's accepted AU-advertising access point. Repeated
 hardware tests remain under NEO-5. [Hardware qualification](docs/29-hardware-qualification.md)
 records ten cold starts, ten USB reconnections, basic keypad/backlight and load
-checks, power transitions and the remaining Lightkey/charging findings.
+checks, power transitions, installed battery-policy simulations, the first
+awake-idle power estimate and the remaining Lightkey/charging findings.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a

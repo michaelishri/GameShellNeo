@@ -14,6 +14,7 @@ env:
   NEO_ACTIVE_COUNTRY: '{{.ACTIVE_COUNTRY | default ""}}'
   NEO_USB_CYCLES: '{{.CYCLES | default "4"}}'
   NEO_BOOT_CYCLES: '{{.CYCLES | default "4"}}'
+  NEO_IDLE_SECONDS: '{{.SECONDS | default "600"}}'
 
 tasks:
   default:
@@ -136,6 +137,14 @@ tasks:
   device:stability:
     desc: Check a temporary 128 MiB file and run five minutes of CPU/memory load; keep USB connected
     cmds: [python3 tools/remote.py device stability]
+
+  device:battery-check:
+    desc: Simulate critical and invalid readings against the installed guard without shutting down
+    cmds: [python3 tools/remote.py device battery-check]
+
+  device:idle-sample:
+    desc: Sample battery-powered idle for SECONDS=600 after one minute settling; leave controls alone
+    cmds: [python3 tools/remote.py device idle-sample]
 
   device:boot-cycles:
     desc: Observe CYCLES=4 physical power cycles; keep USB connected (CYCLES=0 captures current boot only)

@@ -148,6 +148,27 @@ def device_action(config, action, route):
                     sftp.rmdir(remote_dir)
                     print('Private integration evidence:', directory)
             return
+        elif action == 'battery-check':
+            source = ROOT / 'runtime/usr/local/lib/gameshellneo/battery_guard.py'
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            arguments = ['env', 'NEO_BATTERY_MODULE=/usr/local/lib/gameshellneo/battery_guard.py',
+                         'NEO_BATTERY_SHA256=' + digest, '/usr/bin/timeout', '60',
+                         '/usr/bin/python3', '-B', '-c',
+                         (ROOT / 'runtime/tests/test_battery.py').read_text(), '-v']
+            with (directory / 'battery-policy.txt').open('wb') as output:
+                run(client, shlex.join(arguments), output=output, timeout=90)
+        elif action == 'idle-sample':
+            seconds = int(os.environ.get('NEO_IDLE_SECONDS', '600'))
+            if not 60 <= seconds <= 3600 or seconds % 10:
+                raise ValueError('SECONDS must be a multiple of 10 in 60..3600')
+            arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
+                         '--collect', '--unit=gameshellneo-idle-sample',
+                         '--property=RuntimeMaxSec=' + str(seconds + 120),
+                         '--property=TimeoutStopSec=10', '--property=Nice=10',
+                         '/usr/bin/python3', '-B', '-u', '-c',
+                         (ROOT / 'tools/sample-idle.py').read_text(), '--seconds', str(seconds)]
+            with (directory / 'idle-sample.jsonl').open('wb') as output:
+                run(client, shlex.join(arguments), output=output, timeout=90)
         elif action == 'stability':
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-stability-test',
@@ -297,7 +318,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='host', required=True)
     target = sub.add_parser('device')
-    target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight', 'stability'])
+    target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
+                                          'stability', 'battery-check', 'idle-sample'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])

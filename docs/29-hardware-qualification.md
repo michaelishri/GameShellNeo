@@ -515,12 +515,63 @@ change, not percentage accuracy or a discharge curve. Evidence is
 `identified-pack-status.txt` in the same private directory; the check made no
 charger or gauge writes.
 
+The owner subsequently reported another brief USB reconnection and removal.
+The guard journal recorded Charging at 05:20:29 UTC and Discharging at
+05:20:39 UTC. At 05:25:25 UTC, Wi-Fi reached the same boot, USB power was
+offline and monitoring was valid at 94% and 3,980,900 µV. The guard retained
+PID 266 with zero restarts, there were no failed units, and the kernel had
+zero taint with no new entries since the preceding check. This establishes
+software continuity, not the electrical effect of the brief charge interval.
+Evidence: `policy-postcheck.txt` in the same private directory.
+
+## Installed battery-policy simulation
+
+`task device:battery-check ROUTE=wifi` passed all nine battery test methods
+on the running ARM system. The six main-loop methods cover fifteen scenarios,
+in addition to three existing parser/policy methods. The installed guard's
+SHA-256 matched the tracked production source:
+`834c5b6c1b834b22752ec21ed7088fc8e1eea10f35cd164edaaac45fea42a6f0`.
+
+The scenarios cover three consecutive low readings at the provisional 10%
+boundary; suppression while charging or above the threshold; invalid and
+missing readings; recovery that resets the observation count; delayed or
+too-fast samples; atomic status publication; and retry after a rejected
+shutdown request. Each run uses fake power-supply files, simulated time and
+a temporary status directory. The shutdown command is intercepted inside
+the isolated process. The real guard continues running and no actual
+power-off, charger write or gauge change occurs.
+
+The on-device run completed in 0.483 seconds. Evidence:
+`.local/diagnostics/20260927T052409.864112Z/battery-policy.txt`.
+The postcheck above confirmed the live service remained healthy. This
+qualifies the installed software's simulated behavior; physical low-battery
+shutdown reserve, percentage accuracy and charging limits remain open.
+
+## Prepared awake-idle baseline
+
+`task device:idle-sample ROUTE=wifi SECONDS=600` now provides a bounded,
+read-only measurement: one minute settling, then ten minutes of software
+readings at ten-second intervals. It preserves the existing brightness and
+CPU governor and checks that battery-only operation, Wi-Fi association and
+valid battery monitoring continue. It stops sampling on changed conditions,
+20% or lower reported capacity, excessive temperature or kernel taint. The
+ordinary battery guard remains responsible for its existing shutdown policy.
+
+The task records raw current/voltage, gauge percentage, temperature,
+frequency, signal context and actual sample times. Its summary integrates
+current and power over elapsed time. Estimates remain uncalibrated and
+include an open Wi-Fi SSH connection, transmitted samples and the existing
+battery guard. Host regression tests verify charge/energy units and
+nonuniform sampling integration. No on-device idle result is claimed here
+until a run completes successfully; this does not establish true capacity
+or extrapolated endurance.
+
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
 - Local operation without an access point.
 - Charging-voltage discrepancy and replacement-pack limits (NEO-10).
-- Battery-policy hardware checks, timed awake-idle measurements and separate
+- Physical low-battery reserve, timed awake-idle measurements and separate
   readiness timings with their uncertainty.
 
 Sleep remains disabled. A short power-button press still requests shutdown;

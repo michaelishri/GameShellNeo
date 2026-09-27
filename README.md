@@ -202,6 +202,8 @@ task device:check ROUTE=usb
 task device:backlight ROUTE=usb # Watch the screen during this test
 task device:usb-reconnects CYCLES=4 # Wait for ready, then operate the USB cable
 task device:stability ROUTE=usb # Keep the board connected throughout
+task device:battery-check ROUTE=wifi # Isolated simulation; no real power-off or charger writes
+task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:boot-cycles CYCLES=4 # Wait for ready, then operate the power button
 task device:boot-cycles CYCLES=0 # Capture/check this boot without starting a batch
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
@@ -254,6 +256,41 @@ A transient service runs at reduced scheduling priority with a seven-minute
 limit. Results are private `stability.jsonl`; collect `device:status` and
 `device:logs` afterwards to inspect services and kernel messages. This bounded
 check does not qualify long-term endurance or idle power consumption.
+
+`device:battery-check ROUTE=wifi` runs the battery policy regressions against
+the **installed** guard after verifying its SHA-256 matches the tracked source.
+It includes the real main loop with fake power-supply files and simulated time:
+three low readings, invalid/missing telemetry, charging or capacity recovery,
+sampling gaps and retry after a rejected shutdown request. Output is retained
+privately as `battery-policy.txt`.
+
+The checks run as the SSH user with a 60-second bound. Temporary state replaces
+the real `/run/gameshellneo` path inside that process, and a test function
+records every would-be shutdown command. The live battery service continues
+running; no real shutdown request, charger write or gauge change occurs. This
+qualifies simulated behavior of the installed software, not physical low-battery
+shutdown reserve, percentage accuracy or charging limits. It needs no image rebuild.
+
+`device:idle-sample ROUTE=wifi SECONDS=600` records a repeatable awake-idle
+scenario after one minute of settling. Unplug USB, keep Wi-Fi associated and
+leave the controls alone; avoid other diagnostics during the run. The task
+preserves brightness and governor settings and samples every ten seconds.
+It stops sampling if external power returns, brightness/governor changes,
+Wi-Fi disconnects, the guard becomes invalid/stale, capacity reaches 20%,
+temperature reaches 80 °C or the kernel is tainted. These stops do not request
+power-off; the existing battery guard continues independently.
+
+The private `idle-sample.jsonl` records raw software readings, temperature,
+frequency, signal context and timing. Its final summary integrates current and
+voltage using actual sample intervals, reporting **uncalibrated estimates** of
+charge and energy. It does not establish true pack capacity, electrical meter
+accuracy or future runtime. This scenario includes an open Wi-Fi SSH connection,
+one transmitted sample per ten seconds and the ordinary ten-second battery
+guard; it is not an observer-free idle measurement. The temporary service has
+a runtime bound of the requested sample duration plus two minutes. `SECONDS`
+accepts multiples of ten from 60 to 3600; the initial settling minute is extra.
+A complete result is required before interpreting the run. No charger, gauge,
+radio, display or CPU setting is written, and no image rebuild is needed.
 
 `device:boot-cycles CYCLES=4` observes physical shutdown/startup cycles over
 USB SSH through the Mac and checks direct Wi-Fi SSH on every captured boot.

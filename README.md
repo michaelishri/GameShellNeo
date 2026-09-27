@@ -18,7 +18,9 @@ the live USB correction and initial qualification findings. The
 includes that correction, explicit New Zealand provisioning and the kernel/
 userspace integration fixes. Its first boot, USB/Wi-Fi access and live integration
 checks passed on the owner's accepted AU-advertising access point. Repeated
-hardware tests remain under NEO-5. The original card has a
+hardware tests remain under NEO-5. [Hardware qualification](docs/29-hardware-qualification.md)
+records the passing basic main-keypad checks and unresolved rear Lightkey inputs.
+The original card has a
 [verified recovery backup](docs/28-original-card-recovery-backup.md) on both hosts.
 
 Passwords, Wi-Fi credentials and private connection settings belong in the

@@ -197,6 +197,7 @@ task device:status ROUTE=usb
 task device:logs ROUTE=usb
 task device:check ROUTE=usb
 task device:backlight ROUTE=usb # Watch the screen during this test
+task device:usb-reconnects CYCLES=4 # Wait for ready, then operate the USB cable
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
 ```
 
@@ -215,6 +216,26 @@ through the normal sysfs interface; it does not suspend or reboot the board.
 Requested values and software readbacks are captured in a private
 `backlight.txt`. The person watching must confirm visible levels, darkness and
 recovery: successful sysfs readbacks alone do not establish those results.
+
+`device:usb-reconnects CYCLES=4` uses USB SSH through the Mac. A temporary
+device service records USB state changes while the cable is disconnected;
+it does not depend on GameShell Wi-Fi. It checks the initial connection,
+then prints `ready`.
+For each cycle, unplug USB for three seconds, reconnect it, and leave it
+connected for at least 30 seconds. Keep the board running on its battery.
+The device recorder must see `not attached` followed by `configured`, and a
+fresh SSH connection through the Mac must reach the same boot at the USB
+address before a cycle counts. Initial attachment is not a cycle. The task
+records state changes and successful cycles privately as `usb-reconnects.jsonl`
+with a `summary.json` and `device-states.jsonl`; interruption or timeout
+preserves partial results. If multiple removals occurred before SSH was checked,
+the task fails instead of counting unchecked cycles. The recorder is stopped
+and its temporary files removed on completion. If USB is unavailable for
+cleanup, its runtime is bounded to the test timeout plus one minute and the
+private capture prints the retained device path.
+Use batches of four, four and two for ten cycles. The default overall wait is
+ten minutes; `CYCLES` accepts 1–10. This task always uses USB and ignores `ROUTE`.
+It does not qualify idle power while a temporary recorder is running.
 
 `device:check` compares the running kernel/image with the source lock, verifies
 required services, the journal's effective user ACL, selected regdb files and

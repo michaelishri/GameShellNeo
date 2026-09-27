@@ -12,6 +12,7 @@ env:
   NEO_DISK: '{{.DISK | default ""}}'
   NEO_COMMAND: '{{.CLI_ARGS}}'
   NEO_ACTIVE_COUNTRY: '{{.ACTIVE_COUNTRY | default ""}}'
+  NEO_USB_CYCLES: '{{.CYCLES | default "4"}}'
 
 tasks:
   default:
@@ -126,6 +127,10 @@ tasks:
   device:backlight:
     desc: Cycle visible brightness and three off/on transitions, then restore; watch the screen
     cmds: [python3 tools/remote.py device backlight]
+
+  device:usb-reconnects:
+    desc: Record CYCLES=4 cable removals on the board and verify USB SSH after each return
+    cmds: [python3 tools/check-usb-reconnects.py]
 
   mac:status:
     desc: Show Mac connectivity and physical external disks without changing them

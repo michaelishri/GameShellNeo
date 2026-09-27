@@ -73,10 +73,10 @@ def device(config, route):
         yield client
 
 
-def run(client, command, password=None, output=None, display=True):
+def run(client, command, password=None, output=None, display=True, timeout=300):
     """Drain one combined channel to avoid stdout/stderr deadlocks."""
     channel = client.get_transport().open_session(timeout=10)
-    channel.settimeout(300)
+    channel.settimeout(timeout)
     channel.set_combine_stderr(True)
     try:
         channel.exec_command(command)

@@ -144,11 +144,72 @@ and `postcheck.txt`. The postcheck confirmed brightness/readback 1, unblanked
 panel, active USB/battery/SSH services and zero kernel taint. Failed-unit and
 kernel-warning checks are recorded alongside those reads.
 
+## USB reconnection results
+
+The first batch of four physical removals/reconnections passed using
+`task device:usb-reconnects CYCLES=4`. The Wi-Fi observer saw each USB removal
+and subsequent configured state. After each return, a fresh SSH connection
+through the Mac reached the USB address on the same boot. Initial attachment
+was verified separately and was not counted. A second batch of four also
+passed with the same boot throughout. A final recorded batch of two completed
+the target: **ten USB reconnections verified**, excluding the two actions
+whose observer failed as described below.
+
+Private evidence is
+`.local/diagnostics/20260927T035215.285355Z/{usb-reconnects.jsonl,summary.json}`.
+First observed configured state to completed SSH verification took 15.073,
+5.871, 13.071 and 4.314 seconds. These intervals include observer polling,
+SSH setup, retries and the final state check; they are not pure USB
+enumeration or network-ready latency measurements. Some initial SSH attempts
+failed while connectivity recovered; all four cycles completed without a
+board reboot. Subsequent instructions allow 20 seconds connected between
+removals. Wi-Fi polling during this test does not qualify idle power.
+
+The second batch is recorded in
+`.local/diagnostics/20260927T035525.615187Z/{usb-reconnects.jsonl,summary.json}`.
+Configured-state-to-verification intervals were 12.463, 3.637, 4.864 and
+3.707 seconds, with the same measurement limits above.
+
+The next requested two-cycle batch was **not verified**. Its Wi-Fi observer
+saw one removal and then failed with `Timeout opening channel`; the owner
+reported completing the actions, but no additional cycles were credited.
+Evidence is `.local/diagnostics/20260927T035838.730022Z/`. A subsequent direct
+Wi-Fi SSH attempt also failed. USB SSH remained usable on the same boot,
+with all six services active, zero restarts/failed units and no kernel taint.
+The radio was associated at -85 dBm; five subsequent ICMP probes succeeded
+and no new kernel warnings were recorded. These observations do not establish
+the cause of the SSH failures. Postcheck evidence is in
+`.local/diagnostics/20260927T040024.759411Z/`.
+
+The reusable task now runs a bounded state recorder on the GameShell and
+retrieves its events through USB SSH after reconnection. This removes the
+continuous Wi-Fi SSH dependency. It still requires a fresh USB SSH check for
+each counted cycle and rejects multiple removals between checks. The failed
+Wi-Fi-observed batch remains excluded.
+
+The final two-cycle repeat passed with on-device recording. Its complete trace
+contains configured → not attached → configured → not attached → configured;
+each return was followed by successful USB SSH on the original boot. Initial
+SSH attempts returned routing, banner/session or channel errors before later
+attempts succeeded. The temporary recorder was stopped and its remote files
+removed. Evidence is
+`.local/diagnostics/20260927T040647.062293Z/{usb-reconnects.jsonl,device-states.jsonl,summary.json}`.
+Future instructions allow 30 seconds after reconnection to leave time for
+the host's complete verification path. This confirms eventual recovery in
+the tested setup, not a latency target or ten uninterrupted first-attempt
+SSH successes.
+
+Final USB postcheck in `.local/diagnostics/20260927T041021.837995Z/status.txt`
+showed the original boot still running, all six services active with zero
+restarts, no failed units and no kernel taint. The reusable monitor and
+recorder passed Python compilation checks; `task check` passed the existing
+25 Python tests, C regressions and shell lint. The initial observer failure
+and intermittent SSH setup errors remain follow-up work.
+
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
-- Nine more cold starts to reach ten for this candidate, and ten physical
-  USB reconnections. Only the initial attachment has been verified so far.
+- Nine more cold starts to reach ten for this candidate.
 - Local operation without an access point, sustained CPU/memory/storage
   checks, frequency transitions and supervised orderly shutdown.
 - Charging/unplugging and battery-policy hardware checks, timed awake-idle

@@ -18,6 +18,7 @@ env:
   NEO_IDLE_BACKLIGHT: '{{.BACKLIGHT | default "keep"}}'
   NEO_PROFILE_SECONDS: '{{.SECONDS | default "120"}}'
   NEO_GOVERNOR_RATE_US: '{{.RATE_US | default "10000"}}'
+  NEO_PERF_SECONDS: '{{.SECONDS | default "30"}}'
 
 tasks:
   default:
@@ -59,6 +60,10 @@ tasks:
   build:kernel:
     desc: Compile the locked kernel and modules; preserve incremental build outputs
     cmds: [bash tools/run-logged.sh kernel tools/build-kernel.sh]
+
+  build:perf:
+    desc: Cross-build optional ARM perf from the locked Linux source; no image or device change
+    cmds: [bash tools/run-logged.sh perf bash tools/build-perf.sh]
 
   build:image:
     desc: Rebuild and verify userspace/image using the completed kernel stage
@@ -160,6 +165,10 @@ tasks:
   device:governor-compare:
     desc: Compare original/slower/original schedutil rates, then restore; SECONDS=120 per phase, RATE_US=10000
     cmds: [python3 tools/remote.py device governor-compare]
+
+  device:governor-profile:
+    desc: Sample sugov kernel instructions with perf for SECONDS=30; USB unplugged, settings unchanged
+    cmds: [python3 tools/remote.py device governor-profile]
 
   device:boot-cycles:
     desc: Observe CYCLES=4 physical power cycles; keep USB connected (CYCLES=0 captures current boot only)

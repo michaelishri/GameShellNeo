@@ -242,6 +242,53 @@ def device_action(config, action, route):
                 for key in ('interrupts', 'softirqs', 'processes'):
                     phase['counters'][key] = phase['counters'][key][:10]
             print(json.dumps(result, indent=2))
+        elif action == 'governor-profile':
+            seconds = int(os.environ.get('NEO_PERF_SECONDS', '30'))
+            if route != 'wifi' or not 10 <= seconds <= 60:
+                raise ValueError('Use ROUTE=wifi with USB unplugged and SECONDS in 10..60')
+            binary = LOCAL / 'build/perf/perf'
+            expected = (binary.parent / 'perf.sha256').read_text().split()[0]
+            if hashlib.sha256(binary.read_bytes()).hexdigest() != expected:
+                raise ValueError('perf binary hash mismatch; run task build:perf')
+            remote_dir = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-sugov.XXXXXXXX',
+                             display=False).decode().strip()
+            if not re.fullmatch(r'/tmp/gameshellneo-sugov\.[A-Za-z0-9]+', remote_dir):
+                raise ValueError('Unexpected temporary governor profile directory')
+            names = ('profile-governor.py', 'profile-power.py')
+            artifacts = ('perf.data', 'perf-record.txt', 'perf-report.txt', 'kallsyms.txt')
+            with client.open_sftp() as sftp:
+                for name in names:
+                    upload(sftp, ROOT / 'tools' / name, remote_dir + '/' + name)
+                upload(sftp, binary, remote_dir + '/perf')
+                sftp.chmod(remote_dir + '/perf', 0o700)
+            print('Capturing private governor profile:', directory, flush=True)
+            print('Device helper directory (retained on failure):', remote_dir, flush=True)
+            arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+                         '--unit=gameshellneo-governor-profile',
+                         '--property=RuntimeMaxSec=' + str(seconds + 60),
+                         '--property=TimeoutStopSec=15', '--property=Nice=10',
+                         '/usr/bin/python3', '-B', '-u', remote_dir + '/profile-governor.py',
+                         '--seconds', str(seconds)]
+            path = directory / 'governor-profile.jsonl'
+            try:
+                with path.open('wb') as output:
+                    run(client, shlex.join(arguments), output=output, display=False, timeout=seconds + 90)
+            finally:
+                # Keep error diagnostics too; a missing artifact never implies a successful capture.
+                with client.open_sftp() as sftp:
+                    for name in artifacts:
+                        try:
+                            sftp.get(remote_dir + '/' + name, str(directory / name))
+                        except FileNotFoundError:
+                            pass
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+            if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
+                raise ValueError('Incomplete governor profile; inspect the private capture')
+            with client.open_sftp() as sftp:
+                for name in (*names, *artifacts, 'perf'):
+                    sftp.remove(remote_dir + '/' + name)
+                sftp.rmdir(remote_dir)
+            print((directory / 'perf-report.txt').read_text())
         elif action == 'stability':
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-stability-test',
@@ -393,7 +440,7 @@ def main():
     target = sub.add_parser('device')
     target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
                                           'stability', 'battery-check', 'idle-sample', 'power-profile',
-                                          'governor-compare'])
+                                          'governor-compare', 'governor-profile'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])

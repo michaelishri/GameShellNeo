@@ -1,28 +1,151 @@
-# Temporary governor-rate comparison
+# Governor-rate comparison and function attribution
 
 Date: **2026-09-27**. Ticket: **NEO-12**, in progress. Target: the owner's CPI v3.1
 with the existing `6.18.54-gameshellneo2` diagnostic kernel.
 
 ## Status and purpose
 
-The reusable comparison task is implemented and its restoration behavior is
-tested on the Intel host. **No comparison has run on the GameShell yet.** Two
-Wi-Fi SSH attempts during this work failed before remote command execution,
-starting around 09:09 UTC. No device files or settings were changed. After the
-owner reconnected the board to the Mac, USB and Wi-Fi access both recovered.
-The previous system journal confirms the battery guard requested orderly
-shutdown at 08:12:36 UTC, followed by filesystem syncing. The new boot initially
-reported 10% and Charging, then 11–13%. [Report 29](29-hardware-qualification.md#first-observed-automatic-low-battery-shutdown)
-records the evidence and its limits. The comparison now awaits sufficient
-charge for its above-20% precondition and subsequent USB disconnection; no
-governor setting has been changed on this boot.
+**The hardware comparison and a subsequent function profile both completed.**
+Changing the schedutil update limit from 366 to 10,000 µs approximately halved
+the worker's reported CPU time; restoring 366 µs returned it to the baseline.
+Estimated battery power fell only 2–3%. The function sample directly locates
+substantial execution in the NKMP clock-factor search/calculation code.
+The original 366 µs setting is restored; no production policy or driver was
+changed. The two reusable tasks and the optional ARM `perf` build are described
+in the [README](../README.md).
+
+Initially, two SSH attempts failed because the board had shut down. After the
+owner reconnected USB, recovered logs established an orderly guard-triggered
+low-battery shutdown; see [report 29](29-hardware-qualification.md#first-observed-automatic-low-battery-shutdown).
+The current boot is `8b6f1e61-fc3a-45e4-a419-4131297ca94d`. At 09:46:14 UTC,
+the gauge reported 41% Charging. The owner unplugged USB; the 09:46:54
+preflight reported 42% Discharging, brightness 1 and rate limit 366 µs.
 
 [Report 31](31-awake-power-profile.md) found `sugov:0` using 33.94–35.79% of one
 CPU in quiet windows. The inspected schedutil update limit was 366 µs, derived
 from the advertised transition latency. The task asks whether limiting how
 frequently the governor can request changes materially reduces that overhead.
-It does not yet identify the expensive kernel function. The NKMP factor search
-remains a source-supported hypothesis, and no clock algorithm is changed.
+The later function profile below moves NKMP cost from a source-supported
+hypothesis to directly sampled execution. It does not qualify an optimization
+or assign all division samples to a specific caller.
+
+## Hardware comparison results
+
+The run started at 09:47:02 UTC and completed at 09:54:36. Each phase settled
+for thirty seconds and measured for approximately 120.4 seconds. All phases
+used brightness 1, Wi-Fi power save off, USB/AC offline, four online CPUs and
+the unchanged 120–1008 MHz OPP policy. `sugov:0` remained PID 63 with start
+tick 135. All health/configuration checks passed.
+
+| Measurement | Original before: 366 µs | Slower: 10,000 µs | Original after: 366 µs |
+| --- | ---: | ---: | ---: |
+| Governor worker CPU seconds | 42.71 | 20.98 | 42.84 |
+| Worker % of one CPU, using process accounting | 35.47% | 17.43% | 35.58% |
+| Estimated time-weighted battery power | 1.0333 W | 1.0106 W | 1.0419 W |
+| Estimated time-weighted discharge current | 275.42 mA | 270.79 mA | 280.75 mA |
+| Architectural timer interrupts/s | 219.82 | 136.15 | 222.45 |
+| RSB interrupts/s | 38.15 | 22.31 | 43.22 |
+| IRQ-work IPIs/s | 65.97 | 25.88 | 68.64 |
+| Context switches/s | 487.94 | 289.41 | 503.75 |
+| Wi-Fi MMC interrupts/s | 27.32 | 26.64 | 27.14 |
+| CPU2 accounting coverage of wall time | 82.89% | 81.32% | 84.92% |
+| Aggregate CPU accounting coverage | 95.37% | 95.08% | 95.87% |
+| Peak sampled temperature | 41.796 °C | 39.528 °C | 38.880 °C |
+| Endpoint Wi-Fi signal | −81 → −79 dBm | −82 → −83 dBm | −83 → −79 dBm |
+
+The middle phase used approximately **51% less governor-worker CPU time** than
+the mean of the controls, while the two controls closely agreed. Timer,
+IRQ-work and RSB activity also fell and returned afterward. These observations
+support an update-rate-dependent overhead. They are not a direct count of
+frequency transitions or unique wakeups.
+
+The estimated power reduction was **2.61% against the mean control power**
+(2.20% against the first control and 3.01% against the last). There were only
+13 battery samples per phase, and post-charge voltage and temperature were
+falling. Voltage ranges were 3.7444–3.7642 V, 3.7257–3.7378 V and
+3.7059–3.7158 V respectively. Radio signal also varied. These are short,
+uncalibrated software estimates, not precise savings or an endurance forecast.
+Sampled frequencies varied across all phases and are not residency measurements.
+
+The gauge remained at 42% throughout despite recorded discharge. This does
+not imply zero energy use or validate the percentage estimate after charging.
+The battery guard remained valid and its configured protection stayed active.
+
+The CPU accounting discrepancy remains unresolved. In this boot it is
+concentrated on CPU2, whereas report 31's previous boot showed it on CPU1.
+Most timer interrupts were on CPU2 during this run. In the middle phase,
+aggregate accounting reports only 0.83% busy while the worker's process
+accounting alone records 20.98 CPU seconds. Those figures do not reconcile;
+do not interpret the aggregate percentage as precise utilization or proof that
+all four CPUs were almost completely idle. The reversible process/interrupt
+changes remain useful, with that explicit measurement limitation.
+
+The comparison service exited successfully, reporting 7.453 CPU seconds and
+8.4 MiB peak memory for its whole lifetime. Postcheck confirmed 366 µs restored,
+the restoration record removed, no failed units and no new kernel journal
+entries since the preflight. The following profile ran separately, after the
+comparison had finished.
+
+## Kernel function sample
+
+`task build:perf` cross-built Linux 6.18.54's standard tool using the locked
+archive and builder container. Optional libraries/features were disabled;
+the resulting ARM EABI hard-float executable depends only on `libm.so.6`,
+`libc.so.6` and `ld-linux-armhf.so.3`. It was staged temporarily rather than
+installed into the image. Binary SHA-256:
+`52794666237e2717cc8fe1e6494b46c53be177518051fa0a2e8e98a5696bc6c1`.
+
+`task device:governor-profile ROUTE=wifi SECONDS=30` recorded only PID 63's
+kernel instruction pointers using the software `cpu-clock:k` event at a
+requested 99 Hz, with a 64-page ring and no callchains. It used the restored
+366 µs limit. It captured **1,064 samples, with zero reported lost samples**,
+then resolved their addresses using that boot's kernel symbol map.
+
+| Symbol | Samples | Reported sample share |
+| --- | ---: | ---: |
+| `__udivsi3` | 323 | 30.36% |
+| `ccu_nkmp_find_best.constprop.0` | 315 | 29.61% |
+| `finish_task_switch` | 164 | 15.41% |
+| `ccu_nkmp_calc_rate` | 147 | 13.82% |
+| `_raw_spin_unlock_irqrestore` | 26 | 2.44% |
+| `ccu_helper_wait_for_lock.part.0` | 7 | 0.66% |
+| `ccu_nkmp_set_rate` | 5 | 0.47% |
+
+The factor search and rate-calculation functions directly account for
+**462/1,064 samples (43.42%)**. A further 323 samples landed in integer
+division. The locked factor-search source repeatedly calls rate calculation,
+which divides candidate products, making that a strong explanation for much
+of the division cost. Without caller stacks, however, attributing every
+division sample to NKMP would be an inference. Software-timer sampling can
+also miss interrupt-disabled work and is not exact per-function wall time.
+The observed scheduler/context-switch samples are retained, not discarded.
+
+This is direct evidence that NKMP selection consumes a substantial share of
+the worker's execution. The small sampled lock-wait share does not establish
+that PLL settling has no cost. No electrical constraint, rail sequence or
+clock rate was changed for this profile.
+
+The profile service completed, all staged files were removed after download,
+and the 09:57:03 postcheck found the same boot, all six expected services
+active, zero restarts/failed units, zero kernel taint, USB detached and valid
+Discharging monitoring. Brightness remained 1 and the governor interval 366 µs.
+
+## Consequence for implementation
+
+The next change should reduce the clock search's work while preserving selected
+factors, rather than making 10,000 µs a production governor default from this
+one experiment. A narrow candidate is to stop searching once the existing
+strict-improvement branch finds an exact frequency match: no later candidate
+can improve on zero error, and retaining the first exact match preserves tie
+order. The zero-rate/no-improvement behavior must remain unchanged.
+
+Before adding that to the production patch queue, compare the actual original
+and proposed functions across the R16/A33 candidate-rate boundaries, exact OPPs,
+between-OPP requests and edge cases, including the chosen N/K/M/P factors.
+Then build and qualify the candidate kernel with the original governor interval,
+repeating CPU/function/power measurements and load/recovery checks. This run
+does not demonstrate a driver fix, sustained energy improvement or a completed
+NEO-12 ticket. It supplies the evidence needed to choose the next patch.
 
 ## Repeatable experiment
 
@@ -119,27 +242,39 @@ active experiment or delete its helpers before it stops.
   SIGKILL. No host CPU setting was used as a fixture.
 - Python compilation, Taskfile discovery and `git diff --check` passed.
 
-These checks establish host behavior, not successful operation on the target's
-systemd, sysfs or battery hardware. Live comparison and postcheck remain open.
+After adding the optional perf workflow, `task check` passed 13 runtime and
+41 tool tests (one additional systemd test skipped in the ordinary suite),
+the compiled current-selector tests and shell lint. Four new tool cases cover
+worker identity/uniqueness, sampling bounds/target, invalid inputs and refusal
+to accept a report without samples. Python compilation and diff checks passed.
+The pinned perf build, live comparison/restoration, live function capture and
+postchecks all passed. Forced-kill/timeout restoration remains host-tested;
+it was not deliberately induced on the GameShell.
+
+## Private evidence
+
+- `.local/diagnostics/20260927T094701.147084Z/governor-comparison.jsonl`:
+  complete three-phase raw counters, battery readings and summary.
+- `.local/diagnostics/20260927T095512.426562Z/`: governor-profile metadata,
+  `perf.data`, `perf-record.txt`, `perf-report.txt` and the boot's `kallsyms.txt`.
+- `.local/diagnostics/neo12-comparison/`: preflight, task console captures,
+  comparison postcheck, final status and host-check logs. The initial preflight
+  queried an absent `axp20x-ac` path; the comparison correctly enumerated the
+  actual `axp22x-ac` supply and verified both external inputs offline.
+- `.local/diagnostics/20260927T095658.549938Z/status.txt`: full final status.
+- `.local/build/perf.log` and `.local/build/perf/`: build log, executable/hash,
+  ELF dependency and compiler records.
 
 ## Remaining NEO-12 work
 
-1. Connectivity and shutdown diagnosis are complete: the recovered system
-   journal identifies a guard-triggered orderly poweroff, and the current boot
-   has healthy services. Recheck battery/guard status after sufficient recharge;
-   the initial 10–13% is below the experiment's required reserve.
-2. Run the bounded comparison if battery-only preconditions hold. Compare the
-   governor worker, CPU accounting coverage, timer/RSB activity, radio conditions
-   and software power in all three phases. Verify the original interval and
-   healthy services afterward.
-3. If an effect is clear, test repeatability and responsiveness/load recovery
-   before proposing a persistent rate policy. A different frequency mix can
-   affect power and performance independently of transition overhead.
-4. Attribute the costly function before choosing a driver optimization. If the
-   NKMP path is responsible, preserve its rounding, selected factors, tie order
-   and clock constraints, and validate against the existing algorithm before
-   building a candidate. This task does not adopt the withdrawn A64-specific
-   proposal discussed in report 31.
+1. Implement and validate a minimal selection-preserving NKMP optimization,
+   using the directly observed function cost as its justification. Do not adopt
+   the withdrawn A64-specific proposal discussed in report 31.
+2. Build and qualify the candidate with the original rate policy: worker CPU,
+   function samples, timer/RSB activity, responsiveness/load recovery and
+   matched software power windows. Keep voltage/OPP and protection policy fixed.
+3. Investigate the accounting shortfall; do not claim precise aggregate CPU
+   utilization or electrical savings from these counters.
 
-NEO-12 remains in progress. No efficiency improvement, new kernel, battery
-endurance result or production governor setting is claimed by this preparation.
+NEO-12 remains in progress. A temporary reduction in measured activity is
+established; a deployed efficiency fix and battery-endurance improvement are not.

@@ -28,9 +28,10 @@ synced filesystems, and USB/Wi-Fi access recovered on the next boot.
 [Awake-power profiling](docs/31-awake-power-profile.md) identifies substantial
 CPU time in the frequency-governor worker and records the next optimization
 priorities, instrumentation limits and reusable capture task.
-[Governor comparison preparation](docs/32-governor-rate-comparison.md) records
-the reversible comparison task and host-tested recovery; live measurements are
-pending sufficient recharge for battery-only testing.
+[Governor comparison and function profiling](docs/32-governor-rate-comparison.md)
+records a reversible halving of governor-worker CPU time, only a 2–3% estimated
+power reduction, and directly sampled NKMP clock-search cost. Original settings
+are restored; the driver optimization remains the next implementation step.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a
@@ -217,6 +218,8 @@ task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls a
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
 task device:governor-compare ROUTE=wifi SECONDS=120 RATE_US=10000 # Three phases; automatically restore
+task build:perf # Optional diagnostic tool from the locked source/container; no image rebuild
+task device:governor-profile ROUTE=wifi SECONDS=30 # Separate kernel-function sample; USB unplugged
 task device:boot-cycles CYCLES=4 # Wait for ready, then operate the power button
 task device:boot-cycles CYCLES=0 # Capture/check this boot without starting a batch
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
@@ -400,6 +403,30 @@ Snapshots are sequential and include the observer's overhead. This diagnostic
 profile complements the idle-power samples; it is not another power/endurance
 measurement. `SECONDS` accepts multiples of thirty in 30..300, with the settling
 period extra and a transient-service limit of `SECONDS + 90` seconds.
+
+For function attribution, run `task build:perf` once, then
+`task device:governor-profile ROUTE=wifi SECONDS=30` as a separate experiment.
+The build uses the locked Linux archive and Docker image and writes a minimal
+ARM hard-float `perf` binary, hash, compiler and ELF dependency records under
+`.local/build/perf/`. It needs the Linux source already prepared by the kernel
+build. It does not rebuild the kernel, install packages or alter the image.
+
+The device task stages the tool temporarily and samples only the existing
+`sugov:0` worker's kernel instruction pointers using `cpu-clock:k` at a requested
+99 Hz (10–60 seconds supported). It checks the worker's PID/start time and
+unchanged power configuration, plus the battery-only profiler's health rules.
+No callchains or power-setting changes are requested. Health checks and sampling
+add overhead; run this separately from power comparisons. A runtime bound and
+the transient service's process-group cleanup contain failed captures.
+
+Private evidence includes `governor-profile.jsonl`, `perf.data`, record/report
+text and the same boot's kernel symbol map. The report must contain samples;
+inspect lost-sample warnings and unresolved symbols before interpreting it.
+Successful runs remove their staged files; failed runs retain the printed
+temporary directory for diagnosis. Instruction samples attribute where this
+worker was executing when sampled, not individual component watts. Software
+timer sampling can miss work while interrupts are disabled; symbol names do
+not provide caller stacks or exact per-function wall time.
 
 `device:boot-cycles CYCLES=4` observes physical shutdown/startup cycles over
 USB SSH through the Mac and checks direct Wi-Fi SSH on every captured boot.

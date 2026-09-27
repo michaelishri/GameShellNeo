@@ -198,6 +198,7 @@ task device:logs ROUTE=usb
 task device:check ROUTE=usb
 task device:backlight ROUTE=usb # Watch the screen during this test
 task device:usb-reconnects CYCLES=4 # Wait for ready, then operate the USB cable
+task device:stability ROUTE=usb # Keep the board connected throughout
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
 ```
 
@@ -236,6 +237,18 @@ private capture prints the retained device path.
 Use batches of four, four and two for ten cycles. The default overall wait is
 ten minutes; `CYCLES` accepts 1–10. This task always uses USB and ignores `ROUTE`.
 It does not qualify idle power while a temporary recorder is running.
+
+`device:stability ROUTE=usb` writes a new temporary 128 MiB random file, flushes
+it to storage and checks its SHA-256 with a direct read that bypasses the file
+data cache. It then runs five minutes of `stress-ng` with four CPU workers,
+one 256 MiB memory worker and verification enabled. It records temperature,
+CPU frequency and kernel taint, stops if the sampled temperature reaches
+80 °C or USB disconnects, and removes its temporary files. It requires at
+least 512 MiB of available memory and free filesystem space before starting.
+A transient service runs at reduced scheduling priority with a seven-minute
+limit. Results are private `stability.jsonl`; collect `device:status` and
+`device:logs` afterwards to inspect services and kernel messages. This bounded
+check does not qualify long-term endurance or idle power consumption.
 
 `device:check` compares the running kernel/image with the source lock, verifies
 required services, the journal's effective user ACL, selected regdb files and

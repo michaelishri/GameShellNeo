@@ -206,12 +206,56 @@ recorder passed Python compilation checks; `task check` passed the existing
 25 Python tests, C regressions and shell lint. The initial observer failure
 and intermittent SSH setup errors remain follow-up work.
 
+## CPU, memory, storage and frequency results
+
+`task device:stability ROUTE=usb` passed on 27 September 2026,
+04:15:43–04:21:20 UTC. It created a temporary file on the diagnostic root
+filesystem, wrote 128 MiB of random data, flushed the file with `fsync`, and
+read it using `dd iflag=direct`. The full read size and SHA-256 matched:
+`ce3d62e190574f9cd9f9ed262380cbacaeac17ffcb646e97fb5a93300be2f7ff`.
+Direct reads bypassed the file data cache; the temporary directory was removed.
+This is a bounded file-integrity check, not whole-card or endurance qualification.
+
+The following five-minute load used `stress-ng` 0.19.02 with four CPU workers,
+one 256 MiB memory worker, `--verify` and `--abort`. It reported all five
+workers passed, zero skipped/failed stressors, zero untrustworthy metrics and
+exit status zero. A live process snapshot confirmed the four active CPU
+workers and the memory worker; memory use was approximately 353 MiB, with
+646 MiB available during that snapshot.
+
+The governor remained `schedutil`, with reported limits of 120–1,008 MHz.
+All load samples reported 1,008 MHz. After load stopped, recovery samples
+reported 240 MHz, 240 MHz and 120 MHz. This demonstrates the sampled governor
+transitions; it is not an exhaustive voltage/OPP or idle-residency test.
+
+Reported CPU temperature rose from 46.494 °C to a sampled maximum of
+66.258 °C. The test's 80 °C stop limit was not reached. Fifteen seconds after
+the load ended, the sensor reported 56.700 °C. Kernel taint remained zero;
+no kernel journal entries appeared during the test interval. The final
+status capture showed six active services with no restarts, zero failed
+units, the same boot, working USB SSH and approximately 74 MiB memory used.
+No temperature, clock, governor, voltage or charging policy was changed.
+
+Private evidence:
+
+- `.local/diagnostics/20260927T041537.374392Z/stability.jsonl`: parameters,
+  checksum, samples, stress-ng output and successful completion.
+- `under-load.txt` and `postcheck.txt` in the same directory: process/memory
+  snapshot, logind configuration, kernel log check and temporary-file cleanup.
+- `.local/diagnostics/20260927T042245.487229Z/status.txt`: final device status.
+
+The reusable task is documented in the [README](../README.md). It uses a
+seven-minute transient-service limit, five-second temperature/taint samples,
+available-memory/free-space preflight checks and temporary files. The script
+passed Python compilation and the existing `task check` suite passed. This
+short run supports basic diagnostic-image stability; it does not establish
+long-duration reliability, battery endurance or suspend behavior.
+
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
 - Nine more cold starts to reach ten for this candidate.
-- Local operation without an access point, sustained CPU/memory/storage
-  checks, frequency transitions and supervised orderly shutdown.
+- Local operation without an access point and supervised orderly shutdown.
 - Charging/unplugging and battery-policy hardware checks, timed awake-idle
   measurements and separate readiness timings with their uncertainty.
 

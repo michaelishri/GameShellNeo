@@ -132,6 +132,10 @@ tasks:
     desc: Record CYCLES=4 cable removals on the board and verify USB SSH after each return
     cmds: [python3 tools/check-usb-reconnects.py]
 
+  device:stability:
+    desc: Check a temporary 128 MiB file and run five minutes of CPU/memory load; keep USB connected
+    cmds: [python3 tools/remote.py device stability]
+
   mac:status:
     desc: Show Mac connectivity and physical external disks without changing them
     cmds: [python3 tools/remote.py mac status]

@@ -16,6 +16,7 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 | 0003 (generated) | Fresh CPI3 DTS, panel/backlight implementations, bindings and current-limit helper | Compile/DT checks establish software integration only; hardware tests remain NEO-5 |
 | 0004 | Describe GPIO hog children already supported by the sunxi GPIO driver | Remove when the upstream pinctrl schema accepts these standard GPIO nodes |
 | 0005 | Stop NKMP factor search at its first exact match, preserving selected factors | Native/ARM32 equivalence and NEO-12 hardware checks passed; about 92% lower recorded governor CPU time at unchanged policy (report 33). Remove when an equivalent upstream optimization is verified |
+| 0006 | Order AXP USB resource release as IRQs, polling work, then power supply | Actual-source host lifetime regressions and isolated ARM object build passed (report 38); not installed. Remove when the selected upstream source has equivalent lifetime ordering |
 
 ## Provenance and limits
 
@@ -59,3 +60,11 @@ on native Linux and emulated ARM32, including every output boundary and its
 neighbors for the tested constraints, plus the A33 CPU operating points.
 The arithmetic shim models `do_div`'s quotient, not its kernel implementation
 or timing. See [report 33](../docs/33-nkmp-clock-search-optimization.md).
+
+`task test:usb-lifecycle` extracts the actual probe, IRQ and poll functions from
+the hash-verified Linux archive and runs deterministic managed-resource/work
+shims. Its negative control reproduces the old ordering failure; the patched
+code covers immediate IRQs and partial-probe unwind. `task check:usb-driver`
+also compiles the complete driver for ARM in isolated scratch, preserving the
+installed-image build artifacts. These checks do not execute kernel concurrency
+or physical PMIC transactions. See [report 38](../docs/38-usb-work-lifetime.md).

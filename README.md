@@ -222,6 +222,23 @@ These are correctness and search-work checks; emulation does not measure board
 performance. Ordinary `task check` remains independent of Docker/downloads for
 this test; run `test:nkmp` explicitly when working only on the clock patch.
 
+For USB driver lifetime changes, use:
+
+```sh
+task test:usb-lifecycle # Actual-source host probe/IRQ/poll lifetime regression
+task check:usb-driver   # Also cross-compile the complete driver in isolated scratch
+```
+
+Both verify the locked Linux archive (downloading it if missing) and retain
+evidence in `.local/build/usb-lifecycle-tests/`. The negative control must
+reproduce the original cleanup failure; the patched code must pass. The ARM
+check uses the pinned Docker builder and its own source/output directory, so
+it does not overwrite the current image's kernel artifacts. Normal `task build`
+includes the lifetime regression; `task check` stays independent of this archive
+and Docker. [Report 38](docs/38-usb-work-lifetime.md) explains coverage and limits.
+After changing the patch queue, use the documented `task kernel:reset` before
+the next full kernel build; isolated driver checks do not reset that workspace.
+
 ### Routine device work
 
 ```sh

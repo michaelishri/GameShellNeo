@@ -18,6 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [38 — USB work lifetime](38-usb-work-lifetime.md) | Managed-resource ordering correction, actual-source probe/IRQ/poll regressions and isolated ARM driver build |
 | [36 — USB polling policy](36-usb-polling-policy.md) | Host/peripheral timing distinction, experimental absent-state fallback, activation checks, workqueue races and validation requirements |
 | [35 — USB detection capture](35-usb-detection-capture.md) | Shared IRQ/uevent/controller recorder, read-only PMIC configuration, test coverage and instrumented cable cycles |
 | [34 — USB status polling investigation](34-usb-status-polling-investigation.md) | AXP223 polling rationale, USB detection deadlines, board wiring, live attached state and requirements for reducing unnecessary work |

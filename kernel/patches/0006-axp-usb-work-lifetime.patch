@@ -1,0 +1,31 @@
+diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -963,11 +963,6 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = devm_delayed_work_autocancel(&pdev->dev, &power->vbus_detect,
+-					   axp_data->axp20x_read_vbus);
+-	if (ret)
+-		return ret;
+-
+ 	if (power->vbus_mon_bit) {
+ 		/* Enable vbus valid checking */
+ 		ret = regmap_field_write(power->vbus_mon_bit, 1);
+@@ -1005,6 +1000,15 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
+ 	if (IS_ERR(power->supply))
+ 		return PTR_ERR(power->supply);
+ 
++	/*
++	 * Unwind IRQs, then work, then the supply referenced by the work.
++	 * Initialize before requesting IRQs, which may fire immediately.
++	 */
++	ret = devm_delayed_work_autocancel(&pdev->dev, &power->vbus_detect,
++					   axp_data->axp20x_read_vbus);
++	if (ret)
++		return ret;
++
+ 	/* Request irqs after registering, as irqs may trigger immediately */
+ 	for (i = 0; i < axp_data->num_irq_names; i++) {
+ 		irq = platform_get_irq_byname(pdev, axp_data->irq_names[i]);

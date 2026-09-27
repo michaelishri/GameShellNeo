@@ -18,7 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
-| [32 — Governor-rate comparison](32-governor-rate-comparison.md) | Reversible three-phase task, independent restoration and host validation; live experiment pending connectivity |
+| [32 — Governor-rate comparison](32-governor-rate-comparison.md) | Reversible three-phase task, independent restoration and host validation; access restored after low-battery shutdown, live experiment pending recharge |
 | [31 — Awake-power profile](31-awake-power-profile.md) | CPU/interrupt/radio captures, substantial governor-worker activity, instrumentation limits and prioritized follow-ups |
 | [30 — BL-5C battery identification](30-bl5c-battery-identification.md) | Owner-supplied replacement-pack listing, primary-source charging examples and unresolved exact-pack limits |
 | [29 — Hardware qualification](29-hardware-qualification.md) | Ten cold starts and USB reconnections, keypad/backlight and load results, power transitions, Lightkey issue and charging-voltage discrepancy |

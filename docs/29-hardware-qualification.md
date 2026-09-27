@@ -714,12 +714,76 @@ Private evidence:
 `postcheck.txt` in the same directory, and
 `.local/diagnostics/20260927T061759.246986Z/status.txt`.
 
+## First observed automatic low-battery shutdown
+
+The owner found the board off after the earlier battery-only work and
+reconnected it to the Mac. Recovered **system** journal entries establish that
+the awake battery guard requested an orderly poweroff; the earlier SSH outage
+was not, by itself, evidence of its cause.
+
+| Observation | Recorded result |
+| --- | --- |
+| Previous boot | `b82a951a-31a3-4e7f-b4db-69a4fc5aa894` |
+| Guard decision | 2026-09-27 08:12:36 UTC / 21:12:36 NZDT: valid, Discharging, critical=True; three low samples; orderly poweroff requested |
+| Shutdown sequence | Services stopped, `/boot` unmounted, poweroff target reached, filesystems/block devices synced, journal stopped at 08:12:39 UTC |
+| Reconnected boot | `8b6f1e61-fc3a-45e4-a419-4131297ca94d`, current journal starts 09:29:19 UTC |
+| Initial charge reading | 10%, Charging, valid monitoring; subsequent readings 11% and 13% |
+| Access and services | USB high-speed ECM and direct Wi-Fi SSH work; all six expected services active, zero restarts/failed units and kernel taint zero |
+| Restored settings | Brightness 1/31; schedutil update limit 366 µs |
+
+The installed guard's SHA-256 still matches the tracked production source:
+`834c5b6c1b834b22752ec21ed7088fc8e1eea10f35cd164edaaac45fea42a6f0`.
+That source requires three consecutive valid Discharging samples at or below
+10%, ten seconds apart with its timing checks. The journal records the decision
+and request, not the three individual percentage/voltage values; `/run` state
+does not survive reboot. Do not claim an exact last reading of 10% or 0% from
+these logs.
+
+This is the first observed **real automatic low-battery shutdown** and supports
+the guard's ability to reach orderly shutdown with the available reserve in
+this instance. It is not an abrupt-loss diagnosis, a measured physical cutoff,
+a repeated reserve qualification or evidence that the gauge is calibrated.
+The journal ends before the final PMIC power-off action. The next kernel log
+has no ext4 recovery/error report; the FAT boot-partition check completed
+without a reported repair. The root-filesystem fsck unit was skipped because
+root was already read-write, so this is not a full filesystem integrity audit.
+
+The previously tracked USB-gadget target ordering warning recurred during
+shutdown and did not stop the recorded poweroff sequence. No new shutdown bug
+is inferred from that known warning.
+
+There was no recorded return to Charging between 05:20:39 and the 08:12:36
+guard decision, an interval of 2 h 51 min 57 s. That interval included changing
+diagnostic workloads/display conditions and lacked continuous current logging;
+it is not a controlled full-charge runtime or capacity benchmark.
+
+At 09:31:45 UTC, nearby charging samples reported 3.9248–3.9589 V and +527 mA;
+an earlier direct sample reported +549 mA. The configured charge target/current
+remain 4.2 V / 1.2 A. These software readings do not resolve NEO-10's earlier
+target/readout discrepancy or establish the replacement pack's permissible
+limits. No charger, gauge or governor setting was changed during recovery.
+The NEO-12 battery-only comparison remains pending enough charge to meet its
+above-20% precondition and subsequent USB disconnection.
+
+Private evidence:
+
+- `.local/diagnostics/20260927T092959.839279Z/status.txt`: USB access/status.
+- `.local/diagnostics/20260927T092959.839644Z/status.txt`: Wi-Fi access/status.
+- `.local/diagnostics/neo12-reconnected/system-shutdown-and-boot.txt`: root-read
+  previous-boot guard/shutdown journal and new kernel journal.
+- `guard-identity-and-poweroff.txt` in that directory: installed guard hash,
+  charging snapshot and additional shutdown/filesystem service messages.
+- `shutdown-and-power.txt` in that directory: initial non-root capture and
+  power-supply snapshot. Its journal view is limited to the account's visible
+  messages and must not be used to infer missing system events.
+
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
 - Local operation without an access point.
 - Charging-voltage discrepancy and replacement-pack limits (NEO-10).
-- Physical low-battery reserve, awake-idle power comparisons and separate
+- Repeatable physical low-battery reserve after the first observed automatic
+  shutdown, awake-idle power comparisons and separate
   readiness timings with their uncertainty.
 
 Sleep remains disabled. A short power-button press still requests shutdown;

@@ -8,10 +8,14 @@ with the existing `6.18.54-gameshellneo2` diagnostic kernel.
 The reusable comparison task is implemented and its restoration behavior is
 tested on the Intel host. **No comparison has run on the GameShell yet.** Two
 Wi-Fi SSH attempts during this work failed before remote command execution,
-starting around 09:09 UTC. No device files or settings were changed. The owner
-was asked to check whether the dim login console is still visible, leaving USB
-unplugged. A disconnected host does not establish that the battery guard shut
-the device down; that remains unknown until inspection or recovered logs.
+starting around 09:09 UTC. No device files or settings were changed. After the
+owner reconnected the board to the Mac, USB and Wi-Fi access both recovered.
+The previous system journal confirms the battery guard requested orderly
+shutdown at 08:12:36 UTC, followed by filesystem syncing. The new boot initially
+reported 10% and Charging, then 11–13%. [Report 29](29-hardware-qualification.md#first-observed-automatic-low-battery-shutdown)
+records the evidence and its limits. The comparison now awaits sufficient
+charge for its above-20% precondition and subsequent USB disconnection; no
+governor setting has been changed on this boot.
 
 [Report 31](31-awake-power-profile.md) found `sugov:0` using 33.94–35.79% of one
 CPU in quiet windows. The inspected schedutil update limit was 366 µs, derived
@@ -120,9 +124,10 @@ systemd, sysfs or battery hardware. Live comparison and postcheck remain open.
 
 ## Remaining NEO-12 work
 
-1. Recover connectivity and inspect fresh battery/guard/service status. If the
-   board has rebooted, collect the previous boot's ending logs where available;
-   do not infer a critical-battery shutdown from the SSH timeout.
+1. Connectivity and shutdown diagnosis are complete: the recovered system
+   journal identifies a guard-triggered orderly poweroff, and the current boot
+   has healthy services. Recheck battery/guard status after sufficient recharge;
+   the initial 10–13% is below the experiment's required reserve.
 2. Run the bounded comparison if battery-only preconditions hold. Compare the
    governor worker, CPU accounting coverage, timer/RSB activity, radio conditions
    and software power in all three phases. Verify the original interval and

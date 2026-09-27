@@ -22,13 +22,15 @@ hardware tests remain under NEO-5. [Hardware qualification](docs/29-hardware-qua
 records ten cold starts, ten USB reconnections, basic keypad/backlight and load
 checks, power transitions, installed battery-policy simulations, two consistent
 awake-idle power estimates, the backlight-off comparison and the remaining
-Lightkey/charging findings.
+Lightkey/charging findings. It also records the first real automatic low-battery
+shutdown: the guard requested poweroff after three low samples, the system
+synced filesystems, and USB/Wi-Fi access recovered on the next boot.
 [Awake-power profiling](docs/31-awake-power-profile.md) identifies substantial
 CPU time in the frequency-governor worker and records the next optimization
 priorities, instrumentation limits and reusable capture task.
 [Governor comparison preparation](docs/32-governor-rate-comparison.md) records
 the reversible comparison task and host-tested recovery; live measurements are
-pending restoration of device connectivity.
+pending sufficient recharge for battery-only testing.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a

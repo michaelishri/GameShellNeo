@@ -166,7 +166,7 @@ task provision
 task build
 ```
 
-`task build` tests the NKMP optimization, compiles the kernel, validates the device tree, then builds and
+`task build` runs the kernel regressions, compiles the kernel, validates the device tree, then builds and
 verifies the image **in sequence**. It does not provision credentials implicitly.
 Run `task provision` again after editing Wi-Fi settings, country or the authorized key,
 then rebuild. This changes the next image, not the running board.
@@ -238,6 +238,21 @@ includes the lifetime regression; `task check` stays independent of this archive
 and Docker. [Report 38](docs/38-usb-work-lifetime.md) explains coverage and limits.
 After changing the patch queue, use the documented `task kernel:reset` before
 the next full kernel build; isolated driver checks do not reset that workspace.
+
+For fixed-parent clock rate-constraint changes, use:
+
+```sh
+task test:clock-ranges   # Actual NM/NKM searches and constraints, native + ARM32
+task check:clock-drivers # Also compile complete clock objects in isolated scratch
+```
+
+These verify the locked Linux archive and compare original/patched rates,
+selected factors, constraints and getter counts. Results and hashes are in
+`.local/build/clock-range-tests/`; logs use `clock-ranges.log` or
+`clock-drivers.log` under `.local/build/`. Both need the pinned builder for the
+ARM32 checks; the compile task preserves the current image's kernel artifacts.
+Normal `task build` includes the equivalence check. [Report 39](docs/39-clock-rate-constraint-optimization.md)
+records the results and hardware validation still required.
 
 ### Routine device work
 

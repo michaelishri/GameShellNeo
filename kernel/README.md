@@ -17,6 +17,7 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 | 0004 | Describe GPIO hog children already supported by the sunxi GPIO driver | Remove when the upstream pinctrl schema accepts these standard GPIO nodes |
 | 0005 | Stop NKMP factor search at its first exact match, preserving selected factors | Native/ARM32 equivalence and NEO-12 hardware checks passed; about 92% lower recorded governor CPU time at unchanged policy (report 33). Remove when an equivalent upstream optimization is verified |
 | 0006 | Order AXP USB resource release as IRQs, polling work, then power supply | Actual-source host lifetime regressions and isolated ARM object build passed (report 38); not installed. Remove when the selected upstream source has equivalent lifetime ordering |
+| 0007 | Read effective rate constraints once per fixed-parent NM/NKM search | Native/ARM32 rates and factors match; isolated ARM clock-object builds passed (report 39). Not installed or timed on hardware. Remove when equivalent upstream behavior is verified |
 
 ## Provenance and limits
 
@@ -68,3 +69,11 @@ code covers immediate IRQs and partial-probe unwind. `task check:usb-driver`
 also compiles the complete driver for ARM in isolated scratch, preserving the
 installed-image build artifacts. These checks do not execute kernel concurrency
 or physical PMIC transactions. See [report 38](../docs/38-usb-work-lifetime.md).
+
+`task test:clock-ranges` compares actual NM/NKM searches, comparators and clock
+boundary code from the verified archive, natively and on ARM32. It checks fresh
+constraints, ties, arithmetic extremes and reduced getter calls. The exported
+comparator and parent-adjusting search retain their previous behavior.
+`task check:clock-drivers` additionally builds complete affected clock objects
+in isolated scratch. These are computation and integration checks, not physical
+PLL, power or timing measurements. See [report 39](../docs/39-clock-rate-constraint-optimization.md).

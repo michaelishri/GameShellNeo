@@ -1,0 +1,105 @@
+diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
+--- a/drivers/clk/sunxi-ng/ccu_common.c
++++ b/drivers/clk/sunxi-ng/ccu_common.c
+@@ -48,16 +48,8 @@
+ 
+ 	clk_hw_get_rate_range(&common->hw, &min_rate, &max_rate);
+ 
+-	if (current_rate > max_rate)
+-		return false;
+-
+-	if (current_rate < min_rate)
+-		return false;
+-
+-	if (common->features & CCU_FEATURE_CLOSEST_RATE)
+-		return abs(current_rate - target_rate) < abs(best_rate - target_rate);
+-
+-	return current_rate <= target_rate && current_rate > best_rate;
++	return ccu_is_better_rate_with_range(common, target_rate, current_rate,
++					  best_rate, min_rate, max_rate);
+ }
+ EXPORT_SYMBOL_NS_GPL(ccu_is_better_rate, "SUNXI_CCU");
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
+--- a/drivers/clk/sunxi-ng/ccu_common.h
++++ b/drivers/clk/sunxi-ng/ccu_common.h
+@@ -8,6 +8,7 @@
+ 
+ #include <linux/compiler.h>
+ #include <linux/clk-provider.h>
++#include <linux/math.h>
+ 
+ #define CCU_FEATURE_FRACTIONAL		BIT(0)
+ #define CCU_FEATURE_VARIABLE_PREDIV	BIT(1)
+@@ -61,6 +62,24 @@
+ 
+ void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock);
+ 
++/* The caller owns the rate-range snapshot for this comparison. */
++static inline bool ccu_is_better_rate_with_range(struct ccu_common *common,
++			unsigned long target_rate, unsigned long current_rate,
++			unsigned long best_rate, unsigned long min_rate,
++			unsigned long max_rate)
++{
++	if (current_rate > max_rate)
++		return false;
++
++	if (current_rate < min_rate)
++		return false;
++
++	if (common->features & CCU_FEATURE_CLOSEST_RATE)
++		return abs(current_rate - target_rate) < abs(best_rate - target_rate);
++
++	return current_rate <= target_rate && current_rate > best_rate;
++}
++
+ bool ccu_is_better_rate(struct ccu_common *common,
+ 			unsigned long target_rate,
+ 			unsigned long current_rate,
+diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+--- a/drivers/clk/sunxi-ng/ccu_nm.c
++++ b/drivers/clk/sunxi-ng/ccu_nm.c
+@@ -33,13 +33,18 @@
+ 	unsigned long best_rate = 0;
+ 	unsigned long best_n = 0, best_m = 0;
+ 	unsigned long _n, _m;
++	unsigned long min_rate, max_rate;
++
++	/* No callbacks in this fixed-parent search; the prepare lock holds. */
++	clk_hw_get_rate_range(&common->hw, &min_rate, &max_rate);
+ 
+ 	for (_n = nm->min_n; _n <= nm->max_n; _n++) {
+ 		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
+ 			unsigned long tmp_rate = ccu_nm_calc_rate(parent,
+ 								  _n, _m);
+ 
+-			if (ccu_is_better_rate(common, rate, tmp_rate, best_rate)) {
++			if (ccu_is_better_rate_with_range(common, rate, tmp_rate,
++						  best_rate, min_rate, max_rate)) {
+ 				best_rate = tmp_rate;
+ 				best_n = _n;
+ 				best_m = _m;
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+--- a/drivers/clk/sunxi-ng/ccu_nkm.c
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -78,6 +78,10 @@
+ 	unsigned long best_rate = 0;
+ 	unsigned long best_n = 0, best_k = 0, best_m = 0;
+ 	unsigned long _n, _k, _m;
++	unsigned long min_rate, max_rate;
++
++	/* No callbacks in this fixed-parent search; the prepare lock holds. */
++	clk_hw_get_rate_range(&common->hw, &min_rate, &max_rate);
+ 
+ 	for (_k = nkm->min_k; _k <= nkm->max_k; _k++) {
+ 		for (_n = nkm->min_n; _n <= nkm->max_n; _n++) {
+@@ -89,7 +93,8 @@
+ 
+ 				tmp_rate = parent * _n * _k / _m;
+ 
+-				if (ccu_is_better_rate(common, rate, tmp_rate, best_rate)) {
++				if (ccu_is_better_rate_with_range(common, rate, tmp_rate,
++							  best_rate, min_rate, max_rate)) {
+ 					best_rate = tmp_rate;
+ 					best_n = _n;
+ 					best_k = _k;

@@ -18,6 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [39 — Clock rate constraints](39-clock-rate-constraint-optimization.md) | Once-per-search NM/NKM limits, native/ARM32 equivalence, lookup counts and isolated ARM object builds |
 | [38 — USB work lifetime](38-usb-work-lifetime.md) | Managed-resource ordering correction, actual-source probe/IRQ/poll regressions and isolated ARM driver build |
 | [37 — Driver optimization audit](37-driver-optimization-audit.md) | Clock constraint walks, redundant backlight requests, RSB autosuspend interaction and display/USB lifecycle findings |
 | [36 — USB polling policy](36-usb-polling-policy.md) | Host/peripheral timing distinction, experimental absent-state fallback, activation checks, workqueue races and validation requirements |

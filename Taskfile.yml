@@ -56,6 +56,7 @@ tasks:
       - task: doctor
       - task: test:nkmp
       - task: test:usb-lifecycle
+      - task: test:clock-ranges
       - task: build:kernel
       - task: check:dt
       - task: build:image
@@ -118,6 +119,14 @@ tasks:
   check:usb-driver:
     desc: Run USB lifetime regressions and cross-compile the driver in isolated kernel scratch
     cmds: [bash tools/run-logged.sh usb-driver python3 tools/check-usb-lifecycle.py --compile-driver]
+
+  test:clock-ranges:
+    desc: Compare actual NM/NKM clock searches and constraints natively and on ARM32
+    cmds: [bash tools/run-logged.sh clock-ranges python3 tools/check-clock-ranges.py]
+
+  check:clock-drivers:
+    desc: Run clock-range regressions and cross-compile complete clock objects in isolated scratch
+    cmds: [bash tools/run-logged.sh clock-drivers python3 tools/check-clock-ranges.py --compile-driver]
 
   check:kernel:
     desc: Check resolved Kconfig and the completed kernel artifact manifest

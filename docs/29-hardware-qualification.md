@@ -388,7 +388,7 @@ the successful four-of-four `summary.json`, `boot-cycles.jsonl` and baseline
 plus four per-boot captures. All boot monitors have finished. This completes
 the repeated-start subcheck, not the remaining NEO-5 hardware qualification.
 
-## Battery-transition preflight
+## Battery transition: unplugged operation
 
 After the tenth start, direct Wi-Fi SSH remained usable with all six services
 active, no restarts/failed units and zero kernel taint. At 04:59:06 UTC the
@@ -396,10 +396,38 @@ connected-power snapshot reported battery present, `Charging`, 100% and
 4,199,800 µV; the awake battery guard reported valid monitoring. Both USB and
 AC supply inputs reported present/online. No charging or input-limit setting
 was changed. These are software readings, not calibrated charge/endurance or
-electrical current measurements. The unplugged comparison is pending.
+electrical current measurements.
 
 Private evidence is `.local/diagnostics/20260927T045838.887394Z/status.txt`
 and `.local/diagnostics/neo5-battery.JREzc0bg/connected-before.txt`.
+
+The owner unplugged USB, left the device running for two minutes and confirmed
+that the screen stayed on, dim, throughout. At 05:02:45 UTC, direct Wi-Fi SSH
+still reached boot `b82a951a-31a3-4e7f-b4db-69a4fc5aa894`. All six services
+remained active without restarts, no units were failed and kernel taint was
+zero. USB reported `not attached`; both the USB and AC power-supply inputs
+reported present/online zero. The battery remained present and reported
+`Discharging`. **The supervised transition to battery-only operation passed.**
+
+The battery guard journal changed from valid/Charging to valid/Discharging
+at 05:00:26 UTC, with no degraded-monitoring entry or critical condition. Its
+later status still reported valid monitoring and zero consecutive low samples.
+Backlight brightness was 1 with `bl_power=0`, matching the connected baseline;
+the owner's dim-screen observation does not establish an automatic dimming
+transition. No new kernel journal entries appeared after the connected baseline.
+
+The direct battery snapshot reported 100%, 4,024,900 µV and -347,000 µA. The
+guard's earlier ten-second sample reported 4,051,300 µV. These sequential
+software samples were collected during active SSH/status work; they are not
+simultaneous readings, an idle-current measurement, a gauge calibration or a
+battery-capacity/endurance result. The unchanged 100% reading after this short
+interval does not validate or invalidate the gauge by itself.
+
+Additional private evidence is
+`.local/diagnostics/neo5-battery.JREzc0bg/disconnected.txt` and
+`.local/diagnostics/20260927T050240.984866Z/status.txt`.
+Reconnection and the return to externally powered/charging status remain to
+be checked before the complete power-transition sequence is marked passed.
 
 ## Remaining hardware gates
 

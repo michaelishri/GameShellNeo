@@ -426,15 +426,89 @@ interval does not validate or invalidate the gauge by itself.
 Additional private evidence is
 `.local/diagnostics/neo5-battery.JREzc0bg/disconnected.txt` and
 `.local/diagnostics/20260927T050240.984866Z/status.txt`.
-Reconnection and the return to externally powered/charging status remain to
-be checked before the complete power-transition sequence is marked passed.
+After the owner reconnected USB and waited one minute, the 05:05:51 UTC
+capture reached the same boot over USB and direct Wi-Fi SSH. USB was configured
+at high speed, both USB/AC inputs reported present/online, and the battery
+reported `Charging`. All six services remained active without restarts, no
+units failed, kernel taint remained zero and there were no new kernel journal
+entries since the baseline. Brightness remained 1, unblanked. The guard logged
+valid/Charging at 05:04:26 UTC, completing its observed
+Charging → Discharging → Charging sequence.
+
+**The functional unplug/reconnect and status-transition checks passed.** The
+electrical charging qualification remains open because of the voltage
+discrepancy below; successful status transitions are not proof of appropriate
+limits or accurate telemetry. Reconnection evidence is
+`.local/diagnostics/neo5-battery.JREzc0bg/reconnected.txt` and
+`.local/diagnostics/20260927T050546.954145Z/status.txt`.
+
+## Charging-voltage discrepancy (NEO-10)
+
+The reconnected snapshot reported `voltage_now=4254800` µV and positive
+battery current of 220,000 µA. The guard's nearby sample reported 4,255,900 µV.
+A separate read at 05:06:39 UTC reported `voltage_max=4200000` µV and
+`voltage_now=4255900` µV. Configured `constant_charge_current` and its maximum
+both read 1,200,000 µA; this is a programmed limit, not that instant's measured
+current. The original installation had already reported the same maximum
+current in [report 21](21-installed-hardware-baseline.md). No charger, ADC or
+gauge setting was changed during these tests.
+
+The largest observed voltage was 55.9 mV above the reported target. **This is
+an unresolved software-measurement/configuration discrepancy, not confirmed
+physical overcharge or an established driver bug.** `health=Good` is the
+driver's limited PMIC status interpretation, not independent validation of
+the cell or charge voltage. The replacement pack's specified limits and
+physical voltage are not yet known.
+
+The read-only trace used the locked Linux 6.18.54 source and supplied AXP223
+datasheet:
+
+- `drivers/iio/adc/axp20x_adc.c` reads a 12-bit AXP22x battery-voltage value
+  with a 1.1 mV/LSB scale. This matches the supplied
+  [ADC table, PDF p. 28](<../allwinner/extracted/R16/Firmware/AXP223 Datasheet V1.1 20131128.pdf#page=28>).
+  The live IIO battery channel subsequently read raw 3674 and scale 1.100000:
+  their product is 4,041.4 mV, matching `voltage_now=4041400` µV in that
+  unplugged capture. Agreement between two interfaces to the same ADC does
+  not independently establish ADC accuracy.
+- `drivers/power/supply/axp20x_battery.c` decodes charge-target bits 6:5 of
+  `AXP20X_CHRG_CTRL1`; code `10` maps to 4.2 V. The mapping agrees with
+  [REG33H, PDF p. 40](<../allwinner/extracted/R16/Firmware/AXP223 Datasheet V1.1 20131128.pdf#page=40>).
+  `voltage_now` converts the IIO millivolt result to microvolts. No conversion
+  or target-decoding defect was identified in this bounded inspection.
+- The MFD driver uses a regmap cache and does not classify this charge-control
+  register as volatile. The target property is therefore a driver/regmap view,
+  not an independent fresh bus read or electrical measurement. This does not
+  establish that the cache is stale; no bypass or direct bus operation was
+  attempted.
+
+The owner unplugged USB again and confirmed the device remained running.
+Wi-Fi SSH verified the original boot, external USB power offline and
+`Discharging`. At 05:08:45 UTC, the direct battery reading was 4,023,800 µV
+and -357,000 µA; the guard remained valid and had logged the second discharge
+transition at 05:07:37 UTC. These are active diagnostic readings, not settled
+open-circuit or idle measurements.
+
+NEO-10 tracks the investigation and the replacement battery's model/label,
+specified charge voltage/current and independent validation options. The owner
+has no external measurement equipment. Extended charging/termination tests
+are deferred while this discrepancy is unresolved; battery-only investigation
+can continue. Do not apply a guessed ADC offset or change charger limits to
+hide the observation. Pack identification has been requested without asking
+the owner to open the running device.
+
+Additional private evidence in `.local/diagnostics/neo5-battery.JREzc0bg/`:
+`charger-readback.txt`, `adc-readback.txt` and `disconnected-again.txt`.
+The IIO probe found no optional `name` file for the PMIC ADC; its raw/scale
+attributes were present and readable. The channel identity above comes from
+the driver mapping, not that missing name attribute.
 
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
 - Local operation without an access point.
-- Charging/unplugging and battery-policy hardware checks, timed awake-idle
-  measurements and separate readiness timings with their uncertainty.
+- Charging-voltage discrepancy and replacement-pack limits (NEO-10).
+- Battery-policy hardware checks, timed awake-idle measurements and separate
+  readiness timings with their uncertainty.
 
 Sleep remains disabled. A short power-button press still requests shutdown;
 this session has not tested sleep, wake, the five-second boot aspiration or

@@ -21,7 +21,8 @@ checks passed on the owner's accepted AU-advertising access point. Repeated
 hardware tests remain under NEO-5. [Hardware qualification](docs/29-hardware-qualification.md)
 records ten cold starts, ten USB reconnections, basic keypad/backlight and load
 checks, power transitions, installed battery-policy simulations, two consistent
-awake-idle power estimates and the remaining Lightkey/charging findings.
+awake-idle power estimates, the backlight-off comparison and the remaining
+Lightkey/charging findings.
 [Replacement battery identification](docs/30-bl5c-battery-identification.md)
 records the owner's BL-5C listing and the charge limits still needing verification.
 The original card has a

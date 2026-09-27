@@ -648,7 +648,7 @@ Private evidence:
 `postcheck.txt` in the same directory, and
 `.local/diagnostics/20260927T055939.897642Z/status.txt`.
 
-### Prepared backlight-off comparison
+### Backlight-off comparison
 
 The same task now accepts `BACKLIGHT=off`. It checks battery-only health before
 changing brightness, saves the current value, requests zero brightness and
@@ -659,11 +659,60 @@ Host regressions cover successful collection, an input failure, termination and
 failed off readback. `task check` passed all 36 Python tests, the current-selector
 C regression, shell syntax and ShellCheck.
 
-This comparison isolates the requested backlight change while keeping the panel
-unblanked, the system awake and Wi-Fi associated. It does not test full display
-power-down or suspend. The existing guard and charger/gauge settings are
-unchanged. The hardware result remains pending until collection and restoration
-finish successfully.
+The sole requested setting change is backlight brightness, while keeping the
+panel unblanked, the system awake and Wi-Fi associated. It does not test full
+display power-down or suspend. The existing guard and charger/gauge settings
+are unchanged.
+
+The run completed successfully with 61 samples over 600.000 seconds on the
+same boot. All samples reported brightness zero, `bl_power=0`, USB/AC offline,
+Discharging, associated Wi-Fi, `schedutil`, valid guard monitoring and zero
+kernel taint. The maximum sampling interval was 10.006 seconds, maximum
+lateness below 8 ms and guard age 0.33–1.92 seconds. Wi-Fi signal changed
+from -81 dBm initially to -76 dBm at completion.
+
+| Software-derived quantity | Backlight off |
+| --- | ---: |
+| Time-weighted discharge current | 262.51 mA |
+| Time-weighted battery power | 1.020 W |
+| Sampled power range | 0.988–1.081 W |
+| Integrated charge estimate | 43.75 mAh |
+| Integrated energy estimate | 170.08 mWh |
+| Reported capacity, measurement start → end | 85% → 82% |
+| Sampled battery voltage range | 3.8742–3.8984 V |
+| Sampled temperature range | 38.394–39.852 °C |
+
+Before reporting success, the task restored brightness 1 and verified the
+driver's `actual_brightness`. The owner explicitly confirmed that the dim
+login console returned normally. The postcheck at 06:18 UTC independently
+read brightness 1, actual brightness 1 and `bl_power=0`, on the same boot.
+All six expected services remained active with zero restarts, no failed units,
+no kernel taint and no new kernel entries since the run began. USB remained
+offline and the guard was valid at 80% Discharging. The temporary service
+exited successfully and was collected, reporting 3.261 seconds CPU time and
+a 5.3 MiB memory peak.
+
+The average reported power was 21.57 mW (2.07%) below the first dim-screen
+run and 28.49 mW (2.72%) below its repeat. Average current was lower by only
+1.01 mA and 5.02 mA respectively. These are observed differences between
+sequential runs, not a precise measurement of backlight consumption: battery
+voltage fell, Wi-Fi signal varied, readings remain uncalibrated and there is
+no interleaved return-to-dim control. The backlight was already at its minimum
+nonzero setting in the earlier runs. Do not generalize this small difference
+to maximum brightness or infer remaining runtime from gauge movement.
+
+The useful conclusion is that this awake, Wi-Fi-associated scenario still
+reports approximately 1 W with the backlight off. The next efficiency work
+should profile CPU activity, interrupts/timers and peripheral power states,
+including the previously identified USB-power polling and radio behavior.
+Those are candidates to measure, not established causes of the observed draw.
+No further identical idle run is needed now. Longer battery-capacity/endurance
+work and NEO-10 electrical qualification remain separate.
+
+Private evidence:
+`.local/diagnostics/20260927T060352.580923Z/idle-sample.jsonl`,
+`postcheck.txt` in the same directory, and
+`.local/diagnostics/20260927T061759.246986Z/status.txt`.
 
 ## Remaining hardware gates
 

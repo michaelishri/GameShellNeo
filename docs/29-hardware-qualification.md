@@ -61,15 +61,32 @@ produced its single event.
 
 The centre-button check then requested centre+A, A alone, centre+Start,
 Start alone, releasing centre between combinations. The resulting sequence
-was `KEY_J`, `KEY_J`, `KEY_ENTER`, `KEY_ENTER`, each with a release. The rear
-centre therefore did not activate the alternate mapping in this test. A
-working Shift selector would have changed the first and third actions to
-`KEY_H` and `KEY_KPPLUS`, as the front Shift tests already demonstrated.
+was `KEY_J`, `KEY_J`, `KEY_ENTER`, `KEY_ENTER`, each with a release. The owner
+subsequently clarified that the need to hold both buttons at the same time
+had been misunderstood. **This attempt is inconclusive for rear Shift**, and
+must not be counted as a failed simultaneous combination. The reference
+mapping changes A to `KEY_H` and Start to `KEY_KPPLUS`, as the front Shift
+tests already demonstrated.
+
+At the owner's request, a fresh capture then tested four rear-centre presses
+alone, each held for about one second and fully released. No events were
+recorded while the capture service remained active. **This standalone check is
+inconclusive:** the reference firmware uses the centre button to select an
+alternate mapping and does not report it as an ordinary key. A functioning
+centre button could therefore also be silent when pressed alone.
+
+The simultaneous test was then repeated with explicit instructions to hold
+rear centre down while tapping A and Start, release centre, and tap A and
+Start again. The owner confirmed completing that sequence. The fresh capture
+recorded `KEY_J`, `KEY_ENTER`, `KEY_J`, `KEY_ENTER`, all with clean releases.
+**The rear centre did not select alternate mappings in this clarified test.**
+This is a functional observation, not a diagnosis of the switch, connection
+or firmware. Front Shift's successful alternate mappings provide a comparison.
 
 **Lightkey qualification is incomplete.** No connector, switch, firmware or
-Linux-driver cause has been established. Original-software behavior is not
-yet known. Record that history, then compare or inspect the affected path
-before choosing a fix. No keypad firmware was flashed and no wiring was
+Linux-driver cause has been established. The owner is unsure whether all five
+rear controls worked with the original software. Compare or inspect the
+affected path before choosing a fix. No keypad firmware was flashed and no wiring was
 changed during these tests. This issue is tracked in [FOLLOW-UP.md](../FOLLOW-UP.md).
 
 ## Capture reliability and private evidence
@@ -94,9 +111,13 @@ The retained host evidence is under ignored `.local/diagnostics/`:
 | `neo5-keypad.dpbPc6DU/events.txt` | Initial Up/Down tests and initial Left with additional Up |
 | `neo5-keypad.iNMkyRtP/events.txt` | Discarded streaming attempt; device description only |
 | `neo5-keypad.046dL2fy/events.txt` | Cumulative device-side recording: successful main-keypad batches, both outer-Lightkey attempts and centre-button comparison |
+| `neo5-keypad.dTZRAbdC/centre-only.txt` | Fresh capture for four standalone rear-centre presses; active service and device description, no input events |
+| `neo5-keypad.XKllT44R/centre-held.txt` | Clarified simultaneous test: centre held for A/Start, released for A/Start; normal mappings in both cases |
 
 Intermediate snapshots are also retained. Key-event data remains private.
 The device-side copy is volatile and is not the recovery copy of this evidence.
+The separate centre-only and clarified-combination captures were also stopped
+after collection, releasing the keypad each time.
 
 ## Remaining hardware gates
 

@@ -123,6 +123,10 @@ tasks:
     desc: Run an explicit device command, e.g. task device:exec -- uname -r
     cmds: [python3 tools/remote.py device exec]
 
+  device:backlight:
+    desc: Cycle visible brightness and three off/on transitions, then restore; watch the screen
+    cmds: [python3 tools/remote.py device backlight]
+
   mac:status:
     desc: Show Mac connectivity and physical external disks without changing them
     cmds: [python3 tools/remote.py mac status]

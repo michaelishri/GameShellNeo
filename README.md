@@ -196,6 +196,7 @@ task device:exec -- uname -r
 task device:status ROUTE=usb
 task device:logs ROUTE=usb
 task device:check ROUTE=usb
+task device:backlight ROUTE=usb # Watch the screen during this test
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
 ```
 
@@ -204,6 +205,16 @@ USB address, so the Intel host needs no route to that USB subnet. Status and
 diagnostic archives are retained privately in `.local/diagnostics/<timestamp>/`.
 `device:exec` runs the explicitly supplied command and returns its failure
 status. Shell operators require an explicit `sh -c '...'` command.
+
+`device:backlight` runs a roughly 30-second visual check on an unblanked panel:
+brightness 1, 16 and 31, followed by three cycles of 0 (off) and 31 (on).
+It saves the initial brightness and restores it on completion or handled
+termination signals. A temporary systemd service bounds the run to 60 seconds
+and refuses a concurrent run under the same unit name. It changes brightness
+through the normal sysfs interface; it does not suspend or reboot the board.
+Requested values and software readbacks are captured in a private
+`backlight.txt`. The person watching must confirm visible levels, darkness and
+recovery: successful sysfs readbacks alone do not establish those results.
 
 `device:check` compares the running kernel/image with the source lock, verifies
 required services, the journal's effective user ACL, selected regdb files and

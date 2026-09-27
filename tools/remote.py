@@ -148,6 +148,13 @@ def device_action(config, action, route):
                     sftp.rmdir(remote_dir)
                     print('Private integration evidence:', directory)
             return
+        elif action == 'backlight':
+            arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
+                         '--collect', '--unit=gameshellneo-backlight-test',
+                         '--property=RuntimeMaxSec=60', '--property=TimeoutStopSec=5',
+                         '/bin/sh', '-c', (ROOT / 'tools/check-backlight.sh').read_text()]
+            with (directory / 'backlight.txt').open('wb') as output:
+                run(client, shlex.join(arguments), output=output)
         elif action == 'status':
             with (directory / 'status.txt').open('wb') as output:
                 run(client, STATUS_COMMAND, output=output)
@@ -282,7 +289,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='host', required=True)
     target = sub.add_parser('device')
-    target.add_argument('action', choices=['status', 'logs', 'exec', 'check'])
+    target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])

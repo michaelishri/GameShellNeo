@@ -119,11 +119,34 @@ The device-side copy is volatile and is not the recovery copy of this evidence.
 The separate centre-only and clarified-combination captures were also stopped
 after collection, releasing the keypad each time.
 
+## Backlight results
+
+The owner watched `task device:backlight ROUTE=usb` on 27 September 2026,
+03:46:49–03:47:14 UTC. Initial brightness and software readback were 1,
+maximum 31, with `bl_power=0` (unblanked). The test requested brightness
+1, 16 and 31 for four seconds each, then three cycles of 0 for two seconds
+and 31 for two seconds. It restored the starting brightness of 1.
+
+Every sysfs write succeeded and each software readback matched the requested
+value. The owner confirmed three distinct visible brightness levels, three
+complete dark/bright cycles and normal console recovery. **These basic visual
+backlight checks passed.** The driver does not implement a hardware brightness
+readback; software values alone would not prove visible output or electrical
+power-off. This test does not qualify panel rail cycling or sleep/resume.
+
+The task is documented in the [README](../README.md). It uses a temporary
+systemd service with a 60-second bound and a restoration trap. Host validation
+passed all 25 existing Python tests, the C current-selector regressions, shell
+syntax and ShellCheck. The host tooling needs no image rebuild.
+
+Private evidence is `.local/diagnostics/20260927T034641.417076Z/backlight.txt`
+and `postcheck.txt`. The postcheck confirmed brightness/readback 1, unblanked
+panel, active USB/battery/SSH services and zero kernel taint. Failed-unit and
+kernel-warning checks are recorded alongside those reads.
+
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
-- Visual backlight levels and repeated off/on. Initial sysfs brightness was
-  1, maximum 31; these reads alone do not qualify visible brightness or off behavior.
 - Nine more cold starts to reach ten for this candidate, and ten physical
   USB reconnections. Only the initial attachment has been verified so far.
 - Local operation without an access point, sustained CPU/memory/storage

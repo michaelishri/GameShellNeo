@@ -2,6 +2,7 @@
 """Reusable SSH operations for the diagnostic GameShell and the owner's Mac."""
 import argparse
 import base64
+import hashlib
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
 import json
@@ -10,6 +11,7 @@ from pathlib import Path
 import posixpath
 import re
 import shlex
+import shutil
 import sys
 
 import paramiko
@@ -163,7 +165,7 @@ def staged_arguments(sftp, directory):
 
 
 def mac_action(config, action, disk):
-    if action in ('inspect', 'flash') and not re.fullmatch(r'disk[1-9][0-9]*', disk):
+    if action in ('inspect', 'flash', 'backup') and not re.fullmatch(r'disk[1-9][0-9]*', disk):
         raise ValueError('Supply the inspected external whole disk as DISK=diskN')
     with connect_mac(config) as client, client.open_sftp() as sftp:
         if action == 'status':
@@ -171,6 +173,9 @@ def mac_action(config, action, disk):
             return
         directory = posixpath.join(sftp.normalize('.'), '.local/share/GameShellNeo')
         run(client, 'umask 077; mkdir -p {0}; chmod 700 {0}'.format(shlex.quote(directory)), display=False)
+        if action == 'backup':
+            mac_backup(client, sftp, config, directory, disk)
+            return
         upload(sftp, ROOT / 'tools/flash-macos.py', directory + '/flash-macos.py')
         if action == 'stage':
             manifest = json.loads((LOCAL / 'flash/transfer.json').read_text())
@@ -206,6 +211,44 @@ def mac_action(config, action, disk):
             print('Private flash evidence:', capture)
 
 
+def mac_backup(client, sftp, config, directory, disk):
+    capture = evidence_directory()
+    backups = LOCAL / 'backups'
+    backups.mkdir(mode=0o700, parents=True, exist_ok=True)
+    name = 'original-card-' + capture.name + '.img.gz'
+    remote_dir = directory + '/backups'
+    run(client, 'umask 077; mkdir -p {0}; chmod 700 {0}'.format(shlex.quote(remote_dir)), display=False)
+    upload(sftp, ROOT / 'tools/backup-macos.py', directory + '/backup-macos.py')
+    remote_archive = remote_dir + '/' + name
+    report_path = remote_archive + '.json'
+    command, password = sudo(config, ['/usr/bin/python3', '-u', directory + '/backup-macos.py',
+                                      '--disk', disk, '--output', remote_archive, '--report', report_path])
+    with (capture / 'backup.log').open('wb') as output:
+        run(client, command, password, output)
+    command, password = sudo(config, ['/bin/cat', report_path])
+    report_bytes = run(client, command, password, display=False)
+    (capture / 'backup-result.json').write_bytes(report_bytes)
+    report = json.loads(report_bytes)
+    if report['archive'] != remote_archive or report['archive_verification'] != 'passed':
+        raise ValueError('Unexpected backup verification result')
+    if shutil.disk_usage(backups).free < report['compressed_bytes'] + 1024**3:
+        raise RuntimeError('Verified backup is on the Mac; insufficient space for the Linux copy')
+    print('Downloading the verified backup to the Linux host...', flush=True)
+    partial = backups / (name + '.part')
+    with partial.open('xb') as output:
+        sftp.getfo(remote_archive, output)
+        output.flush()
+        os.fsync(output.fileno())
+    with partial.open('rb') as source:
+        digest = hashlib.file_digest(source, 'sha256').hexdigest()
+    if digest != report['compressed_sha256'] or partial.stat().st_size != report['compressed_bytes']:
+        raise RuntimeError('Downloaded backup checksum/size mismatch; Mac copy is preserved')
+    partial.rename(backups / name)
+    (backups / (name + '.json')).write_bytes(report_bytes)
+    print('Verified recovery backup:', backups / name)
+    print('Private backup evidence:', capture)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='host', required=True)
@@ -213,7 +256,7 @@ def main():
     target.add_argument('action', choices=['status', 'logs', 'exec'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
-    mac.add_argument('action', choices=['status', 'stage', 'inspect', 'preflight', 'flash'])
+    mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])
     mac.add_argument('--disk', default=os.environ.get('NEO_DISK', ''))
     args = parser.parse_args()
     os.umask(0o077)

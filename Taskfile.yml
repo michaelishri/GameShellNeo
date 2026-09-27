@@ -128,6 +128,12 @@ tasks:
       - task: image:pack
       - python3 tools/remote.py mac stage
 
+  mac:backup:
+    desc: Read and verify the complete original card, copy archive to Linux, and eject
+    requires:
+      vars: [DISK]
+    cmds: [python3 tools/remote.py mac backup]
+
   mac:inspect:
     desc: Record a fresh target identity after identifying the spare (DISK=diskN)
     requires:

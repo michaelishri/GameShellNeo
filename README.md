@@ -194,6 +194,30 @@ diagnostic archives are retained privately in `.local/diagnostics/<timestamp>/`.
 `device:exec` runs the explicitly supplied command and returns its failure
 status. Shell operators require an explicit `sh -c '...'` command.
 
+### Backing up the original card
+
+Insert the original card in the Mac while the GameShell runs from the DEV card.
+Identify its current disk number, then run:
+
+```sh
+task mac:status
+task mac:backup DISK=diskN
+```
+
+This task unmounts the selected external USB card and opens it **read-only**.
+It archives the entire card, including its bootloader and both partitions,
+verifies that decompressing the archive reproduces every captured byte, and
+ejects after success. It supports Linux filesystems that macOS cannot mount.
+It does not change the flash target inspection or authorize a write.
+
+Private archives and checksum/identity reports are kept on the Mac under
+`~/.local/share/GameShellNeo/backups/` and copied to Linux `.local/backups/`.
+The downloaded copy is checked against the Mac's SHA-256. Operation logs are in
+`.local/diagnostics/`. Allow free space on the Mac for the whole card plus 1 GiB,
+and on Linux for the compressed archive plus 1 GiB. A failed run preserves any
+partial archive as `.part` for diagnosis and does not report a successful backup.
+Verification checks archive integrity; booting a restored card is a separate test.
+
 ### Staging and flashing the spare card
 
 ```sh

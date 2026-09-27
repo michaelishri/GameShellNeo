@@ -18,6 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [28 — Original-card recovery backup](28-original-card-recovery-backup.md) | Read-only whole-card recovery workflow, private copies, integrity checks and recovery limits |
 | [23 — First-build specification](23-first-build-spec.md) | Approved diagnostic scope, immutable inputs, boot/storage/access contract and acceptance gates |
 | [24 — Building and testing](24-building-and-testing.md) | Private provisioning, pinned build stages, offline checks and first hardware session |
 | [25 — First-build validation](25-first-build-validation.md) | Completed diagnostic image, exact hash, build evidence and remaining hardware qualification |

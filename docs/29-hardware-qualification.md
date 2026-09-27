@@ -313,13 +313,48 @@ Two earlier recorder development attempts failed before completing collection
 because `journalctl` does not accept `--no-legend`; that option was removed.
 Those attempts involved no power operation and add no cycle credit. Python
 compilation, `git diff --check`, all 25 existing Python tests, the C selector
-regressions and shell lint passed. The four-cycle workflow still needs its
-physical batch test.
+regressions and shell lint passed. The physical batch result follows.
+
+## First batch of four power cycles
+
+The owner completed four shutdown/startup cycles with USB connected, waiting
+ten seconds after darkness and sixty seconds after each login console. The
+recorder verified all four, with no missed boot IDs. **The candidate now has
+six observed consecutive cold starts; four remain.**
+
+| Candidate boot | Boot ID | Local readiness (seconds) | Systemd startup total (seconds) |
+| --- | --- | --- | --- |
+| 3 | `062f38b7-67ee-47ee-bb36-d9751747ee18` | 14.171 | 14.324 |
+| 4 | `8e1333f1-8a3f-418b-aee1-ed1074e48501` | 14.169 | 14.343 |
+| 5 | `9bda7973-fed3-47a1-8467-0235fb3ed263` | 14.599 | 14.844 |
+| 6 | `596ac163-4f5b-4a1b-a729-8ca8e549fd93` | 14.994 | 15.220 |
+
+Every boot passed image/kernel identity, four CPUs, 1,024,520 KiB memory,
+untainted kernel, active services without restarts, no failed units, local
+getty, input enumeration, backlight restoration and valid battery monitoring.
+Fresh USB SSH and direct Wi-Fi SSH both reached the same boot. The saved
+journals link each boot to the preceding captured boot and show each short
+power press reaching `poweroff.target` and filesystem syncing.
+
+The shutdown USB-target ordering warning recurred in all four preceding
+shutdowns; it remains tracked and did not prevent these observed cycles.
+The kernel warning/error search found the same inherited `/init` lookup and
+optional board-specific radio firmware/CLM lookup messages as the baseline,
+without an oops, panic, timeout or ext4 recovery/error report in these captures.
+SSH probes reported connection refusals, missing routes or timeouts between
+boots; all four cycles subsequently passed both access checks. This does not
+measure network readiness latency or remove the earlier connectivity follow-up.
+
+Private evidence is `.local/diagnostics/20260927T043918.378623Z/`:
+`boot-cycles.jsonl`, a successful four-of-four `summary.json`, and the baseline
+plus four per-boot JSON files containing checks and kernel/shutdown journals.
+The recorder exited successfully. Readiness times retain the exclusions
+described above; software polling during this batch is not an idle-power test.
 
 ## Remaining hardware gates
 
 - Lightkey diagnosis and a successful repeat of affected controls.
-- Eight more cold starts to reach ten for this candidate.
+- Four more cold starts to reach ten for this candidate.
 - Local operation without an access point.
 - Charging/unplugging and battery-policy hardware checks, timed awake-idle
   measurements and separate readiness timings with their uncertainty.

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fail when Kconfig silently drops a requested diagnostic option."""
 import argparse
+import json
 from pathlib import Path
 import re
 
@@ -16,6 +17,11 @@ def main():
                                (ROOT / 'kernel/gameshellneo.config').read_text(), re.M))
     requested.update(CONFIG_MMC_BLOCK='y', CONFIG_BLK_DEV_SD='y', CONFIG_SERIAL_8250_CONSOLE='y',
                      CONFIG_UNIX='y', CONFIG_INET='y', CONFIG_PROC_FS='y', CONFIG_SYSFS='y')
+    lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
+    if 'usb_absent_poll' in lock.get('experiments', {}):
+        requested.update(CONFIG_USB_MUSB_GADGET='y', CONFIG_USB_MUSB_SUNXI='y',
+                         CONFIG_USB_MUSB_HOST='n', CONFIG_USB_MUSB_DUAL_ROLE='n',
+                         CONFIG_PM_SLEEP='n', CONFIG_OF_DYNAMIC='n')
     errors = [f'{key}: requested {value}, resolved {actual.get(key, "n")}'
               for key, value in requested.items() if actual.get(key, 'n') != value]
     if errors:

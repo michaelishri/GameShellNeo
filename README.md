@@ -45,6 +45,11 @@ work-lifetime fix and once-per-search NM/NKM clock constraints. Its
 and flash verification, hardware results and the exact repeatable test sequence.
 Diagnostic.3 remains available for recovery. The new changes do not yet have
 an attributed battery-power or clock-latency measurement.
+The [diagnostic.5 USB polling experiment](docs/41-usb-polling-experiment.md)
+has passed the full build and offline image checks and is staged and verified
+on the Mac for the next hardware session. The driver defaults off; the test
+image explicitly opts in after board/topology/PMIC checks. Diagnostic.4
+remains the installed, tested baseline until the new image is qualified.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -245,6 +250,19 @@ and Docker. [Report 38](docs/38-usb-work-lifetime.md) explains coverage and limi
 After changing the patch queue, use the documented `task kernel:reset` before
 the next full kernel build; isolated driver checks do not reset that workspace.
 
+For the opt-in USB polling experiment, use:
+
+```sh
+task test:usb-policy          # Actual gates, callbacks/probe, errors and races; native + ARM32
+task check:usb-policy-driver  # Also compile the full ARM driver in isolated scratch
+task test:usb-policy-board    # Run the gate against the compiled DTB; accepts DTB=path
+```
+
+`task build` includes the policy regression and checks the completed DTB before
+image assembly. Evidence is in `.local/build/usb-policy-tests/`. These checks
+use deterministic OF/register/workqueue shims; hardware testing is separate.
+[Report 41](docs/41-usb-polling-experiment.md) records the experiment and limits.
+
 For fixed-parent clock rate-constraint changes, use:
 
 ```sh
@@ -374,7 +392,25 @@ preparation, hardware evidence and measurement limits.
 [Report 36](docs/36-usb-polling-policy.md) defines the next experimental USB
 polling policy: a slower fallback only for confirmed absence in this fixed
 peripheral configuration, retaining interrupt notifications and fast checks
-for uncertainty. It is a design; diagnostic.4 still uses the existing policy.
+for uncertainty. It is implemented as an opt-in diagnostic.5 experiment in
+[report 41](docs/41-usb-polling-experiment.md); the installed diagnostic.4 still
+uses the existing policy.
+
+On diagnostic.5, use these repeatable commands:
+
+```sh
+task device:usb-policy ROUTE=usb                     # Verify running and next-boot policy
+task device:usb-policy ROUTE=wifi MODE=stock         # Select stock on the next boot
+task device:usb-policy ROUTE=wifi MODE=experimental  # Select experimental on the next boot
+```
+
+Selection verifies the image and both prebuilt U-Boot variants, replaces the
+executable script last, and verifies readback. It never reboots or changes the
+running policy. Status checks both the read-only requested parameter and the
+driver's acceptance/refusal message; a refused experiment fails the check.
+Keep diagnostic.4 for full recovery. See report 41 for interruption limits and
+the physical qualification sequence. A successful host test or build does not
+establish USB detection latency or a battery improvement.
 
 `device:stability ROUTE=usb` writes a new temporary 128 MiB random file, flushes
 it to storage and checks its SHA-256 with a direct read that bypasses the file

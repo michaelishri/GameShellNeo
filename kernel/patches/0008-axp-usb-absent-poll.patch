@@ -1,0 +1,69 @@
+From: GameShellNeo contributors
+Subject: [PATCH 8/8] power: axp20x: add opt-in fixed-peripheral absent polling
+
+Keep the stock policy by default. Only the validated CPI/AXP223 topology may
+use 250 ms recurring reads after confirmed absence; retain IRQ notification,
+50 ms uncertain/error retries, and IRQ-first work deadlines. No PMIC writes.
+The policy gate lives in the generated overlay patch. Hardware qualification
+and physical detection latency remain separate from software regression.
+
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -97,8 +97,11 @@
+ 	unsigned int old_status;
+ 	unsigned int online;
+ 	unsigned int num_irqs;
++	bool gameshellneo_slow_poll;
+ 	unsigned int irqs[] __counted_by(num_irqs);
+ };
++
++#include "axp20x_usb_gameshellneo.h"
+ 
+ static bool axp20x_usb_vbus_needs_polling(struct axp20x_usb_power *power)
+ {
+@@ -152,8 +155,17 @@
+ 	power->online = val & AXP20X_PWR_STATUS_VBUS_USED;
+ 
+ out:
+-	if (axp20x_usb_vbus_needs_polling(power))
++	if (READ_ONCE(power->gameshellneo_slow_poll)) {
++		/* Never replace an IRQ's already pending fast deadline. An error
++		 * retains the last valid status but must retry even if online.
++		 */
++		if (ret || val != (AXP20X_PWR_STATUS_VBUS_PRESENT |
++				   AXP20X_PWR_STATUS_VBUS_USED))
++			queue_delayed_work(system_power_efficient_wq, &power->vbus_detect,
++					   ret || val ? DEBOUNCE_TIME : GAMESHELLNEO_ABSENT_POLL);
++	} else if (axp20x_usb_vbus_needs_polling(power)) {
+ 		mod_delayed_work(system_power_efficient_wq, &power->vbus_detect, DEBOUNCE_TIME);
++	}
+ }
+ 
+ static void axp717_usb_power_poll_vbus(struct work_struct *work)
+@@ -908,6 +920,7 @@
+ 	struct power_supply_config psy_cfg = {};
+ 	struct axp20x_usb_power *power;
+ 	const struct axp_data *axp_data;
++	const char *refusal;
+ 	int i, irq, ret;
+ 
+ 	if (!of_device_is_available(pdev->dev.of_node))
+@@ -1027,7 +1040,17 @@
+ 		}
+ 	}
+ 
+-	if (axp20x_usb_vbus_needs_polling(power))
++	/* Eligibility stays false during IRQ registration and partial unwind. */
++	refusal = gameshellneo_poll_refusal(power, axp20x);
++	WRITE_ONCE(power->gameshellneo_slow_poll, !refusal);
++	if (gameshellneo_slow_poll || of_machine_is_compatible("clockwork,clockworkpi-cpi3"))
++		dev_info(&pdev->dev, "GameShellNeo USB polling: %s%s\n",
++			 refusal ? "stock: " : "experimental absent=250ms, fast=50ms",
++			 refusal ? refusal : "");
++	if (!refusal)
++		/* Request a fresh initial read, including after an early IRQ. */
++		mod_delayed_work(system_power_efficient_wq, &power->vbus_detect, 0);
++	else if (axp20x_usb_vbus_needs_polling(power))
+ 		queue_delayed_work(system_power_efficient_wq, &power->vbus_detect, 0);
+ 
+ 	return 0;

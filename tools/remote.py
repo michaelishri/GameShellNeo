@@ -163,6 +163,14 @@ def device_action(config, action, route):
                     sftp.rmdir(remote_dir)
                     print('Private integration evidence:', directory)
             return
+        elif action == 'usb-policy':
+            mode = os.environ.get('NEO_USB_POLL_MODE', 'status')
+            if mode not in ('status', 'stock', 'experimental'):
+                raise ValueError('MODE must be status, stock or experimental')
+            arguments = ['sudo', '-n', 'python3', '-c',
+                         (ROOT / 'tools/usb_poll_boot.py').read_text(), '--mode', mode]
+            with (directory / 'usb-policy.txt').open('wb') as output:
+                run(client, shlex.join(arguments), output=output, timeout=30)
         elif action == 'battery-check':
             source = ROOT / 'runtime/usr/local/lib/gameshellneo/battery_guard.py'
             digest = hashlib.sha256(source.read_bytes()).hexdigest()
@@ -440,7 +448,7 @@ def main():
     target = sub.add_parser('device')
     target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
                                           'stability', 'battery-check', 'idle-sample', 'power-profile',
-                                          'governor-compare', 'governor-profile'])
+                                          'governor-compare', 'governor-profile', 'usb-policy'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])

@@ -20,6 +20,8 @@ env:
   NEO_PROFILE_SECONDS: '{{.SECONDS | default "120"}}'
   NEO_GOVERNOR_RATE_US: '{{.RATE_US | default "10000"}}'
   NEO_PERF_SECONDS: '{{.SECONDS | default "30"}}'
+  NEO_USB_POLL_MODE: '{{.MODE | default "status"}}'
+  NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
 
 tasks:
   default:
@@ -56,8 +58,10 @@ tasks:
       - task: doctor
       - task: test:nkmp
       - task: test:usb-lifecycle
+      - task: test:usb-policy
       - task: test:clock-ranges
       - task: build:kernel
+      - task: test:usb-policy-board
       - task: check:dt
       - task: build:image
 
@@ -120,6 +124,18 @@ tasks:
     desc: Run USB lifetime regressions and cross-compile the driver in isolated kernel scratch
     cmds: [bash tools/run-logged.sh usb-driver python3 tools/check-usb-lifecycle.py --compile-driver]
 
+  test:usb-policy:
+    desc: Test actual opt-in USB policy, topology, errors, races and probe cleanup natively and on ARM32
+    cmds: [bash tools/run-logged.sh usb-policy python3 tools/check-usb-policy.py]
+
+  check:usb-policy-driver:
+    desc: Run USB policy regressions and compile the complete ARM driver in isolated scratch
+    cmds: [bash tools/run-logged.sh usb-policy-driver python3 tools/check-usb-policy.py --compile-driver]
+
+  test:usb-policy-board:
+    desc: Exercise the actual policy against the compiled DTB and rejected role/connector mutations
+    cmds: [bash tools/run-logged.sh usb-policy-board python3 tools/check-usb-policy.py --dtb "$NEO_USB_POLICY_DTB"]
+
   test:clock-ranges:
     desc: Compare actual NM/NKM clock searches and constraints natively and on ARM32
     cmds: [bash tools/run-logged.sh clock-ranges python3 tools/check-clock-ranges.py]
@@ -173,6 +189,10 @@ tasks:
   device:usb-detect:
     desc: Capture detailed USB IRQ/state events over Wi-Fi; start unplugged, CYCLES=4 (0 for smoke)
     cmds: [python3 tools/check-usb-detection.py]
+
+  device:usb-policy:
+    desc: Verify running USB policy, or select MODE=stock/experimental for next boot (never reboots)
+    cmds: [python3 tools/remote.py device usb-policy]
 
   device:stability:
     desc: Check a temporary 128 MiB file and run five minutes of CPU/memory load; keep USB connected

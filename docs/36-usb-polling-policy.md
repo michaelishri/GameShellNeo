@@ -5,6 +5,12 @@ Scope: design for the owner's **CPI v3.1**, using the locked Linux
 `6.18.54` source and diagnostic.3 configuration. This report proposes an
 experiment; no policy described here has been deployed.
 
+Subsequent implementation: [report 41](41-usb-polling-experiment.md) records
+diagnostic.5 preparation and the reusable policy/compiled-DTB tests. Physical
+qualification remains pending. Diagnostic.4 is the newer tested recovery
+baseline; the diagnostic.3 references below describe this design's original
+source/evidence context.
+
 ## Decision
 
 Develop a small, explicitly enabled experiment that retains USB interrupts and

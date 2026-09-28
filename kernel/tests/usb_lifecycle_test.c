@@ -10,6 +10,10 @@
 #include <string.h>
 #include <errno.h>
 
+#ifdef NEO_USB_POLL_TEST
+#include "usb_poll_of_shims.h"
+#endif
+
 #define BIT(n) (1U << (n))
 #define __counted_by(member)
 #define GFP_KERNEL 0
@@ -19,7 +23,9 @@
 #define AXP20X_PWR_STATUS_VBUS_PRESENT BIT(5)
 #define AXP20X_PWR_STATUS_VBUS_USED BIT(4)
 #define DEBOUNCE_TIME 50
+#ifndef IS_ENABLED
 #define IS_ENABLED(option) 0
+#endif
 #define IS_ERR(ptr) ((intptr_t)(ptr) < 0 && (intptr_t)(ptr) > -4096)
 #define PTR_ERR(ptr) ((int)(intptr_t)(ptr))
 #define ERR_PTR(value) ((void *)(intptr_t)(value))
@@ -27,6 +33,7 @@
 #define container_of(ptr, type, member) ((type *)((char *)(ptr) - offsetof(type, member)))
 #define dev_dbg(...) ((void)0)
 #define dev_err(...) ((void)0)
+#define dev_info(...) ((void)0)
 
 typedef int irqreturn_t;
 struct device { struct device *parent; void *of_node, *drvdata; };
@@ -43,8 +50,9 @@ struct delayed_work {
 	struct work_struct work;
 	void (*callback)(struct work_struct *);
 	bool initialized, pending;
+	unsigned long delay;
 };
-struct axp20x_dev { struct regmap *regmap; void *regmap_irqc; };
+struct axp20x_dev { struct regmap *regmap; void *regmap_irqc; int variant; };
 
 #include "usb_structs.h"
 
@@ -77,7 +85,9 @@ static void push(enum resource resource)
 
 static void *dev_get_drvdata(struct device *dev) { return dev->drvdata; }
 static void platform_set_drvdata(struct platform_device *pdev, void *data) { pdev->dev.drvdata = data; }
+#ifndef NEO_USB_POLL_TEST
 static bool of_device_is_available(void *node) { return node != NULL; }
+#endif
 static const void *of_device_get_match_data(struct device *dev) { (void)dev; return &test_data; }
 static void *dev_fwnode(struct device *dev) { return dev->of_node; }
 
@@ -123,8 +133,15 @@ static int regmap_field_write(struct regmap_field *reg, unsigned int value)
 static int regmap_read(struct regmap *map, unsigned int reg, unsigned int *value)
 {
 	(void)map; (void)reg;
+#ifdef NEO_USB_POLL_TEST
+	read_count++;
+	if ((int)reg == error_register)
+		return -EIO;
+	*value = reg == 0x30 ? input_config : reg == 0x8f ? gpio_config : input_status;
+#else
 	/* Force a new status notification if work runs after unregister. */
 	*value = AXP20X_PWR_STATUS_VBUS_PRESENT;
+#endif
 	return 0;
 }
 
@@ -135,19 +152,48 @@ static void power_supply_changed(struct power_supply *psy)
 	notifications++;
 }
 
+#ifdef NEO_USB_POLL_TEST
+static void rearm_irq(struct delayed_work *work);
+#endif
+
 static bool queue_delayed_work(void *queue, struct delayed_work *work, unsigned long delay)
 {
-	bool pending = work->pending;
+	bool pending;
 	(void)queue; (void)delay;
+#ifdef NEO_USB_POLL_TEST
+	if (race_position == 1) {
+		race_position = 0;
+		rearm_irq(work);
+	}
+#endif
+	pending = work->pending;
 	if (!work->initialized)
 		fault("IRQ queued work before initialization");
+	if (!pending)
+		work->delay = delay;
 	work->pending = true;
+#ifdef NEO_USB_POLL_TEST
+	if (race_position == 2) {
+		race_position = 0;
+		rearm_irq(work);
+	}
+#endif
 	return !pending;
 }
 
 static bool mod_delayed_work(void *queue, struct delayed_work *work, unsigned long delay)
 {
+#ifdef NEO_USB_POLL_TEST
+	bool pending = work->pending;
+	(void)queue;
+	if (!work->initialized)
+		fault("IRQ modified work before initialization");
+	work->delay = delay;
+	work->pending = true;
+	return pending;
+#else
 	return !queue_delayed_work(queue, work, delay);
+#endif
 }
 
 static int devm_delayed_work_autocancel(struct device *dev, struct delayed_work *work,
@@ -193,8 +239,19 @@ static int devm_request_any_context_irq(struct device *dev, unsigned int irq,
 		return -EBUSY;
 	push(IRQ);
 	irq_count++;
-	if (immediate_mask & BIT(irq))
+#ifdef NEO_USB_POLL_TEST
+	if (((struct axp20x_usb_power *)data)->gameshellneo_slow_poll)
+		fault("policy enabled before all IRQ registrations completed");
+#endif
+	if (immediate_mask & BIT(irq)) {
 		handler((int)irq, data);
+#ifdef NEO_USB_POLL_TEST
+		if (run_early_work) {
+			recorded_work->pending = false;
+			recorded_work->callback(&recorded_work->work);
+		}
+#endif
+	}
 	return 0;
 }
 
@@ -247,12 +304,21 @@ static void unwind(void)
 	}
 }
 
+#ifdef NEO_USB_POLL_TEST
+#define main lifetime_tests
+#endif
 int main(void)
 {
 	struct regmap regmap = { 0 };
 	struct axp20x_dev pmic = { .regmap = &regmap };
 	struct device parent = { .drvdata = &pmic };
 	struct platform_device pdev = { .dev = { .parent = &parent, .of_node = &pdev } };
+
+#ifdef NEO_USB_POLL_TEST
+	pmic.variant = AXP223_ID;
+	parent.of_node = &nodes[1];
+	pdev.dev.of_node = &nodes[2];
+#endif
 
 	for (unsigned int failure = NONE; failure <= IRQ_REQUEST_1; failure++) {
 		for (unsigned int mask = 0; mask < 4; mask++) {
@@ -267,6 +333,11 @@ int main(void)
 				fault("initial offline read was not queued");
 			if (result == 0 && notifications != (unsigned int)__builtin_popcount(mask))
 				fault("immediate IRQ notification was lost");
+#ifdef NEO_USB_POLL_TEST
+			if (result == 0 && gameshellneo_slow_poll &&
+			    (!allocated->gameshellneo_slow_poll || recorded_work->delay != 0))
+				fault("eligible probe failed to request its fresh initial read");
+#endif
 			unwind();
 			if (irq_count || allocated || supply.live)
 				fault("owned resources leaked after unwind");
@@ -277,3 +348,8 @@ int main(void)
 	printf("USB lifetime: %d probe/unwind scenarios, %d violations\n", scenarios, total_faults);
 	return total_faults ? EXIT_FAILURE : EXIT_SUCCESS;
 }
+
+#ifdef NEO_USB_POLL_TEST
+#undef main
+#include "usb_poll_cases.h"
+#endif

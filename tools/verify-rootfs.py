@@ -10,6 +10,7 @@ import struct
 import subprocess
 import tempfile
 import zlib
+from usb_poll_boot import verify_scripts
 
 
 def require(condition, message):
@@ -74,6 +75,13 @@ def main():
     require(f'root=PARTUUID={identity["root_partuuid"]}'.encode() in script, 'Root PARTUUID mismatch')
     require(b'bootm 0x48000000 - 0x49000000' in script, 'Unexpected boot handoff')
     require(not list(boot.glob('*Initrd*')) and not list(boot.glob('initrd*')), 'Unexpected initramfs')
+    experiment = identity['sources'].get('experiments', {}).get('usb_absent_poll')
+    if experiment is not None:
+        require(type(experiment) is bool, 'Invalid USB policy selection')
+        _, mode = verify_scripts(boot, identity)
+        expected = 'experimental' if experiment else 'stock'
+        require(mode == expected and identity['usb_poll_boot']['initial_mode'] == expected,
+                'Image USB policy differs from source lock')
     for key, expected in built['files'].items():
         if '/lib/modules/' in key:
             relative = key.split('/lib/modules/', 1)[1]

@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import struct
 import subprocess
+from usb_poll_boot import boot_script, verify_scripts
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = json.loads((ROOT / 'build/sources.lock.json').read_text())
@@ -90,13 +91,11 @@ def finalize(root, loop):
     partuuid = subprocess.check_output(['blkid', '-s', 'PARTUUID', '-o', 'value', loop + 'p2'], text=True).strip()
     if not partuuid:
         raise SystemExit('Missing root PARTUUID')
-    cmd = (f'setenv bootargs console=tty0 console=ttyS0,115200n8 root=PARTUUID={partuuid} '
-           'rootfstype=ext4 rootwait rw panic=10\n'
-           'if fatload mmc 0:1 0x48000000 uImage; then\n'
-           f'  if fatload mmc 0:1 0x49000000 {dtb}; then\n'
-           '    bootm 0x48000000 - 0x49000000\n  fi\nfi\n'
-           'echo "GameShellNeo boot failed"\n')
-    (boot / 'boot.cmd').write_text(cmd)
+    experiment = LOCK.get('experiments', {}).get('usb_absent_poll')
+    if experiment is not None and type(experiment) is not bool:
+        raise ValueError('USB polling selection must be an explicit boolean')
+    selected = None if experiment is None else 'experimental' if experiment else 'stock'
+    (boot / 'boot.cmd').write_bytes(boot_script(partuuid, selected))
     run('mkimage', '-A', 'arm', '-T', 'script', '-C', 'none', '-n', 'GameShellNeo',
         '-d', boot / 'boot.cmd', boot / 'boot.scr')
     (root / 'etc/fstab').write_text(f'PARTUUID={partuuid} / ext4 defaults,noatime,data=ordered,commit=5 0 1\n'
@@ -108,6 +107,19 @@ def finalize(root, loop):
     identity = {'version': LOCK['image_version'], 'board': LOCK['board'], 'kernel': release,
                 'hardware_qualified': False, 'root_partuuid': partuuid,
                 'sources': LOCK, 'project_inputs_sha256': input_manifest()}
+    if selected is not None:
+        files = {}
+        for mode in ('stock', 'experimental'):
+            source = boot / f'boot-usb-{mode}.cmd'
+            compiled = boot / f'boot-usb-{mode}.scr'
+            source.write_bytes(boot_script(partuuid, mode))
+            run('mkimage', '-A', 'arm', '-T', 'script', '-C', 'none', '-n', 'GameShellNeo',
+                '-d', source, compiled)
+            files.update({source.name: sha(source), compiled.name: sha(compiled)})
+        for suffix in ('cmd', 'scr'):
+            shutil.copyfile(boot / f'boot-usb-{selected}.{suffix}', boot / f'boot.{suffix}')
+        identity['usb_poll_boot'] = {'initial_mode': selected, 'files': files}
+        verify_scripts(boot, identity)
     (destination / 'image.json').write_text(json.dumps(identity, indent=2) + '\n')
     output = LOCAL / 'artifacts'
     output.mkdir(exist_ok=True, mode=0o700)

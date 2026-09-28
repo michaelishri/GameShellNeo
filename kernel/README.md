@@ -18,6 +18,7 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 | 0005 | Stop NKMP factor search at its first exact match, preserving selected factors | Native/ARM32 equivalence and NEO-12 hardware checks passed; about 92% lower recorded governor CPU time at unchanged policy (report 33). Remove when an equivalent upstream optimization is verified |
 | 0006 | Order AXP USB resource release as IRQs, polling work, then power supply | Actual-source host lifetime regressions and isolated ARM object build passed (report 38); installed in diagnostic.4, with hardware results in report 40. Normal integration does not exercise every teardown race. Remove when the selected upstream source has equivalent lifetime ordering |
 | 0007 | Read effective rate constraints once per fixed-parent NM/NKM search | Native/ARM32 rates and factors match; isolated ARM clock-object builds passed (report 39). Installed in diagnostic.4, with hardware results in report 40; no attributed board timing or power measurement. Remove when equivalent upstream behavior is verified |
+| 0008 | Opt-in CPI/AXP223 fixed-peripheral absent polling, with graph/configuration gates and IRQ-preserving rearm | Native/ARM32 policy, lifecycle and compiled-board regressions passed. Report 41 records diagnostic.5 build evidence and pending physical qualification. Keep disabled elsewhere; no charging writes or measured battery gain. Remove if an equivalent upstream policy is verified or the experiment fails qualification |
 
 ## Provenance and limits
 

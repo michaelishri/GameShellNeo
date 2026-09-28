@@ -39,6 +39,12 @@ recorded governor CPU time fell about 92% (35.5% → 2.7% of one core), supporte
 by separate function samples. Estimated battery power was 2.7% lower; differing
 charge state and uncalibrated readings limit that comparison. Final checks
 passed and the original governor setting is restored.
+The current image, `0.1.0-diagnostic.4` / `6.18.54-gameshellneo4`, adds the USB
+work-lifetime fix and once-per-search NM/NKM clock constraints. Its
+[validation report](docs/40-diagnostic4-hardware-validation.md) records build
+and flash verification, hardware results and the exact repeatable test sequence.
+Diagnostic.3 remains available for recovery. The new changes do not yet have
+an attributed battery-power or clock-latency measurement.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -190,7 +196,7 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task setup:host` | Install missing native prerequisites on Debian/Ubuntu |
 | `task build:image` | Runtime/image changes; reuses the completed, verified kernel stage |
 | `task build:kernel` | Kernel source/configuration work; preserves incremental build outputs |
-| `task kernel:reset` | After changing the patch queue; archives old kernel source/output under `.local/previous-kernels/`, then run `task build` |
+| `task kernel:reset` | After changing the patch queue; archives old kernel source/output and artifact metadata/logs under `.local/previous-kernels/`, then run `task build`. Recovery images stay in `.local/artifacts/` |
 | `task build:rootfs` | Exercise Debian bootstrap/cache preparation independently |
 | `task check` | Python and C regressions, Bash syntax and ShellCheck |
 | `task test:nkmp` | Compare original/patched clock searches natively and under ARM32 emulation; also runs before the kernel in `task build` |
@@ -368,7 +374,7 @@ preparation, hardware evidence and measurement limits.
 [Report 36](docs/36-usb-polling-policy.md) defines the next experimental USB
 polling policy: a slower fallback only for confirmed absence in this fixed
 peripheral configuration, retaining interrupt notifications and fast checks
-for uncertainty. It is a design; diagnostic.3 still uses the existing policy.
+for uncertainty. It is a design; diagnostic.4 still uses the existing policy.
 
 `device:stability ROUTE=usb` writes a new temporary 128 MiB random file, flushes
 it to storage and checks its SHA-256 with a direct read that bypasses the file

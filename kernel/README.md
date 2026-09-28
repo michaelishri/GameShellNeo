@@ -16,8 +16,8 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 | 0003 (generated) | Fresh CPI3 DTS, panel/backlight implementations, bindings and current-limit helper | Compile/DT checks establish software integration only; hardware tests remain NEO-5 |
 | 0004 | Describe GPIO hog children already supported by the sunxi GPIO driver | Remove when the upstream pinctrl schema accepts these standard GPIO nodes |
 | 0005 | Stop NKMP factor search at its first exact match, preserving selected factors | Native/ARM32 equivalence and NEO-12 hardware checks passed; about 92% lower recorded governor CPU time at unchanged policy (report 33). Remove when an equivalent upstream optimization is verified |
-| 0006 | Order AXP USB resource release as IRQs, polling work, then power supply | Actual-source host lifetime regressions and isolated ARM object build passed (report 38); not installed. Remove when the selected upstream source has equivalent lifetime ordering |
-| 0007 | Read effective rate constraints once per fixed-parent NM/NKM search | Native/ARM32 rates and factors match; isolated ARM clock-object builds passed (report 39). Not installed or timed on hardware. Remove when equivalent upstream behavior is verified |
+| 0006 | Order AXP USB resource release as IRQs, polling work, then power supply | Actual-source host lifetime regressions and isolated ARM object build passed (report 38); installed in diagnostic.4, with hardware results in report 40. Normal integration does not exercise every teardown race. Remove when the selected upstream source has equivalent lifetime ordering |
+| 0007 | Read effective rate constraints once per fixed-parent NM/NKM search | Native/ARM32 rates and factors match; isolated ARM clock-object builds passed (report 39). Installed in diagnostic.4, with hardware results in report 40; no attributed board timing or power measurement. Remove when equivalent upstream behavior is verified |
 
 ## Provenance and limits
 

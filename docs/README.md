@@ -18,6 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [40 — Diagnostic.4 validation](40-diagnostic4-hardware-validation.md) | Verified build/flash, labeled backlight, load/recovery, four USB reconnects and four cold starts; exact repeatable tasks and qualification limits |
 | [39 — Clock rate constraints](39-clock-rate-constraint-optimization.md) | Once-per-search NM/NKM limits, native/ARM32 equivalence, lookup counts and isolated ARM object builds |
 | [38 — USB work lifetime](38-usb-work-lifetime.md) | Managed-resource ordering correction, actual-source probe/IRQ/poll regressions and isolated ARM driver build |
 | [37 — Driver optimization audit](37-driver-optimization-audit.md) | Clock constraint walks, redundant backlight requests, RSB autosuspend interaction and display/USB lifecycle findings |

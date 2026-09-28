@@ -6,7 +6,9 @@ Patch 0007 reads the effective clock rate limits once per fixed-parent NM or
 NKM factor search. Previously, the search reconstructed the same limits for
 every eligible factor combination. Actual-source comparisons passed on native
 Linux and emulated ARM32, and the affected kernel objects compiled for ARM.
-The patch is prepared for a future image; it is not installed on the GameShell.
+The patch was initially prepared without deployment. The subsequent NEO-19
+session installed it in diagnostic.4; [report 40](40-diagnostic4-hardware-validation.md)
+records the complete build and hardware integration results.
 
 ## Change and scope
 
@@ -144,8 +146,9 @@ Do not translate the lookup counts into a percentage of total CPU, boot-time
 or battery improvement. This optimization can benefit relevant clock setup or
 mode changes; its board-level magnitude remains unmeasured.
 
-Use the normal kernel-reset/build workflow for the next image and retain
-diagnostic.3 for recovery. Then verify boot/display behavior, blanking and
-restoration, peripheral access and any affected clock transitions. Measure
-actual latency separately if attribution is needed. No GameShell/Mac access,
-flashing, charger changes or physical interaction was part of this work.
+NEO-19 subsequently used the normal kernel-reset/build workflow, retained
+diagnostic.3 for recovery and installed diagnostic.4. Report 40 records normal
+boot/display, backlight and peripheral regression checks. These do not exhaust
+all PLL transitions or establish attributed latency or power savings; measure
+those separately. No GameShell/Mac access, flashing, charger changes or physical
+interaction was part of the original NEO-18 work described above.

@@ -106,14 +106,15 @@ resolved config, plus the pinned builder identity.
 case skipped), the compiled current-limit regression and shell lint. Its log
 is `.local/build/neo17-check.log`.
 
-No full image or module installation was produced. The normal diagnostic.3
-source/output and completed image were preserved. A later full build must use
+No full image or module installation was produced during NEO-17. The normal
+diagnostic.3 source/output and completed image were preserved. Later builds use
 the normal patch-queue reset workflow before applying the expanded queue.
 
 ## Remaining validation
 
-Run the normal image build and integration/cable checks when a new image is
-prepared and the owner is available. Retain the previous image for recovery.
+The subsequent NEO-19 session built and installed diagnostic.4 with this patch,
+retaining diagnostic.3 for recovery. [Report 40](40-diagnostic4-hardware-validation.md)
+records the full build, flash readback and hardware integration results.
 Kernel-level fault injection or concurrency instrumentation can supplement the
 host lifetime model; they were not performed here. The separate USB polling
 experiment in [report 36](36-usb-polling-policy.md), battery-voltage investigation

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "board": "gameshellneo-cpi31",
-  "image_version": "0.1.0-diagnostic.3",
+  "image_version": "0.1.0-diagnostic.4",
   "architecture": "armhf",
   "armbian": {
     "url": "https://github.com/armbian/build.git",
@@ -10,7 +10,7 @@
   "linux": {
     "url": "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git",
     "tag": "v6.18.54",
-    "localversion": "-gameshellneo3",
+    "localversion": "-gameshellneo4",
     "commit": "1b357ecb321392158d507b04672ffee57bfa071d",
     "tarball_url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.54.tar.xz",
     "tarball_sha256": "9df30b02dd8102bbd0be52556288ef6889ddbe7f1ddb96fbf847d0becf3eacac",

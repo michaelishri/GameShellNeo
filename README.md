@@ -286,8 +286,13 @@ diagnostic archives are retained privately in `.local/diagnostics/<timestamp>/`.
 `device:exec` runs the explicitly supplied command and returns its failure
 status. Shell operators require an explicit `sh -c '...'` command.
 
-`device:backlight` runs a roughly 30-second visual check on an unblanked panel:
-brightness 1, 16 and 31, followed by three cycles of 0 (off) and 31 (on).
+`device:backlight` runs a roughly 40-second visual check on an unblanked panel.
+It prints a ten-second countdown and stage labels on the GameShell's `tty1`
+console: brightness 1, 16 and 31 for four seconds each, followed by three
+cycles of 0 (off) and 31 (on), held for two seconds each. Each dark interval
+has a two-second on-screen notice first. The labels include requested levels
+and software readbacks. It leaves the existing login session running; press
+Enter afterward to redisplay the login prompt if needed.
 It saves the initial brightness and restores it on completion or handled
 termination signals. A temporary systemd service bounds the run to 60 seconds
 and refuses a concurrent run under the same unit name. It changes brightness

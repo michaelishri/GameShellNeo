@@ -65,8 +65,11 @@ The board's current WLAN address was obtained over USB and saved only to
 `GAMESHELL_IP` in `.env`. Wi-Fi SSH through the Mac initially timed out because
 the Mac was on a different subnet and routed that address through its ordinary
 default gateway. The Mac's ping also timed out. These failures are retained;
-the owner was asked to connect the Mac to the same hotspot. Independent Wi-Fi
-access must be verified before detailed cable tests or unplugged startup.
+after the owner connected the Mac to the same hotspot, Wi-Fi SSH through the
+tailnet/Mac path passed. USB policy/status verification also passed over the
+separate USB path. The running device remained on the same boot with healthy
+services and both interfaces up. No Wi-Fi software change was needed to
+restore these access paths.
 
 ## Repeating the completed checks
 
@@ -97,6 +100,8 @@ Private evidence under `.local/diagnostics/`:
 | `20260929T044944.495339Z` | Full diagnostic archive including initial radio failures |
 | `20260929T045045.388893Z` | Passing integration JSON |
 | `20260929T045313.583755Z` | Nine installed battery-guard regressions |
+| `20260929T045545.460820Z` | Successful Wi-Fi SSH/status through the Mac after network switch |
+| `20260929T045545.310870Z` | Separate successful USB-policy check after network switch |
 
 The initial supplicant journal is also retained privately as
 `.local/build/neo22-diagnostic5-wifi-journal.txt`. Credentials, network names,
@@ -104,7 +109,22 @@ private archives and image provisioning are not committed.
 
 ## Remaining acceptance
 
-Verify independent Wi-Fi SSH, then complete attached/detached startup,
+### Experimental USB reconnection batch
+
+`task device:usb-reconnects CYCLES=4` passed all four owner-operated cycles
+with the experimental policy active. For each cycle the device recorder saw
+`not attached` followed by `configured`, and a fresh USB SSH session through
+the Mac verified the same boot. The initial attachment was excluded. The
+recorder stopped and its temporary files were removed after the fourth pass.
+
+Private evidence: `.local/diagnostics/20260929T045611.055298Z/`, including
+`summary.json`, `usb-reconnects.jsonl` and `device-states.jsonl`. The result is
+functional reconnection coverage; it does not measure the physical cable-edge
+latency or poll-call rate. More detailed detection captures remain separate.
+
+### Outstanding checks
+
+Independent Wi-Fi SSH is now verified. Complete attached/detached startup,
 stock/experimental cable batches, rapid reconnection and separate matched
 battery-only comparisons. Detailed event recording must not run during power
 measurements. Direct poll-call instrumentation and error/IRQ coverage remain

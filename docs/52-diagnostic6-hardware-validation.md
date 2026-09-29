@@ -292,6 +292,29 @@ observations, not the pending repeated physical cold-start batch.
 
 ## Qualification scope and remaining work
 
+### Repeatable firmware checks for cold starts (NEO-33)
+
+The saved `device:boot-cycles` recorder now validates the source lock's pinned
+`radio.firmware.runtime_identity` against exactly one loaded brcmfmac identity
+in each captured boot's kernel journal. Missing, different or repeated loads
+fail, as do known firmware-halted, SDIO-card-removal and runtime-PM-underflow
+markers. The per-boot JSON retains expected/actual identities, fault counts
+and pass status. Optional board-specific firmware and CLM-file fallback
+messages do not themselves fail a successful load. Older source locks without
+a runtime expectation explicitly record firmware qualification as skipped;
+malformed expectations fail.
+
+Seven host regression tests passed, covering these failure cases and retained
+boot-health checks. Replay of `20260929T104155.273925Z` also passed. A live
+`task device:boot-cycles CYCLES=0` passed in `20260929T104834.217570Z` on boot
+`8c4089bd-f675-442f-8c9d-eb648c6d81ca`, with one expected A0 identity, zero
+tracked fault markers, and independent USB/Wi-Fi SSH to that same boot.
+This host-tool change needs no image rebuild and gives no physical-cycle
+credit. It retains the existing consecutive-boot and prior button/shutdown
+journal requirements. NEO-31's owner-operated cold-start batch remains pending.
+
+### Scope
+
 The functional USB experiment now has the direct callback, bounded error and
 physical post-error IRQ/access evidence that was missing from diagnostic.5.
 Together with [report 44](44-diagnostic5-hardware-validation.md)'s startup and

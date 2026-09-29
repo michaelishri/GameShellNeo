@@ -839,8 +839,12 @@ if the screen fails to turn off or the login screen fails to return.
 
 The recorder checks image/kernel identity, four CPUs and expected memory,
 services, input enumeration, backlight state, battery monitoring and USB/Wi-Fi
-access. Each new boot must follow the previously captured boot in the saved
-journal and contain evidence that the previous short power press reached
+access. When the source lock pins a radio `runtime_identity`, each boot must
+have exactly one matching loaded firmware identity and no firmware-crash,
+SDIO-removal or runtime-PM-underflow markers. Per-boot JSON preserves these
+identities and fault counts; older locks without an expectation explicitly
+skip firmware qualification. Each new boot must follow the previously captured
+boot in the saved journal and contain evidence that the previous short power press reached
 systemd power-off and filesystem syncing. It saves private per-boot JSON,
 kernel/shutdown journals and a summary under `.local/diagnostics/`. It retries
 transient SSH failures and rejects missed boots; a default 15-minute timeout

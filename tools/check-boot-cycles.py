@@ -56,14 +56,35 @@ print(json.dumps(result))
 '''
 
 
+def firmware_check(journal, firmware):
+    """Preserve loaded identities/fault counts; only enforce a pinned expectation."""
+    required = 'runtime_identity' in firmware
+    expected = firmware.get('runtime_identity')
+    prefix = 'brcmf_c_preinit_dcmds: '
+    identities = [line.split(prefix, 1)[1].strip() for line in journal.splitlines()
+                  if prefix + 'Firmware: ' in line]
+    faults = {name: journal.count(marker) for name, marker in {
+        'firmware_crashes': 'brcmf_fw_crashed: Firmware has halted or crashed',
+        'sdio_removals': 'mmc1: card 0001 removed',
+        'pm_usage_underflows': 'Runtime PM usage count underflow',
+    }.items()}
+    passed = (isinstance(expected, str) and expected.startswith('Firmware: ') and
+              identities == [expected] and not any(faults.values())) if required else None
+    return {'required': required, 'expected': expected, 'identities': identities,
+            'faults': faults, 'passed': passed}
+
+
 def validate(snapshot, lock):
     expected_kernel = lock['linux']['tag'][1:] + lock['linux']['localversion']
+    snapshot['firmware_check'] = firmware_check(
+        snapshot.get('kernel_journal', ''), lock.get('radio', {}).get('firmware', {}))
     checks = {
         'image': snapshot['image']['version'] == lock['image_version'],
         'kernel': snapshot['kernel'] == expected_kernel,
         'cpus': snapshot['cpus'] == 4,
         'memory': 900 * 1024 <= snapshot['memory_kib'] <= 1100 * 1024,
         'kernel_taint': snapshot['taint'] == 0,
+        'firmware': snapshot['firmware_check']['passed'] is not False,
         'services': all(s['ActiveState'] == 'active' and s['NRestarts'] == '0'
                         for s in snapshot['services'].values()),
         'failed_units': not snapshot['failed_units'],

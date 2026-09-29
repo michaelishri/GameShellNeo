@@ -58,8 +58,10 @@ It has passed the build/offline checks, Mac transfer verification and guarded
 card flash with full readback. [Report 51](docs/51-diagnostic6-preparation.md)
 records implementation and host verification;
 [report 52](docs/52-diagnostic6-hardware-validation.md) tracks ongoing hardware
-qualification. First boot, integration, battery-policy simulation and connected
-experimental USB count/error tests passed; wider USB/Wi-Fi qualification remains.
+qualification. First boot, integration, battery-policy simulation and connected/
+unplugged USB count/error tests passed in both modes. Direct unplugged polling
+fell from 16.65 to 3.85 callbacks/second (76.9%) in matched one-minute windows;
+this does not establish an energy saving. Wider USB/Wi-Fi qualification remains.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

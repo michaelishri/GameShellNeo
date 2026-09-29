@@ -5,8 +5,10 @@ Date: **29 September 2026 NZDT**. Board: owner's **CPI v3.1**; Samsung
 and **NEO-31** (integrated A0 firmware qualification).
 
 Status: **flash/readback, first boot, integration, battery-policy simulation
-and connected experimental USB diagnostics passed**. Stock-policy comparison,
-unplugged counts, physical recovery and Wi-Fi qualification remain pending.
+and connected/unplugged stock/experimental USB diagnostics passed**. Direct
+unplugged callback rate fell **76.9%** in the matched one-minute windows.
+Wi-Fi recovered after software reboots with USB attached and absent. Physical
+cable recovery and repeated cold-start/AP-loss qualification remain pending.
 This report follows [diagnostic.6 preparation](51-diagnostic6-preparation.md).
 Sleep remains disabled; charging and governor settings are unchanged.
 
@@ -121,12 +123,98 @@ Zero connected polls is expected, not an unplugged-polling optimization result.
 Synthetic failures exercise a narrow driver call site and do not reproduce
 electrical faults or qualify physical cable IRQ recovery.
 
+## Wi-Fi configuration and stock comparison
+
+The owner confirmed that `.env` holds an available 2.4 GHz network.
+`task device:wifi-config` applied that private configuration over USB and
+verified an independent Wi-Fi SSH connection through the Mac before committing
+the transaction. Evidence: `20260929T101249.709404Z`. Credentials and the
+updated Wi-Fi address remain private; this runtime provisioning change does not
+rewrite the preserved image artifact.
+
+`task device:boot-cycles CYCLES=0` then captured the first boot and verified
+both access paths (`20260929T101328.667026Z`). This command captures the current
+boot only; it does not constitute a repeated cold-start batch.
+
+The saved policy selector chose stock for the next boot, followed by an
+explicit remote `systemctl reboot`. On boot
+`9068c060-822f-456d-a0fe-d5afea461ed7`, USB and independent Wi-Fi SSH recovered,
+the loaded firmware identity remained correct and the stock policy verified.
+Status, policy and current-boot captures are `20260929T101435.876145Z`,
+`20260929T101435.876022Z` and `20260929T101434.542870Z` respectively. Readiness
+was 14.581 seconds; systemd reported 14.994 seconds. A software reboot is not
+a physical cold-start test.
+
+The AP announces AU, matching the owner's previously accepted setting.
+Configured country remains NZ. The saved integration check passed with
+`ACTIVE_COUNTRY=AU` in `20260929T101658.723313Z`; no router or regulatory
+configuration was changed for the test.
+
+The same connected count/error commands then passed under stock policy:
+
+| Capture under `.local/diagnostics/` | Result |
+| --- | --- |
+| `20260929T101455.073729Z` | Zero natural callbacks in 60.005 seconds; observer CPU 0.0146 seconds |
+| `20260929T101619.748163Z` | One requested/injected failure; retained `0x30`, no automatic retry |
+| `20260929T101649.305609Z` | Four requested, one consumed; unused budget expired, no automatic retry |
+
+Stock preserves its historical connected-state behavior: after an injected
+failure it stops polling because it retains the online state. The remaining
+three errors in the four-error request expired rather than being deferred to
+later cable activity. Experimental retries provide the additional recovery
+observed above. All stock tests restored counting off and budget zero, with
+no real read errors. Physical removal/reconnection after the fault window
+still needs separate verification.
+
+## Direct unplugged counts and recovery
+
+After the owner unplugged USB, Wi-Fi status verified Discharging and an
+unattached controller (`20260929T101802.994572Z`). The stock count then ran,
+followed by a separate four-error test. The verified selector chose experimental
+for the next boot (`20260929T102010.401182Z`), and a remote software reboot
+completed on battery with USB still absent. Wi-Fi recovered on boot
+`eea8f9b9-a2a3-473d-bd95-5333d6b81dbb`; status and active policy passed in
+`20260929T102058.430567Z` and `20260929T102058.429123Z`. The matching experimental
+count ran before its separate four-error test.
+
+For each mode, the exact tasks were:
+
+```sh
+task device:usb-counts ROUTE=wifi SECONDS=60
+task device:usb-errors ROUTE=wifi ERRORS=4
+```
+
+| Policy | Count-window capture | Duration | Successful callbacks | Calls/second | Observer CPU seconds |
+| --- | --- | --- | --- | --- | --- |
+| Stock | `20260929T101816.831934Z` | 60.005094 s | 999 | 16.64859 | 0.01604 |
+| Experimental | `20260929T102112.450339Z` | 60.005238 s | 231 | 3.84966 | 0.01415 |
+
+The normalized rate reduction is **76.9%**. Both natural windows recorded
+zero real/injected errors and zero synthetic requests, with coherent counters
+and retained status `0x00`. No other diagnostic observer ran in either window.
+The count uses the two measurement snapshots, excluding any callbacks during
+subsequent validation/cleanup. Nominal 50/250 ms delays are requested workqueue
+delays; they are not guarantees of exactly 20/4 executions per second.
+
+This directly establishes fewer polling callbacks on this board/image, unlike
+the earlier aggregate RSB-interrupt comparison. It does **not** quantify total
+CPU wakeups, incremental kernel-counter cost or battery-energy savings. The
+reported CPU time covers only the userspace measurement process, excluding
+SSH, child processes and kernel instrumentation. These are two initial windows,
+not a long-duration energy or scheduling study.
+
+The unplugged four-error checks passed in `20260929T101956.362126Z` (stock)
+and `20260929T102230.164983Z` (experimental). Both consumed exactly four
+injected failures, retained `0x00`, requested 50 ms retries and recovered with
+a successful real read. Stock then requested 50 ms normal polling;
+experimental returned to 250 ms. Both restored diagnostics disabled and
+budget zero, with no real read errors. Physical cable tests follow separately.
+
 ## Remaining qualification
 
-Compare the stock policy and collect matched unplugged counts. Keep connected count
-and synthetic error windows separate from unplugged natural counts and
-physical cable-recovery checks. Counting defaults off and each saved diagnostic
-task restores its owned controls.
+Complete physical cable recovery in both modes after the error windows. Keep
+high-rate cable recorders separate from natural count/energy windows. Counting
+defaults off and each saved diagnostic task restores its owned controls.
 
 Firmware qualification requires the expected loaded A0 identity, association,
 independent Wi-Fi SSH, repeated cold starts and AP-absent/reconnection tests.

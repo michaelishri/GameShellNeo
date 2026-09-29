@@ -1,0 +1,13 @@
+{
+  "source_commit": "58a9869598b606fc2e5531298932b8757292f9a0",
+  "url": "https://gitlab.com/api/v4/projects/kernel-firmware%2Flinux-firmware/repository/files/brcm%2Fbrcmfmac43430a0-sdio.bin/raw?ref=58a9869598b606fc2e5531298932b8757292f9a0",
+  "sha256": "ad85074b7919517d7e1a7e463e0176d46e7b312216bd7aa372e4aee2bfe8e07a",
+  "size_bytes": 382455,
+  "fwid": "01-93c3a6da",
+  "runtime_identity": "Firmware: BCM43430/0 wl0: May 29 2017 00:03:43 version 7.13.53.9 (r664949) FWID 01-130000",
+  "version": "7.13.53.9",
+  "build_date": "2017-05-29",
+  "license_url": "https://gitlab.com/api/v4/projects/kernel-firmware%2Flinux-firmware/repository/files/LICENSES%2FLICENCE.broadcom_bcm43xx/raw?ref=58a9869598b606fc2e5531298932b8757292f9a0",
+  "license_sha256": "b16056fc91b82a0e3e8de8f86c2dac98201aa9dc3cbd33e8d38f1b087fcec30d",
+  "qualified": false
+}

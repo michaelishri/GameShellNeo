@@ -1,6 +1,7 @@
 """Mac transport selection must preserve the already trusted SSH identity."""
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -145,6 +146,31 @@ class DeviceRouteTests(unittest.TestCase):
                         self.fail('Unexpected connected session')
         self.connect_mac.assert_not_called()
         self.client.connect.assert_not_called()
+
+
+class ScanRecoveryTests(unittest.TestCase):
+    def test_recovery_waits_for_running_comparison_before_restoring(self):
+        commands = []
+        def run(_client, command, **_kwargs):
+            commands.append(command)
+            return b'loaded\n' if 'LoadState' in command else b''
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(remote, 'device'), \
+                patch.object(remote, 'evidence_directory', return_value=Path(directory)), \
+                patch.object(remote, 'run', side_effect=run):
+            remote.device_action({}, 'wifi-scan-restore', 'usb')
+        self.assertEqual(len(commands), 3)
+        self.assertIn('systemctl stop gameshellneo-scan-test', commands[1])
+        self.assertTrue(commands[2].endswith('--restore'))
+
+    def test_failed_stop_does_not_race_the_active_comparison(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(remote, 'device'), \
+                patch.object(remote, 'evidence_directory', return_value=Path(directory)), \
+                patch.object(remote, 'run', side_effect=[b'loaded\n', RuntimeError('stop failed')]) as run:
+            with self.assertRaises(RuntimeError):
+                remote.device_action({}, 'wifi-scan-restore', 'usb')
+        self.assertEqual(run.call_count, 2)
 
 
 if __name__ == '__main__':

@@ -168,6 +168,32 @@ tasks:
     desc: Capture kernel, service, power and access status (ROUTE=wifi or usb)
     cmds: [python3 tools/remote.py device status]
 
+  device:wifi-config:
+    desc: Apply Wi-Fi credentials from .env over USB, verify Wi-Fi SSH, then update GAMESHELL_IP
+    cmds:
+      - task: provision
+      - python3 tools/change-wifi.py
+
+  device:wifi-scan-test:
+    desc: Compare firmware/host/firmware scanning over USB; SECONDS=120 per phase, restore runtime flag
+    cmds: [python3 tools/remote.py device wifi-scan-test --route usb]
+
+  device:wifi-scan-restore:
+    desc: Restore the saved runtime scan-offload flag over USB after an interrupted comparison
+    cmds: [python3 tools/remote.py device wifi-scan-restore --route usb]
+
+  device:wifi-firmware-test:
+    desc: Try the pinned A0 firmware over USB for SECONDS=120, then restore original firmware
+    cmds: [python3 tools/check-wifi-firmware.py]
+
+  device:wifi-visibility:
+    desc: Compare cached scans with the .env SSID over USB without printing network names
+    cmds: [python3 tools/check-wifi-visibility.py]
+
+  mac:wifi:
+    desc: Inspect the Mac Wi-Fi band and private SSID match without changing networks
+    cmds: [python3 tools/check-mac-wifi.py]
+
   device:logs:
     desc: Collect and download a private diagnostic archive (ROUTE=wifi or usb)
     cmds: [python3 tools/remote.py device logs]

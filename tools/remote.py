@@ -237,6 +237,49 @@ def device_action(config, action, route):
             for key in ('interrupts', 'softirqs', 'processes'):
                 result[key] = result[key][:10]
             print(json.dumps(result, indent=2))
+        elif action == 'wifi-scan-restore':
+            if route != 'usb':
+                raise ValueError('Restore scan-test state through ROUTE=usb')
+            # Wait for a running comparison and its exit hook before restoring;
+            # otherwise its next phase could overwrite the restored flag.
+            loaded = run(client, 'systemctl show gameshellneo-scan-test -p LoadState --value',
+                         display=False, timeout=10).decode().strip()
+            if loaded != 'not-found':
+                run(client, 'sudo -n systemctl stop gameshellneo-scan-test',
+                    display=False, timeout=45)
+            arguments = ['sudo', '-n', '/usr/bin/python3', '-B', '-c',
+                         (ROOT / 'tools/test-wifi-scanning.py').read_text(), '--restore']
+            with (directory / 'scan-restore.txt').open('wb') as output:
+                run(client, shlex.join(arguments), output=output, timeout=45)
+            print('Scan comparison stopped; any saved scan-offload setting restored.')
+        elif action == 'wifi-scan-test':
+            seconds = int(os.environ.get('NEO_PROFILE_SECONDS', '120'))
+            if route != 'usb' or not 60 <= seconds <= 180 or seconds % 10:
+                raise ValueError('Use ROUTE=usb and SECONDS a multiple of ten in 60..180')
+            remote_dir = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-scan.XXXXXXXX',
+                             display=False).decode().strip()
+            if not re.fullmatch(r'/tmp/gameshellneo-scan\.[A-Za-z0-9]+', remote_dir):
+                raise ValueError('Unexpected scan-test directory')
+            script = remote_dir + '/test-wifi-scanning.py'
+            with client.open_sftp() as sftp:
+                upload(sftp, ROOT / 'tools/test-wifi-scanning.py', script)
+            arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+                         '--unit=gameshellneo-scan-test',
+                         '--property=RuntimeMaxSec=' + str(3 * (seconds + 10) + 90),
+                         '--property=TimeoutStopSec=30',
+                         '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
+                         '/usr/bin/python3', '-B', '-u', script, '--seconds', str(seconds)]
+            print('Private scan comparison:', directory, flush=True)
+            print('Retain device helper on failure:', remote_dir, flush=True)
+            path = directory / 'wifi-scanning.jsonl'
+            with path.open('wb') as output:
+                run(client, shlex.join(arguments), output=output, timeout=60)
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+            if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
+                raise ValueError('Incomplete scan comparison; verify runtime-setting restoration')
+            with client.open_sftp() as sftp:
+                sftp.remove(script)
+                sftp.rmdir(remote_dir)
         elif action == 'governor-compare':
             seconds = int(os.environ.get('NEO_PROFILE_SECONDS', '120'))
             rate = int(os.environ.get('NEO_GOVERNOR_RATE_US', '10000'))
@@ -490,7 +533,8 @@ def main():
     target = sub.add_parser('device')
     target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
                                           'stability', 'battery-check', 'idle-sample', 'power-profile',
-                                          'governor-compare', 'governor-profile', 'usb-policy'])
+                                          'governor-compare', 'governor-profile', 'usb-policy',
+                                          'wifi-scan-test', 'wifi-scan-restore'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash', 'compare'])

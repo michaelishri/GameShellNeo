@@ -18,6 +18,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [48 — A0 firmware trials](48-a0-firmware-trials.md) | Reversible upstream A0 scan comparison, runtime identity correction and network visibility limits |
+| [47 — Wi-Fi firmware options](47-wifi-firmware-options.md) | Exact A0 silicon compatibility, candidate binary versions and primary-source provenance |
+| [46 — Wi-Fi transition and scan recovery](46-wifi-transition-and-scan-recovery.md) | Guarded .env network changes, automatic rollback and firmware/host scan isolation |
+| [45 — USB polling idle comparison](45-usb-polling-idle-comparison.md) | Repeatable experimental/stock/experimental protocol; measurements pending network recovery |
 | [44 — Diagnostic.5 initial validation](44-diagnostic5-hardware-validation.md) | Stock/experimental startup and 20 cable cycles, repeatable rapid-test support, hotspot recovery and remaining power/instrumentation limits |
 | [43 — macOS card mount guard](43-macos-card-mount-guard.md) | Failed-readback diagnosis, read-only sector comparison, temporary target-specific mount veto and verified recovery |
 | [42 — Remote network preparation](42-remote-network-preparation.md) | Mac tailnet transport, Wi-Fi SSH through the Mac, private provisioning refresh and pre-existing Wi-Fi crash evidence |

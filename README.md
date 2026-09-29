@@ -316,6 +316,11 @@ task device:usb-detect CYCLES=0 SECONDS=8 # Unplugged smoke capture; no cable ac
 task device:usb-detect CYCLES=4 # Start unplugged; detailed IRQ/events over Wi-Fi
 task device:stability ROUTE=usb # Keep the board connected throughout
 task device:battery-check ROUTE=wifi # Isolated simulation; no real power-off or charger writes
+task device:wifi-config             # Apply .env Wi-Fi over USB and verify Wi-Fi SSH; no reflash
+task device:wifi-visibility         # Cached target visibility; no network names in output
+task mac:wifi                      # Mac Wi-Fi band/security; names may be redacted by macOS
+task device:wifi-scan-test SECONDS=120 # USB-only firmware/host/firmware scan comparison; restores flag
+task device:wifi-firmware-test SECONDS=120 # USB-only pinned A0 binary trial; always restores original
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
@@ -461,6 +466,77 @@ A transient service runs at reduced scheduling priority with a seven-minute
 limit. Results are private `stability.jsonl`; collect `device:status` and
 `device:logs` afterwards to inspect services and kernel messages. This bounded
 check does not qualify long-term endurance or idle power consumption.
+
+To change Wi-Fi, update `GAMESHELL_WIFI_SSID`, `GAMESHELL_WIFI_PSK` and the
+confirmed `GAMESHELL_WIFI_COUNTRY` in `.env`. Keep USB connected and the Mac
+awake. For remote work, put the Mac on the same new network and retain its
+tailnet endpoint plus `GAMESHELL_WIFI_VIA_MAC=1`. Run `task device:wifi-config`.
+The task always uses USB for the change, refreshes private build provisioning,
+and verifies Wi-Fi SSH against the provisioned host key, same boot and new
+Wi-Fi address before committing. It updates only `GAMESHELL_IP` in `.env`.
+No image rebuild or reboot is needed; the Wi-Fi service restarts.
+
+Credentials travel by SFTP in a private directory, not in command arguments or
+logs. A bounded device service preserves the previous config and restores it
+unless the host verifies the new route within two minutes. Its `ExecStopPost`
+also runs restoration on service termination. This needs a functioning
+kernel/systemd; it cannot undo sudden power loss. If SSH disappears or cleanup
+fails, retain the printed private evidence and device transaction directory;
+reconnect over USB and verify restoration before removing it. An unavailable
+previous access point may still prevent association after a correct rollback.
+Host tests cover commit, deadline, stale-address rejection, interrupted-state
+restoration and `.env` preservation; these are not physical power-loss tests.
+
+`device:wifi-scan-test SECONDS=120` investigates firmware resets while scanning.
+Keep USB attached; the task always controls the device through USB and takes
+roughly seven minutes. It requires `disable_scan_offload=0`, then compares that
+setting with `1` and finally `0` again. These are runtime supplicant settings;
+credentials, radio firmware and persistent configuration stay unchanged.
+Each phase has ten seconds settling, followed by `SECONDS` of nominal
+ten-second samples (multiples of ten in 60–180). Private output records the
+flag, supplicant state, interface recreation and firmware/SDIO event counts,
+without SSIDs, BSSIDs or keys. This is a functional diagnostic, not a power test.
+
+The bounded service and its independent `ExecStopPost` restore the saved flag.
+If interrupted, retain the printed helper directory and private evidence until
+restoration is confirmed. `task device:wifi-scan-restore` first stops a running
+comparison and its exit hook, then restores any remaining record through USB.
+A temporarily rejected reassociation during radio recovery
+is distinct from setting readback; both are recorded where applicable.
+[Report 46](docs/46-wifi-transition-and-scan-recovery.md) records observed
+failures and qualification status.
+
+`device:wifi-firmware-test SECONDS=120` fetches the exact A0 candidate and its
+license from [the pinned manifest](build/wifi-firmware-candidate.json), verifies
+their hashes, and runs a bounded USB-only trial. It requires the original
+firmware and GameShell NVRAM hashes, CPI v3.1 image identity, normal scan policy
+and a configured USB link. It stops the supplicant, reloads the radio modules
+with the candidate, checks a **new** firmware-identification message, and records
+scan state plus firmware/SDIO events. Board NVRAM and Wi-Fi credentials are
+preserved. `SECONDS` accepts multiples of ten in 60–300.
+
+The task always restores the original binary, file mode and loaded version;
+it does not adopt the candidate or update image provenance. Restoration also
+runs through `ExecStopPost` on termination. Leave USB connected, do not reboot
+or run another radio test concurrently, and retain the printed helper directory
+on failure. Recovery state lives in `/run/gameshellneo-firmware-trial`; do not
+remove it before checking restoration. This needs a functioning kernel/systemd
+and is not sudden-power-loss recovery. A completed trial includes successful
+restoration; its event counts and network behavior determine whether the
+candidate helped. [Report 47](docs/47-wifi-firmware-options.md) explains candidate
+provenance and why Pi A1/B0 firmware is not interchangeable.
+[Report 48](docs/48-a0-firmware-trials.md) records actual trials and their limits.
+
+For the separate **network-transition** trial, first complete the unchanged-profile
+120-second scan trial above. Then run `task device:wifi-firmware-test SECONDS=300`
+in one terminal. After its `candidate_loaded` event, run `task device:wifi-config`
+in a second terminal, with the Mac already on the intended network. This is the
+one intentional concurrent operation: it tests the new credentials on the
+candidate, with its own independent verification/rollback. A committed network
+configuration remains when the firmware trial restores the original binary.
+Keep the two captures together and recheck Wi-Fi afterward; the firmware task's
+completion alone does not establish successful association. Do not count this
+mixed connected/disconnected workload as another offline-scan comparison.
 
 `device:battery-check ROUTE=wifi` runs the battery policy regressions against
 the **installed** guard after verifying its SHA-256 matches the tracked source.

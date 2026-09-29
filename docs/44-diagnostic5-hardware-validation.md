@@ -246,13 +246,108 @@ physical detection-speed comparison.
 Final trace validation and cleanup passed. Private stock evidence:
 `.local/diagnostics/20260929T051104.764393Z/`, with the same summary/trace/log
 files as the experimental run. USB was left unplugged after the final cycle.
+The full post-stock archive is `20260929T051430.566393Z/` under the same
+private diagnostics directory.
+
+## Stock cold start with USB connected
+
+The owner connected USB, performed the same orderly shutdown/ten-second
+wait/power-on procedure, and confirmed the login screen with USB still
+attached. `task device:boot-cycles CYCLES=0` checked the current boot without
+requesting extra cycles. It passed all image/kernel, CPU/memory, service,
+battery-monitor, USB, display/input and taint checks, and independently reached
+the same boot over Wi-Fi.
+
+New boot: `9bf0a244-47b1-406c-897a-514ac48b35cc`; the preceding stock detached
+boot is recorded in its journal. The actual stock-policy message and parameter
+`N` were rechecked. Local readiness was 15.0337 seconds; no new boot-speed
+claim is based on this observation.
+
+Private evidence: `.local/diagnostics/20260929T051656.810213Z/` (boot checks
+and journals) and `20260929T051701.116345Z/` (stock-policy verification).
+
+## Rapid reconnection test support
+
+NEO-27 adds `task device:usb-rapid CYCLES=4`. It reuses the basic USB
+reconnection observer with nominal **20 ms** sampling instead of its preserved
+250 ms default. Every counted cycle must include an observed `not attached`
+state followed by `configured` and fresh USB SSH on the same boot. Multiple
+unchecked removals fail the task. The existing bounded service, exclusive
+lock, failure evidence and cleanup apply to both modes. Mode/interval are
+recorded in the summary; events include monotonic observation times.
+
+The owner starts connected, waits for `ready`, then unplugs and promptly
+reinserts without a deliberate pause, leaving USB connected for 30 seconds
+between cycles and after the last. A short removal missed by sampling is not
+silently counted. This checks quick manual reconnection; it does not establish
+precise physical pulse widths, a minimum detectable duration or a detection
+deadline. The recorder remains separate from power measurements.
+
+Host validation passed 13 runtime and 97 tool tests, with one optional
+user-systemd skip, plus C regressions and shell lint. Eight focused new tests
+cover unchanged defaults, rapid-mode propagation, timestamped change capture,
+unsupported intervals and strict cycle accounting. Private host log:
+`.local/build/neo27-check.log`.
+
+The stock rapid batch passed **4/4**, with actual event metadata confirming
+20 ms sampling, each observed removal/reconfiguration followed by USB SSH on
+boot `9bf0a244-47b1-406c-897a-514ac48b35cc`, and clean recorder removal.
+Observed `not attached`→`configured` intervals were approximately **1.214,
+1.505, 1.629 and 2.028 seconds**; these include reconnection/enumeration and
+are not measured cable-out durations. Private capture:
+`.local/diagnostics/20260929T051955.826335Z/`.
+
+After that batch, `device:usb-policy ROUTE=usb MODE=experimental` selected
+the experimental next-boot script (capture `20260929T052255.794579Z`). A
+separate `device:exec ROUTE=usb -- sudo -n systemctl reboot` requested an
+orderly remote reboot with USB attached. This transition is a software reboot,
+not another owner-observed cold start.
+
+Initial USB probes after requesting reboot timed out; the failed boot-check
+capture `.local/diagnostics/20260929T052356.341073Z/` is retained. Wi-Fi then
+reached a healthy new boot with USB configured, followed by successful USB
+policy and full dual-route boot checks. The owner confirmed the normal login
+screen. New boot: `73a1cbd0-0b12-4137-bdb1-7965671bab5d`; experimental policy
+was accepted and remains selected for the next boot.
+
+Successful transition captures are `20260929T052436.040778Z/` (Wi-Fi status),
+`20260929T052531.165113Z/` (boot checks) and `20260929T052532.648619Z/` (USB
+policy). The previous journal records a completed reboot request and a
+sunxi-watchdog rejection of systemd's ten-minute timeout. That warning is
+tracked in `FOLLOW-UP.md`; no watchdog setting was changed and its role, if
+any, in transition time has not been established.
+
+The experimental rapid batch then passed **4/4** on this new boot, again with
+actual 20 ms event metadata, a fresh USB SSH check per removal/reconfiguration
+and successful recorder cleanup. Observed `not attached`→`configured`
+intervals were approximately **1.725, 1.522, 1.860 and 2.489 seconds**, with
+the same enumeration/manual-timing limits as the stock batch. Evidence:
+`.local/diagnostics/20260929T052634.275310Z/`. The owner confirmed all four
+quick cycles and left USB attached. This completes NEO-27's host tooling and
+eight-cycle rapid-test qualification; NEO-22's broader measurement work stays
+open.
+
+Across the session, **20 cable cycles** passed: four basic experimental, four
+detailed experimental, four detailed stock, four rapid stock and four rapid
+experimental. Both policies also booted with USB attached and detached. The
+running and next-boot policies are experimental, with diagnostic.4 recovery
+retained. These are bounded functional results, not a general reliability or
+power-efficiency certification.
+
+Final USB status and Wi-Fi diagnostic collection succeeded after recorder
+cleanup. Both interfaces were up, USB was configured at high speed, the six
+monitored services had no restarts, and there were no failed units or kernel
+taint. The current-boot kernel archive contained no firmware crash, SDIO card
+removal or warning/BUG/Oops signatures. Private captures:
+`20260929T053037.108660Z/` (status) and `20260929T053037.289094Z/` (full
+archive). The battery gauge reported 99% and charging; this does not resolve
+the separate charger-voltage/pack-limit investigation.
 
 ## Remaining acceptance
 
 Independent Wi-Fi SSH and the initial experimental attached/detached starts
-plus stock detached startup and both detailed cable batches are now verified.
-Complete stock attached startup,
-rapid reconnection and separate matched
+plus stock attached/detached startup and both detailed cable batches are now
+verified, including both rapid batches. Complete separate matched
 battery-only comparisons. Detailed event recording must not run during power
 measurements. Direct poll-call instrumentation and error/IRQ coverage remain
 requirements before broad enablement or measured-work claims. Keep the

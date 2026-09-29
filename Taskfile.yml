@@ -188,6 +188,10 @@ tasks:
     desc: Record CYCLES=4 cable removals on the board and verify USB SSH after each return
     cmds: [python3 tools/check-usb-reconnects.py]
 
+  device:usb-rapid:
+    desc: Record CYCLES=4 immediate unplug/replug checks with 20 ms sampling; wait for ready
+    cmds: [python3 tools/check-usb-reconnects.py --rapid]
+
   device:usb-detect:
     desc: Capture detailed USB IRQ/state events over Wi-Fi; start unplugged, CYCLES=4 (0 for smoke)
     cmds: [python3 tools/check-usb-detection.py]

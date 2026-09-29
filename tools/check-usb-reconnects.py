@@ -43,7 +43,20 @@ def packet(client, config, remote_dir, directory):
     return lines[1], lines[2], trace
 
 
-def observe(config, cycles, timeout, record, directory):
+def cycle_complete(events, state):
+    """Count only one observed removal followed by the current configuration."""
+    removals = [event for event in events if event['state'] == 'not attached']
+    if len(removals) > 1:
+        raise RuntimeError('Multiple removals occurred before USB SSH could be verified; '
+                           'leave more time between cycles')
+    if removals and state == 'configured' and events[-1]['state'] == 'configured':
+        if events[-1]['sequence'] <= removals[0]['sequence']:
+            raise ValueError('No configured state after removal')
+        return True
+    return False
+
+
+def observe(config, cycles, timeout, record, directory, sample_ms=250):
     started = False
     with device(config, 'usb') as client:
         remote_dir = run(client, 'sudo -n mktemp -d /run/gameshellneo-usb-reconnects.XXXXXXXX',
@@ -55,7 +68,8 @@ def observe(config, cycles, timeout, record, directory):
                      '--property=RuntimeMaxSec=' + str(timeout + 60), '--property=UMask=0077',
                      '--property=StandardOutput=file:' + remote_dir + '/states.jsonl',
                      '--property=StandardError=journal', '/usr/bin/python3', '-u', '-c',
-                     (ROOT / 'tools/record-usb-states.py').read_text()]
+                     (ROOT / 'tools/record-usb-states.py').read_text(),
+                     '--sample-ms', str(sample_ms)]
         run(client, shlex.join(arguments), display=False, timeout=10)
         started = True
     try:
@@ -67,6 +81,7 @@ def observe(config, cycles, timeout, record, directory):
         identity = {'boot_id': boot_id,
                     'server_address': config.get('GAMESHELL_USB_IP', '192.168.10.1')}
         record('ready', requested_cycles=cycles, baseline=identity,
+               sample_interval_ms=sample_ms,
                message='Baseline verified. Ready for physical USB cable cycles.')
         deadline = time.monotonic() + timeout
         completed = 0
@@ -83,13 +98,7 @@ def observe(config, cycles, timeout, record, directory):
             if current_boot != boot_id:
                 raise RuntimeError('Board rebooted during cable testing')
             events = [event for event in trace if event['sequence'] > verified_sequence]
-            removals = [event for event in events if event['state'] == 'not attached']
-            if len(removals) > 1:
-                raise RuntimeError('Multiple removals occurred before USB SSH could be verified; '
-                                   'leave more time between cycles')
-            if removals and state == 'configured' and events[-1]['state'] == 'configured':
-                if events[-1]['sequence'] <= removals[0]['sequence']:
-                    raise ValueError('No configured state after removal')
+            if cycle_complete(events, state):
                 completed += 1
                 record('verified', cycle=completed, identity=identity, device_events=events)
                 verified_sequence = events[-1]['sequence']
@@ -124,6 +133,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cycles', type=int, default=os.environ.get('NEO_USB_CYCLES', '4'))
     parser.add_argument('--timeout', type=int, default=600)
+    parser.add_argument('--rapid', action='store_true',
+                        help='Use nominal 20 ms state samples for immediate unplug/replug checks')
     args = parser.parse_args()
     if not 1 <= args.cycles <= 10 or not 30 <= args.timeout <= 3600:
         parser.error('cycles must be 1..10 and timeout must be 30..3600 seconds')
@@ -132,7 +143,10 @@ def main():
     directory = evidence_directory()
     print('Private USB reconnection evidence:', directory, flush=True)
     summary = {'started_at': stamp(), 'requested_cycles': args.cycles,
-               'verified_cycles': 0, 'passed': False}
+               'verified_cycles': 0, 'passed': False,
+               'mode': 'rapid' if args.rapid else 'standard',
+               'sample_interval_ms': 20 if args.rapid else 250,
+               'physical_timing_qualified': False}
     with (LOCAL / 'usb-reconnects.lock').open('a') as lock, \
             (directory / 'usb-reconnects.jsonl').open('w') as output:
         def record(event, **fields):
@@ -146,7 +160,8 @@ def main():
 
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            observe(config, args.cycles, args.timeout, record, directory)
+            observe(config, args.cycles, args.timeout, record, directory,
+                    summary['sample_interval_ms'])
             summary['passed'] = True
         except (OSError, ValueError, RuntimeError, paramiko.SSHException, KeyboardInterrupt) as error:
             summary['error'] = str(error) or type(error).__name__

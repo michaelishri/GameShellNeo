@@ -311,6 +311,7 @@ task device:logs ROUTE=usb
 task device:check ROUTE=usb
 task device:backlight ROUTE=usb # Watch the screen during this test
 task device:usb-reconnects CYCLES=4 # Wait for ready, then operate the USB cable
+task device:usb-rapid CYCLES=4 # Immediate unplug/replug, then stay connected 30 seconds
 task device:usb-detect CYCLES=0 SECONDS=8 # Unplugged smoke capture; no cable actions
 task device:usb-detect CYCLES=4 # Start unplugged; detailed IRQ/events over Wi-Fi
 task device:stability ROUTE=usb # Keep the board connected throughout
@@ -366,6 +367,20 @@ private capture prints the retained device path.
 Use batches of four, four and two for ten cycles. The default overall wait is
 ten minutes; `CYCLES` accepts 1–10. This task always uses USB and ignores `ROUTE`.
 It does not qualify idle power while a temporary recorder is running.
+
+`device:usb-rapid CYCLES=4` uses the same checks and cleanup with nominal
+20 ms controller-state sampling instead of the normal 250 ms interval. Start
+connected and wait for `ready`. For each cycle, unplug and promptly reinsert
+the GameShell's USB cable without a deliberate pause, then keep it connected
+for at least 30 seconds. Finish connected. The recorder must still observe
+`not attached` followed by `configured`, and USB SSH must reach the same boot
+before a cycle counts. A missed observation is not silently counted as a pass.
+Both modes share a lock and temporary service, so they cannot run together.
+The summary records the mode/interval and events include monotonic observation
+times. Sampling can be delayed, and manual cable motion has no measured edge
+timestamp: this checks recovery from quick manual reconnection, not a precise
+minimum disconnect duration or detection-latency guarantee. Keep power
+measurements separate from either recorder.
 
 `device:usb-detect CYCLES=4` is the detailed CPI v3.1 diagnostic, using Wi-Fi
 for control and the Mac's USB route for a separate SSH check on each attachment.

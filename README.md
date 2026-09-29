@@ -68,6 +68,15 @@ SSH routes. The saved installed-firmware test also passed four software
 reconnections, unavailable-network scanning and connection restoration.
 Physical AP-loss Wi-Fi qualification is deferred; the random-SSID simulation
 provides the current unavailable-network evidence. Broader power/sleep work remains.
+The next image, `0.1.0-diagnostic.7` / `6.18.54-gameshellneo7`, is built,
+offline-verified and checksum-verified on the Mac. It prepares manual
+freezer/device PM debug tests and advanced runtime-PM inspection. Normal sleep
+stays disabled. It uses stock USB polling and retains SDIO power for the first
+driver tests; this is a separate configuration from diagnostic.6's polling
+experiment. [Report 54](docs/54-staged-pm-diagnostic.md) records the source audit,
+build evidence and owner-present test sequence. It has not been flashed or
+hardware-qualified. Diagnostic.6 remains installed and available for recovery;
+NEO-37 tracks the owner-present flash and staged tests.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -343,6 +352,11 @@ task device:wifi-firmware-connected SECONDS=120 # Four reconnections and Wi-Fi S
 task device:wifi-recovery SECONDS=120 # Installed firmware: four reconnections, unavailable/connected windows
 task device:rsb-compare SECONDS=120 DELAY_MS=100 # USB-powered bus-delay comparison
 task device:rsb-restore # Stop/recover an interrupted RSB comparison
+task device:pm-inspect # Read-only capabilities, counters and device links over USB
+task device:pm-test STAGE=freezer # Diagnostic.7 only, owner present; one debug cycle
+task device:pm-test STAGE=devices CYCLES=1 # Only after the freezer test passes
+task device:pm-collect RUN=<32-character-run-id> # Recover saved evidence after SSH loss
+task device:pm-restore # Stop a test and restore its owned debug controls
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
@@ -732,6 +746,49 @@ functioning kernel/systemd. The [first comparison](docs/53-rsb-runtime-pm-compar
 found zero runtime-suspended time at both 100 ms and 20 ms; the default remains
 1,000 ms. Outstanding runtime-PM references/policy need inspection before a
 shorter delay can be justified.
+
+### Staged power-management diagnostics
+
+Use `device:pm-inspect` for read-only kernel capabilities, runtime counters and
+RSB supplier/consumer links. It also works on diagnostic.6, where sleep support
+is absent. Full private evidence includes radio/network state and kernel logs;
+only a small capability summary is printed. The task never enters suspend.
+
+`device:pm-test` requires diagnostic.7's exact image/kernel/radio, stock USB
+polling, normal sleep masks, SDIO power retention, USB power, healthy services
+and working USB/Wi-Fi SSH. Be present for the initial hardware tests and retain
+the diagnostic.6 recovery card image. Leave USB connected, the Mac awake, Wi-Fi
+available and the controls untouched. Start with one `STAGE=freezer`, then one
+`STAGE=devices`. After those pass and the console/backlight return normally,
+`STAGE=devices CYCLES=4` repeats four identical cycles with 20 seconds between
+them. `CYCLES` defaults to one and accepts 1–4; there is no default stage.
+
+These use the kernel's **five-second debug test**: `freezer` freezes/thaws
+processes; `devices` additionally invokes ordinary driver suspend/resume
+callbacks. They stop before late/noirq/platform stages and actual s2idle.
+The task refuses `none`, `platform`, `processors`, `core`, `mem` and other
+stages. It does not implement normal sleep, wake-button testing, DRAM retention
+or the desired low-power runtime. The temporary process-memory checksum is
+only an integrity check across this debug cycle.
+
+The helper serializes driver callbacks with `pm_async=0`, records the original
+controls, and restores them on exit and through independent `ExecStopPost`.
+A temporary logind inhibitor covers power-key/sleep/idle handling. Evidence is
+written on the device under `/var/lib/gameshellneo/pm-tests/<RUN>/` before and
+after the test; the host stores copies and the source lock under
+`.local/diagnostics/`. The systemd service owns execution independently of SSH,
+and both routes must reconnect to the original boot before a host pass is
+recorded. A 120-second service limit and 180-second host collection deadline
+bound ordinary failures; **they cannot recover a kernel or driver deadlock**.
+No automatic retry is made after missing evidence.
+
+If a result is interrupted, retain its printed run ID and helper path. Use
+`device:pm-collect RUN=...` after access returns, then `device:pm-restore` if
+owned controls still need restoration. Collection retrieves evidence and does
+not by itself repeat the network qualification. Helpers, ownership records and
+device results remain available for investigation. No remote task guarantees
+recovery from a hung kernel; physical power cycling/reflashing may be needed.
+The first hardware stage tests are deferred until the owner returns.
 
 `device:battery-check ROUTE=wifi` runs the battery policy regressions against
 the **installed** guard after verifying its SHA-256 matches the tracked source.

@@ -99,6 +99,8 @@
 	mmc-pwrseq = <&wifi_pwrseq>;
 	bus-width = <4>;
 	non-removable;
+	/* First PM debug stages retain Wi-Fi power; full removal is unqualified. */
+	keep-power-in-suspend;
 	status = "okay";
 	#address-cells = <1>;
 	#size-cells = <0>;

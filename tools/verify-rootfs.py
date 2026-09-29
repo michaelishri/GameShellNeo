@@ -76,6 +76,18 @@ def main():
     require(b'bootm 0x48000000 - 0x49000000' in script, 'Unexpected boot handoff')
     require(not list(boot.glob('*Initrd*')) and not list(boot.glob('initrd*')), 'Unexpected initramfs')
     experiment = identity['sources'].get('experiments', {}).get('usb_absent_poll')
+    if identity['sources'].get('experiments', {}).get('suspend_diagnostics') is True:
+        require(experiment is None and 'usb_poll_boot' not in identity and
+                'usb_diagnostics' not in identity['sources']['experiments'],
+                'Suspend-test image must omit USB experiment selection')
+        require(b'mem_sleep_default=s2idle' in script and
+                b'gameshellneo_slow_poll=' not in script and b'gameshellneo_diagnostics=' not in script,
+                'Suspend-test boot policy is not isolated')
+        require('AllowSuspend=no' in (root / 'etc/systemd/sleep.conf.d/50-gameshellneo.conf').read_text(),
+                'Normal system sleep must remain disabled for staged diagnostics')
+        logind = (root / 'etc/systemd/logind.conf.d/50-gameshellneo.conf').read_text().splitlines()
+        require('HandlePowerKey=poweroff' in logind and 'IdleAction=ignore' in logind,
+                'Staged diagnostics must retain normal button shutdown and disabled idle sleep')
     if experiment is not None:
         require(type(experiment) is bool, 'Invalid USB policy selection')
         _, mode = verify_scripts(boot, identity)
@@ -116,6 +128,7 @@ def main():
         require((root / 'etc/systemd/system/multi-user.target.wants' / (name + '.service')).is_symlink(),
                 f'Service not enabled: {name}')
     for name in ('sleep.target', 'suspend.target', 'hibernate.target',
+                 'hybrid-sleep.target', 'suspend-then-hibernate.target',
                  'wpa_supplicant.service', 'dbus-fi.w1.wpa_supplicant1.service'):
         require((root / 'etc/systemd/system' / name).readlink() == Path('/dev/null'), f'Unit is not masked: {name}')
     require((root / 'etc/systemd/system/multi-user.target.wants/wpa_supplicant@wlan0.service').is_symlink(),

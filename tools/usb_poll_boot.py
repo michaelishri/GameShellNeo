@@ -17,14 +17,18 @@ DIAGNOSTIC_PARAMETER = 'axp20x_usb_power.gameshellneo_diagnostics'
 MODES = ('stock', 'experimental')
 
 
-def boot_script(partuuid, mode=None, diagnostics=False):
+def boot_script(partuuid, mode=None, diagnostics=False, suspend_tests=False):
     if not re.fullmatch(r'[0-9a-fA-F]{8}-02', partuuid) or mode not in (*MODES, None):
         raise ValueError('Unexpected root PARTUUID or USB policy')
     if type(diagnostics) is not bool:
         raise ValueError('Diagnostic opt-in must be a boolean')
+    if type(suspend_tests) is not bool or (suspend_tests and (mode is not None or diagnostics)):
+        raise ValueError('Suspend diagnostics must be separate from USB polling experiments')
     option = '' if mode is None else f' {PARAMETER}={int(mode == "experimental")}'
     if diagnostics:
         option += f' {DIAGNOSTIC_PARAMETER}=1'
+    if suspend_tests:
+        option += ' mem_sleep_default=s2idle'
     return (f'setenv bootargs console=tty0 console=ttyS0,115200n8 root=PARTUUID={partuuid} '
             f'rootfstype=ext4 rootwait rw panic=10{option}\n'
             'if fatload mmc 0:1 0x48000000 uImage; then\n'

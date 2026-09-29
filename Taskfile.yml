@@ -25,6 +25,9 @@ env:
   NEO_USB_DIAG_ERRORS: '{{.ERRORS | default "1"}}'
   NEO_RSB_SECONDS: '{{.SECONDS | default "120"}}'
   NEO_RSB_DELAY_MS: '{{.DELAY_MS | default "100"}}'
+  NEO_PM_STAGE: '{{.STAGE | default ""}}'
+  NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
+  NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
   NEO_COOLING_STARTED: '{{.COOLING_STARTED | default ""}}'
   NEO_COMPARISON_CAPTURE: '{{.CAPTURE | default ""}}'
@@ -209,6 +212,22 @@ tasks:
   device:rsb-restore:
     desc: Stop an interrupted RSB comparison and restore its saved delay over USB
     cmds: [python3 tools/check-rsb-runtime.py --restore]
+
+  device:pm-inspect:
+    desc: Read PM capabilities and RSB debug state over USB without entering suspend
+    cmds: [python3 tools/check-pm-stages.py --inspect]
+
+  device:pm-test:
+    desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required
+    cmds: [python3 tools/check-pm-stages.py --test]
+
+  device:pm-collect:
+    desc: Retrieve a PM stage's persistent device evidence after reconnection; RUN required
+    cmds: [python3 tools/check-pm-stages.py --collect]
+
+  device:pm-restore:
+    desc: Stop a PM stage and restore its owned debug controls over USB
+    cmds: [python3 tools/check-pm-stages.py --restore]
 
   device:wifi-visibility:
     desc: Compare cached scans with the .env SSID over USB without printing network names

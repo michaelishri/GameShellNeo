@@ -12,6 +12,16 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 ## Diagnostic implementation follow-up
 
+- [ ] Add explicit selection of a retained image's matching verification/transfer manifests to the shared recovery workflow. Raw/gzip images are retained, and diagnostic.6 metadata is checkpointed, but the default build/pack/stage commands point at the newest manifests. Avoid pairing an older image with the current build's kernel manifest when preparing a rollback.
+
+- [x] NEO-36: build/offline-verify diagnostic.7, implement gated PM inspection/freezer/devices/recovery tasks and regression checks, and stage the 271 MB archive on the Mac with compressed/decompressed verification. Normal sleep stays masked; no physical card or suspend test was performed. [Report 54](docs/54-staged-pm-diagnostic.md).
+- [ ] NEO-37: flash the prepared diagnostic.7 only with the owner available; run initial integration/PM inspection, one freezer test, one devices test, then four device cycles if those pass. Confirm the console/backlight visually and both SSH routes. No live suspend/debug stage was attempted overnight. [Report 54](docs/54-staged-pm-diagnostic.md).
+- [ ] Before late/noirq or actual s2idle, quiesce and rearm the AXP USB delayed worker across suspend, including IRQ/requeue races and failure unwind. Its current suspend callback masks IRQs but leaves a nonfreezable work item that accesses RSB, whose noirq callback resets/gates the controller. Preserve the existing experimental polling PM_SLEEP exclusion until this is implemented and tested.
+- [ ] Qualify power-button wake event consumption for AXP223 before enabling normal sleep. The inspected powerkey driver clears a wake edge specially for AXP288, not AXP223; a wake press must not reach logind as a new shutdown/sleep request. First PM debug tests use a temporary inhibitor and do not qualify this behavior.
+- [ ] Qualify SDIO suspend retention first, then deliberate radio disconnect/power removal/reload for lower-power sleep. Diagnostic.7 advertises KEEP_POWER to match brcmfmac's existing request; it does not enable radio wake or prove deep-sleep power retention. Treat legitimate stage-related firmware reloads separately from crashes.
+- [ ] Audit brcmfmac's retained-power suspend error handling: in the locked source, `brcmf_ops_sdio_suspend()` ignores the return from `brcmf_sdiod_freezer_on()`, which includes an unbounded worker-freeze wait and returns the bus-sleep result; the resume helper also ignores its wake result. Define bounded unwind and failure propagation before real sleep qualification. The staged recorder rejects the known bus-sleep/clock error messages, but a successful PM counter alone cannot establish radio sleep.
+- [ ] Investigate brcmfmac's intentional host `pm_runtime_forbid()` and the active RSB runtime-PM consumer link as a concrete bus-residency constraint. Do not force `power/control=auto`, remove links, or relax clock/wake dependencies without driver and interrupt-path analysis. Advanced-debug reference counts and actual energy impact remain to be measured.
+
 - [x] NEO-35: add repeatable RSB delay comparison/recovery tasks and complete connected-USB original/100 ms/original and original/20 ms/original comparisons. All six 120-second windows recorded zero runtime-suspended time. Original 1,000 ms restored; no energy improvement claimed. [Report 53](docs/53-rsb-runtime-pm-comparison.md).
 - [ ] Inspect RSB runtime usage/enabled counters and supplier/consumer links with advanced PM debugging before changing reference ownership or autosuspend defaults. Shorter delays alone did not suspend the bus. Repeat battery-only residency/energy tests if a justified change is identified; do not equate interrupt counts with resumes.
 
@@ -179,6 +189,8 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] If extending gauge calibration, audit the AXP22x regmap range and volatile/self-clearing registers; the inspected maximum `E6h` excludes later calibration registers. Keep this in the driver rather than a raw-register userspace service.
 
 ## Startup, reliability and future updates
+
+- [ ] Audit inherited built-in Ethernet support after the PM baseline is qualified. Diagnostic.7 still resolves `CONFIG_SUN4I_EMAC=y` and STMMAC/DWMAC drivers from `sunxi_defconfig`, although this board's network paths are SDIO Wi-Fi and USB gadget Ethernet. Confirm all board bindings, then compare kernel/image size and boot time with unused controller drivers disabled while preserving USB networking. Configuration menu/vendor booleans alone are not evidence of executable code or active power consumption; no energy saving is established.
 
 - [ ] Investigate `sunxi-mmc 1c10000.mmc: Runtime PM usage count underflow!` during repeated Wi-Fi firmware crash/recovery on diagnostic.5. It was observed after the 29 September reversible firmware trial restored the original binary; causation by the trial is not established. Preserve `.local/build/neo30-kernel-trial-window.log` and inspect SDIO removal/reprobe PM reference balancing before changing the host controller driver.
 

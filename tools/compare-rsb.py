@@ -150,7 +150,7 @@ def boundary_health(lock):
         raise ValueError('Failed systemd units exist')
     observers = ('idle-sample', 'power-profile', 'governor-profile', 'governor-comparison',
                  'usb-detection', 'usb-reconnects', 'usb-diagnostics', 'scan-test',
-                 'firmware-trial', 'stability-test', 'backlight-test')
+                 'firmware-trial', 'stability-test', 'backlight-test', 'pm-test')
     if command('systemctl', 'list-units', '--all', '--plain', '--no-legend',
                '--state=active,activating,deactivating',
                *['gameshellneo-' + n + '.service' for n in observers]):

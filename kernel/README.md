@@ -19,6 +19,7 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 | 0006 | Order AXP USB resource release as IRQs, polling work, then power supply | Actual-source host lifetime regressions and isolated ARM object build passed (report 38); installed in diagnostic.4, with hardware results in report 40. Normal integration does not exercise every teardown race. Remove when the selected upstream source has equivalent lifetime ordering |
 | 0007 | Read effective rate constraints once per fixed-parent NM/NKM search | Native/ARM32 rates and factors match; isolated ARM clock-object builds passed (report 39). Installed in diagnostic.4, with hardware results in report 40; no attributed board timing or power measurement. Remove when equivalent upstream behavior is verified |
 | 0008 | Opt-in CPI/AXP223 fixed-peripheral absent polling, with graph/configuration gates and IRQ-preserving rearm | Native/ARM32 policy, lifecycle and compiled-board regressions passed. Report 41 records diagnostic.5 build evidence and pending physical qualification. Keep disabled elsewhere; no charging writes or measured battery gain. Remove if an equivalent upstream policy is verified or the experiment fails qualification |
+| 0009 | Opt-in USB callback counters and bounded poll-read error injection | Diagnostic.6 source/ARM/board and hardware checks are in reports 51–52. Defaults off; diagnostic.7 omits this opt-in along with experimental polling. These are diagnostic controls, not production energy measurements; remove when the investigation no longer needs them |
 
 ## Provenance and limits
 
@@ -47,8 +48,14 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
   are exposed. There is no writable LCD/backlight bytecode or private `/proc` API.
 
 The kernel fragment starts from upstream `sunxi_defconfig`, enables required
-Debian/systemd features, and disables deferred functionality, system suspend,
-hibernation and PSCI deep idle. CPU DVFS uses upstream operating points with
+Debian/systemd features, and disables deferred functionality, hibernation and
+PSCI deep idle. Diagnostic.7 enables system-suspend/debug infrastructure only
+for explicit freezer/devices tests, while normal systemd sleep remains masked.
+USB experiments remain off with their existing PM_SLEEP refusal guard intact.
+The SDIO node advertises `keep-power-in-suspend`, matching brcmfmac's retained
+power request when card power-off is not enabled; no radio wake or full card
+power-off is qualified. See [report 54](../docs/54-staged-pm-diagnostic.md).
+CPU DVFS uses upstream operating points with
 the CPU supply correctly linked. Timings, voltage behavior and peripheral
 compatibility still require physical qualification.
 

@@ -18,6 +18,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 Latest: [53 — RSB runtime PM comparison](53-rsb-runtime-pm-comparison.md): restored 100/20 ms trials with zero runtime-suspended time, reusable recovery and investigation limits.
 
+Next image: [54 — Staged PM diagnostic](54-staged-pm-diagnostic.md): isolated freezer/devices tests, retained SDIO power, source findings, recovery and pending hardware qualification.
+
 | Report | Contents |
 | --- | --- |
 | [52 — Diagnostic.6 hardware validation](52-diagnostic6-hardware-validation.md) | Verified flash/boot, 76.9% fewer direct unplugged USB callbacks, bounded errors, eight cable cycles, four A0 cold starts and installed-firmware scan/recovery tests |

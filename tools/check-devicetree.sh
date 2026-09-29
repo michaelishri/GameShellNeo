@@ -21,4 +21,5 @@ docker run --rm --entrypoint bash -v "$PWD:/project" "$image" -c '
         exit 1
     fi
     echo "Device-tree schemas and board DTB: no diagnostics"
+    python3 /project/tools/check-pm-board.py /project/.local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb
     '

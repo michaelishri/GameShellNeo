@@ -196,6 +196,10 @@ tasks:
     desc: Verify candidate association, four Wi-Fi reconnections and original restoration over USB
     cmds: [python3 tools/check-wifi-firmware.py --connected]
 
+  device:wifi-recovery:
+    desc: Check installed firmware through four reconnections and unavailable/connected windows; USB required
+    cmds: [python3 tools/check-wifi-firmware.py --installed]
+
   device:wifi-visibility:
     desc: Compare cached scans with the .env SSID over USB without printing network names
     cmds: [python3 tools/check-wifi-visibility.py]

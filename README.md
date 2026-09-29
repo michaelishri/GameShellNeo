@@ -62,8 +62,11 @@ qualification. First boot, integration, battery-policy simulation and connected/
 unplugged USB count/error tests passed in both modes. Direct unplugged polling
 fell from 16.65 to 3.85 callbacks/second (76.9%) in matched one-minute windows;
 this does not establish an energy saving. Four subsequent physical cable cycles
-passed in each mode, including USB SSH and plug/removal IRQ delivery. Repeated
-cold-start/AP-loss Wi-Fi qualification and broader power/sleep work remain.
+passed in each mode, including USB SSH and plug/removal IRQ delivery. Four
+consecutive physical cold starts passed with the expected firmware and both
+SSH routes. The saved installed-firmware test also passed four software
+reconnections, unavailable-network scanning and connection restoration.
+Physical AP-loss Wi-Fi qualification and broader power/sleep work remain.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -336,6 +339,7 @@ task mac:wifi                      # Mac Wi-Fi band/security; names may be redac
 task device:wifi-scan-test SECONDS=120 # USB-only firmware/host/firmware scan comparison; restores flag
 task device:wifi-firmware-test SECONDS=120 # USB-only pinned A0 binary trial; always restores original
 task device:wifi-firmware-connected SECONDS=120 # Four reconnections and Wi-Fi SSH on candidate/original
+task device:wifi-recovery SECONDS=120 # Installed firmware: four reconnections, unavailable/connected windows
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
@@ -672,6 +676,40 @@ This tests software reconnection to an available AP. It does not simulate an
 AP disappearing, cold startup, sleep/resume or battery operation, and leaves
 the original firmware installed. Checkpoint times include polling, DHCP and
 host SSH verification; they are not precise radio reassociation latency.
+
+For the A0 firmware already installed in diagnostic.6, use
+`task device:wifi-recovery SECONDS=120`. Keep USB connected, the Mac awake and
+the usual Wi-Fi network available. The task requires the source lock's exact
+image/kernel, firmware and NVRAM hashes, one connected network profile, normal
+scan offload and a clean single firmware load. It performs four software
+disconnect/reconnect cycles, scans for a randomly generated unavailable test
+network for `SECONDS`, restores the persistent network configuration, then
+observes `SECONDS` connected. Seven checkpoints require independent pinned-key
+Wi-Fi SSH on the same boot. No firmware file/module reload, persistent network
+edit or router change is performed. `SECONDS` accepts multiples of ten in
+60–300; the default is 120 for each observation window.
+
+The temporary credential-free profile exists only in supplicant memory.
+Restoration reloads the unchanged persistent configuration, requires association
+to the original network with only its profile remaining, and verifies the
+scan policy. A recovery record in `/run/gameshellneo-wifi-recovery` is retained
+until this succeeds. The bounded device service invokes the same idempotent
+restoration through `ExecStopPost`, independently of the host. Do not run other
+radio/configuration tasks concurrently. On failure, retain the printed helper
+directory and recovery record; the host attempts restoration before reporting
+failure. If needed after reconnecting USB, stop `gameshellneo-firmware-trial`
+and run its retained helper with `--installed --restore` through `device:exec`.
+This recovery assumes a functioning kernel/systemd and an available original AP.
+
+The private `firmware-trial.jsonl`, `wifi-ssh.jsonl` and source lock preserve the
+sequence, sampled states, firmware identity/fault counts and SSH evidence.
+Firmware crashes, reloads, SDIO removals, PM underflows or changes to boot,
+firmware, NVRAM, persistent configuration, scan policy or USB state fail the test.
+The synthetic network exercises scanning while the requested network is
+unavailable; it does not reproduce physical loss of an associated AP's beacon.
+Cold starts, physical AP disappearance, sleep, long-term stability and energy
+need their own evidence. The original-firmware trial tasks above require the
+old binary and are separate from this installed-firmware task.
 
 `device:battery-check ROUTE=wifi` runs the battery policy regressions against
 the **installed** guard after verifying its SHA-256 matches the tracked source.

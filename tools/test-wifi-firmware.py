@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""USB-controlled exact-A0 firmware trial; always restore the installed binary."""
+"""USB-controlled A0 trials with separate binary and runtime-network recovery."""
 import argparse
 import hashlib
 import ipaddress
@@ -16,6 +16,7 @@ import time
 FIRMWARE = Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.bin')
 NVRAM = Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt')
 STATE = Path('/run/gameshellneo-firmware-trial')
+INSTALLED_STATE = Path('/run/gameshellneo-wifi-recovery')
 WIFI_REQUEST = Path('/run/gameshellneo-firmware-wifi.json')
 WIFI_ACK = Path('/run/gameshellneo-firmware-wifi.ack')
 WIFI_CONFIG = Path('/etc/wpa_supplicant/wpa_supplicant-wlan0.conf')
@@ -169,7 +170,7 @@ def wifi_checkpoint(phase, boot, expected_identity):
         WIFI_ACK.unlink(missing_ok=True)
 
 
-def reconnect(cycle, boot, expected_identity):
+def reconnect(cycle, boot, expected_identity, phase=None):
     if command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'disconnect') != 'OK':
         raise ValueError('Wi-Fi disconnect request was rejected')
     deadline = time.monotonic() + 10
@@ -181,7 +182,143 @@ def reconnect(cycle, boot, expected_identity):
     time.sleep(2)
     if command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'reconnect') != 'OK':
         raise ValueError('Wi-Fi reconnect request was rejected')
-    wifi_checkpoint('candidate_reconnect_' + str(cycle), boot, expected_identity)
+    wifi_checkpoint(phase or 'candidate_reconnect_' + str(cycle), boot, expected_identity)
+
+
+def wpa(*args):
+    value = command('/usr/sbin/wpa_cli', '-i', 'wlan0', *args)
+    if value != 'OK':
+        raise ValueError('Wi-Fi control request failed: ' + args[0])
+
+
+def single_current_network():
+    networks = command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'list_networks').splitlines()[1:]
+    return (len(networks) == 1 and len(networks[0].split('\t')) == 4 and
+            networks[0].split('\t')[3] == '[CURRENT]')
+
+
+def installed_health(lock, saved):
+    """Fail on reloads or faults even if association subsequently recovered."""
+    firmware = lock['radio']['firmware']
+    expected = firmware['runtime_identity']
+    log = kernel()
+    prefix = 'brcmf_c_preinit_dcmds: '
+    loaded = [line.split(prefix, 1)[1].strip() for line in log.splitlines()
+              if prefix + 'Firmware: ' in line]
+    faults = {name: log.count(marker) for name, marker in {
+        'firmware_crashes': 'brcmf_fw_crashed: Firmware has halted or crashed',
+        'sdio_removals': 'mmc1: card 0001 removed',
+        'pm_usage_underflows': 'Runtime PM usage count underflow',
+    }.items()}
+    if loaded != [expected] or any(faults.values()):
+        raise ValueError('Installed firmware identity/reload/fault check failed')
+    if (Path('/proc/sys/kernel/random/boot_id').read_text().strip() != saved['boot_id'] or
+            Path('/proc/sys/kernel/tainted').read_text().strip() != '0' or
+            digest(FIRMWARE.read_bytes()) != firmware['sha256'] or
+            digest(NVRAM.read_bytes()) != lock['radio']['nvram']['sha256'] or
+            digest(WIFI_CONFIG.read_bytes()) != saved['config_sha256'] or
+            command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'get', 'disable_scan_offload') != '0'):
+        raise ValueError('Installed firmware/board/configuration/boot/scan policy changed')
+    udc = list(Path('/sys/class/udc').glob('*/state'))
+    if len(udc) != 1 or udc[0].read_text().strip() != 'configured':
+        raise ValueError('USB recovery connection must remain configured')
+    return dict(identities=loaded, faults=faults)
+
+
+def restore_installed():
+    """Reload the unchanged persistent Wi-Fi config, without reloading firmware."""
+    record = INSTALLED_STATE / 'state.json'
+    if not record.exists():
+        return
+    saved = json.loads(record.read_text())
+    if (Path('/proc/sys/kernel/random/boot_id').read_text().strip() != saved['boot_id'] or
+            digest(WIFI_CONFIG.read_bytes()) != saved['config_sha256']):
+        raise ValueError('Recovery boot/configuration changed; retain recovery state')
+    wpa('reconfigure')
+    wpa('reconnect')
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        fields = wifi_status()
+        if (fields.get('wpa_state') == 'COMPLETED' and
+                digest(fields.get('ssid', '').encode()) == saved['ssid_sha256'] and
+                wifi_address() and single_current_network() and
+                command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'get', 'disable_scan_offload') == '0'):
+            record.unlink()
+            INSTALLED_STATE.rmdir()
+            return
+        time.sleep(1)
+    raise ValueError('Persistent Wi-Fi configuration reloaded, but association did not recover')
+
+
+def installed_observe(lock, saved, seconds, offline=False):
+    started = time.monotonic()
+    scanning = 0
+    for index in range(seconds // 10 + 1):
+        time.sleep(max(0, started + index * 10 - time.monotonic()))
+        health = installed_health(lock, saved)
+        fields = wifi_status()
+        state = fields.get('wpa_state')
+        if offline:
+            if state not in ('SCANNING', 'DISCONNECTED'):
+                raise ValueError('Unavailable-network trial entered unexpected Wi-Fi state')
+            scanning += state == 'SCANNING'
+        elif (state != 'COMPLETED' or
+              digest(fields.get('ssid', '').encode()) != saved['ssid_sha256']):
+            raise ValueError('Connected observation lost the original network')
+        emit('installed_sample', phase='unavailable_network' if offline else 'connected',
+             monotonic_seconds=time.monotonic(), state=state, health=health)
+    if offline and not scanning:
+        raise ValueError('No scanning state observed for the unavailable test network')
+    emit('installed_window_complete', phase='unavailable_network' if offline else 'connected',
+         duration_seconds=time.monotonic() - started, scanning_samples=scanning)
+
+
+def installed_trial(lock, seconds):
+    image = json.loads(Path('/etc/gameshellneo/image.json').read_text())
+    fields = wifi_status()
+    if (image.get('board') != 'gameshellneo-cpi31' or image.get('version') != lock['image_version'] or
+            os.uname().release != lock['linux']['tag'][1:] + lock['linux']['localversion'] or
+            not single_current_network() or
+            fields.get('wpa_state') != 'COMPLETED' or not fields.get('ssid') or
+            not wifi_address() or STATE.exists()):
+        raise ValueError('Installed-image/connected-single-network/recovery-state preflight failed')
+    saved = dict(boot_id=Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
+                 config_sha256=digest(WIFI_CONFIG.read_bytes()),
+                 ssid_sha256=digest(fields['ssid'].encode()))
+    expected = lock['radio']['firmware']['runtime_identity']
+    emit('installed_preflight', boot_id=saved['boot_id'], health=installed_health(lock, saved))
+    INSTALLED_STATE.mkdir(mode=0o700)
+    write(INSTALLED_STATE / 'state.json', json.dumps(saved).encode())
+    try:
+        wifi_checkpoint('installed_initial', saved['boot_id'], expected)
+        for cycle in range(1, 5):
+            reconnect(cycle, saved['boot_id'], expected, 'installed_reconnect_' + str(cycle))
+            installed_health(lock, saved)
+        number = command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'add_network')
+        if not number.isdecimal():
+            raise ValueError('Could not create a temporary network profile')
+        # Random, credential-free profile exists only in supplicant memory. Never SAVE_CONFIG.
+        ssid = 'Neo-test-' + secrets.token_hex(10)
+        wpa('set_network', number, 'ssid', '"' + ssid + '"')
+        wpa('set_network', number, 'key_mgmt', 'NONE')
+        wpa('set_network', number, 'scan_ssid', '1')
+        wpa('select_network', number)
+        deadline = time.monotonic() + 10
+        while wifi_status().get('wpa_state') not in ('DISCONNECTED', 'SCANNING'):
+            if time.monotonic() >= deadline:
+                raise ValueError('Unavailable-network disconnection was not observed')
+            time.sleep(0.5)
+        emit('unavailable_network_selected')
+        installed_observe(lock, saved, seconds, offline=True)
+    finally:
+        restore_installed()
+        emit('installed_configuration_restored')
+    wifi_checkpoint('installed_restored', saved['boot_id'], expected)
+    installed_observe(lock, saved, seconds)
+    wifi_checkpoint('installed_final', saved['boot_id'], expected)
+    emit('complete', passed=True, installed=True, connected=True,
+         health=installed_health(lock, saved), configuration_restored=not INSTALLED_STATE.exists(),
+         limits='Software disconnects and a synthetic unavailable network; physical AP loss, sleep and energy unqualified.')
 
 
 def trial(candidate, metadata, seconds, connected=False):
@@ -265,6 +402,7 @@ def main():
     parser.add_argument('--seconds', type=int, default=120)
     parser.add_argument('--restore', action='store_true')
     parser.add_argument('--connected', action='store_true')
+    parser.add_argument('--installed', action='store_true')
     parser.add_argument('--ack')
     args = parser.parse_args()
     os.umask(0o077)
@@ -272,15 +410,20 @@ def main():
         acknowledge(args.ack)
         return
     if args.restore:
-        restore()
+        restore_installed() if args.installed else restore()
         WIFI_REQUEST.unlink(missing_ok=True)
         WIFI_ACK.unlink(missing_ok=True)
         return
-    if not args.candidate or not args.metadata or not 60 <= args.seconds <= 300 or args.seconds % 10:
+    if ((not args.installed and not args.candidate) or not args.metadata or
+            not 60 <= args.seconds <= 300 or args.seconds % 10 or (args.installed and args.connected)):
         parser.error('Supply candidate/metadata and seconds in 60..300, a multiple of ten')
     for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, interrupted)
-    trial(args.candidate, json.loads(args.metadata.read_text()), args.seconds, args.connected)
+    metadata = json.loads(args.metadata.read_text())
+    if args.installed:
+        installed_trial(metadata, args.seconds)
+    else:
+        trial(args.candidate, metadata, args.seconds, args.connected)
 
 
 if __name__ == '__main__':

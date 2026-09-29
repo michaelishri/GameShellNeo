@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch the pinned A0 candidate and run a bounded USB-only trial with rollback."""
+"""Run bounded USB-controlled candidate or installed-firmware recovery tests."""
 import argparse
 import fcntl
 import hashlib
@@ -19,6 +19,9 @@ from remote import LOCAL, ROOT, device, evidence_directory, run, upload
 
 PHASES = ['original_before', 'candidate_initial',
           *['candidate_reconnect_' + str(index) for index in range(1, 5)], 'original_restored']
+INSTALLED_PHASES = ['installed_initial',
+                    *['installed_reconnect_' + str(index) for index in range(1, 5)],
+                    'installed_restored', 'installed_final']
 
 
 def verify_wifi(config, boot, address):
@@ -33,11 +36,12 @@ def verify_wifi(config, boot, address):
 
 class ConnectedCapture:
     """Handle split JSON lines while the device waits for independent Wi-Fi proof."""
-    def __init__(self, output, evidence, client, config, boot, script):
+    def __init__(self, output, evidence, client, config, boot, script, phases=PHASES):
         self.output, self.evidence, self.client = output, evidence, client
         self.config, self.boot, self.script = config, boot, script
         self.pending = b''
         self.phases = []
+        self.expected_phases = phases
 
     def flush(self):
         self.output.flush()
@@ -55,7 +59,7 @@ class ConnectedCapture:
                 continue
             phase, token = record['phase'], record['token']
             address = str(ipaddress.IPv4Address(record['address']))
-            if (len(self.phases) >= len(PHASES) or phase != PHASES[len(self.phases)] or
+            if (len(self.phases) >= len(self.expected_phases) or phase != self.expected_phases[len(self.phases)] or
                     record['boot_id'] != self.boot or not re.fullmatch('[0-9a-f]{32}', token) or
                     address == self.config.get('GAMESHELL_USB_IP', '192.168.10.1')):
                 raise ValueError('Invalid or out-of-order Wi-Fi checkpoint')
@@ -90,14 +94,16 @@ def fetch(path, url, expected):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--connected', action='store_true')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--connected', action='store_true')
+    mode.add_argument('--installed', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     config = load_env()
     seconds = int(os.environ.get('NEO_PROFILE_SECONDS', '120'))
     if not 60 <= seconds <= 300 or seconds % 10:
         raise ValueError('SECONDS must be a multiple of ten in 60..300')
-    metadata_path = ROOT / 'build/wifi-firmware-candidate.json'
+    metadata_path = ROOT / ('build/sources.lock.json' if args.installed else 'build/wifi-firmware-candidate.json')
     metadata = json.loads(metadata_path.read_text())
     directory = LOCAL / 'firmware-candidate'
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -105,8 +111,9 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         candidate = directory / 'brcmfmac43430a0-sdio.bin'
         license_path = directory / 'LICENCE.broadcom_bcm43xx'
-        fetch(candidate, metadata['url'], metadata['sha256'])
-        fetch(license_path, metadata['license_url'], metadata['license_sha256'])
+        if not args.installed:
+            fetch(candidate, metadata['url'], metadata['sha256'])
+            fetch(license_path, metadata['license_url'], metadata['license_sha256'])
         capture = evidence_directory()
         (capture / 'candidate.json').write_text(json.dumps(metadata, indent=2) + '\n')
         print('Private firmware trial:', capture, flush=True)
@@ -120,29 +127,22 @@ def main():
             if not re.fullmatch(r'/tmp/gameshellneo-firmware\.[A-Za-z0-9]+', remote_dir):
                 raise ValueError('Unexpected firmware trial directory')
             files = [(ROOT / 'tools/test-wifi-firmware.py', 'test-wifi-firmware.py'),
-                     (candidate, 'candidate.bin'), (metadata_path, 'candidate.json'),
-                     (license_path, license_path.name)]
+                     (metadata_path, 'candidate.json')]
+            if not args.installed:
+                files += [(candidate, 'candidate.bin'), (license_path, license_path.name)]
             with client.open_sftp() as sftp:
                 for source, name in files:
                     upload(sftp, source, remote_dir + '/' + name)
             script = remote_dir + '/test-wifi-firmware.py'
-            command = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe', '--collect',
-                       '--unit=gameshellneo-firmware-trial',
-                       '--property=RuntimeMaxSec=' + str(seconds + (1500 if args.connected else 210)),
-                       '--property=TimeoutStopSec=180',
-                       '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
-                       '/usr/bin/python3', '-B', '-u', script,
-                       '--candidate', remote_dir + '/candidate.bin',
-                       '--metadata', remote_dir + '/candidate.json', '--seconds', str(seconds)]
-            if args.connected:
-                command.append('--connected')
+            command = service_command(script, seconds, args.connected, args.installed)
+            phases = INSTALLED_PHASES if args.installed else PHASES
             print('Retain helper on failure:', remote_dir, flush=True)
             path = capture / 'firmware-trial.jsonl'
             sink = None
             try:
                 with path.open('wb') as output, (capture / 'wifi-ssh.jsonl').open('w') as evidence:
-                    if args.connected:
-                        sink = ConnectedCapture(output, evidence, client, config, boot, script)
+                    if args.connected or args.installed:
+                        sink = ConnectedCapture(output, evidence, client, config, boot, script, phases)
                     run(client, shlex.join(command), output=sink or output, timeout=240)
             except BaseException:
                 # Do not leave a live firmware trial waiting for a failed host acknowledgement.
@@ -152,22 +152,50 @@ def main():
                     if loaded != 'not-found':
                         run(client, 'sudo -n systemctl stop gameshellneo-firmware-trial',
                             display=False, timeout=210)
-                    run(client, shlex.join(['sudo', '-n', '/usr/bin/python3', '-B', script, '--restore']),
+                    run(client, shlex.join(['sudo', '-n', '/usr/bin/python3', '-B', script, '--restore'] +
+                                          (['--installed'] if args.installed else [])),
                         display=False, timeout=210)
-                    print('Independent original-firmware recovery hook completed.', flush=True)
+                    print('Independent recovery hook completed.', flush=True)
                 except (OSError, RuntimeError, paramiko.SSHException):
                     print('Recovery could not be verified; retain the helper and recovery record.', flush=True)
                 raise
             records = [json.loads(line) for line in path.read_text().splitlines()]
             if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
-                raise ValueError('Incomplete firmware trial; verify original-firmware restoration')
-            if args.connected and (sink.phases != PHASES or not records[-1].get('connected')):
+                raise ValueError('Incomplete firmware trial; verify restoration using the retained helper')
+            if (args.connected or args.installed) and (sink.phases != phases or not records[-1].get('connected')):
                 raise ValueError('Incomplete independent Wi-Fi checkpoint evidence')
+            if args.installed and (records[-1].get('installed') is not True or
+                                   records[-1].get('configuration_restored') is not True):
+                raise ValueError('Installed-firmware test lacks restoration evidence')
             with client.open_sftp() as sftp:
                 for _, name in files:
                     sftp.remove(remote_dir + '/' + name)
                 sftp.rmdir(remote_dir)
-            print('Original firmware restored; candidate remains unqualified for production.')
+            print('Installed firmware unchanged; Wi-Fi configuration restored.' if args.installed else
+                  'Original firmware restored; candidate remains unqualified for production.')
+
+
+def service_command(script, seconds, connected=False, installed=False):
+    if (not re.fullmatch(r'/tmp/gameshellneo-firmware\.[A-Za-z0-9]+/test-wifi-firmware.py', script) or
+            not 60 <= seconds <= 300 or seconds % 10 or (connected and installed)):
+        raise ValueError('Invalid firmware test path, mode or duration')
+    directory = script.rsplit('/', 1)[0]
+    command = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+               '--unit=gameshellneo-firmware-trial',
+               '--property=RuntimeMaxSec=' + str(2 * seconds + 1500 if installed else
+                                                seconds + (1500 if connected else 210)),
+               '--property=TimeoutStopSec=180',
+               '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore' +
+               (' --installed' if installed else ''),
+               '/usr/bin/python3', '-B', '-u', script,
+               '--metadata', directory + '/candidate.json', '--seconds', str(seconds)]
+    if installed:
+        command.append('--installed')
+    else:
+        command += ['--candidate', directory + '/candidate.bin']
+        if connected:
+            command.append('--connected')
+    return command
 
 
 if __name__ == '__main__':

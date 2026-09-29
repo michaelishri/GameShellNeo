@@ -1,6 +1,6 @@
 # Diagnostic.6 hardware validation
 
-Date: **29 September 2026 NZDT**. Board: owner's **CPI v3.1**; Samsung
+Dates: **29–30 September 2026 NZDT**. Board: owner's **CPI v3.1**; Samsung
 64 GB DEV card. Work continues under **NEO-22** (USB polling qualification)
 and **NEO-31** (integrated A0 firmware qualification).
 
@@ -10,7 +10,8 @@ unplugged callback rate fell **76.9%** in the matched one-minute windows.
 Wi-Fi recovered after software reboots with USB attached and absent. Four
 physical cable cycles passed in each policy after the fault windows.
 Four consecutive physical cold starts also passed with the pinned A0 firmware.
-Unavailable-network/reconnection and physical AP-loss checks remain pending.
+Four installed-firmware software reconnections and bounded unavailable-network/
+connected observations passed. Physical AP-loss checks remain pending.
 This report follows [diagnostic.6 preparation](51-diagnostic6-preparation.md).
 Sleep remains disabled; charging and governor settings are unchanged.
 
@@ -347,6 +348,53 @@ Final status (`20260929T105710.884995Z`) and all six integration groups
 reported 100% Charging. This qualifies the finite four-cycle connected-USB
 cold-start batch, not sleep, physical AP disappearance or long-term stability.
 
+### Installed-firmware recovery task (NEO-34)
+
+On 30 September NZDT, the new saved command
+`task device:wifi-recovery SECONDS=120` passed in
+`20260929T110411.924110Z`, on the fourth cold-start boot above. It extends the
+existing firmware-trial helpers with a separate installed mode: there is no
+binary swap, radio-module reload, persistent credential edit or AP change.
+Source-lock image/kernel, firmware/NVRAM hashes, normal scan offload, configured
+USB and a single healthy loaded firmware identity are required.
+
+The task uses a bounded device service and an idempotent `ExecStopPost`
+restoration hook. A private recovery record is written before runtime changes;
+restoration reloads the unchanged persistent Wi-Fi configuration, requires the
+original network with exactly one current profile, and only then removes the
+record. Interrupted or failed recovery retains evidence and can be retried.
+Forty-two Wi-Fi-related host tests passed, including ten new tests for installed
+identity/fault guards, input changes, scan observation, interrupted trials,
+idempotent recovery, failed-restoration retention, service arguments and all
+seven independent SSH acknowledgements. The older binary-swap tests still pass.
+
+| Stage | Observed result |
+| --- | --- |
+| Initial installed-firmware Wi-Fi | Independent same-boot SSH passed |
+| Four software disconnect/reconnect cycles | Four observed disconnections; all four independent Wi-Fi SSH checks passed |
+| Generated unavailable network | 120.178 s; all 13 samples `SCANNING`; no tracked radio faults |
+| Persistent configuration restored | Original network associated; temporary profile removed; independent Wi-Fi SSH passed |
+| Connected observation | 120.160 s; all 13 samples `COMPLETED`; no tracked radio faults |
+| Final checkpoint | Independent Wi-Fi SSH passed; one expected firmware load; configuration restoration confirmed |
+
+All seven host checkpoints used the pinned host key, the same boot and the
+actual Wi-Fi endpoint. Reconnect checkpoint durations were 4.347, 3.326, 3.327
+and 3.346 seconds; these include status polling, address availability and host
+SSH verification after the reconnect request, not just radio association.
+The generated network exists only in supplicant memory and has no credentials.
+Firmware, board NVRAM and persistent Wi-Fi configuration hashes remained intact;
+USB remained configured and scan-offload policy stayed at its normal zero.
+Successful completion removed the staged helper and metadata.
+
+The final `device:boot-cycles CYCLES=0` capture
+`20260929T110916.742599Z` passed all boot-health checks and same-boot USB/Wi-Fi
+verification again, without adding physical-cycle credit. A full private
+diagnostic archive was retained in `20260929T110917.467011Z`.
+
+This is a bounded scan/recovery result. A generated unavailable network does
+not reproduce an associated AP abruptly ceasing to transmit beacons. Physical
+AP-loss handling, longer connected use, sleep and energy effects remain open.
+
 ### Scope
 
 The functional USB experiment now has the direct callback, bounded error and
@@ -362,8 +410,9 @@ real electrical-fault recovery and longer-duration energy measurement remain
 separate follow-ups. Keep high-rate recorders out of natural count/energy
 windows. Counting defaults off; each saved task restores its owned controls.
 
-Firmware qualification requires the expected loaded A0 identity, association,
-independent Wi-Fi SSH, repeated cold starts and AP-absent/reconnection tests.
-Prior reversible firmware trials do not establish these results for this image.
+The installed A0 candidate now has expected-identity, association, independent
+Wi-Fi SSH, four connected-USB cold-start and software reconnect/unavailable-
+network results on this image. Physical AP-loss handling still needs its own
+test; the synthetic profile does not establish it.
 Direct callback reductions do not establish an energy saving; observer cost,
 live concurrency, long-term stability and sleep remain separate limits.

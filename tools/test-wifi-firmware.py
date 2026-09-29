@@ -2,10 +2,12 @@
 """USB-controlled exact-A0 firmware trial; always restore the installed binary."""
 import argparse
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
 import signal
+import secrets
 import stat
 import subprocess
 import tempfile
@@ -14,6 +16,9 @@ import time
 FIRMWARE = Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.bin')
 NVRAM = Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt')
 STATE = Path('/run/gameshellneo-firmware-trial')
+WIFI_REQUEST = Path('/run/gameshellneo-firmware-wifi.json')
+WIFI_ACK = Path('/run/gameshellneo-firmware-wifi.ack')
+WIFI_CONFIG = Path('/etc/wpa_supplicant/wpa_supplicant-wlan0.conf')
 ORIGINAL = 'bb2bd00ede1fe04c74d3684e76ef58d9f2acd54d6759894b934bbefb159668e9'
 BOARD_DATA = '5f977a2a3916ef795ceb184cf928231d587249606d1750dacecb5f16ed941ae6'
 
@@ -106,7 +111,80 @@ def emit(event, **values):
     print(json.dumps(dict(event=event, **values)), flush=True)
 
 
-def trial(candidate, metadata, seconds):
+def wifi_status():
+    return dict(line.split('=', 1) for line in
+                command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'status').splitlines() if '=' in line)
+
+
+def wifi_address():
+    if wifi_status().get('wpa_state') != 'COMPLETED':
+        return None
+    interfaces = json.loads(command('/usr/sbin/ip', '-j', '-4', 'address', 'show', 'dev', 'wlan0'))
+    addresses = [entry['local'] for interface in interfaces for entry in interface['addr_info']
+                 if entry.get('scope') == 'global' and entry.get('family') == 'inet']
+    return str(ipaddress.IPv4Address(addresses[0])) if len(addresses) == 1 else None
+
+
+def acknowledge(token):
+    request = json.loads(WIFI_REQUEST.read_text())
+    if token != request['token'] or len(token) != 32 or any(c not in '0123456789abcdef' for c in token):
+        raise ValueError('Stale or invalid Wi-Fi verification token')
+    write(WIFI_ACK, token.encode())
+
+
+def wifi_checkpoint(phase, boot, expected_identity):
+    started = time.monotonic()
+    deadline = started + 60
+    address = None
+    while time.monotonic() < deadline:
+        try:
+            address = wifi_address()
+        except subprocess.SubprocessError:
+            address = None
+        if address:
+            break
+        time.sleep(1)
+    if not address:
+        raise ValueError('Wi-Fi association/address deadline expired: ' + phase)
+    if (Path('/proc/sys/kernel/random/boot_id').read_text().strip() != boot or
+            expected_identity not in identity()):
+        raise ValueError('Boot or firmware identity changed at Wi-Fi checkpoint')
+    token = secrets.token_hex(16)
+    WIFI_ACK.unlink(missing_ok=True)
+    write(WIFI_REQUEST, json.dumps(dict(token=token, phase=phase, boot_id=boot, address=address)).encode())
+    try:
+        emit('wifi_ready', token=token, phase=phase, boot_id=boot, address=address)
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            if WIFI_ACK.exists() and WIFI_ACK.read_text() == token:
+                if (wifi_address() != address or expected_identity not in identity() or
+                        Path('/proc/sys/kernel/random/boot_id').read_text().strip() != boot):
+                    raise ValueError('Wi-Fi/firmware changed during independent SSH verification')
+                emit('wifi_verified', phase=phase, duration_seconds=time.monotonic() - started)
+                return
+            time.sleep(1)
+        raise ValueError('Independent Wi-Fi SSH verification deadline expired: ' + phase)
+    finally:
+        WIFI_REQUEST.unlink(missing_ok=True)
+        WIFI_ACK.unlink(missing_ok=True)
+
+
+def reconnect(cycle, boot, expected_identity):
+    if command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'disconnect') != 'OK':
+        raise ValueError('Wi-Fi disconnect request was rejected')
+    deadline = time.monotonic() + 10
+    while wifi_status().get('wpa_state') != 'DISCONNECTED':
+        if time.monotonic() >= deadline:
+            raise ValueError('Wi-Fi disconnection was not observed')
+        time.sleep(0.5)
+    emit('wifi_disconnected', cycle=cycle)
+    time.sleep(2)
+    if command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'reconnect') != 'OK':
+        raise ValueError('Wi-Fi reconnect request was rejected')
+    wifi_checkpoint('candidate_reconnect_' + str(cycle), boot, expected_identity)
+
+
+def trial(candidate, metadata, seconds, connected=False):
     image = json.loads(Path('/etc/gameshellneo/image.json').read_text())
     value = identity()
     if (image.get('board') != 'gameshellneo-cpi31' or 'FWID 01-e2c3069b' not in value or
@@ -126,23 +204,33 @@ def trial(candidate, metadata, seconds):
     write(STATE / 'original.bin', FIRMWARE.read_bytes())
     write(STATE / 'state.json', json.dumps({'identity': value, 'mode': mode}).encode())
     boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+    config_hash = digest(WIFI_CONFIG.read_bytes())
     before = counts()
     try:
+        if connected:
+            wifi_checkpoint('original_before', boot, value)
+            before = counts()
         previous_count = reload(data, mode)
         # The binary footer FWID differs from the firmware's runtime `ver` reply.
         # Require the observed exact chip/date/version/runtime FWID, not the footer.
         observed = wait_identity(metadata['runtime_identity'], previous_count)
         emit('candidate_loaded', identity=observed, sha256=digest(FIRMWARE.read_bytes()))
         after_reload = counts()
+        if connected:
+            wifi_checkpoint('candidate_initial', boot, metadata['runtime_identity'])
+            for cycle in range(1, 5):
+                reconnect(cycle, boot, metadata['runtime_identity'])
         start = time.monotonic()
         for index in range(seconds // 10 + 1):
             time.sleep(max(0, start + index * 10 - time.monotonic()))
             if Path('/proc/sys/kernel/random/boot_id').read_text().strip() != boot:
                 raise ValueError('Boot changed during firmware trial')
-            fields = dict(line.split('=', 1) for line in command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'status').splitlines() if '=' in line)
+            fields = wifi_status()
             offload = command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'get', 'disable_scan_offload')
             if offload != '0' or digest(NVRAM.read_bytes()) != BOARD_DATA:
                 raise ValueError('Scan policy or board data changed during firmware trial')
+            if connected and (fields.get('wpa_state') != 'COMPLETED' or digest(WIFI_CONFIG.read_bytes()) != config_hash):
+                raise ValueError('Connected trial lost association or Wi-Fi configuration changed')
             emit('sample', monotonic_seconds=time.monotonic(), state=fields.get('wpa_state'),
                  disable_scan_offload=0)
         after = counts()
@@ -151,11 +239,19 @@ def trial(candidate, metadata, seconds):
         result = {key: after[key] - after_reload[key] for key in before}
         emit('candidate_complete', counts=result, duration_seconds=time.monotonic() - start,
              reload_counts={key: after_reload[key] - before[key] for key in before})
+        if connected and any(after[key] != before[key] for key in before):
+            raise ValueError('Firmware crash or SDIO removal during connected trial')
     finally:
         restored = restore()
         emit('restored', identity=restored, firmware_sha256=digest(FIRMWARE.read_bytes()))
+    if connected:
+        wifi_checkpoint('original_restored', boot, value)
+        if digest(WIFI_CONFIG.read_bytes()) != config_hash:
+            raise ValueError('Wi-Fi configuration changed during connected trial')
     emit('complete', passed=True, counts=result,
-         limits='Candidate observation and original restoration; not association or energy qualification.')
+         connected=connected,
+         limits=('Software reconnection and original restoration; not cold boot, AP disappearance or energy qualification.'
+                 if connected else 'Candidate observation and original restoration; not association or energy qualification.'))
 
 
 def interrupted(number, _frame):
@@ -168,16 +264,23 @@ def main():
     parser.add_argument('--metadata', type=Path)
     parser.add_argument('--seconds', type=int, default=120)
     parser.add_argument('--restore', action='store_true')
+    parser.add_argument('--connected', action='store_true')
+    parser.add_argument('--ack')
     args = parser.parse_args()
     os.umask(0o077)
+    if args.ack:
+        acknowledge(args.ack)
+        return
     if args.restore:
         restore()
+        WIFI_REQUEST.unlink(missing_ok=True)
+        WIFI_ACK.unlink(missing_ok=True)
         return
     if not args.candidate or not args.metadata or not 60 <= args.seconds <= 300 or args.seconds % 10:
         parser.error('Supply candidate/metadata and seconds in 60..300, a multiple of ten')
     for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, interrupted)
-    trial(args.candidate, json.loads(args.metadata.read_text()), args.seconds)
+    trial(args.candidate, json.loads(args.metadata.read_text()), args.seconds, args.connected)
 
 
 if __name__ == '__main__':

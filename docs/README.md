@@ -18,6 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [49 — Connected firmware validation](49-connected-firmware-validation.md) | Candidate association, four software reconnections and independently verified original-firmware recovery |
 | [48 — A0 firmware trials](48-a0-firmware-trials.md) | Reversible upstream A0 scan comparison, runtime identity correction and network visibility limits |
 | [47 — Wi-Fi firmware options](47-wifi-firmware-options.md) | Exact A0 silicon compatibility, candidate binary versions and primary-source provenance |
 | [46 — Wi-Fi transition and scan recovery](46-wifi-transition-and-scan-recovery.md) | Guarded .env network changes, automatic rollback and firmware/host scan isolation |

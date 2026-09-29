@@ -186,6 +186,10 @@ tasks:
     desc: Try the pinned A0 firmware over USB for SECONDS=120, then restore original firmware
     cmds: [python3 tools/check-wifi-firmware.py]
 
+  device:wifi-firmware-connected:
+    desc: Verify candidate association, four Wi-Fi reconnections and original restoration over USB
+    cmds: [python3 tools/check-wifi-firmware.py --connected]
+
   device:wifi-visibility:
     desc: Compare cached scans with the .env SSID over USB without printing network names
     cmds: [python3 tools/check-wifi-visibility.py]

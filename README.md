@@ -321,6 +321,7 @@ task device:wifi-visibility         # Cached target visibility; no network names
 task mac:wifi                      # Mac Wi-Fi band/security; names may be redacted by macOS
 task device:wifi-scan-test SECONDS=120 # USB-only firmware/host/firmware scan comparison; restores flag
 task device:wifi-firmware-test SECONDS=120 # USB-only pinned A0 binary trial; always restores original
+task device:wifi-firmware-connected SECONDS=120 # Four reconnections and Wi-Fi SSH on candidate/original
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
@@ -537,6 +538,33 @@ configuration remains when the firmware trial restores the original binary.
 Keep the two captures together and recheck Wi-Fi afterward; the firmware task's
 completion alone does not establish successful association. Do not count this
 mixed connected/disconnected workload as another offline-scan comparison.
+
+Once the GameShell and Mac can communicate over a compatible network, run
+`task device:wifi-firmware-connected SECONDS=120`. Keep USB connected, the Mac
+awake and the hotspot/AP enabled. This requires the same original-firmware,
+board-data, scan-policy and USB gates as the ordinary trial. It verifies a
+fresh Wi-Fi SSH connection on the original firmware, loads the candidate,
+verifies candidate Wi-Fi, then performs four software disconnect/reconnect
+cycles. Each cycle must observe `DISCONNECTED` before reconnecting and verify
+`COMPLETED` plus an IPv4 address. Every checkpoint requires a fresh independent
+Wi-Fi SSH session through the configured route, with the pinned host key,
+same boot and correct endpoint. USB supplies control and acknowledgements.
+
+After the cycles, the task observes `SECONDS` of connected operation, restores
+the original firmware, and requires original-firmware Wi-Fi SSH again. The
+seven checkpoints use fresh tokens to reject stale acknowledgements. Private
+`firmware-trial.jsonl` and `wifi-ssh.jsonl` preserve device and host evidence.
+Any crash/SDIO removal during candidate loading or the connected test fails
+this mode; the original observation-only task still reports such events as
+data. Credentials/NVRAM stay unchanged. On host verification failure, the
+controller stops the service and invokes its recovery helper; the bounded
+device service also restores independently if the host disappears. Retain a
+failed helper until restoration is verified.
+
+This tests software reconnection to an available AP. It does not simulate an
+AP disappearing, cold startup, sleep/resume or battery operation, and leaves
+the original firmware installed. Checkpoint times include polling, DHCP and
+host SSH verification; they are not precise radio reassociation latency.
 
 `device:battery-check ROUTE=wifi` runs the battery policy regressions against
 the **installed** guard after verifying its SHA-256 matches the tracked source.

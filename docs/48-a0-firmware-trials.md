@@ -110,7 +110,9 @@ must be resolved before connection and reconnection qualification.
 The owner subsequently re-enabled a visible 2.4 GHz mobile hotspot. The
 original firmware joined it and the guarded network commit passed; see
 [report 46](46-wifi-transition-and-scan-recovery.md#hotspot-transition-qualified).
-The upstream candidate has not yet been tested for association to that hotspot.
+The subsequent [connected trial](49-connected-firmware-validation.md) also
+passed candidate association, four software reconnections, a two-minute
+connected observation and independently verified original-firmware recovery.
 
 ## Remaining work
 
@@ -140,8 +142,8 @@ bytes/mode/NVRAM, retryable failed restoration and stale log rejection. Scan
 recovery stops any running comparison before restoring the saved flag. Visibility
 tests preserve unknown/redacted identity and keep network names out of summaries.
 
-Qualify association and repeated reconnection on a visible compatible network,
-then cold-start loading before adopting this binary in a diagnostic image.
+Association and four software reconnections subsequently passed in report 49.
+Qualify cold-start loading before adopting this binary in a diagnostic image.
 Keep `qualified=false` until the acceptance scope is explicit. Measure any
 power benefit separately; eliminating recovery work suggests an opportunity
 but is not a battery result. The original firmware's recurring reset path also

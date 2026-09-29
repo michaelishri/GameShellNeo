@@ -66,7 +66,8 @@ passed in each mode, including USB SSH and plug/removal IRQ delivery. Four
 consecutive physical cold starts passed with the expected firmware and both
 SSH routes. The saved installed-firmware test also passed four software
 reconnections, unavailable-network scanning and connection restoration.
-Physical AP-loss Wi-Fi qualification and broader power/sleep work remain.
+Physical AP-loss Wi-Fi qualification is deferred; the random-SSID simulation
+provides the current unavailable-network evidence. Broader power/sleep work remains.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

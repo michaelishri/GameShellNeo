@@ -11,7 +11,8 @@ Wi-Fi recovered after software reboots with USB attached and absent. Four
 physical cable cycles passed in each policy after the fault windows.
 Four consecutive physical cold starts also passed with the pinned A0 firmware.
 Four installed-firmware software reconnections and bounded unavailable-network/
-connected observations passed. Physical AP-loss checks remain pending.
+connected observations passed. Physical AP-loss checks are deferred at the
+owner's request; the random-SSID simulation is the available evidence for now.
 This report follows [diagnostic.6 preparation](51-diagnostic6-preparation.md).
 Sleep remains disabled; charging and governor settings are unchanged.
 
@@ -394,6 +395,14 @@ diagnostic archive was retained in `20260929T110917.467011Z`.
 This is a bounded scan/recovery result. A generated unavailable network does
 not reproduce an associated AP abruptly ceasing to transmit beacons. Physical
 AP-loss handling, longer connected use, sleep and energy effects remain open.
+
+On 30 September the owner said real AP interruption was not practical and
+requested simulation with a random SSID. The completed run above already
+performs that exact sequence, so it supplies the requested evidence without
+another run or additional test credit. Physical AP interruption is deferred in
+`FOLLOW-UP.md` and does not hold up the next development work. The distinction
+between an unavailable configured network and abrupt loss of an associated
+AP's beacons remains recorded for later qualification.
 
 ### Scope
 

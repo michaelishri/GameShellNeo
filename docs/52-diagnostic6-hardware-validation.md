@@ -7,8 +7,9 @@ and **NEO-31** (integrated A0 firmware qualification).
 Status: **flash/readback, first boot, integration, battery-policy simulation
 and connected/unplugged stock/experimental USB diagnostics passed**. Direct
 unplugged callback rate fell **76.9%** in the matched one-minute windows.
-Wi-Fi recovered after software reboots with USB attached and absent. Physical
-cable recovery and repeated cold-start/AP-loss qualification remain pending.
+Wi-Fi recovered after software reboots with USB attached and absent. Four
+physical cable cycles passed in each policy after the fault windows.
+Repeated cold-start/AP-loss firmware qualification remains pending.
 This report follows [diagnostic.6 preparation](51-diagnostic6-preparation.md).
 Sleep remains disabled; charging and governor settings are unchanged.
 
@@ -210,11 +211,99 @@ a successful real read. Stock then requested 50 ms normal polling;
 experimental returned to 250 ms. Both restored diagnostics disabled and
 budget zero, with no real read errors. Physical cable tests follow separately.
 
-## Remaining qualification
+## Experimental physical recovery after fault injection
 
-Complete physical cable recovery in both modes after the error windows. Keep
-high-rate cable recorders separate from natural count/energy windows. Counting
-defaults off and each saved diagnostic task restores its owned controls.
+After the unplugged four-error check had restored diagnostics off and budget
+zero, the saved `task device:usb-detect CYCLES=4` recorder ran on the same
+experimental boot. The owner completed four connect-for-20-seconds /
+disconnect-for-10-seconds cycles. Capture: `20260929T102245.409817Z`.
+
+All four cycles passed. Each reached the configured USB state and authenticated
+SSH on the separate USB endpoint, then returned to an unattached controller
+with both USB/AC inputs absent and offline. Each complete cycle incremented
+ACIN_PLUGIN, ACIN_REMOVAL, VBUS_PLUGIN and VBUS_REMOVAL once. No reboot or
+Wi-Fi-observer reconnection occurred during the recorded batch.
+
+Cycles 2 and 4 each had an early Mac forwarding probe return `No route to host`;
+a retry succeeded during the same connected window. Those failures are retained
+in the host log. End-to-end SSH checks include Mac interface/routing setup and
+SSH negotiation, so neither these retries nor their successful durations
+measure the board's electrical detection latency.
+
+The recorder stopped cleanly after 19,305 samples over 387.855 seconds,
+including the wait before physical cycling began. Its process used 177.052 CPU
+seconds during recording; maximum sample gap was 43.966 ms. This is deliberately
+separate, expensive diagnostic observation, not a low-power measurement.
+The trace records physical IRQ delivery after the expired error window; it
+does not reproduce a real bus fault coincident with a cable edge.
+
+The recorded fourth cycle ended unattached. A later status capture,
+`20260929T103002.148163Z`, found USB connected again, with working services,
+95% reported charge and no taint. That later attachment is not counted as a
+fifth qualified cycle. The companion archive is `20260929T103002.135686Z`.
+The sampled gauge voltage reached 4.2658 V during one connected interval;
+this extends the existing unqualified charging-telemetry evidence under
+NEO-10, without establishing physical cell voltage or changing charge policy.
+
+## Stock physical recovery after fault injection
+
+The selector chose stock (`20260929T103026.448767Z`), followed by a software
+reboot. Status and policy passed in `20260929T103151.303835Z` and
+`20260929T103159.179935Z`. On this new boot,
+`41f0747c-a90c-4760-9e7c-e4623f0e8ae1`, a connected four-error request again
+consumed one error and expired the rest, preserving `0x30` with no automatic
+retry. Controls were restored off/budget zero (`20260929T103207.081398Z`).
+
+After the owner confirmed USB removal, the same saved detection task and
+four-cycle physical sequence ran in `20260929T103518.916750Z`. All four cycles
+passed, with authenticated USB SSH during each attachment and an unattached,
+absent/offline state after each removal. Every complete cycle again incremented
+each of the four ACIN/VBUS plug/removal counters exactly once. The host log
+contained no failed USB-SSH attempts or Wi-Fi-observer reconnections in this
+stock batch. Neither batch establishes electrical-edge detection latency.
+
+The stock recorder stopped cleanly after 9,884 samples in 198.703 seconds,
+using 89.398 CPU seconds during recording; maximum sample gap was 49.246 ms.
+Different waiting times and observer loads make these recorder durations/CPU
+totals unsuitable for comparing idle power between modes.
+
+The fourth recorded cycle ended unplugged; a subsequent uncounted attachment
+was present at postcheck `20260929T103925.141208Z`. Services and battery
+monitoring remained healthy, with 95% reported charge and no kernel taint.
+The corresponding archive `20260929T103925.134722Z` retained the intended A0
+runtime identity, with no firmware-halted, PM-usage-underflow, panic or Oops
+markers in this boot's kernel log. This is bounded observed stability.
+
+## Restored state
+
+Experimental mode was selected in `20260929T103947.771629Z`, then the board
+rebooted on connected USB. Final status and policy passed in
+`20260929T104142.805401Z` and `20260929T104142.805415Z`. Boot
+`8c4089bd-f675-442f-8c9d-eb648c6d81ca` had healthy services, no taint, valid
+battery monitoring at 97% Charging, and configured high-speed USB. A read-only
+diagnostic-interface check confirmed counting disabled, budget zero and no
+in-flight callbacks. Current and next-boot policies both select experimental.
+
+Final integration passed with the accepted AU AP domain in
+`20260929T104155.943519Z`; `device:boot-cycles CYCLES=0` independently verified
+USB and Wi-Fi on the same boot in `20260929T104155.273925Z`. Readiness was
+14.924 seconds and systemd reported 15.106 seconds. These are software-reboot
+observations, not the pending repeated physical cold-start batch.
+
+## Qualification scope and remaining work
+
+The functional USB experiment now has the direct callback, bounded error and
+physical post-error IRQ/access evidence that was missing from diagnostic.5.
+Together with [report 44](44-diagnostic5-hardware-validation.md)'s startup and
+rapid-cycle checks and [report 45](45-usb-polling-idle-comparison.md)'s original-
+firmware energy comparison, this completes NEO-22's functional qualification
+on the owner's CPI v3.1. The policy stays explicitly opted in for diagnostics;
+there is no new production-default change or battery-saving claim.
+
+Incremental kernel instrumentation cost, unique wakeups, physical-edge latency,
+real electrical-fault recovery and longer-duration energy measurement remain
+separate follow-ups. Keep high-rate recorders out of natural count/energy
+windows. Counting defaults off; each saved task restores its owned controls.
 
 Firmware qualification requires the expected loaded A0 identity, association,
 independent Wi-Fi SSH, repeated cold starts and AP-absent/reconnection tests.

@@ -18,7 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
-| [52 — Diagnostic.6 hardware validation](52-diagnostic6-hardware-validation.md) | Verified Mac transfer, guarded card flash/full readback and ongoing live USB/firmware qualification |
+| [52 — Diagnostic.6 hardware validation](52-diagnostic6-hardware-validation.md) | Verified flash/boot, 76.9% fewer direct unplugged USB callbacks, bounded errors, eight post-error cable cycles and ongoing firmware qualification |
 | [51 — Diagnostic.6 preparation](51-diagnostic6-preparation.md) | Direct USB counts, bounded read-error diagnostics, pinned A0 firmware and qualification sequence |
 | [49 — Connected firmware validation](49-connected-firmware-validation.md) | Candidate association, four software reconnections and independently verified original-firmware recovery |
 | [50 — Direct USB diagnostic notes](50-usb-diagnostic-implementation-notes.md) | Source-reviewed requirements; implementation and verification follow in report 51 |

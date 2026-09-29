@@ -46,13 +46,13 @@ and flash verification, hardware results and the exact repeatable test sequence.
 Diagnostic.3 remains available for recovery. The new changes do not yet have
 an attributed battery-power or clock-latency measurement.
 The [diagnostic.5 USB polling experiment](docs/41-usb-polling-experiment.md)
-is installed and has passed the stock/experimental cable and startup tests in
+passed the stock/experimental cable and startup tests in
 [report 44](docs/44-diagnostic5-hardware-validation.md). The
 [battery comparison](docs/45-usb-polling-idle-comparison.md) found about 72% fewer
 aggregate PMIC bus interrupts, with no resolved battery-power difference.
 The driver defaults off; diagnostic images explicitly opt in after
 board/topology/PMIC checks. Diagnostic.4/5 recovery images are retained.
-The next candidate, `0.1.0-diagnostic.6` / `6.18.54-gameshellneo6`, adds direct
+The installed candidate, `0.1.0-diagnostic.6` / `6.18.54-gameshellneo6`, adds direct
 USB callback diagnostics and the tested upstream A0 firmware candidate.
 It has passed the build/offline checks, Mac transfer verification and guarded
 card flash with full readback. [Report 51](docs/51-diagnostic6-preparation.md)
@@ -61,7 +61,9 @@ records implementation and host verification;
 qualification. First boot, integration, battery-policy simulation and connected/
 unplugged USB count/error tests passed in both modes. Direct unplugged polling
 fell from 16.65 to 3.85 callbacks/second (76.9%) in matched one-minute windows;
-this does not establish an energy saving. Wider USB/Wi-Fi qualification remains.
+this does not establish an energy saving. Four subsequent physical cable cycles
+passed in each mode, including USB SSH and plug/removal IRQ delivery. Repeated
+cold-start/AP-loss Wi-Fi qualification and broader power/sleep work remain.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

@@ -165,10 +165,46 @@ messages in its preceding ten-minute window, no failed units and no kernel
 taint. USB remained `not attached`. A full post-batch archive is retained at
 `.local/diagnostics/20260929T050555.401588Z/`.
 
+## Experimental cold start without USB
+
+The owner briefly pressed power to shut down, waited ten seconds after the
+screen went dark and powered on with USB remaining unplugged. The normal
+login screen returned. Wi-Fi SSH verified a new boot
+`8a3c7582-92c2-4d41-8c25-a1dd5532ac6a`; the journal identifies the preceding
+boot and records an orderly poweroff, filesystem syncing and journal stop.
+
+The driver again accepted experimental polling. USB remained `not attached`,
+the valid battery monitor reported discharging, and all six monitored services
+were active with zero restarts, no failed units and no taint. The integration
+checks passed over Wi-Fi. No firmware crash/reprobe appeared in the initial
+new-boot kernel check, and the radio remained `phy0`. Local readiness was
+14.6576 seconds; `systemd-analyze` reported 14.855 seconds, with the same
+physical power-on/bootloader timing limits noted above.
+
+Repeat with USB unplugged and the configured network available: orderly
+power-button shutdown, wait ten seconds after darkness, power on, then run
+`device:status`, `device:usb-policy`, `device:check` and `device:logs` with
+`ROUTE=wifi`. Preserve the new boot ID and preceding shutdown journal; a
+software reboot alone is not evidence of this physical cold-start procedure.
+
+Private evidence under `.local/diagnostics/`:
+
+- `20260929T050734.299894Z`: disconnected new-boot status.
+- `20260929T050734.146998Z`: accepted experimental policy.
+- `20260929T050808.337097Z`: passing integration checks.
+- `20260929T050809.437124Z`: full new-boot diagnostic archive.
+
+For the comparison, `task device:usb-policy ROUTE=wifi MODE=stock` verified
+and selected the stock script for the next boot. It reported the current
+experimental policy unchanged and `reboot_performed: false`. Selection
+evidence: `.local/diagnostics/20260929T050855.071980Z/`. The owner was then
+asked to repeat the battery-only shutdown/cold-start procedure.
+
 ## Remaining acceptance
 
-Independent Wi-Fi SSH is now verified. Complete attached/detached startup,
-the stock-policy cable comparison, rapid reconnection and separate matched
+Independent Wi-Fi SSH and the initial experimental attached/detached starts
+are now verified. Complete stock-policy startup and cable comparisons,
+rapid reconnection and separate matched
 battery-only comparisons. Detailed event recording must not run during power
 measurements. Direct poll-call instrumentation and error/IRQ coverage remain
 requirements before broad enablement or measured-work claims. Keep the

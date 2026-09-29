@@ -415,8 +415,9 @@ preparation, hardware evidence and measurement limits.
 polling policy: a slower fallback only for confirmed absence in this fixed
 peripheral configuration, retaining interrupt notifications and fast checks
 for uncertainty. It is implemented as an opt-in diagnostic.5 experiment in
-[report 41](docs/41-usb-polling-experiment.md); the installed diagnostic.4 still
-uses the existing policy.
+[report 41](docs/41-usb-polling-experiment.md). Diagnostic.5 is now installed
+for qualification; [report 44](docs/44-diagnostic5-hardware-validation.md)
+records its live results. The diagnostic.4 recovery image uses the existing policy.
 
 On diagnostic.5, use these repeatable commands:
 

@@ -107,7 +107,7 @@ The initial supplicant journal is also retained privately as
 `.local/build/neo22-diagnostic5-wifi-journal.txt`. Credentials, network names,
 private archives and image provisioning are not committed.
 
-## Remaining acceptance
+## USB checks
 
 ### Experimental USB reconnection batch
 
@@ -122,10 +122,53 @@ Private evidence: `.local/diagnostics/20260929T045611.055298Z/`, including
 functional reconnection coverage; it does not measure the physical cable-edge
 latency or poll-call rate. More detailed detection captures remain separate.
 
-### Outstanding checks
+### Disconnected recorder check
+
+With USB physically unplugged, Wi-Fi status verified the same boot, valid
+97% battery monitoring, `Discharging`, `not attached` USB state and healthy
+services. Capture: `.local/diagnostics/20260929T050007.931221Z/`.
+
+`task device:usb-detect CYCLES=0 SECONDS=8` then passed with 399 samples over
+8.002 seconds and a maximum observed sample gap of 28.79 ms. It recorded no
+cable cycles and cleaned up successfully. Capture:
+`.local/diagnostics/20260929T050013.957970Z/`. The recorder consumed 3.674 CPU
+seconds during that window; this instrumented check is unsuitable for an
+idle-power comparison and does not qualify physical detection timing.
+
+### Experimental detailed detection batch
+
+`task device:usb-detect CYCLES=4` passed all four attachment/removal cycles
+with USB SSH verified on every attachment, continuous Wi-Fi control and the
+same boot throughout. Both AC and USB supplies reported `present=1, online=1`
+on attachment and settled to `present=0, online=0` on removal. Each cycle
+recorded exactly one increment of each `ACIN_PLUGIN`, `ACIN_REMOVAL`,
+`VBUS_PLUGIN` and `VBUS_REMOVAL` counter. These are named IRQ observations,
+not USB poll-call counts.
+
+The final cable remained connected longer than requested; the owner noticed
+and unplugged it while recording continued. The four observed windows from
+configured state to settled removal were approximately **23.10, 23.46, 21.93
+and 84.64 seconds**, so this is not four equal-duration cycles. Fresh USB SSH
+checks took 2.16–4.83 seconds including the tailnet/Mac forwarding path; those
+durations are not hardware detection latency.
+
+The capture contains 11,680 samples over 234.649 seconds, with maximum
+observed sample gap 46.15 ms and 109.384 observer CPU seconds. Clean final
+trace validation and recorder cleanup passed. Private evidence:
+`.local/diagnostics/20260929T050036.944052Z/`, including `summary.json`,
+`usb-detection.jsonl` and `device-trace.jsonl`. Initial read-only PMIC control
+values were `30h=60h` and `8fh=01h`, with their documented regmap-cache limits.
+No charger, current-limit, governor or regulator settings were changed.
+
+The post-batch check found no firmware crash/removal, kernel warning/BUG/Oops
+messages in its preceding ten-minute window, no failed units and no kernel
+taint. USB remained `not attached`. A full post-batch archive is retained at
+`.local/diagnostics/20260929T050555.401588Z/`.
+
+## Remaining acceptance
 
 Independent Wi-Fi SSH is now verified. Complete attached/detached startup,
-stock/experimental cable batches, rapid reconnection and separate matched
+the stock-policy cable comparison, rapid reconnection and separate matched
 battery-only comparisons. Detailed event recording must not run during power
 measurements. Direct poll-call instrumentation and error/IRQ coverage remain
 requirements before broad enablement or measured-work claims. Keep the

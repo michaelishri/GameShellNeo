@@ -9,7 +9,8 @@ and connected/unplugged stock/experimental USB diagnostics passed**. Direct
 unplugged callback rate fell **76.9%** in the matched one-minute windows.
 Wi-Fi recovered after software reboots with USB attached and absent. Four
 physical cable cycles passed in each policy after the fault windows.
-Repeated cold-start/AP-loss firmware qualification remains pending.
+Four consecutive physical cold starts also passed with the pinned A0 firmware.
+Unavailable-network/reconnection and physical AP-loss checks remain pending.
 This report follows [diagnostic.6 preparation](51-diagnostic6-preparation.md).
 Sleep remains disabled; charging and governor settings are unchanged.
 
@@ -311,7 +312,40 @@ boot-health checks. Replay of `20260929T104155.273925Z` also passed. A live
 tracked fault markers, and independent USB/Wi-Fi SSH to that same boot.
 This host-tool change needs no image rebuild and gives no physical-cycle
 credit. It retains the existing consecutive-boot and prior button/shutdown
-journal requirements. NEO-31's owner-operated cold-start batch remains pending.
+journal requirements.
+
+### Four physical cold starts (NEO-31)
+
+The owner completed the four requested button shutdown/startup cycles with
+USB connected, waiting ten seconds after darkness and sixty seconds after
+the login screen each time. The saved task completed with four verified
+consecutive cycles and no missed boots in `20260929T104938.242902Z`.
+
+| Cycle | Boot ID | Readiness marker | Kernel + userspace startup |
+| --- | --- | ---: | ---: |
+| 1 | `f47e95a9-93bf-44e4-8456-27ccb6b85166` | 14.529 s | 14.727 s |
+| 2 | `0ff7d3d3-fcf4-4ed4-b294-df74a256954b` | 14.708 s | 14.877 s |
+| 3 | `c93993a4-d145-415e-b0ec-879668707e6a` | 14.478 s | 14.671 s |
+| 4 | `6c38af94-5335-41a5-aa97-3d17a549be6d` | 14.352 s | 14.524 s |
+
+Every captured boot passed image/kernel, CPU/memory, services, backlight,
+inputs, battery-monitoring and untainted-kernel checks. Each loaded exactly
+one matching A0 firmware identity with zero recorded firmware crashes, SDIO
+removals or PM underflows. Independent pinned-key Wi-Fi SSH reached the same
+boot as USB SSH. The saved previous-boot journals contain all three required
+short-power-press, power-off-target and filesystem-sync markers.
+
+Nineteen USB-not-ready events were retained during shutdown/startup, including
+refused connections, timeouts, route errors and one SSH-banner interruption.
+The recorder retried and verified every cycle. These host observations do not
+measure electrical power-off duration or exact USB availability. Readiness
+and systemd timings exclude bootloader time and are not wall-clock timings
+from the owner's power press.
+
+Final status (`20260929T105710.884995Z`) and all six integration groups
+(`20260929T105710.885161Z`, accepted AU AP domain) passed. Battery telemetry
+reported 100% Charging. This qualifies the finite four-cycle connected-USB
+cold-start batch, not sleep, physical AP disappearance or long-term stability.
 
 ### Scope
 

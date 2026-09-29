@@ -21,6 +21,8 @@ env:
   NEO_GOVERNOR_RATE_US: '{{.RATE_US | default "10000"}}'
   NEO_PERF_SECONDS: '{{.SECONDS | default "30"}}'
   NEO_USB_POLL_MODE: '{{.MODE | default "status"}}'
+  NEO_USB_DIAG_SECONDS: '{{.SECONDS | default "60"}}'
+  NEO_USB_DIAG_ERRORS: '{{.ERRORS | default "1"}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
   NEO_COOLING_STARTED: '{{.COOLING_STARTED | default ""}}'
   NEO_COMPARISON_CAPTURE: '{{.CAPTURE | default ""}}'
@@ -233,6 +235,18 @@ tasks:
   device:usb-policy:
     desc: Verify running USB policy, or select MODE=stock/experimental for next boot (never reboots)
     cmds: [python3 tools/remote.py device usb-policy]
+
+  device:usb-counts:
+    desc: Count actual USB poll callbacks for SECONDS=60; diagnostics off again on exit
+    cmds: [python3 tools/check-usb-diagnostics.py --mode count]
+
+  device:usb-errors:
+    desc: Inject ERRORS=1 (1..4) bounded poll-only read failures and verify retained state/retry
+    cmds: [python3 tools/check-usb-diagnostics.py --mode errors]
+
+  device:usb-diag-restore:
+    desc: Stop a USB diagnostic test and restore its owned controls after an interruption
+    cmds: [python3 tools/check-usb-diagnostics.py --restore]
 
   device:stability:
     desc: Check a temporary 128 MiB file and run five minutes of CPU/memory load; keep USB connected

@@ -50,6 +50,22 @@ class BootPolicyTests(unittest.TestCase):
             policy.select(self.boot, self.identity, 'experimental')
         self.assertEqual((self.boot / 'boot.scr').read_bytes(), previous)
 
+    def test_diagnostics_opt_in_matches_both_modes_and_image_manifest(self):
+        self.identity['sources'] = {'experiments': {'usb_diagnostics': True}}
+        for mode in policy.MODES:
+            source = policy.boot_script(self.identity['root_partuuid'], mode, True)
+            self.assertIn((policy.DIAGNOSTIC_PARAMETER + '=1').encode(), source)
+            for suffix, data in [('cmd', source), ('scr', compiled(source))]:
+                name = f'boot-usb-{mode}.{suffix}'
+                (self.boot / name).write_bytes(data)
+                self.identity['usb_poll_boot']['files'][name] = policy.sha(data)
+                if mode == 'stock':
+                    (self.boot / f'boot.{suffix}').write_bytes(data)
+        policy.select(self.boot, self.identity, 'experimental')
+        self.identity['sources']['experiments']['usb_diagnostics'] = False
+        with self.assertRaises(ValueError):
+            policy.verify_scripts(self.boot, self.identity)
+
     def test_hash_alone_cannot_bless_wrong_script(self):
         for content in (b'corrupt CRC', compiled(b'boot an unexpected kernel\n')):
             name = 'boot-usb-experimental.scr'

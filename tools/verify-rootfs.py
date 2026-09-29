@@ -90,9 +90,11 @@ def main():
     dtb = boot / 'sun8i-r16-clockworkpi-cpi3.dtb'
     require(hashlib.sha256(dtb.read_bytes()).hexdigest() == built['files']['.local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb'],
             'Installed DTB differs from completed stage')
-    for kind in ('firmware', 'nvram'):
+    for kind in ('firmware', 'nvram', 'license'):
+        if kind not in identity['sources']['radio']:
+            continue
         asset = identity['sources']['radio'][kind]
-        name = asset['filename'] if kind == 'firmware' else 'brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt'
+        name = asset['filename'] if kind != 'nvram' else 'brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt'
         require(hashlib.sha256((root / 'usr/lib/firmware/brcm' / name).read_bytes()).hexdigest() == asset['sha256'],
                 f'Installed radio {kind} differs from locked input')
     for name, relative in [('machine-id', 'etc/machine-id'),

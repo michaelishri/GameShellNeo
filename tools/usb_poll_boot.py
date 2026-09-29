@@ -13,13 +13,18 @@ import tempfile
 import zlib
 
 PARAMETER = 'axp20x_usb_power.gameshellneo_slow_poll'
+DIAGNOSTIC_PARAMETER = 'axp20x_usb_power.gameshellneo_diagnostics'
 MODES = ('stock', 'experimental')
 
 
-def boot_script(partuuid, mode=None):
+def boot_script(partuuid, mode=None, diagnostics=False):
     if not re.fullmatch(r'[0-9a-fA-F]{8}-02', partuuid) or mode not in (*MODES, None):
         raise ValueError('Unexpected root PARTUUID or USB policy')
+    if type(diagnostics) is not bool:
+        raise ValueError('Diagnostic opt-in must be a boolean')
     option = '' if mode is None else f' {PARAMETER}={int(mode == "experimental")}'
+    if diagnostics:
+        option += f' {DIAGNOSTIC_PARAMETER}=1'
     return (f'setenv bootargs console=tty0 console=ttyS0,115200n8 root=PARTUUID={partuuid} '
             f'rootfstype=ext4 rootwait rw panic=10{option}\n'
             'if fatload mmc 0:1 0x48000000 uImage; then\n'
@@ -50,6 +55,7 @@ def script_source(data):
 
 def verify_scripts(boot, identity):
     record = identity['usb_poll_boot']
+    diagnostics = identity.get('sources', {}).get('experiments', {}).get('usb_diagnostics', False)
     expected_names = {f'boot-usb-{mode}.{suffix}' for mode in MODES for suffix in ('cmd', 'scr')}
     if set(record['files']) != expected_names:
         raise ValueError('Unexpected boot-policy manifest')
@@ -63,7 +69,7 @@ def verify_scripts(boot, identity):
             raise ValueError('Boot-policy file hash mismatch: ' + name)
     for mode in MODES:
         source = data[f'boot-usb-{mode}.cmd']
-        if source != boot_script(identity['root_partuuid'], mode) or script_source(data[f'boot-usb-{mode}.scr']) != source:
+        if source != boot_script(identity['root_partuuid'], mode, diagnostics) or script_source(data[f'boot-usb-{mode}.scr']) != source:
             raise ValueError('Unexpected boot-policy source or compiled script')
     selected = (boot / 'boot.scr').read_bytes()
     mode = next((mode for mode in MODES if selected == data[f'boot-usb-{mode}.scr']), None)

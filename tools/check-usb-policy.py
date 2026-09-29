@@ -48,7 +48,8 @@ def main():
             else:
                 raise RuntimeError('Missing locked USB driver')
         patches = [ROOT / 'kernel/patches' / name for name in
-                   ('0006-axp-usb-work-lifetime.patch', '0008-axp-usb-absent-poll.patch')]
+                   ('0006-axp-usb-work-lifetime.patch', '0008-axp-usb-absent-poll.patch',
+                    '0009-axp-usb-diagnostics.patch')]
         for patch in patches:
             run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=WORK / 'patched')
         spec = importlib.util.spec_from_file_location('lifecycle', ROOT / 'tools/check-usb-lifecycle.py')
@@ -58,9 +59,13 @@ def main():
         include = '#include "axp20x_usb_gameshellneo.h"\n'
         if source.count(include) != 1:
             raise RuntimeError('Unexpected policy inclusion')
-        lifecycle.headers(source.replace(include, ''), WORK)
+        diag_include = '#include "axp20x_usb_diag_impl.h"\n'
+        lifecycle.headers(source.replace(include, '').replace(diag_include, ''), WORK)
+        diag_header = HEADER.with_name('axp20x_usb_diag.h')
+        diag_impl = HEADER.with_name('axp20x_usb_diag_impl.h')
+        (WORK / diag_header.name).write_text(diag_header.read_text())
         callbacks = WORK / 'usb_callbacks.h'
-        callbacks.write_text(HEADER.read_text() + '\n' + callbacks.read_text())
+        callbacks.write_text(HEADER.read_text() + '\n' + diag_impl.read_text() + '\n' + callbacks.read_text())
         harness = ROOT / 'kernel/tests/usb_lifecycle_test.c'
         flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-DNEO_USB_POLL_TEST']
         builder = lock['builder']
@@ -83,22 +88,39 @@ def main():
             'absent_interval': good.replace('msecs_to_jiffies(250)', 'msecs_to_jiffies(50)', 1),
             'irq_deadline': good.replace(
                 'queue_delayed_work(system_power_efficient_wq, &power->vbus_detect,',
-                'mod_delayed_work(system_power_efficient_wq, &power->vbus_detect,', 1),
+                'mod_delayed_work(system_power_efficient_wq, &power->vbus_detect,'),
+            'error_bound': good.replace("command[7] <= '0' + NEO_USB_MAX_ERRORS",
+                                        "command[7] <= '9'", 1),
+            'error_expiry': good.replace('diag->counts.budget = 0;', '(void)diag;', 1),
+            'error_retention': good.replace('if (ret)\n\t\tgoto out;',
+                                            'if (ret) { power->old_status = 0; goto out; }', 1),
+            'inflight_reset': good.replace('diag->enabled || counts->inflight', 'diag->enabled', 1),
+            'file_cleanup': good.replace('debugfs_remove_recursive(directory);',
+                                          'if (!directory) debugfs_remove_recursive(directory);', 1),
         }
+        probe = WORK / 'usb_probe.h'
+        good_probe = probe.read_text()
+        registration = '\tret = neo_usb_register(power, axp20x);\n\tif (ret)\n\t\treturn ret;\n'
+        irq_marker = '\t/* Request irqs after registering, as irqs may trigger immediately */'
+        if good_probe.count(registration) != 1 or good_probe.count(irq_marker) != 1:
+            raise RuntimeError('Unexpected diagnostic registration boundary')
+        controls_to_check = [(name, callbacks, good, broken) for name, broken in mutations.items()]
+        controls_to_check.append(('cleanup_order', probe, good_probe,
+                                  good_probe.replace(registration, '').replace(irq_marker, registration + irq_marker)))
         controls = {}
-        try:
-            for name, broken in mutations.items():
-                if broken == good:
+        for name, header, original, broken in controls_to_check:
+            try:
+                if broken == original:
                     raise RuntimeError('Mutation no longer matches candidate: ' + name)
-                callbacks.write_text(broken)
+                header.write_text(broken)
                 binary = WORK / ('negative-' + name)
                 run(['cc', *flags, '-I', str(WORK), str(harness), '-o', str(binary)])
                 result = subprocess.run([str(binary)], capture_output=True, text=True)
                 if result.returncode == 0 or 'Assertion' not in result.stderr:
                     raise RuntimeError('Negative control did not fail as intended: ' + name)
                 controls[name] = {'returncode': result.returncode, 'diagnostic': result.stderr.strip()}
-        finally:
-            callbacks.write_text(good)
+            finally:
+                header.write_text(original)
         arm = capture(['docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
                        '--platform', builder['platform'], '--entrypoint', 'bash',
                        '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
@@ -108,7 +130,9 @@ def main():
                        '-static -I.local/build/usb-policy-tests '
                        'kernel/tests/usb_lifecycle_test.c -o .local/build/usb-policy-tests/arm\n'
                        'qemu-arm .local/build/usb-policy-tests/arm'])
-        inputs = [*patches, HEADER, harness, ROOT / 'kernel/tests/usb_poll_of_shims.h',
+        inputs = [*patches, HEADER, diag_header, diag_impl, harness,
+                  ROOT / 'kernel/tests/usb_diag_shims.h', ROOT / 'kernel/tests/usb_diag_cases.h',
+                  ROOT / 'kernel/tests/usb_poll_of_shims.h',
                   ROOT / 'kernel/tests/usb_poll_cases.h', Path(__file__),
                   ROOT / 'tools/check-usb-lifecycle.py', ROOT / 'tools/kernel_checks.py']
         if args.dtb:

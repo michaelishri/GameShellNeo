@@ -66,6 +66,8 @@ static void gate_tests(void)
 		case 46: nodes[4].extcon_port = -1; break;
 		}
 		assert((gameshellneo_poll_refusal(&power, &pmic) == NULL) == (test == 0));
+		/* Diagnostics call this complete gate independently of policy opt-in. */
+		assert((gameshellneo_hardware_refusal(&power, &pmic) == NULL) == (test <= 1));
 		no_refs();
 		policy_cases++;
 	}
@@ -161,6 +163,8 @@ static void state_tests(void)
 #include "usb_board_fixture.h"
 #endif
 
+#include "usb_diag_cases.h"
+
 int main(void)
 {
 	gate_tests();
@@ -179,6 +183,8 @@ int main(void)
 		no_refs();
 	}
 	assert(total_faults == 0);
+	diagnostic_state_tests();
+	diagnostic_lifetime_tests();
 	printf("USB policy: %u gate/state/race cases and %d probe/unwind cases passed\n",
 	       policy_cases, scenarios);
 	return 0;

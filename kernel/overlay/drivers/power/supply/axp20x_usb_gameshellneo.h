@@ -114,14 +114,12 @@ out:
 }
 
 /* Called only after all IRQ registrations succeed. No PMIC writes. */
-static const char *gameshellneo_poll_refusal(struct axp20x_usb_power *power,
+static const char *gameshellneo_hardware_refusal(struct axp20x_usb_power *power,
 					  struct axp20x_dev *pmic)
 {
 	struct device_node *parent = power->dev->parent->of_node;
 	unsigned int input, gpio;
 
-	if (!gameshellneo_slow_poll)
-		return "opt-in disabled";
 	if (!of_machine_is_compatible("clockwork,clockworkpi-cpi3") ||
 	    !of_machine_is_compatible("allwinner,sun8i-a33") ||
 	    pmic->variant != AXP223_ID ||
@@ -148,6 +146,14 @@ static const char *gameshellneo_poll_refusal(struct axp20x_usb_power *power,
 	if ((input & (BIT(7) | BIT(2))) || (gpio & BIT(4)))
 		return "PMIC VBUS configuration mismatch";
 	return NULL;
+}
+
+static const char *gameshellneo_poll_refusal(struct axp20x_usb_power *power,
+					  struct axp20x_dev *pmic)
+{
+	if (!gameshellneo_slow_poll)
+		return "opt-in disabled";
+	return gameshellneo_hardware_refusal(power, pmic);
 }
 
 #endif

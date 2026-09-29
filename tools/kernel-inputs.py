@@ -5,7 +5,10 @@ import difflib
 import hashlib
 import json
 from pathlib import Path
+import re
+import shutil
 import subprocess
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,6 +28,35 @@ def patches():
                                          fromfile='/dev/null', tofile=f'b/{name}'))
     queue['0003-gameshell-new-files.patch'] = ''.join(parts).encode()
     yield from sorted(queue.items())
+
+
+def apply_queue(source, queue):
+    # A concatenated `patch --dry-run` checks later patches against unchanged
+    # files, so overlapping patches can falsely fail. Replay the whole queue
+    # on just its input files in scratch, then apply the same verified sequence.
+    combined = b''.join(data for _, data in queue)
+    targets = set(re.findall(rb'^\+\+\+ b/([^\t\n]+)', combined, re.M))
+    if not targets:
+        raise ValueError('Patch queue has no target files')
+    with tempfile.TemporaryDirectory(prefix='gameshellneo-patch-check-') as temporary:
+        scratch = Path(temporary)
+        for target in targets:
+            relative = Path(target.decode())
+            if relative.is_absolute() or '..' in relative.parts:
+                raise ValueError('Unsafe patch target')
+            original = source / relative
+            if original.is_symlink():
+                raise ValueError('Patch target is a symlink')
+            if original.exists():
+                destination = scratch / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(original, destination)
+        for tree in (scratch, source):
+            result = subprocess.run(['patch', '--batch', '--forward', '--fuzz=0', '-p1'],
+                                    input=combined, cwd=tree, capture_output=True)
+            if result.returncode:
+                raise RuntimeError('Patch queue failed before completion:\n' +
+                                   (result.stdout + result.stderr).decode(errors='replace'))
 
 
 def main():
@@ -60,14 +92,7 @@ def main():
         for line in ('VERSION = 6', 'PATCHLEVEL = 18', 'SUBLEVEL = 54'):
             if line not in makefile.splitlines():
                 raise SystemExit('Expected Linux 6.18.54 source.')
-        # Validate the entire queue before changing any file.
-        combined = b''.join(data for _, data in queue)
-        for dry in (True, False):
-            command = ['patch', '--batch', '--forward', '-p1']
-            if dry:
-                command.append('--dry-run')
-            subprocess.run(command, input=combined, cwd=source, check=True,
-                           stdout=subprocess.DEVNULL)
+        apply_queue(source, queue)
         stamp.write_text(json.dumps(manifest, indent=2) + '\n')
     print(json.dumps(manifest, indent=2))
 

@@ -23,6 +23,35 @@ def checked_copy(source, destination, expected):
     shutil.copyfile(source, destination)
 
 
+def stage_radio(radio, reference, inputs, cache):
+    """Keep owner NVRAM private; public blobs require locked URL and digest."""
+    for kind in ('firmware', 'nvram', 'license'):
+        asset = radio.get(kind)
+        if asset is None:
+            continue
+        filename = asset['filename']
+        if Path(filename).name != filename:
+            raise ValueError('Radio inputs must use plain filenames')
+        source = reference / filename
+        if 'url' in asset:
+            if not asset['url'].startswith('https://'):
+                raise ValueError('Public radio inputs require HTTPS')
+            cache.mkdir(parents=True, exist_ok=True)
+            source = cache / asset['sha256']
+            if not source.exists():
+                with urllib.request.urlopen(asset['url'], timeout=60) as response:
+                    data = response.read(2 * 1024 * 1024 + 1)
+                if len(data) > 2 * 1024 * 1024 or hashlib.sha256(data).hexdigest() != asset['sha256']:
+                    raise ValueError('Public radio download failed the locked checksum: ' + kind)
+                temporary = source.with_suffix('.part')
+                try:
+                    temporary.write_bytes(data)
+                    temporary.replace(source)
+                finally:
+                    temporary.unlink(missing_ok=True)
+        checked_copy(source, inputs / filename, asset['sha256'])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bootloader', type=Path, required=True)
@@ -48,9 +77,7 @@ def main():
             run('git', '-C', armbian, 'apply', patch)
     shutil.copytree(ROOT / 'build/armbian', armbian / 'userpatches', dirs_exist_ok=True)
     checked_copy(args.bootloader, LOCAL / 'inputs' / LOCK['bootloader']['filename'], LOCK['bootloader']['sha256'])
-    for item in ('firmware', 'nvram'):
-        asset = LOCK['radio'][item]
-        checked_copy(args.radio_directory / asset['filename'], LOCAL / 'inputs' / asset['filename'], asset['sha256'])
+    stage_radio(LOCK['radio'], args.radio_directory, LOCAL / 'inputs', LOCAL / 'downloads/radio')
     for archive, stamp, expected in [('debian', LOCK['debian']['snapshot'], LOCK['debian']['inrelease_sha256']),
                                      ('debian-security', LOCK['debian']['security_snapshot'], LOCK['debian']['security_inrelease_sha256'])]:
         suite = 'trixie' if archive == 'debian' else 'trixie-security'

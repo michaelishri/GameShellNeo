@@ -3,6 +3,10 @@
 Date: **29 September 2026 NZDT**. Ticket: **NEO-28**.
 Status: **source review and design; not implemented or hardware-qualified**.
 
+Subsequent implementation and verification are recorded in
+[report 51](51-diagnostic6-preparation.md). The status above describes this
+design checkpoint, not a later build or hardware result.
+
 ## Purpose
 
 The [battery comparison](45-usb-polling-idle-comparison.md) can compare software

@@ -39,17 +39,24 @@ recorded governor CPU time fell about 92% (35.5% → 2.7% of one core), supporte
 by separate function samples. Estimated battery power was 2.7% lower; differing
 charge state and uncalibrated readings limit that comparison. Final checks
 passed and the original governor setting is restored.
-The current image, `0.1.0-diagnostic.4` / `6.18.54-gameshellneo4`, adds the USB
+The earlier image, `0.1.0-diagnostic.4` / `6.18.54-gameshellneo4`, adds the USB
 work-lifetime fix and once-per-search NM/NKM clock constraints. Its
 [validation report](docs/40-diagnostic4-hardware-validation.md) records build
 and flash verification, hardware results and the exact repeatable test sequence.
 Diagnostic.3 remains available for recovery. The new changes do not yet have
 an attributed battery-power or clock-latency measurement.
 The [diagnostic.5 USB polling experiment](docs/41-usb-polling-experiment.md)
-has passed the full build and offline image checks and is staged and verified
-on the Mac for the next hardware session. The driver defaults off; the test
-image explicitly opts in after board/topology/PMIC checks. Diagnostic.4
-remains the installed, tested baseline until the new image is qualified.
+is installed and has passed the stock/experimental cable and startup tests in
+[report 44](docs/44-diagnostic5-hardware-validation.md). The
+[battery comparison](docs/45-usb-polling-idle-comparison.md) found about 72% fewer
+aggregate PMIC bus interrupts, with no resolved battery-power difference.
+The driver defaults off; diagnostic images explicitly opt in after
+board/topology/PMIC checks. Diagnostic.4/5 recovery images are retained.
+The next candidate, `0.1.0-diagnostic.6` / `6.18.54-gameshellneo6`, adds direct
+USB callback diagnostics and the tested upstream A0 firmware candidate.
+It is built, offline-verified and packed on the Intel host for the next session.
+[Report 51](docs/51-diagnostic6-preparation.md) records implementation, verification
+and the remaining hardware checks; it is not yet installed or hardware-qualified.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -441,7 +448,7 @@ for uncertainty. It is implemented as an opt-in diagnostic.5 experiment in
 for qualification; [report 44](docs/44-diagnostic5-hardware-validation.md)
 records its live results. The diagnostic.4 recovery image uses the existing policy.
 
-On diagnostic.5, use these repeatable commands:
+On diagnostic.5 and later, use these repeatable commands:
 
 ```sh
 task device:usb-policy ROUTE=usb                     # Verify running and next-boot policy
@@ -456,6 +463,47 @@ driver's acceptance/refusal message; a refused experiment fails the check.
 Keep diagnostic.4 for full recovery. See report 41 for interruption limits and
 the physical qualification sequence. A successful host test or build does not
 establish USB detection latency or a battery improvement.
+
+Diagnostic.6 also provides direct callback counts and bounded error tests:
+
+```sh
+task device:usb-counts ROUTE=usb SECONDS=60  # Connected-state count; no extra poll requested
+task device:usb-errors ROUTE=usb ERRORS=1   # One isolated poll-read failure
+task device:usb-errors ROUTE=usb ERRORS=4   # Maximum finite fault budget
+task device:usb-diag-restore ROUTE=usb      # Stop/recover an interrupted diagnostic test
+```
+
+For **natural unplugged polling counts**, use `ROUTE=wifi`, leave USB unplugged
+throughout, and repeat the same duration in stock and experimental boots.
+Keep other diagnostic observers stopped; the task rejects known active test
+services. These are count measurements, not battery-power tests. Enabling
+counting and reading snapshots never schedules a poll. An online count can
+legitimately be zero.
+
+The error task explicitly requests synthetic work, skips only the poll
+callback's status read and returns `-EIO` at most four times. Any unused budget
+expires after one second. It checks retained status, the policy's retry
+selection and automatic real-read recovery where that policy requests it.
+Stock online polling can stop after the first failure until another IRQ;
+the report distinguishes this from experimental recovery. Keep USB and the
+power state unchanged during this test. It does not simulate electrical bus
+faults or prove physical cable-IRQ recovery.
+
+Both tasks run in a bounded device-side systemd service, save before/after
+snapshots and boot/kernel/policy identity under `.local/diagnostics/`, and
+restore counting to off on exit. A device-side exit hook remains responsible
+for restoration if the host connection disappears. Failed runs retain the
+helper and evidence; use the restore task if needed. Diagnostics are exposed
+only with the independent boot opt-in; both prebuilt policy variants enable
+the interface, while counting remains off until explicitly requested.
+
+`task prepare` now retrieves the exact hash-pinned upstream firmware and its
+license on the Intel host. It still takes the board-specific NVRAM from the
+private radio reference, verifies its original hash and preserves its bytes.
+The image records both sources and contains the matching upstream license.
+The earlier reversible firmware-trial tasks target diagnostic.5's original
+firmware and deliberately refuse an unexpected installed binary; use the new
+image qualification sequence in report 51 after flashing diagnostic.6.
 
 `task device:usb-idle-compare` runs the saved experimental/stock/experimental
 comparison over Wi-Fi, including two software reboots. Start with experimental

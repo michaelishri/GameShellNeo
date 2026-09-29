@@ -95,7 +95,8 @@ def finalize(root, loop):
     if experiment is not None and type(experiment) is not bool:
         raise ValueError('USB polling selection must be an explicit boolean')
     selected = None if experiment is None else 'experimental' if experiment else 'stock'
-    (boot / 'boot.cmd').write_bytes(boot_script(partuuid, selected))
+    diagnostics = LOCK.get('experiments', {}).get('usb_diagnostics', False)
+    (boot / 'boot.cmd').write_bytes(boot_script(partuuid, selected, diagnostics))
     run('mkimage', '-A', 'arm', '-T', 'script', '-C', 'none', '-n', 'GameShellNeo',
         '-d', boot / 'boot.cmd', boot / 'boot.scr')
     (root / 'etc/fstab').write_text(f'PARTUUID={partuuid} / ext4 defaults,noatime,data=ordered,commit=5 0 1\n'
@@ -112,7 +113,7 @@ def finalize(root, loop):
         for mode in ('stock', 'experimental'):
             source = boot / f'boot-usb-{mode}.cmd'
             compiled = boot / f'boot-usb-{mode}.scr'
-            source.write_bytes(boot_script(partuuid, mode))
+            source.write_bytes(boot_script(partuuid, mode, diagnostics))
             run('mkimage', '-A', 'arm', '-T', 'script', '-C', 'none', '-n', 'GameShellNeo',
                 '-d', source, compiled)
             files.update({source.name: sha(source), compiled.name: sha(compiled)})

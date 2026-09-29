@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
   "board": "gameshellneo-cpi31",
-  "image_version": "0.1.0-diagnostic.5",
+  "image_version": "0.1.0-diagnostic.6",
   "experiments": {
-    "usb_absent_poll": true
+    "usb_absent_poll": true,
+    "usb_diagnostics": true
   },
   "architecture": "armhf",
   "armbian": {
@@ -13,7 +14,7 @@
   "linux": {
     "url": "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git",
     "tag": "v6.18.54",
-    "localversion": "-gameshellneo5",
+    "localversion": "-gameshellneo6",
     "commit": "1b357ecb321392158d507b04672ffee57bfa071d",
     "tarball_url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.54.tar.xz",
     "tarball_sha256": "9df30b02dd8102bbd0be52556288ef6889ddbe7f1ddb96fbf847d0becf3eacac",
@@ -45,13 +46,23 @@
   "radio": {
     "firmware": {
       "filename": "brcmfmac43430a0-sdio.bin",
-      "sha256": "bb2bd00ede1fe04c74d3684e76ef58d9f2acd54d6759894b934bbefb159668e9"
+      "sha256": "ad85074b7919517d7e1a7e463e0176d46e7b312216bd7aa372e4aee2bfe8e07a",
+      "url": "https://gitlab.com/api/v4/projects/kernel-firmware%2Flinux-firmware/repository/files/brcm%2Fbrcmfmac43430a0-sdio.bin/raw?ref=58a9869598b606fc2e5531298932b8757292f9a0",
+      "source_commit": "58a9869598b606fc2e5531298932b8757292f9a0",
+      "size_bytes": 382455,
+      "runtime_identity": "Firmware: BCM43430/0 wl0: May 29 2017 00:03:43 version 7.13.53.9 (r664949) FWID 01-130000",
+      "qualification": "diagnostic candidate; cold-start and long-term qualification pending"
     },
     "nvram": {
       "filename": "brcmfmac43430a0-sdio.txt",
       "sha256": "5f977a2a3916ef795ceb184cf928231d587249606d1750dacecb5f16ed941ae6"
     },
-    "distribution": "private owner-supplied assets; redistribution not qualified"
+    "distribution": "Upstream Broadcom firmware with its pinned license; owner-supplied board NVRAM remains private and redistribution unqualified",
+    "license": {
+      "filename": "LICENCE.broadcom_bcm43xx",
+      "url": "https://gitlab.com/api/v4/projects/kernel-firmware%2Flinux-firmware/repository/files/LICENSES%2FLICENCE.broadcom_bcm43xx/raw?ref=58a9869598b606fc2e5531298932b8757292f9a0",
+      "sha256": "b16056fc91b82a0e3e8de8f86c2dac98201aa9dc3cbd33e8d38f1b087fcec30d"
+    }
   },
   "layout": {
     "sector_bytes": 512,

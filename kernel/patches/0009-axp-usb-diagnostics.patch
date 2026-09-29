@@ -1,0 +1,94 @@
+From: GameShellNeo contributors
+Subject: [PATCH 9/9] power: axp20x: add bounded opt-in poll diagnostics
+
+Count real callbacks and isolate finite read-error tests to this poll call site.
+No PMIC register writes or shared regmap error injection.
+
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -8,6 +8,12 @@
+ 
+ #include <linux/bitops.h>
+ #include <linux/device.h>
++#include <linux/debugfs.h>
++#include <linux/fs.h>
++#include <linux/ktime.h>
++#include <linux/mutex.h>
++#include <linux/spinlock.h>
++#include <linux/uaccess.h>
+ #include <linux/devm-helpers.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+@@ -57,6 +63,8 @@
+ #define DEBOUNCE_TIME			msecs_to_jiffies(50)
+ 
+ struct axp20x_usb_power;
++
++#include "axp20x_usb_diag.h"
+ 
+ struct axp_data {
+ 	const struct power_supply_desc	*power_desc;
+@@ -96,10 +104,12 @@
+ 	unsigned int online;
+ 	unsigned int num_irqs;
+ 	bool gameshellneo_slow_poll;
++	struct neo_usb_diag diag;
+ 	unsigned int irqs[] __counted_by(num_irqs);
+ };
+ 
+ #include "axp20x_usb_gameshellneo.h"
++#include "axp20x_usb_diag_impl.h"
+ 
+ static bool axp20x_usb_vbus_needs_polling(struct axp20x_usb_power *power)
+ {
+@@ -129,10 +139,11 @@
+ {
+ 	struct axp20x_usb_power *power =
+ 		container_of(work, struct axp20x_usb_power, vbus_detect.work);
+-	unsigned int val;
++	unsigned int val, retry_ms = 0;
++	bool counted, injected;
+ 	int ret;
+ 
+-	ret = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &val);
++	ret = neo_usb_read(power, &val, &counted, &injected);
+ 	if (ret)
+ 		goto out;
+ 
+@@ -158,12 +169,16 @@
+ 		 * retains the last valid status but must retry even if online.
+ 		 */
+ 		if (ret || val != (AXP20X_PWR_STATUS_VBUS_PRESENT |
+-				   AXP20X_PWR_STATUS_VBUS_USED))
++				   AXP20X_PWR_STATUS_VBUS_USED)) {
++			retry_ms = ret || val ? 50 : 250;
+ 			queue_delayed_work(system_power_efficient_wq, &power->vbus_detect,
+ 					   ret || val ? DEBOUNCE_TIME : GAMESHELLNEO_ABSENT_POLL);
++		}
+ 	} else if (axp20x_usb_vbus_needs_polling(power)) {
++		retry_ms = 50;
+ 		mod_delayed_work(system_power_efficient_wq, &power->vbus_detect, DEBOUNCE_TIME);
+ 	}
++	neo_usb_complete(power, counted, injected, ret, retry_ms);
+ }
+ 
+ static void axp717_usb_power_poll_vbus(struct work_struct *work)
+@@ -953,6 +968,8 @@
+ 	if (!power)
+ 		return -ENOMEM;
+ 
++	spin_lock_init(&power->diag.lock);
++	mutex_init(&power->diag.control_lock);
+ 	platform_set_drvdata(pdev, power);
+ 
+ 	power->dev = &pdev->dev;
+@@ -1061,6 +1078,9 @@
+ 		dev_info(&pdev->dev, "GameShellNeo USB polling: %s%s\n",
+ 			 refusal ? "stock: " : "experimental absent=250ms, fast=50ms",
+ 			 refusal ? refusal : "");
++	ret = neo_usb_register(power, axp20x);
++	if (ret)
++		return ret;
+ 	if (!refusal)
+ 		/* Request a fresh initial read, including after an early IRQ. */
+ 		mod_delayed_work(system_power_efficient_wq, &power->vbus_detect, 0);

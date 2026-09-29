@@ -56,9 +56,10 @@ struct axp20x_dev { struct regmap *regmap; void *regmap_irqc; int variant; };
 
 #include "usb_structs.h"
 
-enum resource { MEMORY, SUPPLY, CANCEL, IRQ };
+enum resource { MEMORY, SUPPLY, CANCEL, IRQ, DIAGNOSTICS };
 enum failure { NONE, ALLOC, FIELD, OPTIONAL, SUPPLY_REGISTER, CANCEL_REGISTER,
-	IRQ_LOOKUP_0, IRQ_LOOKUP_1, IRQ_REQUEST_0, IRQ_REQUEST_1 };
+	IRQ_LOOKUP_0, IRQ_LOOKUP_1, IRQ_REQUEST_0, IRQ_REQUEST_1,
+	DIAG_DIR, DIAG_ACTION, DIAG_STATUS, DIAG_CONTROL };
 static enum resource resources[16];
 static unsigned int resource_count, irq_count, immediate_mask, notifications;
 static enum failure fail_at;
@@ -82,6 +83,10 @@ static void push(enum resource resource)
 		abort();
 	resources[resource_count++] = resource;
 }
+
+#ifdef NEO_USB_POLL_TEST
+#include "usb_diag_shims.h"
+#endif
 
 static void *dev_get_drvdata(struct device *dev) { return dev->drvdata; }
 static void platform_set_drvdata(struct platform_device *pdev, void *data) { pdev->dev.drvdata = data; }
@@ -134,6 +139,7 @@ static int regmap_read(struct regmap *map, unsigned int reg, unsigned int *value
 {
 	(void)map; (void)reg;
 #ifdef NEO_USB_POLL_TEST
+	assert(!locks_held);
 	read_count++;
 	if ((int)reg == error_register)
 		return -EIO;
@@ -277,7 +283,16 @@ static void unwind(void)
 	while (resource_count) {
 		switch (resources[--resource_count]) {
 		case IRQ:
+#ifdef NEO_USB_POLL_TEST
+			if (diag_directory.live)
+				fault("diagnostic files still exposed during IRQ teardown");
+#endif
 			irq_count--;
+			break;
+		case DIAGNOSTICS:
+#ifdef NEO_USB_POLL_TEST
+			diag_cleanup(&diag_directory);
+#endif
 			break;
 		case CANCEL:
 			if (irq_count)

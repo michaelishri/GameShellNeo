@@ -2,6 +2,24 @@
 /* Reference-counted OF and register shims, not a model of electrical behavior. */
 #include <assert.h>
 
+typedef uint64_t u64;
+typedef struct { bool held; } spinlock_t;
+struct mutex { bool held; };
+static unsigned long jiffies;
+static unsigned int locks_held;
+#define spin_lock_init(lock) ((lock)->held = false)
+#define mutex_init(lock) ((lock)->held = false)
+#define spin_lock_irqsave(lock, flags) do { \
+	(flags) = 0; assert(!(lock)->held); (lock)->held = true; locks_held++; \
+} while (0)
+#define spin_unlock_irqrestore(lock, flags) do { \
+	(void)(flags); assert((lock)->held); (lock)->held = false; locks_held--; \
+} while (0)
+#define mutex_lock(lock) do { assert(!(lock)->held); (lock)->held = true; } while (0)
+#define mutex_unlock(lock) do { assert((lock)->held); (lock)->held = false; } while (0)
+#define time_after_eq(a, b) ((long)((a) - (b)) >= 0)
+#define time_before(a, b) ((long)((a) - (b)) < 0)
+
 #define AXP223_ID 3
 #define AXP20X_VBUS_IPSOUT_MGMT 0x30
 #define AXP20X_OVER_TMP 0x8f

@@ -12,6 +12,7 @@ import posixpath
 import re
 import shlex
 import shutil
+import socket
 import sys
 
 import paramiko
@@ -37,16 +38,31 @@ def private_path(value, default):
 
 
 def connect_mac(config):
+    identity = config.get('M2_MACBOOK_AIR_IP') or config.get('M2_MACBOOK_AIR_TAILNET')
+    endpoint = config.get('M2_MACBOOK_AIR_TAILNET') or identity
+    if not identity:
+        raise ValueError('Configure the Mac SSH address in .env')
     client = paramiko.SSHClient()
     client.load_system_host_keys()
     known = LOCAL / 'ssh/known_hosts'
     if known.exists():
         client.load_host_keys(str(known))
     client.set_missing_host_key_policy(paramiko.RejectPolicy())
-    client.connect(config['M2_MACBOOK_AIR_IP'], username=config['M2_MACBOOK_AIR_USERNAME'],
-                   password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
-                   key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
-                   timeout=10, auth_timeout=10, banner_timeout=10)
+    sock = None
+    try:
+        # Use the existing Mac identity for host-key verification even when
+        # reaching that same host through its explicitly configured tailnet IP.
+        if endpoint != identity:
+            sock = socket.create_connection((endpoint, 22), timeout=10)
+        client.connect(identity, username=config['M2_MACBOOK_AIR_USERNAME'],
+                       password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
+                       key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
+                       sock=sock, timeout=10, auth_timeout=10, banner_timeout=10)
+    except BaseException:
+        client.close()
+        if sock is not None:
+            sock.close()
+        raise
     return client
 
 

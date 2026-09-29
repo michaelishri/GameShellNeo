@@ -200,10 +200,58 @@ experimental policy unchanged and `reboot_performed: false`. Selection
 evidence: `.local/diagnostics/20260929T050855.071980Z/`. The owner was then
 asked to repeat the battery-only shutdown/cold-start procedure.
 
+## Stock cold start without USB
+
+The owner repeated the same unplugged cold-start procedure and confirmed the
+login screen. Wi-Fi verified new boot
+`aa18fd5a-aea4-4656-8388-c9329088523c`, an orderly preceding shutdown and
+`not attached` USB state. The actual driver message was
+`GameShellNeo USB polling: stock: opt-in disabled`, with requested parameter
+`N` and stock also selected for the next boot.
+
+All six monitored services were active without restarts; the battery monitor
+was valid/discharging, and no failed units, taint or initial radio crash/removal
+messages appeared. Local readiness was 14.3864 seconds; `systemd-analyze`
+reported 14.802 seconds. These individual boot observations do not establish
+a performance difference between the policies.
+
+Private captures: `.local/diagnostics/20260929T051035.251821Z/` (status) and
+`20260929T051035.254316Z/` (verified stock policy).
+
+## Stock detailed detection and comparison
+
+The same `task device:usb-detect CYCLES=4` task passed all four stock-policy
+cycles on boot `aa18fd5a-aea4-4656-8388-c9329088523c`. Fresh USB SSH was verified
+for every attachment; Wi-Fi observation stayed available. Both supplies
+reported present/online on attachment and absent/offline after removal, with
+exactly one increment of each of the four named insertion/removal IRQs per
+cycle, matching the experimental run's functional results.
+
+| Observation | Experimental | Stock |
+| --- | --- | --- |
+| Detailed cycles passed | 4/4 | 4/4 |
+| ACIN/VBUS insert/remove IRQs | One of each per cycle | One of each per cycle |
+| Final supply state | Both absent/offline | Both absent/offline |
+| Recorder samples | 11,680 | 8,156 |
+| Recorder duration | 234.649 s | 163.872 s |
+| Largest observed sampler gap | 46.15 ms | 42.36 ms |
+| Observer CPU time | 109.384 s | 75.888 s |
+
+Stock configured-to-settled-removal windows were approximately 23.42, 24.27,
+27.08 and 24.54 seconds. Host USB SSH checks took 4.66–11.46 seconds through
+the tailnet/Mac path. The differing manual durations, variable remote-access
+time and high recorder overhead prevent treating these data as an energy or
+physical detection-speed comparison.
+
+Final trace validation and cleanup passed. Private stock evidence:
+`.local/diagnostics/20260929T051104.764393Z/`, with the same summary/trace/log
+files as the experimental run. USB was left unplugged after the final cycle.
+
 ## Remaining acceptance
 
 Independent Wi-Fi SSH and the initial experimental attached/detached starts
-are now verified. Complete stock-policy startup and cable comparisons,
+plus stock detached startup and both detailed cable batches are now verified.
+Complete stock attached startup,
 rapid reconnection and separate matched
 battery-only comparisons. Detailed event recording must not run during power
 measurements. Direct poll-call instrumentation and error/IRQ coverage remain

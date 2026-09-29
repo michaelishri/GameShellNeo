@@ -18,6 +18,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 | Report | Contents |
 | --- | --- |
+| [44 — Diagnostic.5 initial validation](44-diagnostic5-hardware-validation.md) | Confirmed boot/policy activation, passing integration/battery simulations, hotspot recovery and pending independent Wi-Fi/cable tests |
 | [43 — macOS card mount guard](43-macos-card-mount-guard.md) | Failed-readback diagnosis, read-only sector comparison, temporary target-specific mount veto and verified recovery |
 | [42 — Remote network preparation](42-remote-network-preparation.md) | Mac tailnet transport, Wi-Fi SSH through the Mac, private provisioning refresh and pre-existing Wi-Fi crash evidence |
 | [41 — USB polling experiment](41-usb-polling-experiment.md) | Diagnostic.5 opt-in driver, actual-source/compiled-DTB tests, next-boot selection and pending hardware qualification |

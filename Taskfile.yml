@@ -103,6 +103,8 @@ tasks:
       - mkdir -p .local/build
       - cc -std=c11 -Wall -Wextra -Werror -Ikernel/overlay/drivers/power/supply kernel/tests/current_limit_test.c -o .local/build/current_limit_test
       - .local/build/current_limit_test
+      - cc -std=c11 -Wall -Wextra -Werror -DNEO_MAC_GUARD_TEST tools/macos-mount-guard.c -o .local/build/mac-mount-guard-test
+      - .local/build/mac-mount-guard-test
 
   lint:
     desc: Check Bash syntax and ShellCheck (system install or pinned builder cache)
@@ -253,3 +255,9 @@ tasks:
     requires:
       vars: [DISK]
     cmds: [python3 tools/remote.py mac flash]
+
+  mac:compare:
+    desc: Read-only full image/sector comparison after fresh mac:inspect; retain mismatch evidence
+    requires:
+      vars: [DISK]
+    cmds: [python3 tools/remote.py mac compare]

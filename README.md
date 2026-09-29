@@ -690,3 +690,28 @@ ejects after success. Flash logs/results stay under `.local/diagnostics/`.
 Never reuse a disk number without a fresh inspection. A recognizable existing
 volume UUID is required; blank/unrecognized cards need separate preparation.
 The task does not reboot the GameShell or establish hardware acceptance.
+
+Flashing requires Apple's command-line developer tools (`xcrun clang`) on the
+Mac. The task compiles a small Disk Arbitration helper that temporarily blocks
+mounts of the selected card and its partitions. Before writing, it unmounts the
+card and requires an actual rejected mount attempt from that helper. The guard
+stays active through full readback and ejection, preventing macOS metadata
+writes from changing the image. It exits when the operation ends and makes no
+persistent mount-policy changes. A missing compiler, failed veto or exited
+guard stops the operation. [Report 43](docs/43-macos-card-mount-guard.md) records
+the failure that prompted this change and its validation.
+
+If readback fails, keep the card in the reader and retain the failed log.
+Reinspect it because writing an image changes the boot volume UUID, then use:
+
+```sh
+task mac:inspect DISK=diskN
+task mac:compare DISK=diskN
+```
+
+`mac:compare` opens the raw card read-only and compares the complete image
+region. It records both SHA-256 values, differing sector counts, up to 64
+sector ranges and the volume's mount state before/after. It never prints image
+bytes, unmounts, writes or ejects the card. A mismatch returns failure and
+preserves `.local/diagnostics/<capture>/card-compare.json` and its log.
+This diagnoses differences; it does not turn a failed flash into a passed one.

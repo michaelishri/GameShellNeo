@@ -377,7 +377,7 @@ def staged_arguments(sftp, directory):
 
 
 def mac_action(config, action, disk):
-    if action in ('inspect', 'flash', 'backup') and not re.fullmatch(r'disk[1-9][0-9]*', disk):
+    if action in ('inspect', 'flash', 'backup', 'compare') and not re.fullmatch(r'disk[1-9][0-9]*', disk):
         raise ValueError('Supply the inspected external whole disk as DISK=diskN')
     with connect_mac(config) as client, client.open_sftp() as sftp:
         if action == 'status':
@@ -389,6 +389,8 @@ def mac_action(config, action, disk):
             mac_backup(client, sftp, config, directory, disk)
             return
         upload(sftp, ROOT / 'tools/flash-macos.py', directory + '/flash-macos.py')
+        if action == 'flash':
+            upload(sftp, ROOT / 'tools/macos-mount-guard.c', directory + '/macos-mount-guard.c')
         if action == 'stage':
             manifest = json.loads((LOCAL / 'flash/transfer.json').read_text())
             name = manifest['compressed_file']
@@ -407,6 +409,27 @@ def mac_action(config, action, disk):
             sftp.get(directory + '/target.json', str(LOCAL / 'flash/target.json'))
         elif action == 'preflight':
             run(client, shlex.join(staged_arguments(sftp, directory)))
+        elif action == 'compare':
+            with sftp.open(directory + '/target.json') as stream:
+                target = json.load(stream)
+            if target['device'] != disk:
+                raise ValueError('DISK differs from the fresh inspection')
+            capture = evidence_directory()
+            print('Private card comparison:', capture, flush=True)
+            report = directory + '/card-compare-' + capture.name + '.json'
+            arguments = staged_arguments(sftp, directory) + ['--compare-card', '--report', report]
+            command, password = sudo(config, arguments)
+            try:
+                with (capture / 'card-compare.log').open('wb') as output:
+                    run(client, command, password, output)
+            finally:
+                try:
+                    sftp.stat(report)
+                except FileNotFoundError:
+                    pass
+                else:
+                    command, password = sudo(config, ['/bin/cat', report])
+                    (capture / 'card-compare.json').write_bytes(run(client, command, password, display=False))
         else:
             with sftp.open(directory + '/target.json') as stream:
                 target = json.load(stream)
@@ -470,7 +493,7 @@ def main():
                                           'governor-compare', 'governor-profile', 'usb-policy'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
-    mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash'])
+    mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash', 'compare'])
     mac.add_argument('--disk', default=os.environ.get('NEO_DISK', ''))
     args = parser.parse_args()
     os.umask(0o077)

@@ -325,6 +325,7 @@ task device:wifi-firmware-connected SECONDS=120 # Four reconnections and Wi-Fi S
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
+task device:usb-idle-compare          # Three battery comparison phases and two automatic reboots (~45 minutes)
 task device:governor-compare ROUTE=wifi SECONDS=120 RATE_US=10000 # Three phases; automatically restore
 task build:perf # Optional diagnostic tool from the locked source/container; no image rebuild
 task device:governor-profile ROUTE=wifi SECONDS=30 # Separate kernel-function sample; USB unplugged
@@ -455,6 +456,57 @@ driver's acceptance/refusal message; a refused experiment fails the check.
 Keep diagnostic.4 for full recovery. See report 41 for interruption limits and
 the physical qualification sequence. A successful host test or build does not
 establish USB detection latency or a battery improvement.
+
+`task device:usb-idle-compare` runs the saved experimental/stock/experimental
+comparison over Wi-Fi, including two software reboots. Start with experimental
+polling active, USB unplugged, brightness 1, the normal schedutil settings and
+Wi-Fi power saving off. Keep the Mac awake, the hotspot available and the device
+stationary with controls untouched for about 45 minutes. Run no concurrent device
+diagnostics. Connection details come from `.env`; the configured Wi-Fi route
+through the Mac is supported.
+
+Each phase gets five minutes to settle, a five-minute battery sample and a
+two-minute counter profile; each measurement also has its own settling period.
+The task checks the actual running policy, new boot identity and matched settings
+before accepting a phase. After a reboot it restores Wi-Fi power saving to the
+baseline `off` setting before cooling, if the driver default changed it to `on`;
+any other configuration mismatch fails. It stops if firmware crashes or SDIO removal events
+occur during a measurement. A successful run leaves experimental polling active
+and selected for the next boot. A failed run stops the sequence and retains its
+partial evidence; inspect the last policy before resuming. It does not reboot to
+roll back after a failure.
+
+The printed private directory contains `comparison.json` and phase logs with
+links to each raw capture. To count an already observed cooling period, pass
+`COOLING_STARTED=<ISO-8601 timestamp with timezone>`; otherwise five minutes are
+always allowed initially. Only completed phases count as results. See
+[the comparison protocol and evidence](docs/45-usb-polling-idle-comparison.md)
+for measurement limits.
+
+After a successful run, generate the comparison table entirely from its saved
+captures, without contacting the device:
+
+```sh
+task report:usb-idle CAPTURE=.local/diagnostics/COMPARISON_DIRECTORY
+```
+
+This saves `summary.json` and `summary.md` beside `comparison.json`. It rejects
+partial comparisons and raw captures that do not match the accepted phases.
+It reports both experimental windows separately so drift remains visible.
+
+If the wrapper stops **between completed phases**, keep USB unplugged and the
+device stationary. Within thirty minutes of the last profile starting, continue
+with `task device:usb-idle-compare RESUME=.local/diagnostics/COMPARISON_DIRECTORY`.
+It validates the saved captures and current settings, preserves earlier logs and
+the pre-resume record, and gives the next phase a fresh settling period. It
+cannot resume an incomplete measurement or bypass a mismatched policy.
+
+To explicitly **discard and repeat** an incomplete final phase, add
+`RETRY_INCOMPLETE=1` to that resume command. The interrupted phase is preserved
+under `discarded_phases`, its logs and original report remain available, and the
+replacement starts after fresh settling. This never joins partial samples into
+a complete measurement. Resolve the interruption first and keep the same
+physical setup; the thirty-minute continuation limit still applies.
 
 `device:stability ROUTE=usb` writes a new temporary 128 MiB random file, flushes
 it to storage and checks its SHA-256 with a direct read that bypasses the file

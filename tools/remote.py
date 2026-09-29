@@ -200,6 +200,7 @@ def device_action(config, action, route):
             with (directory / 'battery-policy.txt').open('wb') as output:
                 run(client, shlex.join(arguments), output=output, timeout=90)
         elif action == 'idle-sample':
+            print('Capturing private idle sample:', directory / 'idle-sample.jsonl', flush=True)
             seconds = int(os.environ.get('NEO_IDLE_SECONDS', '600'))
             backlight = os.environ.get('NEO_IDLE_BACKLIGHT', 'keep')
             if not 60 <= seconds <= 3600 or seconds % 10:

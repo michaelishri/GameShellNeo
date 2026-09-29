@@ -22,6 +22,10 @@ env:
   NEO_PERF_SECONDS: '{{.SECONDS | default "30"}}'
   NEO_USB_POLL_MODE: '{{.MODE | default "status"}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
+  NEO_COOLING_STARTED: '{{.COOLING_STARTED | default ""}}'
+  NEO_COMPARISON_CAPTURE: '{{.CAPTURE | default ""}}'
+  NEO_COMPARISON_RESUME: '{{.RESUME | default ""}}'
+  NEO_COMPARISON_RETRY_INCOMPLETE: '{{.RETRY_INCOMPLETE | default "0"}}'
 
 tasks:
   default:
@@ -245,6 +249,14 @@ tasks:
   device:power-profile:
     desc: Profile awake CPU/interrupt/radio counters for SECONDS=120; USB unplugged, controls untouched
     cmds: [python3 tools/remote.py device power-profile]
+
+  device:usb-idle-compare:
+    desc: Run experimental/stock/experimental battery idle and counter windows, including two reboots
+    cmds: [python3 tools/compare-usb-idle.py]
+
+  report:usb-idle:
+    desc: Summarize a completed comparison from CAPTURE=directory; no device access
+    cmds: [python3 tools/report-usb-idle.py]
 
   device:governor-compare:
     desc: Compare original/slower/original schedutil rates, then restore; SECONDS=120 per phase, RATE_US=10000

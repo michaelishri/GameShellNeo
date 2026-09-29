@@ -107,6 +107,11 @@ the Mac's current band does not establish whether the AP also offers the same
 SSID on 2.4 GHz. The GameShell requires 2.4 GHz. Router configuration/visibility
 must be resolved before connection and reconnection qualification.
 
+The owner subsequently re-enabled a visible 2.4 GHz mobile hotspot. The
+original firmware joined it and the guarded network commit passed; see
+[report 46](46-wifi-transition-and-scan-recovery.md#hotspot-transition-qualified).
+The upstream candidate has not yet been tested for association to that hotspot.
+
 ## Remaining work
 
 After both completed firmware trials, the original binary was left installed.
@@ -124,6 +129,9 @@ returns the configured zero; to restore it explicitly, set the same flag to zero
 and reassociate. Firmware comparison preflight requires zero, so restore that
 setting before another unchanged-profile trial. This is the already tested
 runtime workaround, not permanent candidate adoption.
+
+The subsequent successful hotspot transition restarted the supplicant and
+readback confirmed zero. The temporary workaround is therefore no longer active.
 
 `task check` passed 13 runtime and 125 tool tests (one optional user-systemd
 test skipped), current-limit and Mac mount-guard C checks, Bash syntax and

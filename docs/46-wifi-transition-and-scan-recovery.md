@@ -2,7 +2,7 @@
 
 Date: **29 September 2026 NZDT**. Work: **NEO-29** (network transition),
 **NEO-26** (firmware crash). Target: owner's CPI v3.1, diagnostic.5.
-Status: **investigation in progress; no crash fix qualified yet**.
+Status: **network transition qualified; firmware recovery investigation continues**.
 
 ## Trigger and separation of faults
 
@@ -158,3 +158,40 @@ band/security and SSID match only when macOS exposes the name. The Mac was on
 5 GHz channel 48 with names redacted. This does not establish the AP lacks a
 2.4 GHz version; the owner is checking its configuration. NEO-29's successful
 commit and the battery comparison remain pending.
+
+## Hotspot transition qualified
+
+The owner re-enabled the mobile hotspot, updated `.env`, and connected the Mac
+to it. The GameShell saw the exact private target at **2412 MHz**, advertising
+WPA2-PSK/SAE, with a cached signal of -76 dBm
+(`20260929T064252.684725Z/`). It associated using WPA2-PSK/CCMP and obtained an
+IPv4 address. This resolves network visibility for the hotspot; it does not
+establish the previous router's 2.4 GHz configuration.
+
+The first transaction (`20260929T064226.253023Z/`) could not verify the host
+route because `.env` selected direct Intel-to-GameShell Wi-Fi access
+(`GAMESHELL_WIFI_VIA_MAC=0`). The Mac could reach the board's SSH port on its
+local Wi-Fi subnet. The transaction rolled back after eleven verification
+retries, with no commit and successful cleanup. A subsequent explicit stop
+found the already-collected unit absent; it was not needed for rollback.
+
+Restored `GAMESHELL_WIFI_VIA_MAC=1`, preserving the other private settings, and
+reran the existing `task device:wifi-config`. Capture
+**`20260929T064520.934822Z/`** reports `passed=true`, `committed=true` and
+`cleanup_verified=true`. The task checked the pinned SSH identity, same boot
+and actual Wi-Fi endpoint through the Mac, updated only `GAMESHELL_IP`, and
+removed the private transaction directory. Private build provisioning also
+contains the owner's hotspot credentials. No image was rebuilt or device
+rebooted.
+
+A separate Wi-Fi SSH read confirmed boot
+`73a1cbd0-0b12-4137-bdb1-7965671bab5d`. `task device:status ROUTE=wifi` then
+verified active services, no failed units, valid battery monitoring and a
+configured USB link. The original firmware remains installed. Restarting the
+supplicant returned `disable_scan_offload` to its configured zero, verified
+over USB; the earlier temporary host-scanning workaround is no longer active.
+
+NEO-29's successful commit and failure rollback paths are now hardware-tested.
+The existing host regressions remain unchanged. NEO-26/NEO-30 firmware
+qualification and NEO-22 battery-only comparisons remain separate work; this
+connection does not establish that offline scanning is repaired.

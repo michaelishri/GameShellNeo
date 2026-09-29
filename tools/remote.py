@@ -68,10 +68,13 @@ def connect_mac(config):
 
 @contextmanager
 def device(config, route):
+    via_mac = config.get('GAMESHELL_WIFI_VIA_MAC') or '0'
+    if route not in ('usb', 'wifi') or via_mac not in ('0', '1'):
+        raise ValueError('Use ROUTE=usb/wifi and GAMESHELL_WIFI_VIA_MAC=0/1')
     with ExitStack() as stack:
         address = config.get('GAMESHELL_USB_IP', '192.168.10.1') if route == 'usb' else config['GAMESHELL_IP']
         sock = None
-        if route == 'usb':
+        if route == 'usb' or via_mac == '1':
             mac = stack.enter_context(connect_mac(config))
             sock = mac.get_transport().open_channel('direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10)
             stack.callback(sock.close)

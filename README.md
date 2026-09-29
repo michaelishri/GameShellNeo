@@ -144,6 +144,7 @@ to `.env`, set its permissions to `0600`, and fill the blank values locally:
 | `GAMESHELL_WIFI_SSID`, `GAMESHELL_WIFI_PSK` | Image Wi-Fi network and passphrase or 64-digit hexadecimal PSK |
 | `GAMESHELL_WIFI_COUNTRY` | Confirmed two-letter operating country; `NZ` for the owner's New Zealand device |
 | `GAMESHELL_IP`, `GAMESHELL_USERNAME` | Running board's Wi-Fi address and SSH account |
+| `GAMESHELL_WIFI_VIA_MAC` | `1` reaches that Wi-Fi address through Mac SSH; absent/empty/`0` connects directly |
 | `GAMESHELL_USB_IP` | Board's USB address; defaults to `192.168.10.1` |
 | `M2_MACBOOK_AIR_IP`, `M2_MACBOOK_AIR_USERNAME`, `M2_MACBOOK_AIR_PASSWORD` | Mac SSH connection |
 | `M2_MACBOOK_AIR_TAILNET` | Optional preferred Mac transport address for all Mac tasks and `ROUTE=usb`; no automatic LAN retry |
@@ -171,7 +172,18 @@ not be reachable. An unavailable tailnet connection fails without trying the
 LAN. Clear the tailnet value to use LAN transport again. If only the tailnet
 address is configured, its own verified `known_hosts` entry is required.
 This changes the Linux-to-Mac connection; the GameShell's USB address stays the
-same, and `ROUTE=wifi` still uses the board's direct Wi-Fi address.
+same. If the GameShell is also on a remote Wi-Fi network, set
+`GAMESHELL_WIFI_VIA_MAC=1` and put its current local Wi-Fi address in `GAMESHELL_IP`.
+Then `ROUTE=wifi` and the Wi-Fi observers in the USB/power tests use the Mac as
+an SSH jump host. `ROUTE=usb` still reaches the separate USB address. Both routes
+verify the provisioned GameShell host key; neither silently falls back to the
+other. The Mac must be able to reach the board on that local Wi-Fi network.
+
+When changing the image's Wi-Fi network, update its SSID/PSK in `.env`, run
+`task provision`, then `task build:image` and `task mac:stage`. This reuses the
+completed kernel and preserves the device's generated SSH identity. After
+flashing, read the new Wi-Fi address through USB and update `GAMESHELL_IP`
+before using Wi-Fi tasks.
 
 ### Building and provisioning
 

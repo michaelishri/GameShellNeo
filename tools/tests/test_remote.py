@@ -78,5 +78,74 @@ class MacConnectionTests(unittest.TestCase):
         self.client.connect.assert_not_called()
 
 
+class DeviceRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.config = {'GAMESHELL_IP': '192.0.2.20'}
+        for name in ('connect_mac', 'private_path'):
+            mock = patch.object(remote, name)
+            setattr(self, name, mock.start())
+            self.addCleanup(mock.stop)
+        self.private_path.return_value.read_text.return_value = 'ssh-ed25519 AA== fixture'
+        factory = patch.object(remote.paramiko, 'SSHClient')
+        self.client = factory.start().return_value.__enter__.return_value
+        self.addCleanup(factory.stop)
+        key = patch.object(remote.paramiko, 'Ed25519Key')
+        self.key = key.start().return_value
+        self.addCleanup(key.stop)
+        self.mac = self.connect_mac.return_value.__enter__.return_value
+        self.forward = self.mac.get_transport.return_value.open_channel
+
+    def check_route(self, route, expected, bridged):
+        with remote.device(self.config, route) as client:
+            self.assertIs(client, self.client)
+            self.client.get_host_keys.return_value.add.assert_called_once_with(
+                expected, 'ssh-ed25519', self.key)
+            self.assertEqual(self.client.connect.call_args.args, (expected,))
+            self.assertIsInstance(self.client.set_missing_host_key_policy.call_args.args[0],
+                                  paramiko.RejectPolicy)
+            if bridged:
+                self.forward.assert_called_once_with('direct-tcpip', (expected, 22),
+                                                     ('127.0.0.1', 0), timeout=10)
+                self.assertIs(self.client.connect.call_args.kwargs['sock'], self.forward.return_value)
+            else:
+                self.connect_mac.assert_not_called()
+                self.assertIsNone(self.client.connect.call_args.kwargs['sock'])
+        if bridged:
+            self.forward.return_value.close.assert_called_once()
+            self.connect_mac.return_value.__exit__.assert_called_once()
+
+    def test_default_wifi_is_direct(self):
+        self.check_route('wifi', '192.0.2.20', False)
+
+    def test_remote_wifi_uses_its_wifi_address_through_mac(self):
+        self.config['GAMESHELL_WIFI_VIA_MAC'] = '1'
+        self.check_route('wifi', '192.0.2.20', True)
+
+    def test_usb_stays_on_separate_usb_address(self):
+        self.config['GAMESHELL_WIFI_VIA_MAC'] = '1'
+        self.config['GAMESHELL_USB_IP'] = '192.0.2.30'
+        self.check_route('usb', '192.0.2.30', True)
+
+    def test_remote_connection_failure_closes_bridge_without_fallback(self):
+        self.config['GAMESHELL_WIFI_VIA_MAC'] = '1'
+        self.client.connect.side_effect = paramiko.SSHException('failed authentication')
+        with self.assertRaises(paramiko.SSHException):
+            with remote.device(self.config, 'wifi'):
+                self.fail('Unexpected connected session')
+        self.client.connect.assert_called_once()
+        self.forward.return_value.close.assert_called_once()
+        self.connect_mac.return_value.__exit__.assert_called_once()
+
+    def test_invalid_route_configuration_fails_before_connection(self):
+        for route, flag in (('wifi', 'typo'), ('other', '0')):
+            with self.subTest(route=route, flag=flag):
+                self.config['GAMESHELL_WIFI_VIA_MAC'] = flag
+                with self.assertRaises(ValueError):
+                    with remote.device(self.config, route):
+                        self.fail('Unexpected connected session')
+        self.connect_mac.assert_not_called()
+        self.client.connect.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()

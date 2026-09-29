@@ -1,6 +1,8 @@
 allwinner/*
 .env
 .env.*
+..env.sw?
+.env~
 !.env.example
 .local/
 __pycache__/

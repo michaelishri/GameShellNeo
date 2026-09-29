@@ -4,6 +4,10 @@ Date: **29 September 2026 NZDT**. Preparation: **NEO-21**;
 hardware qualification: **NEO-22**.
 Target: the owner's **CPI v3.1**. Hardware qualification is pending.
 
+The subsequent [remote-network preparation](42-remote-network-preparation.md)
+records the private provisioning refresh for the owner's current Wi-Fi network.
+The original preparation artifact below remains the historical build record.
+
 ## Purpose and status
 
 The owner approved implementing the [report 36 design](36-usb-polling-policy.md)

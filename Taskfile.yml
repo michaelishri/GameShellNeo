@@ -23,6 +23,8 @@ env:
   NEO_USB_POLL_MODE: '{{.MODE | default "status"}}'
   NEO_USB_DIAG_SECONDS: '{{.SECONDS | default "60"}}'
   NEO_USB_DIAG_ERRORS: '{{.ERRORS | default "1"}}'
+  NEO_RSB_SECONDS: '{{.SECONDS | default "120"}}'
+  NEO_RSB_DELAY_MS: '{{.DELAY_MS | default "100"}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
   NEO_COOLING_STARTED: '{{.COOLING_STARTED | default ""}}'
   NEO_COMPARISON_CAPTURE: '{{.CAPTURE | default ""}}'
@@ -199,6 +201,14 @@ tasks:
   device:wifi-recovery:
     desc: Check installed firmware through four reconnections and unavailable/connected windows; USB required
     cmds: [python3 tools/check-wifi-firmware.py --installed]
+
+  device:rsb-compare:
+    desc: Compare 1000/candidate/1000 ms RSB delays over USB with independent restoration
+    cmds: [python3 tools/check-rsb-runtime.py]
+
+  device:rsb-restore:
+    desc: Stop an interrupted RSB comparison and restore its saved delay over USB
+    cmds: [python3 tools/check-rsb-runtime.py --restore]
 
   device:wifi-visibility:
     desc: Compare cached scans with the .env SSID over USB without printing network names

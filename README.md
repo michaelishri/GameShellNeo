@@ -341,6 +341,8 @@ task device:wifi-scan-test SECONDS=120 # USB-only firmware/host/firmware scan co
 task device:wifi-firmware-test SECONDS=120 # USB-only pinned A0 binary trial; always restores original
 task device:wifi-firmware-connected SECONDS=120 # Four reconnections and Wi-Fi SSH on candidate/original
 task device:wifi-recovery SECONDS=120 # Installed firmware: four reconnections, unavailable/connected windows
+task device:rsb-compare SECONDS=120 DELAY_MS=100 # USB-powered bus-delay comparison
+task device:rsb-restore # Stop/recover an interrupted RSB comparison
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
 task device:idle-sample ROUTE=wifi SECONDS=600 BACKLIGHT=off # Compare with backlight off, then restore
 task device:power-profile ROUTE=wifi SECONDS=120 # Read CPU/interrupt/radio counters; keep settings unchanged
@@ -711,6 +713,25 @@ unavailable; it does not reproduce physical loss of an associated AP's beacon.
 Cold starts, physical AP disappearance, sleep, long-term stability and energy
 need their own evidence. The original-firmware trial tasks above require the
 old binary and are separate from this installed-firmware task.
+
+`device:rsb-compare` measures RSB runtime-active/suspended accounting with USB
+connected, the Mac awake and Wi-Fi available. It requires the currently locked
+image/kernel/radio and a healthy device. `SECONDS` is a multiple of 30 in
+60–300, per window; `DELAY_MS` is 10–500. Three original/candidate/original
+windows each have 15 seconds of settling. The default is 120 seconds and 100 ms.
+Keep controls untouched and other diagnostic tasks stopped. Evidence is saved
+privately under `.local/diagnostics/`, including the source lock. This measures
+runtime residency, not battery power or a count of runtime resumes.
+
+The original delay must be 1,000 ms. A device-side ownership record, `finally`
+restoration and independent `ExecStopPost` restore it after the comparison.
+`device:rsb-restore` stops the unit and retries restoration after an interruption;
+retain the printed helper directory and ownership record until recovery passes.
+The device service is bounded to `3 * (SECONDS + 15) + 90` seconds, assuming a
+functioning kernel/systemd. The [first comparison](docs/53-rsb-runtime-pm-comparison.md)
+found zero runtime-suspended time at both 100 ms and 20 ms; the default remains
+1,000 ms. Outstanding runtime-PM references/policy need inspection before a
+shorter delay can be justified.
 
 `device:battery-check ROUTE=wifi` runs the battery policy regressions against
 the **installed** guard after verifying its SHA-256 matches the tracked source.

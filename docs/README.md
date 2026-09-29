@@ -16,6 +16,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+Latest: [53 — RSB runtime PM comparison](53-rsb-runtime-pm-comparison.md): restored 100/20 ms trials with zero runtime-suspended time, reusable recovery and investigation limits.
+
 | Report | Contents |
 | --- | --- |
 | [52 — Diagnostic.6 hardware validation](52-diagnostic6-hardware-validation.md) | Verified flash/boot, 76.9% fewer direct unplugged USB callbacks, bounded errors, eight cable cycles, four A0 cold starts and installed-firmware scan/recovery tests |

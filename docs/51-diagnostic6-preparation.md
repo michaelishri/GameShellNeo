@@ -3,10 +3,11 @@
 Date: **29 September 2026 NZDT**. Tickets: **NEO-28**, **NEO-31**;
 physical USB qualification continues under **NEO-22**.
 
-Status: **built, offline-verified and packed on the Intel host; transfer,
-flashing and hardware qualification pending**. The last connected board
-was running diagnostic.5. The owner is disconnecting for travel; large
-transfers must wait for the Mac to reconnect on a non-hotspot network.
+Preparation status: **built, offline-verified and packed on the Intel host**.
+At the end of preparation, the last connected board was running diagnostic.5
+and transfer/flashing were deferred while the owner travelled. The subsequent
+regular-Wi-Fi transfer and verified card installation are recorded in
+[report 52](52-diagnostic6-hardware-validation.md), which tracks live qualification.
 
 ## Why this image
 

@@ -54,9 +54,12 @@ The driver defaults off; diagnostic images explicitly opt in after
 board/topology/PMIC checks. Diagnostic.4/5 recovery images are retained.
 The next candidate, `0.1.0-diagnostic.6` / `6.18.54-gameshellneo6`, adds direct
 USB callback diagnostics and the tested upstream A0 firmware candidate.
-It is built, offline-verified and packed on the Intel host for the next session.
-[Report 51](docs/51-diagnostic6-preparation.md) records implementation, verification
-and the remaining hardware checks; it is not yet installed or hardware-qualified.
+It has passed the build/offline checks, Mac transfer verification and guarded
+card flash with full readback. [Report 51](docs/51-diagnostic6-preparation.md)
+records implementation and host verification;
+[report 52](docs/52-diagnostic6-hardware-validation.md) tracks ongoing hardware
+qualification. First boot, integration, battery-policy simulation and connected
+experimental USB count/error tests passed; wider USB/Wi-Fi qualification remains.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

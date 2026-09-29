@@ -1,9 +1,12 @@
 """Boot-policy integrity and interrupted-selection checks without card access."""
+from contextlib import redirect_stdout
+import io
 import json
 from pathlib import Path
 import struct
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 import zlib
@@ -25,8 +28,15 @@ class BootPolicyTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.boot = Path(self.temp.name)
         self.identity = {'root_partuuid': '1234abcd-02', 'usb_poll_boot': {'files': {}}}
+        self.install_variants()
+
+    def install_variants(self, diagnostics=None):
+        if diagnostics is None:
+            self.identity.pop('sources', None)
+        else:
+            self.identity['sources'] = {'experiments': {'usb_diagnostics': diagnostics}}
         for mode in policy.MODES:
-            source = policy.boot_script(self.identity['root_partuuid'], mode)
+            source = policy.boot_script(self.identity['root_partuuid'], mode, bool(diagnostics))
             for suffix, data in [('cmd', source), ('scr', compiled(source))]:
                 name = f'boot-usb-{mode}.{suffix}'
                 (self.boot / name).write_bytes(data)
@@ -51,20 +61,64 @@ class BootPolicyTests(unittest.TestCase):
         self.assertEqual((self.boot / 'boot.scr').read_bytes(), previous)
 
     def test_diagnostics_opt_in_matches_both_modes_and_image_manifest(self):
-        self.identity['sources'] = {'experiments': {'usb_diagnostics': True}}
+        self.install_variants(diagnostics=True)
         for mode in policy.MODES:
-            source = policy.boot_script(self.identity['root_partuuid'], mode, True)
+            source = (self.boot / f'boot-usb-{mode}.cmd').read_bytes()
             self.assertIn((policy.DIAGNOSTIC_PARAMETER + '=1').encode(), source)
-            for suffix, data in [('cmd', source), ('scr', compiled(source))]:
-                name = f'boot-usb-{mode}.{suffix}'
-                (self.boot / name).write_bytes(data)
-                self.identity['usb_poll_boot']['files'][name] = policy.sha(data)
-                if mode == 'stock':
-                    (self.boot / f'boot.{suffix}').write_bytes(data)
         policy.select(self.boot, self.identity, 'experimental')
         self.identity['sources']['experiments']['usb_diagnostics'] = False
         with self.assertRaises(ValueError):
             policy.verify_scripts(self.boot, self.identity)
+
+    def run_status(self, mode):
+        self.identity.update(board='gameshellneo-cpi31', kernel='test-kernel')
+        identity_file = self.boot / 'image.json'
+        identity_file.write_text(json.dumps(self.identity))
+        parameter_file = self.boot / 'requested'
+        parameter_file.write_text('Y' if mode == 'experimental' else 'N')
+        paths = {
+            '/etc/gameshellneo/image.json': identity_file,
+            '/boot': self.boot,
+            '/run/lock/gameshellneo-usb-policy.lock': self.boot / 'status.lock',
+            '/sys/module/axp20x_usb_power/parameters/gameshellneo_slow_poll': parameter_file,
+        }
+        message = ('experimental absent=250ms, fast=50ms' if mode == 'experimental'
+                   else 'stock: opt-in disabled')
+        output = io.StringIO()
+        with patch.object(policy, 'Path', side_effect=paths.__getitem__), \
+                patch.object(Path, 'is_mount', return_value=True), \
+                patch.object(policy.os, 'uname', return_value=SimpleNamespace(release='test-kernel')), \
+                patch.object(policy.subprocess, 'check_output',
+                             return_value='GameShellNeo USB polling: ' + message + '\n'), \
+                patch.object(sys, 'argv', ['usb_poll_boot.py', '--mode', 'status']), \
+                redirect_stdout(output):
+            code = policy.main()
+        return code, json.loads(output.getvalue())
+
+    def test_cli_status_accepts_verified_source_with_and_without_diagnostics(self):
+        for diagnostics in (None, False, True):
+            self.install_variants(diagnostics)
+            for mode in policy.MODES:
+                with self.subTest(diagnostics=diagnostics, mode=mode):
+                    policy.select(self.boot, self.identity, mode)
+                    before = {suffix: (self.boot / f'boot.{suffix}').read_bytes()
+                              for suffix in ('cmd', 'scr')}
+                    code, result = self.run_status(mode)
+                    self.assertEqual(code, 0)
+                    self.assertTrue(result['boot_source_matches'])
+                    self.assertTrue(result['running_policy_verified'])
+                    self.assertEqual(result['next_boot'], mode)
+                    self.assertEqual(before, {suffix: (self.boot / f'boot.{suffix}').read_bytes()
+                                              for suffix in ('cmd', 'scr')})
+
+    def test_cli_status_rejects_changed_active_source(self):
+        self.install_variants(diagnostics=True)
+        policy.select(self.boot, self.identity, 'experimental')
+        # A valid executable does not excuse a stale informational source.
+        (self.boot / 'boot.cmd').write_bytes((self.boot / 'boot-usb-stock.cmd').read_bytes())
+        code, result = self.run_status('experimental')
+        self.assertEqual(code, 1)
+        self.assertFalse(result['boot_source_matches'])
 
     def test_hash_alone_cannot_bless_wrong_script(self):
         for content in (b'corrupt CRC', compiled(b'boot an unexpected kernel\n')):

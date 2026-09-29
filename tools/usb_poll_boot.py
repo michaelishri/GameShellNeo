@@ -127,7 +127,7 @@ def main():
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.mode != 'status':
             print(json.dumps(select(boot, identity, args.mode)), flush=True)
-        _, selected = verify_scripts(boot, identity)
+        data, selected = verify_scripts(boot, identity)
         requested = Path('/sys/module/axp20x_usb_power/parameters/gameshellneo_slow_poll').read_text().strip()
         log = subprocess.check_output(['journalctl', '-b', '-k', '--no-pager', '-o', 'cat'], text=True)
         messages = [line for line in log.splitlines() if 'GameShellNeo USB polling:' in line]
@@ -136,7 +136,7 @@ def main():
         passed = requested in ('Y', 'N') and len(messages) == 1 and bool(active if requested == 'Y' else stock)
         result = {'running_requested': requested, 'running_policy_messages': messages,
                   'running_policy_verified': passed, 'next_boot': selected,
-                  'boot_source_matches': (boot / 'boot.cmd').read_bytes() == boot_script(identity['root_partuuid'], selected),
+                  'boot_source_matches': (boot / 'boot.cmd').read_bytes() == data[f'boot-usb-{selected}.cmd'],
                   'hardware_qualified': False}
         print(json.dumps(result, indent=2), flush=True)
         return 0 if passed and result['boot_source_matches'] else 1

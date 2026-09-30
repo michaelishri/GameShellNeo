@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+Current physical-input work:
+[64 — Keypad physical input](64-keypad-physical-input-validation.md) records the
+saved on-screen tap/hold/release task and its qualification status.
+
 Latest hardware:
 [63 — Keypad retention hardware validation](63-keypad-retention-hardware-validation.md)
 records diagnostic.9's verified flash/readback, integration and seven PM debug
@@ -43,6 +47,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [64 — Keypad physical input](64-keypad-physical-input-validation.md) | Repeatable physical press/release and held-key test through the original retained input handle |
 | [63 — Keypad retention hardware validation](63-keypad-retention-hardware-validation.md) | Diagnostic.9 installation/integration, repeated input-handle continuity, timing comparison and remaining reset/energy work |
 | [62 — Keypad supply-retention preparation](62-keypad-supply-retention-preparation.md) | Single-property diagnostic.9 DTB, unchanged kernel, checkpoint-based recovery and repeatable continuity qualification |
 | [61 — Keypad persistence comparison](61-keypad-persistence-comparison.md) | Verified on/off/on sequence, ~1.8 s earlier healthy input handle, restored policy, and trace-overflow correction |

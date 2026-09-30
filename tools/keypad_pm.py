@@ -314,7 +314,7 @@ def observe(record, tracing=False):
         if record['handle_before']['ioctl_errno'] is not None:
             raise ValueError('Initial keypad handle is unhealthy')
         with trace(record) if tracing else nullcontext():
-            yield
+            yield fd
         record['old_handle_after'] = handle_state(fd)
         record['after'] = inspect()
         new_fd = os.open(record['after']['inputs'][0]['event'], os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)

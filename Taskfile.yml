@@ -254,6 +254,10 @@ tasks:
     desc: Trace 1..4 devices debug cycles on the retention image; record supply and original-handle continuity
     cmds: [python3 tools/check-pm-stages.py --keypad-retention]
 
+  device:keypad-input:
+    desc: One owner-assisted retained-keypad driver test with on-screen tap/hold/release prompts
+    cmds: [python3 tools/check-pm-stages.py --keypad-input]
+
   device:pm-test:
     desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required
     cmds: [python3 tools/check-pm-stages.py --test]

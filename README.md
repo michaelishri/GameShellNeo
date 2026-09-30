@@ -908,6 +908,29 @@ See [report 62](docs/62-keypad-supply-retention-preparation.md) for the exact
 build/recovery sequence. This candidate reuses `6.18.54-gameshellneo8` deliberately:
 the experimental difference is in the image's DTB, not the kernel binary.
 
+To qualify physical input on this retention image, run
+`task device:keypad-input` with the owner watching and USB connected. It runs
+one devices debug cycle and displays the complete sequence on the GameShell:
+tap/release A, B, X and Y as prompted; press and hold A through the driver test;
+release only at `RELEASE A`; then repeat the four taps. Each button prompt has
+a 15-second deadline; the whole device service is bounded to four minutes.
+Keep all other controls untouched, including power. Both SSH routes must pass
+preflight; the device repeats its health checks after the initial button input.
+
+The recorder reads physical evdev events through the same original handle,
+temporarily grabs only the internal keypad to keep input out of the login
+console, and checks held-key bitmaps before/after PM and release. Queue loss,
+unexpected edges, a changed device or a failed cleanup reject the sequence.
+The screen contents/cursor are restored, and closing the fd releases the grab
+even if the worker is killed. Independent PM recovery also restores the owned
+console snapshot. Use the existing `device:pm-collect RUN=...` and
+`device:pm-restore` tasks after an interrupted run; never blindly resubmit it.
+Evidence is in `result.json`, `retention.json` and, after full success,
+`physical-input.json`. Human interaction makes these runs unsuitable for latency
+comparisons. This exercises four face buttons and one held key, not every
+chord, physical release during the dark interval, actual sleep or energy.
+See [report 64](docs/64-keypad-physical-input-validation.md) for qualification.
+
 The helper serializes driver callbacks with `pm_async=0`, records the original
 controls, and restores them on exit and through independent `ExecStopPost`.
 A temporary logind inhibitor covers power-key/sleep/idle handling. Evidence is

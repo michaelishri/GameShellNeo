@@ -22,32 +22,36 @@ def module(name, filename):
     return result
 
 
-def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None):
+def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False):
     if (not re.fullmatch(r'/tmp/gameshellneo-pm\.[A-Za-z0-9]+', directory) or
             stage not in ('freezer', 'devices') or not re.fullmatch(r'[0-9a-f]{32}', run_id) or
             type(keypad_trace) is not bool or (keypad_trace and stage != 'devices') or
             (keypad_persist is not None and (keypad_persist not in ('0', '1') or
-                                            stage != 'devices' or not keypad_trace))):
+                                            stage != 'devices' or not keypad_trace)) or
+            type(keypad_input) is not bool or (keypad_input and
+                (stage != 'devices' or not keypad_trace or keypad_persist is not None))):
         raise ValueError('Invalid PM stage, path or run ID')
     script = directory + '/test-pm-stages.py'
     # No SSH-owned pipe: USB may disconnect during the devices test.
     return ['sudo', '-n', 'systemd-run', '--quiet', '--collect', '--unit=gameshellneo-pm-test',
-            '--property=RuntimeMaxSec=120', '--property=TimeoutStopSec=15',
+            '--property=RuntimeMaxSec=' + ('240' if keypad_input else '120'), '--property=TimeoutStopSec=15',
             '--property=UMask=0077', '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
             '/usr/bin/systemd-inhibit', '--what=handle-power-key:sleep:idle', '--mode=block',
             '--who=GameShellNeo PM diagnostic', '--why=Bounded freezer/devices debug test',
             '/usr/bin/python3', '-B', script, '--lock', directory + '/sources.lock.json',
             '--stage', stage, '--run-id', run_id] + (['--keypad-trace'] if keypad_trace else []) + (
-                ['--keypad-persist', keypad_persist] if keypad_persist is not None else [])
+                ['--keypad-persist', keypad_persist] if keypad_persist is not None else []) + (
+                ['--keypad-input'] if keypad_input else [])
 
 
 def inline(client, *args):
     # Inline inspection/recovery also needs the same saved keypad helper.
-    program = ('import sys, types\n'
-               'keypad_helper = types.ModuleType("keypad_pm")\n'
-               'exec(' + repr((ROOT / 'tools/keypad_pm.py').read_text()) + ', keypad_helper.__dict__)\n'
-               'sys.modules["keypad_pm"] = keypad_helper\n' +
-               (ROOT / 'tools/test-pm-stages.py').read_text())
+    program = 'import sys, types\n'
+    for name in ('keypad_pm', 'keypad_input'):
+        program += ('keypad_helper = types.ModuleType(' + repr(name) + ')\n'
+                    'exec(' + repr((ROOT / 'tools' / (name + '.py')).read_text()) + ', keypad_helper.__dict__)\n'
+                    'sys.modules[' + repr(name) + '] = keypad_helper\n')
+    program += (ROOT / 'tools/test-pm-stages.py').read_text()
     return run(client, shlex.join(['sudo', '-n', 'python3', '-B', '-c',
                program, *args]), display=False, timeout=40)
 
@@ -64,7 +68,7 @@ def collect(config, run_id):
         return json.loads(inline(client, '--collect', run_id))
 
 
-def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None):
+def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False):
     with device(config, 'usb') as client:
         before = json.loads(inline(client, '--inspect'))
         (capture / 'before.json').write_text(json.dumps(before, indent=2) + '\n')
@@ -76,10 +80,11 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None)
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-pm.XXXXXXXX',
                         display=False).decode().strip()
         run_id = uuid.uuid4().hex
-        command = service_command(directory, stage, run_id, keypad_trace, keypad_persist)
+        command = service_command(directory, stage, run_id, keypad_trace, keypad_persist, keypad_input)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/test-pm-stages.py', directory + '/test-pm-stages.py')
             upload(sftp, ROOT / 'tools/keypad_pm.py', directory + '/keypad_pm.py')
+            upload(sftp, ROOT / 'tools/keypad_input.py', directory + '/keypad_input.py')
             upload(sftp, ROOT / 'build/sources.lock.json', directory + '/sources.lock.json')
         (capture / 'run.json').write_text(json.dumps(dict(run_id=run_id, stage=stage, helper=directory)) + '\n')
         print('PM run:', run_id, 'helper:', directory, flush=True)
@@ -89,7 +94,7 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None)
             run(client, shlex.join(command), display=False, timeout=20)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             (capture / 'submission-error.txt').write_text(type(error).__name__ + '\n')
-    deadline = time.monotonic() + 180
+    deadline = time.monotonic() + (300 if keypad_input else 180)
     while time.monotonic() < deadline:
         time.sleep(5)
         try:
@@ -176,6 +181,29 @@ def retention_result(result):
                 limits='Software supply evidence and input-handle health; physical input, voltage and energy unmeasured.')
 
 
+def validate_physical_result(result, retention):
+    from keypad_input import BUTTONS
+    physical = result.get('physical_input', {})
+    if (physical.get('passed') is not True or physical.get('grab_released') is not True or
+            physical.get('console_restored') is not True or physical.get('reader_error') or
+            not all(retention[k] for k in ('original_handle_healthy', 'usb_device_number_unchanged',
+                                           'input_sysfs_unchanged')) or retention['keypad_disconnects'] or
+            result['keypad']['old_handle_after'].get('hung_up') or
+            result['keypad']['old_handle_after'].get('poll_error')):
+        raise ValueError('Physical input, original-handle continuity or cleanup failed')
+    taps = [(code, value) for _, code in BUTTONS for value in (1, 0)]
+    edges = [(e['code'], e['value']) for e in physical['events'] if e['type'] == 1 and e['value'] != 2]
+    if edges != taps + [(36, 1), (36, 0)] + taps:
+        raise ValueError('Physical input did not deliver the complete ordered sequence')
+    checks = {c['name']: c['handle'] for c in physical['checkpoints']}
+    for name, expected in (('immediately-before-entry', [36]), ('after-stage', [36]),
+                           ('released-after-stage', []), ('final', [])):
+        state = checks.get(name, {})
+        if (state.get('held_key_codes') != expected or state.get('ioctl_errno') is not None or
+                state.get('hung_up') is not False or state.get('poll_error') is not False):
+            raise ValueError('Missing healthy physical-input checkpoint: ' + name)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -185,6 +213,7 @@ def main():
     mode.add_argument('--restore', action='store_true')
     mode.add_argument('--keypad-compare', action='store_true')
     mode.add_argument('--keypad-retention', action='store_true')
+    mode.add_argument('--keypad-input', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     config = load_env()
@@ -216,15 +245,17 @@ def main():
     stage = os.environ.get('NEO_PM_STAGE', '')
     cycles = int(os.environ.get('NEO_PM_CYCLES', '1'))
     trace_option = os.environ.get('NEO_KEYPAD_TRACE', '0')
-    if args.keypad_retention:
+    if args.keypad_retention or args.keypad_input:
         stage, trace_option = 'devices', '1'
     if trace_option not in ('0', '1') or (trace_option == '1' and stage != 'devices'):
         raise ValueError('KEYPAD_TRACE=0/1; tracing requires STAGE=devices')
     if not args.keypad_compare and (stage not in ('freezer', 'devices') or not 1 <= cycles <= 4):
         raise ValueError('Explicit STAGE=freezer/devices and CYCLES=1..4 required')
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
-    if args.keypad_retention and lock.get('experiments', {}).get('keypad_supply_retention') is not True:
+    if (args.keypad_retention or args.keypad_input) and lock.get('experiments', {}).get('keypad_supply_retention') is not True:
         raise ValueError('Keypad retention requires its separately identified image')
+    if args.keypad_input and cycles != 1:
+        raise ValueError('Physical keypad task runs one owner-assisted cycle at a time')
     (capture / 'sources.lock.json').write_text(json.dumps(lock, indent=2) + '\n')
     with (LOCAL / 'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -234,11 +265,15 @@ def main():
         for index in range(cycles):
             directory = capture / ('cycle-' + str(index + 1))
             directory.mkdir(mode=0o700)
-            result = cycle(config, directory, lock, stage, trace_option == '1')
-            if args.keypad_retention:
+            result = cycle(config, directory, lock, stage, trace_option == '1', keypad_input=args.keypad_input)
+            if args.keypad_retention or args.keypad_input:
                 summary = retention_result(result)
                 (directory / 'retention.json').write_text(json.dumps(summary, indent=2) + '\n')
                 print('Retention observation:', json.dumps(summary), flush=True)
+            if args.keypad_input:
+                validate_physical_result(result, summary)
+                (directory / 'physical-input.json').write_text(json.dumps(result['physical_input'], indent=2) + '\n')
+                print('Physical tap/hold/release sequence passed on the original input handle.', flush=True)
             if index + 1 < cycles:
                 time.sleep(20)
 

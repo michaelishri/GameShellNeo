@@ -241,7 +241,7 @@ def check_result(before, after, stage, memory_ok):
     return delta
 
 
-def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None):
+def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False):
     if stage not in STAGES:
         raise ValueError('Only freezer and devices are permitted')
     if keypad_trace and stage != 'devices':
@@ -249,6 +249,9 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None):
     if keypad_persist is not None and (keypad_persist not in ('0', '1') or
                                       stage != 'devices' or not keypad_trace):
         raise ValueError('Persistence comparison requires a traced devices debug stage')
+    if keypad_input and (stage != 'devices' or not keypad_trace or keypad_persist is not None or
+                         lock.get('experiments', {}).get('keypad_supply_retention') is not True):
+        raise ValueError('Physical input requires traced devices with retained supply and unchanged persistence')
     directory = result_dir(run_id)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     record = dict(run_id=run_id, stage=stage, passed=False, event='started',
@@ -259,7 +262,7 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None):
         validate(before, lock)
         observers = ('rsb-comparison', 'idle-sample', 'power-profile', 'governor-profile',
                      'governor-comparison', 'usb-detection', 'usb-reconnects', 'usb-diagnostics',
-                     'scan-test', 'firmware-trial', 'stability-test', 'backlight-test')
+                     'scan-test', 'firmware-trial', 'stability-test', 'backlight-test', 'keypad-capture')
         if command('systemctl', 'list-units', '--all', '--plain', '--no-legend',
                    '--state=active,activating,deactivating',
                    *['gameshellneo-' + n + '.service' for n in observers]):
@@ -267,26 +270,41 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None):
         save(directory / 'started.json', record)
         memory = bytearray(os.urandom(4 * 1024 * 1024))
         digest = hashlib.sha256(memory).hexdigest()
-        from keypad_pm import observe, persistence, wait_ready
+        from keypad_pm import observe, persistence, wait_ready, keypad_identity
         record['keypad'] = {}
         record['persistence'] = {}
         with (persistence(record['persistence'], keypad_persist)
               if keypad_persist is not None else nullcontext()):
-            with observe(record['keypad'], tracing=keypad_trace):
-                started = time.monotonic()
-                with stage_controls(stage):
-                    os.sync()
-                    enter_stage(stage)
-                resumed = time.monotonic()
-                record['stage_seconds'] = resumed - started
-                record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == digest
-                if keypad_trace:
-                    record['keypad_ready_after_stage'] = {}
-                    from keypad_pm import keypad_identity
-                    wait_ready(record['keypad_ready_after_stage'], resumed,
-                               keypad_identity(record['keypad']['before']))
-                # Keep the same minimum recovery window for every comparison phase.
-                time.sleep(max(0, 30 - (time.monotonic() - resumed)))
+            with observe(record['keypad'], tracing=keypad_trace) as original_fd:
+                from keypad_input import capture
+                record['physical_input'] = {}
+                if keypad_input:
+                    keypad_identity(record['keypad']['before'])
+                with capture(record['physical_input'], original_fd) if keypad_input else nullcontext() as inputs:
+                    if inputs:
+                        inputs.before_stage()
+                        record['entry_preflight'] = snapshot()
+                        validate(record['entry_preflight'], lock)
+                        if record['entry_preflight']['boot_id'] != before['boot_id']:
+                            raise ValueError('Boot changed while waiting for physical input')
+                        save(directory / 'started.json', record)
+                    started = time.monotonic()
+                    with stage_controls(stage):
+                        os.sync()
+                        if inputs:
+                            inputs.verify_hold('immediately-before-entry')
+                        enter_stage(stage)
+                    resumed = time.monotonic()
+                    record['stage_seconds'] = resumed - started
+                    record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == digest
+                    if keypad_trace:
+                        record['keypad_ready_after_stage'] = {}
+                        wait_ready(record['keypad_ready_after_stage'], resumed,
+                                   keypad_identity(record['keypad']['before']))
+                    if inputs:
+                        inputs.after_stage()
+                    # Physical input runs include human interaction and are not latency comparisons.
+                    time.sleep(max(0, 30 - (time.monotonic() - resumed)))
         after = snapshot()
         record['after'] = after
         validate(after, lock)
@@ -310,17 +328,22 @@ def main():
     parser.add_argument('--lock', type=Path)
     parser.add_argument('--keypad-trace', action='store_true')
     parser.add_argument('--keypad-persist', choices=('0', '1'))
+    parser.add_argument('--keypad-input', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
         from keypad_pm import restore_trace, restore_persistence
+        from keypad_input import restore_console
         try:
             restore_trace()
         finally:
             try:
                 restore_persistence()
             finally:
-                restore()
+                try:
+                    restore_console()
+                finally:
+                    restore()
     elif args.inspect:
         print(json.dumps(snapshot()))
     elif args.collect:
@@ -337,7 +360,7 @@ def main():
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(sig, interrupted)
         test_stage(json.loads(read(args.lock)), args.stage, args.run_id,
-                   args.keypad_trace, args.keypad_persist)
+                   args.keypad_trace, args.keypad_persist, args.keypad_input)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,249 @@
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -489,6 +489,7 @@
+ #endif				/* DEBUG */
+ 
+ 	uint clkstate;		/* State of sd and backplane clock(s) */
++	bool clkstate_unknown;	/* A failed transition needs revalidation */
+ 	s32 idletime;		/* Control for activity timeout */
+ 	s32 idlecount;		/* Activity timeout counter */
+ 	s32 idleclock;		/* How to set bus driver when idle */
+@@ -519,6 +520,7 @@
+ 	struct brcmf_sdio_count sdcnt;
+ 	bool sr_enabled; /* SaveRestore enabled */
+ 	bool sleeping;
++	bool sleep_state_unknown;
+ 
+ 	u8 tx_hdrlen;		/* sdio bus header length for tx packet */
+ 	bool txglom;		/* host tx glomming enable flag */
+@@ -720,7 +722,7 @@
+ 	 * bit, to avoid polling of KSO bit.
+ 	 */
+ 	if (!on && bus->ci->chip == CY_CC_43012_CHIP_ID)
+-		return err;
++		goto out;
+ 
+ 	if (on) {
+ 		/* device WAKEUP through KSO:
+@@ -767,9 +769,13 @@
+ 		brcmf_dbg(SDIO, "try_cnt=%d rd_val=0x%x err=%d\n", try_cnt,
+ 			  rd_val, err);
+ 
+-	if (try_cnt > MAX_KSO_ATTEMPTS)
++	if (try_cnt > MAX_KSO_ATTEMPTS) {
+ 		brcmf_err("max tries: rd_val=0x%x err=%d\n", rd_val, err);
+-
++		if (!err)
++			err = -ETIMEDOUT;
++	}
++
++out:
+ 	if (on)
+ 		sdio_retune_release(bus->sdiodev->func1);
+ 
+@@ -786,6 +792,7 @@
+ 	int err;
+ 	u8 clkctl, clkreq, devctl;
+ 	unsigned long timeout;
++	bool unknown = bus->clkstate_unknown;
+ 
+ 	brcmf_dbg(SDIO, "Enter\n");
+ 
+@@ -793,9 +800,12 @@
+ 
+ 	if (bus->sr_enabled) {
+ 		bus->clkstate = (on ? CLK_AVAIL : CLK_SDONLY);
++		bus->clkstate_unknown = false;
+ 		return 0;
+ 	}
+ 
++	/* A failed transfer may have changed the hardware despite its error. */
++	bus->clkstate_unknown = true;
+ 	if (on) {
+ 		/* Request HT Avail */
+ 		clkreq =
+@@ -829,17 +839,24 @@
+ 			devctl |= SBSDIO_DEVCTL_CA_INT_ONLY;
+ 			brcmf_sdiod_writeb(bus->sdiodev, SBSDIO_DEVICE_CTL,
+ 					   devctl, &err);
++			if (err)
++				return -EBADE;
+ 			brcmf_dbg(SDIO, "CLKCTL: set PENDING\n");
+ 			bus->clkstate = CLK_PENDING;
++			bus->clkstate_unknown = false;
+ 
+ 			return 0;
+-		} else if (bus->clkstate == CLK_PENDING) {
++		} else if (bus->clkstate == CLK_PENDING || unknown) {
+ 			/* Cancel CA-only interrupt filter */
+ 			devctl = brcmf_sdiod_readb(bus->sdiodev,
+ 						   SBSDIO_DEVICE_CTL, &err);
++			if (err)
++				return -EBADE;
+ 			devctl &= ~SBSDIO_DEVCTL_CA_INT_ONLY;
+ 			brcmf_sdiod_writeb(bus->sdiodev, SBSDIO_DEVICE_CTL,
+ 					   devctl, &err);
++			if (err)
++				return -EBADE;
+ 		}
+ 
+ 		/* Otherwise, wait here (polling) for HT Avail */
+@@ -849,6 +866,8 @@
+ 			clkctl = brcmf_sdiod_readb(bus->sdiodev,
+ 						   SBSDIO_FUNC1_CHIPCLKCSR,
+ 						   &err);
++			if (err)
++				break;
+ 			if (time_after(jiffies, timeout))
+ 				break;
+ 			else
+@@ -878,25 +897,30 @@
+ 	} else {
+ 		clkreq = 0;
+ 
+-		if (bus->clkstate == CLK_PENDING) {
++		if (bus->clkstate == CLK_PENDING || unknown) {
+ 			/* Cancel CA-only interrupt filter */
+ 			devctl = brcmf_sdiod_readb(bus->sdiodev,
+ 						   SBSDIO_DEVICE_CTL, &err);
++			if (err)
++				return -EBADE;
+ 			devctl &= ~SBSDIO_DEVCTL_CA_INT_ONLY;
+ 			brcmf_sdiod_writeb(bus->sdiodev, SBSDIO_DEVICE_CTL,
+ 					   devctl, &err);
+-		}
+-
+-		bus->clkstate = CLK_SDONLY;
++			if (err)
++				return -EBADE;
++		}
++
+ 		brcmf_sdiod_writeb(bus->sdiodev, SBSDIO_FUNC1_CHIPCLKCSR,
+ 				   clkreq, &err);
+-		brcmf_dbg(SDIO, "CLKCTL: turned OFF\n");
+ 		if (err) {
+ 			brcmf_err("Failed access turning clock off: %d\n",
+ 				  err);
+ 			return -EBADE;
+ 		}
+-	}
++		bus->clkstate = CLK_SDONLY;
++		brcmf_dbg(SDIO, "CLKCTL: turned OFF\n");
++	}
++	bus->clkstate_unknown = false;
+ 	return 0;
+ }
+ 
+@@ -916,6 +940,7 @@
+ /* Transition SD and backplane clock readiness */
+ static int brcmf_sdio_clkctl(struct brcmf_sdio *bus, uint target, bool pendok)
+ {
++	int err = 0;
+ #ifdef DEBUG
+ 	uint oldstate = bus->clkstate;
+ #endif				/* DEBUG */
+@@ -923,7 +948,7 @@
+ 	brcmf_dbg(SDIO, "Enter\n");
+ 
+ 	/* Early exit if we're already there */
+-	if (bus->clkstate == target)
++	if (!bus->clkstate_unknown && bus->clkstate == target)
+ 		return 0;
+ 
+ 	switch (target) {
+@@ -932,15 +957,16 @@
+ 		if (bus->clkstate == CLK_NONE)
+ 			brcmf_sdio_sdclk(bus, true);
+ 		/* Now request HT Avail on the backplane */
+-		brcmf_sdio_htclk(bus, true, pendok);
++		err = brcmf_sdio_htclk(bus, true, pendok);
+ 		break;
+ 
+ 	case CLK_SDONLY:
+ 		/* Remove HT request, or bring up SD clock */
+-		if (bus->clkstate == CLK_NONE)
++		if (bus->clkstate_unknown || bus->clkstate == CLK_AVAIL ||
++		    bus->clkstate == CLK_PENDING)
++			err = brcmf_sdio_htclk(bus, false, false);
++		else if (bus->clkstate == CLK_NONE)
+ 			brcmf_sdio_sdclk(bus, true);
+-		else if (bus->clkstate == CLK_AVAIL)
+-			brcmf_sdio_htclk(bus, false, false);
+ 		else
+ 			brcmf_err("request for %d -> %d\n",
+ 				  bus->clkstate, target);
+@@ -948,8 +974,12 @@
+ 
+ 	case CLK_NONE:
+ 		/* Make sure to remove HT request */
+-		if (bus->clkstate == CLK_AVAIL)
+-			brcmf_sdio_htclk(bus, false, false);
++		if (bus->clkstate_unknown || bus->clkstate == CLK_AVAIL ||
++		    bus->clkstate == CLK_PENDING) {
++			err = brcmf_sdio_htclk(bus, false, false);
++			if (err)
++				break;
++		}
+ 		/* Now remove the SD clock */
+ 		brcmf_sdio_sdclk(bus, false);
+ 		break;
+@@ -958,7 +988,7 @@
+ 	brcmf_dbg(SDIO, "%d -> %d\n", oldstate, bus->clkstate);
+ #endif				/* DEBUG */
+ 
+-	return 0;
++	return err;
+ }
+ 
+ static int
+@@ -974,19 +1004,25 @@
+ 	/* If SR is enabled control bus state with KSO */
+ 	if (bus->sr_enabled) {
+ 		/* Done if we're already in the requested state */
+-		if (sleep == bus->sleeping)
++		if (!bus->sleep_state_unknown && sleep == bus->sleeping)
+ 			goto end;
+ 
++		/* Do not let a partial KSO transition make a later wake a no-op. */
++		bus->sleep_state_unknown = true;
+ 		/* Going to sleep */
+ 		if (sleep) {
+ 			clkcsr = brcmf_sdiod_readb(bus->sdiodev,
+ 						   SBSDIO_FUNC1_CHIPCLKCSR,
+ 						   &err);
++			if (err)
++				goto done;
+ 			if ((clkcsr & SBSDIO_CSR_MASK) == 0) {
+ 				brcmf_dbg(SDIO, "no clock, set ALP\n");
+ 				brcmf_sdiod_writeb(bus->sdiodev,
+ 						   SBSDIO_FUNC1_CHIPCLKCSR,
+ 						   SBSDIO_ALP_AVAIL_REQ, &err);
++				if (err)
++					goto done;
+ 			}
+ 			err = brcmf_sdio_kso_control(bus, false);
+ 		} else {
+@@ -1001,14 +1037,20 @@
+ 
+ end:
+ 	/* control clocks */
++	bus->sleep_state_unknown = true;
+ 	if (sleep) {
+ 		if (!bus->sr_enabled)
+-			brcmf_sdio_clkctl(bus, CLK_NONE, pendok);
++			err = brcmf_sdio_clkctl(bus, CLK_NONE, pendok);
+ 	} else {
+-		brcmf_sdio_clkctl(bus, CLK_AVAIL, pendok);
++		err = brcmf_sdio_clkctl(bus, CLK_AVAIL, pendok);
++		if (err)
++			goto done;
+ 		brcmf_sdio_wd_timer(bus, true);
+ 	}
++	if (err)
++		goto done;
+ 	bus->sleeping = sleep;
++	bus->sleep_state_unknown = false;
+ 	brcmf_dbg(SDIO, "new state %s\n",
+ 		  (sleep ? "SLEEP" : "WAKE"));
+ done:

@@ -420,6 +420,22 @@ concurrent changes, wake holds, abort/thaw replay and repeated cycles.
 use of the kernel freezer and the remaining hardware/wake-policy qualification.
 Both freezer options are required by the diagnostic configuration checks.
 
+For the brcmfmac Wi-Fi sleep and clock error paths, use:
+
+```sh
+task test:brcmfmac-sleep   # Actual C helpers, scripted failures, native + ARM32
+task check:brcmfmac-driver # Also compile the complete ARM SDIO object in isolated scratch
+```
+
+These check KSO timeout/error reporting, clock transitions, sleep prechecks,
+state publication and retune cleanup. The original successful transfer/delay
+sequence is compared with the candidate, and deliberately broken variants must
+fail. Evidence is saved under `.local/build/brcmfmac-sleep-tests/`; `task build`
+includes the source regression. [Report 81](docs/81-brcmfmac-sleep-error-propagation.md)
+records the scope and results. This does not qualify real sleep or implement
+the freezer transaction and failed-wake recovery work in
+[report 80](docs/80-brcmfmac-suspend-failure-audit.md).
+
 For the Sunxi MUSB context capability fix, use:
 
 ```sh

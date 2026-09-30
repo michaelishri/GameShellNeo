@@ -49,7 +49,7 @@ def main():
                 raise RuntimeError('Missing locked USB driver')
         patches = [ROOT / 'kernel/patches' / name for name in
                    ('0006-axp-usb-work-lifetime.patch', '0008-axp-usb-absent-poll.patch',
-                    '0009-axp-usb-diagnostics.patch')]
+                    '0009-axp-usb-diagnostics.patch', '0010-axp-usb-suspend-work.patch')]
         for patch in patches:
             run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=WORK / 'patched')
         spec = importlib.util.spec_from_file_location('lifecycle', ROOT / 'tools/check-usb-lifecycle.py')

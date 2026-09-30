@@ -69,6 +69,7 @@ tasks:
       - task: doctor
       - task: test:nkmp
       - task: test:usb-lifecycle
+      - task: test:usb-suspend
       - task: test:usb-policy
       - task: test:clock-ranges
       - task: build:kernel
@@ -140,6 +141,14 @@ tasks:
   test:usb-policy:
     desc: Test actual opt-in USB policy, topology, errors, races and probe cleanup natively and on ARM32
     cmds: [bash tools/run-logged.sh usb-policy python3 tools/check-usb-policy.py]
+
+  test:usb-suspend:
+    desc: Test actual AXP PM/IRQ work draining, wake errors and unwind natively and on ARM32
+    cmds: [bash tools/run-logged.sh usb-suspend python3 tools/check-usb-suspend.py]
+
+  check:usb-suspend-driver:
+    desc: Run AXP suspend regressions and compile the complete ARM driver in isolated scratch
+    cmds: [bash tools/run-logged.sh usb-suspend-driver python3 tools/check-usb-suspend.py --compile-driver]
 
   check:usb-policy-driver:
     desc: Run USB policy regressions and compile the complete ARM driver in isolated scratch

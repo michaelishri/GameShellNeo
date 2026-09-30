@@ -301,6 +301,19 @@ and Docker. [Report 38](docs/38-usb-work-lifetime.md) explains coverage and limi
 After changing the patch queue, use the documented `task kernel:reset` before
 the next full kernel build; isolated driver checks do not reset that workspace.
 
+For AXP polling suspend/resume changes, use:
+
+```sh
+task test:usb-suspend          # Actual PM/IRQ callbacks, native + ARM32
+task check:usb-suspend-driver  # Also compile the full ARM driver in isolated scratch
+```
+
+These cover worker quiescence, IRQ/requeue arrivals, repeated cycles and wake
+setup/teardown errors. Evidence is in `.local/build/usb-suspend-tests/`.
+`task build` includes the source regression. The change is not installed yet;
+[report 56](docs/56-usb-suspend-work.md) records the checks and remaining hardware
+and notification-work qualification before deeper PM tests.
+
 For the opt-in USB polling experiment, use:
 
 ```sh

@@ -1,0 +1,87 @@
+diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -105,6 +105,7 @@
+ 	unsigned int old_status;
+ 	unsigned int online;
+ 	unsigned int num_irqs;
++	bool irq_wake_enabled;
+ 	bool gameshellneo_slow_poll;
+ 	struct neo_usb_diag diag;
+ 	unsigned int irqs[] __counted_by(num_irqs);
+@@ -862,7 +863,22 @@
+ static int axp20x_usb_power_suspend(struct device *dev)
+ {
+ 	struct axp20x_usb_power *power = dev_get_drvdata(dev);
+-	int i = 0;
++	int i = 0, ret;
++
++	/* Retry a wake-disable failure from the previous resume without
++	 * stacking another wake reference or stopping normal polling.
++	 */
++	if (power->irq_wake_enabled) {
++		ret = disable_irq_wake(power->irqs[0]);
++		if (ret)
++			return ret;
++		power->irq_wake_enabled = false;
++	}
++
++	/* Drain the poll before suppliers suspend. Keep it disabled across
++	 * suspend so neither its own retry nor a wake IRQ can queue it again.
++	 */
++	disable_delayed_work_sync(&power->vbus_detect);
+ 
+ 	/*
+ 	 * Allow wake via VBUS_PLUGIN only.
+@@ -870,27 +886,44 @@
+ 	 * As nested threaded IRQs are not automatically disabled during
+ 	 * suspend, we must explicitly disable the remainder of the IRQs.
+ 	 */
+-	if (device_may_wakeup(&power->supply->dev))
+-		enable_irq_wake(power->irqs[i++]);
++	if (device_may_wakeup(&power->supply->dev)) {
++		ret = enable_irq_wake(power->irqs[0]);
++		if (ret)
++			goto restore_work;
++		power->irq_wake_enabled = true;
++		i = 1;
++	}
+ 	while (i < power->num_irqs)
+ 		disable_irq(power->irqs[i++]);
+ 
+ 	return 0;
++
++restore_work:
++	enable_delayed_work(&power->vbus_detect);
++	mod_delayed_work(system_power_efficient_wq, &power->vbus_detect, DEBOUNCE_TIME);
++	return ret;
+ }
+ 
+ static int axp20x_usb_power_resume(struct device *dev)
+ {
+ 	struct axp20x_usb_power *power = dev_get_drvdata(dev);
+-	int i = 0;
+-
+-	if (device_may_wakeup(&power->supply->dev))
+-		disable_irq_wake(power->irqs[i++]);
++	int i = 0, ret = 0;
++
++	/* Balance the wake policy actually armed during suspend, even if
++	 * the requested policy changed or disabling the wake IRQ fails.
++	 */
++	if (power->irq_wake_enabled) {
++		ret = disable_irq_wake(power->irqs[i++]);
++		if (!ret)
++			power->irq_wake_enabled = false;
++	}
+ 	while (i < power->num_irqs)
+ 		enable_irq(power->irqs[i++]);
+ 
++	enable_delayed_work(&power->vbus_detect);
+ 	mod_delayed_work(system_power_efficient_wq, &power->vbus_detect, DEBOUNCE_TIME);
+ 
+-	return 0;
++	return ret;
+ }
+ #endif
+ 

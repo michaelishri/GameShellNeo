@@ -16,19 +16,21 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Next candidate: [62 — Keypad supply-retention preparation](62-keypad-supply-retention-preparation.md)
-isolates one device-tree property on the unchanged diagnostic.8 kernel, with
-verified recovery selection and a saved continuity test. Hardware results and
-energy cost remain pending.
+Latest hardware:
 [63 — Keypad retention hardware validation](63-keypad-retention-hardware-validation.md)
-records its verified flash/readback and ongoing qualification.
+records diagnostic.9's verified flash/readback, integration and seven PM debug
+stages. Four consecutive driver cycles preserved the original keypad input
+handle, with healthy-handle observation about 1.5 s earlier than the previous
+fastest power-off candidate. Physical input, actual sleep and energy remain
+unqualified. [62 — Keypad supply-retention preparation](62-keypad-supply-retention-preparation.md)
+records the isolated DT change, unchanged kernel, recovery and saved test.
 
-Latest comparison: [61 — Keypad persistence](61-keypad-persistence-comparison.md)
+Prior comparison: [61 — Keypad persistence](61-keypad-persistence-comparison.md)
 found roughly 1.8 seconds earlier healthy-handle availability with persistence
-off in an accepted on/off/on debug sequence. The original policy is restored;
-keypad disconnection and real sleep remain unresolved.
+off in an accepted on/off/on debug sequence. Its original policy was restored;
+both power-off variants still disconnected the keypad.
 
-Latest installation: [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md)
+Previous installation: [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md)
 records passing installation, integration and eight PM debug cycles. Two keypad
 traces identify software supply cycling and an exhausted USB persistence wait;
 the unsupported-ULPI warnings are gone in all seven driver cycles.
@@ -41,7 +43,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
-| [63 — Keypad retention hardware validation](63-keypad-retention-hardware-validation.md) | Diagnostic.9 guarded flash/full readback and subsequent hardware qualification status |
+| [63 — Keypad retention hardware validation](63-keypad-retention-hardware-validation.md) | Diagnostic.9 installation/integration, repeated input-handle continuity, timing comparison and remaining reset/energy work |
 | [62 — Keypad supply-retention preparation](62-keypad-supply-retention-preparation.md) | Single-property diagnostic.9 DTB, unchanged kernel, checkpoint-based recovery and repeatable continuity qualification |
 | [61 — Keypad persistence comparison](61-keypad-persistence-comparison.md) | Verified on/off/on sequence, ~1.8 s earlier healthy input handle, restored policy, and trace-overflow correction |
 | [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md) | Verified installation/integration, eight PM debug cycles, zero ULPI warnings, keypad supply transitions and three-second recovery callback |

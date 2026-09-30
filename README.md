@@ -79,7 +79,7 @@ configuration from diagnostic.6's polling experiment.
 [report 55](docs/55-diagnostic7-hardware-validation.md) records hardware
 evidence and outstanding keypad/MUSB recovery work. Diagnostic.6 remains
 available as a recovery image.
-The installed image, `0.1.0-diagnostic.8` / `6.18.54-gameshellneo8`, has passed the
+The previous image, `0.1.0-diagnostic.8` / `6.18.54-gameshellneo8`, has passed the
 full kernel, device-tree and offline image checks, and its 266 MB archive is
 verified on the Mac. It adds the AXP USB polling
 suspend fix, the Sunxi MUSB unsupported-register correction, and bounded keypad
@@ -91,16 +91,20 @@ integration checks passed. One freezer and seven devices debug cycles also
 passed with both SSH routes recovering, zero unsupported-ULPI warnings and no
 PM failures. Two keypad traces confirmed supply cycling and an exhausted
 persistence wait, with about three seconds in the keypad USB resume callback.
-Keypad continuity and actual sleep remain unresolved;
+That power-off image did not preserve keypad input continuity;
 [report 60](docs/60-diagnostic8-hardware-validation.md) records the evidence and
 next reversible persistence comparison.
-The next candidate, `0.1.0-diagnostic.9`, retains that same kernel binary and
+The installed image, `0.1.0-diagnostic.9`, retains that same kernel binary and
 modules while adding one experimental device-tree property to retain the
 internal keypad supply. [Report 62](docs/62-keypad-supply-retention-preparation.md)
 records its preparation, diagnostic.8 recovery path and repeatable continuity
-test. Its flash and full readback have passed; boot and driver tests are tracked
-in [report 63](docs/63-keypad-retention-hardware-validation.md). Normal sleep stays
-disabled; retention energy and physical input behavior remain to be measured.
+test. Flash/readback, boot, integration, one freezer and six devices debug stages
+passed, including four consecutive cycles preserving the original keypad input
+handle without disconnection. The healthy-handle observation was about 1.5 s
+earlier than the previous fastest power-off candidate; this is diagnostic timing,
+not real wake latency. [Report 63](docs/63-keypad-retention-hardware-validation.md)
+records the results and remaining USB reset cost. Normal sleep stays disabled;
+retention energy and physical input behavior remain to be measured.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

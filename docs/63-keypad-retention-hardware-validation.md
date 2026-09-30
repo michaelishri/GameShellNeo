@@ -60,8 +60,148 @@ evidence is `.local/diagnostics/20260930T065623.688089Z/`, with the connection
 failure in `.local/neo45-freezer.log`. The owner was asked to place the Mac on
 the GameShell's configured network before continuing.
 
-## Hardware status
+## First debug tests
 
-Freezer and retention debug tests are pending. Boot and integration do not
-qualify keypad continuity, input delivery, actual sleep, wake latency or energy
-cost.
+After the owner placed the Mac on the same network, both independent SSH routes
+worked. The freezer test passed with the original input handle healthy and
+all controls restored: run `cb0cd155f15845b68ff3e388a45ae31e`, evidence
+`.local/diagnostics/20260930T070006.771026Z/cycle-1/`. Its 5.306-second stage
+includes the deliberate five-second debug pause.
+
+The owner was ready to watch the first retention driver test, then confirmed
+the normal dim console and brightness returned. Run
+`a4bd89ff1137467aa76db12cdc88a8ab`, at
+`.local/diagnostics/20260930T070110.143746Z/cycle-1/`, passed with:
+
+- Both USB/Wi-Fi SSH routes and all PM/trace settings restored.
+- The original input handle healthy, unchanged USB device number 2 and input
+  sysfs identity, and no keypad disconnect.
+- No keypad supply-disable event; 3,738 trace events with no overruns, commit
+  overruns or dropped events on any CPU.
+- A 7.596-second debug stage and a fresh healthy handle observed 0.176 seconds
+  afterwards. This is approximately 7.772 seconds including the five-second
+  pause and measurement overhead, not real sleep/wake or physical key latency.
+
+The USB resume callback took 1.116684 seconds. The journal recorded
+`Waited 0ms for CONNECT`, followed by reset-resume of the same low-speed USB
+device. Supply retention avoids the disconnected persistence wait and preserves
+the input handle, but it does not eliminate USB reset recovery.
+
+## Interrupted repeated batch and recorder correction
+
+The first four-cycle attempt is retained at
+`.local/diagnostics/20260930T070308.916091Z/`. Its first cycle,
+`f4641b415d2e49399c2c57e2b1fe0ba9`, passed with the same input continuity and
+no supply-disable event. Its stage took 7.581 seconds, with a fresh healthy
+handle observed 0.191 seconds later. Collection encountered one transient SSH
+banner error; the saved retry collected the same run and verified both routes
+without resubmitting a PM operation.
+
+The second attempt, `cd9897ee95964bbf9748bfd710c7e91a`, was rejected by the
+device-side health preflight before any PM stage. The host preflight had passed,
+but the original recorder omitted the rejected device snapshot, so the exact
+failing condition cannot be established retrospectively. The batch stopped;
+it is not counted as a completed four-cycle qualification.
+
+Independent inspection at
+`.local/diagnostics/20260930T070603.044574Z/inspection.json` confirmed the same
+boot, restored `pm_test=none` / `pm_async=1`, PM success count 3, all failure
+counters zero, all services active without restarts, USB/Wi-Fi connected and
+fresh valid charging telemetry at 100%. The saved service journal showed no
+service restart or failure; its Wi-Fi disconnect/reconnect preceded the
+rejected preflight and does not establish the cause.
+
+NEO-46 fixes the evidence gap: device-owned results now preserve a rejected
+preflight snapshot and identify failed health gates without exposing credentials
+in errors. All gate thresholds and entry/restoration rules are unchanged.
+The added regression proves rejected preflights cannot enter PM. Host checks
+passed 234 tool tests (one optional skip), 13 runtime tests and compiled/lint
+checks. Commit `6be4f60` was pushed before restarting the full four-cycle batch;
+no image or live power policy changed.
+
+## Completed four-cycle batch
+
+The unchanged candidate passed a fresh `task device:keypad-retention CYCLES=4`
+batch after the recorder correction. Evidence is under
+`.local/diagnostics/20260930T070923.063896Z/`, in each cycle's `result.json`,
+`retention.json` and bounded trace. The complete host log is
+`.local/neo45-retention-four-rerun.log`.
+
+| Cycle | Debug stage (s) | Fresh healthy handle after stage (s) | Combined observation (s) | Keypad USB resume callback (s) |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 7.644 | 0.238 | 7.882 | 1.091 |
+| 2 | 7.638 | 0.214 | 7.852 | 1.096 |
+| 3 | 7.698 | 0.245 | 7.942 | 1.088 |
+| 4 | 7.665 | 0.240 | 7.905 | 1.111 |
+
+Run IDs, in order:
+
+- `41cdeafdc97d4830aee7cd282394905d`
+- `3474c039391f41198b3e8f760d485cd4`
+- `f1ea595fcefc4d8d8dd1e8be2f7bb0d8`
+- `f6ac237185b8487c82c87eec39698d77`
+
+Every cycle preserved the original open input handle, USB device number 2 and
+input sysfs identity. There were no keypad disconnects or supply-disable events.
+Persistence remained enabled, runtime control remained `on` and no keypad wake
+attribute appeared. Each trace captured 3,738/3,738 events with no overruns,
+commit overruns or dropped events, and all tracing/PM controls were restored.
+Fresh USB and Wi-Fi SSH connections passed after every cycle. No unsupported
+ULPI warnings, PM failures or extra firmware loads occurred.
+
+Cycles 1 and 2 each encountered one transient SSH collection error (`No existing
+session`). The saved retry retrieved the same completed run and verified both
+routes; no PM operation was resubmitted. Cycles 3 and 4 collected directly.
+There was no health-preflight rejection in this complete batch. The owner
+confirmed the normal dim login console and brightness after the batch.
+
+## Comparison and remaining cost
+
+The mean combined observation is 7.895 seconds, versus 9.372 seconds for
+diagnostic.8's accepted persistence-off/power-off candidate, and 11.187 seconds
+for the mean of its surrounding persistence-on/power-off observations. Supply
+retention therefore produced a healthy handle about **1.48 seconds earlier than
+the previous fastest candidate**, or 3.29 seconds earlier than the surrounding
+default-policy baseline. More significantly, the original handle survived;
+the power-off variants required consumers to reopen the input device.
+
+The prior comparison is preserved at
+`.local/diagnostics/20260930T061124.693722Z/` and described in
+[report 61](61-keypad-persistence-comparison.md). These are small samples from
+different boots using the same kernel binary and tracing method. The combined
+observation includes the intentional five-second debug pause, suspend/setup
+work, synchronization and handle polling. It is not real wake latency or the
+time to the first physical key event; subtracting five seconds does not make
+it either measurement.
+
+Reset-resume remains: every cycle recorded `Waited 0ms for CONNECT` and a reset
+of the same low-speed USB device. The keypad's USB resume callback still took
+1.088–1.111 seconds, while the traced `dpm_resume` interval was 1.521–1.542
+seconds. Retaining the supply removes disconnection and the exhausted connect
+wait, but further USB recovery work remains before a sub-second target can be
+assessed.
+
+## Final state and limits
+
+Independent final inspections are saved at:
+
+- `.local/diagnostics/20260930T071505.380898Z/inspection.json`
+- `.local/diagnostics/20260930T071505.339387Z/keypad.json`
+
+The original boot ID is unchanged. PM success is 7, accounting for one freezer
+and six executed devices stages: the first watched stage, the completed stage
+from the interrupted batch, and the four-cycle rerun. All failure counters are
+zero. `pm_test=none`, `pm_async=1`, all seven services are active without
+restarts, no units have failed, taint is zero and there has been one firmware
+load for the entire boot. USB is configured, Wi-Fi is connected and battery
+telemetry reports 100% with USB attached. Keypad device number remains 2 and
+its supply reports enabled. Software supply state does not measure rail voltage.
+
+NEO-45's installation and driver-debug continuity qualification is complete.
+The test is repeatable with the saved task; diagnostic.8 recovery remains
+available. Physical input delivery, held/released-key behavior, real sleep,
+power-button wake, wake latency and retention energy cost remain unqualified.
+Normal sleep stays disabled and the power button retains its shutdown behavior.
+The next qualification should exercise actual key presses/releases through the
+retained handle before assessing scoped USB recovery options and the power cost
+of retaining the keypad supply.

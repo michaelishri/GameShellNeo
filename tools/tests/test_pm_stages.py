@@ -183,13 +183,22 @@ class Evidence(unittest.TestCase):
                     pm={'pm_test': '[none] freezer devices', 'mem_sleep': '[s2idle]', 'state': 'freeze mem'},
                     pm_test_delay='5', masks={n: '/dev/null' for n in pm.MASKS}, sleep_config='AllowSuspend=no',
                     usb_experiments={'gameshellneo_slow_poll': 'N', 'gameshellneo_diagnostics': 'N'},
-                    sdio_retains_power=True, cmdline='mem_sleep_default=s2idle',
+                    sdio_retains_power=True, keypad_retains_supply=False, cmdline='mem_sleep_default=s2idle',
                     taint='0', failed_units='', usb=['configured'], wifi='wpa_state=COMPLETED\n',
                     battery={'monitoring': 'valid', 'status': 'Charging', 'capacity_percent': 70},
                     battery_age_seconds=2,
                     services={n: {'ActiveState': 'active', 'NRestarts': '0'} for n in pm.SERVICES})
         pm.validate(good, lock)
+        retained = deepcopy(good)
+        retained_lock = deepcopy(lock)
+        retained_lock['experiments']['keypad_supply_retention'] = True
+        retained['image']['sources'] = retained_lock
+        retained['keypad_retains_supply'] = True
+        pm.validate(retained, retained_lock)
+        with self.assertRaises(ValueError):
+            pm.validate(retained | {'keypad_retains_supply': False}, retained_lock)
         changes = [dict(kernel='wrong'), dict(firmware_sha256='other'), dict(sdio_retains_power=False),
+                   dict(keypad_retains_supply=True),
                    dict(pm_test_delay='0'), dict(usb=['not attached']), dict(battery_age_seconds=40),
                    dict(kernel_config=good['kernel_config']+'CONFIG_PM_AUTOSLEEP=y\n'),
                    dict(masks={n: '/lib/systemd/system/' + n for n in pm.MASKS}),
@@ -232,6 +241,8 @@ class Evidence(unittest.TestCase):
     def test_normal_lock_cannot_enable_tests(self):
         for experiments in ({}, {'usb_absent_poll': True},
                             {'suspend_diagnostics': True, 'usb_diagnostics': False},
+                            {'suspend_diagnostics': True, 'keypad_supply_retention': False},
+                            {'suspend_diagnostics': True, 'keypad_supply_retention': 1},
                             {'suspend_diagnostics': 1}):
             with self.assertRaises(ValueError):
                 pm.validate({}, {'experiments': experiments})

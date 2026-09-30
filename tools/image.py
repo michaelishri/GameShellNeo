@@ -9,6 +9,7 @@ import shutil
 import struct
 import subprocess
 from usb_poll_boot import boot_script, verify_scripts
+import keypad_supply
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = json.loads((ROOT / 'build/sources.lock.json').read_text())
@@ -86,6 +87,10 @@ def finalize(root, loop):
         raise SystemExit('uImage overlaps DTB load address')
     dtb = 'sun8i-r16-clockworkpi-cpi3.dtb'
     shutil.copyfile(kernel / 'arch/arm/boot/dts/allwinner' / dtb, boot / dtb)
+    keypad = None
+    if keypad_supply.enabled(LOCK):
+        shutil.copyfile(boot / dtb, boot / keypad_supply.BASE_DTB)
+        keypad = keypad_supply.prepare(boot / keypad_supply.BASE_DTB, boot / dtb)
     if (boot / dtb).stat().st_size >= 0x100000:
         raise SystemExit('Unexpectedly large DTB')
     partuuid = subprocess.check_output(['blkid', '-s', 'PARTUUID', '-o', 'value', loop + 'p2'], text=True).strip()
@@ -109,6 +114,8 @@ def finalize(root, loop):
     identity = {'version': LOCK['image_version'], 'board': LOCK['board'], 'kernel': release,
                 'hardware_qualified': False, 'root_partuuid': partuuid,
                 'sources': LOCK, 'project_inputs_sha256': input_manifest()}
+    if keypad is not None:
+        identity['keypad_supply'] = keypad
     if selected is not None:
         files = {}
         for mode in ('stock', 'experimental'):

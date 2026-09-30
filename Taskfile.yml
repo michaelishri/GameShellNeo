@@ -30,6 +30,7 @@ env:
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
   NEO_CHECKPOINT_NAME: '{{.NAME | default ""}}'
+  NEO_RECOVERY_UPLOAD: '{{.UPLOAD | default "0"}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
   NEO_COOLING_STARTED: '{{.COOLING_STARTED | default ""}}'
   NEO_COMPARISON_CAPTURE: '{{.CAPTURE | default ""}}'
@@ -249,6 +250,10 @@ tasks:
     desc: Three traced devices debug cycles with internal keypad persistence on/off/on; restore each phase
     cmds: [python3 tools/check-pm-stages.py --keypad-compare]
 
+  device:keypad-retention:
+    desc: Trace 1..4 devices debug cycles on the retention image; record supply and original-handle continuity
+    cmds: [python3 tools/check-pm-stages.py --keypad-retention]
+
   device:pm-test:
     desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required
     cmds: [python3 tools/check-pm-stages.py --test]
@@ -358,6 +363,10 @@ tasks:
     cmds:
       - task: image:pack
       - python3 tools/remote.py mac stage
+
+  mac:stage-recovery:
+    desc: Select a verified recovery checkpoint on the Mac; reuse its existing archive when present; NAME required
+    cmds: [python3 tools/remote.py mac stage-recovery]
 
   mac:backup:
     desc: Read and verify the complete original card, copy archive to Linux, and eject

@@ -125,6 +125,8 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None)
 
 
 def compare_keypad(config, capture, lock):
+    if lock.get('experiments', {}).get('keypad_supply_retention'):
+        raise ValueError('Persistence comparison requires the power-off baseline image')
     results = []
     baseline = None
     for name, value in (('before', '1'), ('off', '0'), ('after', '1')):
@@ -151,6 +153,29 @@ def compare_keypad(config, capture, lock):
     print('Keypad persistence on/off/on comparison passed; original policy restored.', flush=True)
 
 
+def retention_result(result):
+    keypad = result['keypad']
+    if (not result['before']['keypad_retains_supply'] or
+            not result['after']['keypad_retains_supply'] or
+            keypad.get('trace_overrun') is not False or
+            keypad.get('trace_restored') is not True or
+            re.search(r'regulator_disable(?:_complete)?:.*keypad-vbus', keypad['trace'])):
+        raise ValueError('Supply retention or complete restored tracing was not demonstrated')
+    before, after = keypad['before'], keypad['after']
+    if any(before['usb']['power'][key] != after['usb']['power'][key]
+           for key in ('persist', 'control', 'wakeup')):
+        raise ValueError('Keypad persistence/runtime/wake policy changed')
+    old = keypad['old_handle_after']
+    return dict(run_id=result['run_id'], stage_seconds=result['stage_seconds'],
+                ready_after_stage_seconds=result['keypad_ready_after_stage']['seconds'],
+                original_handle_healthy=old['ioctl_errno'] is None and not old['disconnected'],
+                usb_device_number_unchanged=before['usb']['attributes']['devnum'] == after['usb']['attributes']['devnum'],
+                input_sysfs_unchanged=before['inputs'][0]['sysfs'] == after['inputs'][0]['sysfs'],
+                keypad_disconnects=len(re.findall(r'usb \d+-1: USB disconnect', result['journal_delta'])),
+                supply_disable_events=0,
+                limits='Software supply evidence and input-handle health; physical input, voltage and energy unmeasured.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -159,6 +184,7 @@ def main():
     mode.add_argument('--collect', action='store_true')
     mode.add_argument('--restore', action='store_true')
     mode.add_argument('--keypad-compare', action='store_true')
+    mode.add_argument('--keypad-retention', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     config = load_env()
@@ -190,11 +216,15 @@ def main():
     stage = os.environ.get('NEO_PM_STAGE', '')
     cycles = int(os.environ.get('NEO_PM_CYCLES', '1'))
     trace_option = os.environ.get('NEO_KEYPAD_TRACE', '0')
+    if args.keypad_retention:
+        stage, trace_option = 'devices', '1'
     if trace_option not in ('0', '1') or (trace_option == '1' and stage != 'devices'):
         raise ValueError('KEYPAD_TRACE=0/1; tracing requires STAGE=devices')
     if not args.keypad_compare and (stage not in ('freezer', 'devices') or not 1 <= cycles <= 4):
         raise ValueError('Explicit STAGE=freezer/devices and CYCLES=1..4 required')
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
+    if args.keypad_retention and lock.get('experiments', {}).get('keypad_supply_retention') is not True:
+        raise ValueError('Keypad retention requires its separately identified image')
     (capture / 'sources.lock.json').write_text(json.dumps(lock, indent=2) + '\n')
     with (LOCAL / 'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -204,7 +234,11 @@ def main():
         for index in range(cycles):
             directory = capture / ('cycle-' + str(index + 1))
             directory.mkdir(mode=0o700)
-            cycle(config, directory, lock, stage, trace_option == '1')
+            result = cycle(config, directory, lock, stage, trace_option == '1')
+            if args.keypad_retention:
+                summary = retention_result(result)
+                (directory / 'retention.json').write_text(json.dumps(summary, indent=2) + '\n')
+                print('Retention observation:', json.dumps(summary), flush=True)
             if index + 1 < cycles:
                 time.sleep(20)
 

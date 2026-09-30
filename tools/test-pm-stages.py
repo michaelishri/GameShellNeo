@@ -138,6 +138,7 @@ def snapshot():
                 usb_experiments={name: optional('/sys/module/axp20x_usb_power/parameters/' + name)
                                  for name in ('gameshellneo_slow_poll', 'gameshellneo_diagnostics')},
                 sdio_retains_power=Path('/sys/firmware/devicetree/base/soc/mmc@1c10000/keep-power-in-suspend').is_file(),
+                keypad_retains_supply=Path('/sys/firmware/devicetree/base/regulator-keypad/regulator-always-on').is_file(),
                 stats={p.name: read(p) for p in (POWER / 'suspend_stats').glob('*') if p.is_file()},
                 rsb={p.name: read(p) for p in rsb.glob('*') if p.is_file()},
                 rsb_links=links,
@@ -165,9 +166,14 @@ def snapshot():
 
 def validate(snapshot, lock):
     experiments = lock.get('experiments', {})
-    if experiments != {'suspend_diagnostics': True} or type(experiments.get('suspend_diagnostics')) is not bool:
+    retention = experiments.get('keypad_supply_retention', False)
+    if (experiments not in ({'suspend_diagnostics': True},
+                           {'suspend_diagnostics': True, 'keypad_supply_retention': True}) or
+            any(type(value) is not bool for value in experiments.values())):
         raise ValueError('A dedicated suspend diagnostic source lock is required')
     s = snapshot
+    if s['keypad_retains_supply'] is not retention:
+        raise ValueError('Live keypad supply policy differs from the image experiment')
     if (s['image']['board'] != 'gameshellneo-cpi31' or s['image']['version'] != lock['image_version'] or
             s['image']['sources'].get('experiments') != experiments or
             s['kernel'] != lock['linux']['tag'][1:] + lock['linux']['localversion'] or
@@ -268,10 +274,11 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None):
                 resumed = time.monotonic()
                 record['stage_seconds'] = resumed - started
                 record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == digest
-                if keypad_persist is not None:
+                if keypad_trace:
                     record['keypad_ready_after_stage'] = {}
+                    from keypad_pm import keypad_identity
                     wait_ready(record['keypad_ready_after_stage'], resumed,
-                               record['persistence']['identity'])
+                               keypad_identity(record['keypad']['before']))
                 # Keep the same minimum recovery window for every comparison phase.
                 time.sleep(max(0, 30 - (time.monotonic() - resumed)))
         after = snapshot()

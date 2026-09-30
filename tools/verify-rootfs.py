@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import zlib
 from usb_poll_boot import verify_scripts
+import keypad_supply
 
 
 def require(condition, message):
@@ -99,9 +100,8 @@ def main():
             relative = key.split('/lib/modules/', 1)[1]
             require(hashlib.sha256((root / 'usr/lib/modules' / relative).read_bytes()).hexdigest() == expected,
                     f'Installed module differs: {relative}')
-    dtb = boot / 'sun8i-r16-clockworkpi-cpi3.dtb'
-    require(hashlib.sha256(dtb.read_bytes()).hexdigest() == built['files']['.local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb'],
-            'Installed DTB differs from completed stage')
+    keypad_supply.verify_image(boot, identity,
+        built['files']['.local/build/kernel/arch/arm/boot/dts/allwinner/' + keypad_supply.DTB])
     for kind in ('firmware', 'nvram', 'license'):
         if kind not in identity['sources']['radio']:
             continue

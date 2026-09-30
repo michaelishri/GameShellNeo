@@ -4,11 +4,13 @@ import argparse
 import json
 from pathlib import Path
 import re
+from keypad_supply import enabled as keypad_retention
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def requirements(requested, lock):
+    keypad_retention(lock)
     requested = dict(requested)
     experiments = lock.get('experiments', {})
     suspend_tests = experiments.get('suspend_diagnostics', False)

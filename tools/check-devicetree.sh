@@ -22,4 +22,12 @@ docker run --rm --entrypoint bash -v "$PWD:/project" "$image" -c '
     fi
     echo "Device-tree schemas and board DTB: no diagnostics"
     python3 /project/tools/check-pm-board.py /project/.local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb
+    python3 /project/tools/check-keypad-supply.py
+    dt-validate -s /project/.local/build/schema.json /project/.local/build/keypad-supply.dtb \
+        > /project/.local/build/keypad-dt-validation.log 2>&1
+    if [[ -s /project/.local/build/keypad-dt-validation.log ]]; then
+        cat /project/.local/build/keypad-dt-validation.log >&2
+        exit 1
+    fi
+    echo "Keypad retention DTB: no schema diagnostics"
     '

@@ -7,6 +7,7 @@ import unittest
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 import usb_poll_boot
+import keypad_supply
 
 spec = importlib.util.spec_from_file_location('kernel_config', TOOLS / 'check-kernel-config.py')
 config = importlib.util.module_from_spec(spec)
@@ -14,6 +15,19 @@ spec.loader.exec_module(config)
 
 
 class SuspendBuildTests(unittest.TestCase):
+    def test_retention_is_explicit_and_isolated(self):
+        self.assertFalse(keypad_supply.enabled({}))
+        self.assertTrue(keypad_supply.enabled({'experiments': {
+            'suspend_diagnostics': True, 'keypad_supply_retention': True}}))
+        for experiments in ({'keypad_supply_retention': True},
+                            {'suspend_diagnostics': 1, 'keypad_supply_retention': True},
+                            {'suspend_diagnostics': True, 'keypad_supply_retention': False},
+                            {'suspend_diagnostics': True, 'keypad_supply_retention': 1},
+                            {'suspend_diagnostics': True, 'keypad_supply_retention': True,
+                             'usb_absent_poll': False}):
+            with self.assertRaises(ValueError):
+                config.requirements({}, {'experiments': experiments})
+
     def test_sleep_image_requires_debug_gates_and_excludes_automatic_sleep(self):
         required = config.requirements({}, {'experiments': {'suspend_diagnostics': True}})
         for option in ('CONFIG_SUSPEND', 'CONFIG_PM_SLEEP', 'CONFIG_PM_DEBUG', 'CONFIG_PM_SLEEP_DEBUG'):

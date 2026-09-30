@@ -420,9 +420,36 @@ def staged_arguments(sftp, directory):
             '--target', directory + '/target.json']
 
 
+def stage_recovery(client, sftp, directory, recovery, allow_upload=False):
+    compressed, metadata, manifest = recovery
+    destination = directory + '/' + compressed.name
+    try:
+        size = sftp.stat(destination).st_size
+    except FileNotFoundError:
+        size = None
+    if size is None:
+        if not allow_upload:
+            raise ValueError('Recovery archive is absent on the Mac; use UPLOAD=1 on an approved network')
+        print('Uploading retained recovery image to the Mac...', flush=True)
+        upload(sftp, compressed, destination)
+    elif size != manifest['compressed_bytes']:
+        raise ValueError('Existing Mac recovery archive has a different size; selection unchanged')
+    temporary = directory + '/transfer-recovery.json'
+    upload(sftp, metadata, temporary)
+    run(client, shlex.join(['/usr/bin/python3', '-u', directory + '/flash-macos.py',
+        '--image', destination, '--manifest', temporary,
+        '--target', directory + '/target.json', '--source-only']))
+    sftp.posix_rename(temporary, directory + '/transfer.json')
+    print('Recovery archive verified and selected; no card written:', manifest['image'], flush=True)
+
+
 def mac_action(config, action, disk):
     if action in ('inspect', 'flash', 'backup', 'compare') and not re.fullmatch(r'disk[1-9][0-9]*', disk):
         raise ValueError('Supply the inspected external whole disk as DISK=diskN')
+    recovery = None
+    if action == 'stage-recovery':
+        from recovery_image import resolve
+        recovery = resolve(ROOT, os.environ.get('NEO_CHECKPOINT_NAME', ''))
     with connect_mac(config) as client, client.open_sftp() as sftp:
         if action == 'status':
             run(client, 'sw_vers; diskutil list external physical; route -n get 192.168.10.1')
@@ -435,7 +462,12 @@ def mac_action(config, action, disk):
         upload(sftp, ROOT / 'tools/flash-macos.py', directory + '/flash-macos.py')
         if action == 'flash':
             upload(sftp, ROOT / 'tools/macos-mount-guard.c', directory + '/macos-mount-guard.c')
-        if action == 'stage':
+        if action == 'stage-recovery':
+            option = os.environ.get('NEO_RECOVERY_UPLOAD', '0')
+            if option not in ('0', '1'):
+                raise ValueError('UPLOAD must be 0 or 1')
+            stage_recovery(client, sftp, directory, recovery, option == '1')
+        elif action == 'stage':
             manifest = json.loads((LOCAL / 'flash/transfer.json').read_text())
             name = manifest['compressed_file']
             if Path(name).name != name:
@@ -538,7 +570,7 @@ def main():
                                           'wifi-scan-test', 'wifi-scan-restore'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))
     mac = sub.add_parser('mac')
-    mac.add_argument('action', choices=['status', 'backup', 'stage', 'inspect', 'preflight', 'flash', 'compare'])
+    mac.add_argument('action', choices=['status', 'backup', 'stage', 'stage-recovery', 'inspect', 'preflight', 'flash', 'compare'])
     mac.add_argument('--disk', default=os.environ.get('NEO_DISK', ''))
     args = parser.parse_args()
     os.umask(0o077)

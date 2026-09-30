@@ -79,7 +79,7 @@ configuration from diagnostic.6's polling experiment.
 [report 55](docs/55-diagnostic7-hardware-validation.md) records hardware
 evidence and outstanding keypad/MUSB recovery work. Diagnostic.6 remains
 available as a recovery image.
-The current image, `0.1.0-diagnostic.8` / `6.18.54-gameshellneo8`, has passed the
+The installed image, `0.1.0-diagnostic.8` / `6.18.54-gameshellneo8`, has passed the
 full kernel, device-tree and offline image checks, and its 266 MB archive is
 verified on the Mac. It adds the AXP USB polling
 suspend fix, the Sunxi MUSB unsupported-register correction, and bounded keypad
@@ -94,6 +94,12 @@ persistence wait, with about three seconds in the keypad USB resume callback.
 Keypad continuity and actual sleep remain unresolved;
 [report 60](docs/60-diagnostic8-hardware-validation.md) records the evidence and
 next reversible persistence comparison.
+The next candidate, `0.1.0-diagnostic.9`, retains that same kernel binary and
+modules while adding one experimental device-tree property to retain the
+internal keypad supply. [Report 62](docs/62-keypad-supply-retention-preparation.md)
+records its preparation, diagnostic.8 recovery path and repeatable continuity
+test. It has not yet been flashed or hardware-qualified. Normal sleep stays
+disabled; retention energy and physical input behavior remain to be measured.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -276,6 +282,7 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task image:verify` | Repeat filesystem/content checks on the current bundled image |
 | `task image:pack` | Compress the verified image and record raw/transfer checksums |
 | `task image:checkpoint NAME=diagnostic7-before-usb-pm` | Verify the current raw/gzip image and retain its matching metadata before changing build identity; use a new name for each checkpoint |
+| `task mac:stage-recovery NAME=diagnostic8-before-keypad-retention` | Verify and select a checkpoint's matching recovery archive on the Mac; no card write |
 
 Image assembly automatically runs offline verification and collects its image,
 checksums, manifests, logs and package inventory in `.local/artifacts/`.
@@ -291,6 +298,15 @@ shares the build-stage lock so a running build cannot replace its inputs.
 Raw/gzip files remain at their original paths; keep those files with the
 checkpoint. This preserves recovery provenance but does not change which image
 the default packing/staging commands select.
+
+`mac:stage-recovery NAME=...` rechecks the checkpoint metadata and both retained
+artifact hashes, then verifies the compressed and decompressed archive on the
+Mac before selecting its transfer manifest. It reuses an existing Mac archive.
+If absent, it stops; explicitly add `UPLOAD=1` on an appropriate network to
+allow the large transfer. Current local build/transfer metadata remains intact.
+Then identify the intended DEV card again with `mac:status` and
+`mac:inspect DISK=diskN` before the normal preflight/flash/readback workflow.
+Selecting a recovery archive alone does not change the running device.
 
 Build-stage logs are `.local/build/kernel.log`, `prepare.log`, `devicetree.log`
 and `image.log`. For example, use `tail -f .local/build/image.log` while building.
@@ -872,6 +888,20 @@ about 3.3 seconds shorter in the debug stage, offset by about 1.5 seconds more
 re-enumeration delay afterwards. All three phases passed and restored the
 original policy. This does not yet fix input continuity or establish real
 sleep/wake latency; persistence remains enabled by default.
+
+On the separately identified diagnostic.9 retention image, use
+`task device:keypad-retention CYCLES=1`, then `CYCLES=4` after reviewing the first
+result. This runs traced devices debug stages with the same timing/restoration
+and independent SSH gates. It checks the live supply-retention property against
+the image lock and records original-handle health, USB/input identity, disconnect
+count and fresh-handle delay in each cycle's private `retention.json`. A lost
+original handle remains a negative continuity observation even when the device
+recovers successfully. Regulator-disable events, trace loss and restoration
+failures reject the observation. Physical input delivery and energy are separate
+tests. `device:keypad-compare` remains scoped to the power-off image.
+See [report 62](docs/62-keypad-supply-retention-preparation.md) for the exact
+build/recovery sequence. This candidate reuses `6.18.54-gameshellneo8` deliberately:
+the experimental difference is in the image's DTB, not the kernel binary.
 
 The helper serializes driver callbacks with `pm_async=0`, records the original
 controls, and restores them on exit and through independent `ExecStopPost`.

@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+Next candidate: [62 — Keypad supply-retention preparation](62-keypad-supply-retention-preparation.md)
+isolates one device-tree property on the unchanged diagnostic.8 kernel, with
+verified recovery selection and a saved continuity test. Hardware results and
+energy cost remain pending.
+
 Latest comparison: [61 — Keypad persistence](61-keypad-persistence-comparison.md)
 found roughly 1.8 seconds earlier healthy-handle availability with persistence
 off in an accepted on/off/on debug sequence. The original policy is restored;
@@ -34,6 +39,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [62 — Keypad supply-retention preparation](62-keypad-supply-retention-preparation.md) | Single-property diagnostic.9 DTB, unchanged kernel, checkpoint-based recovery and repeatable continuity qualification |
 | [61 — Keypad persistence comparison](61-keypad-persistence-comparison.md) | Verified on/off/on sequence, ~1.8 s earlier healthy input handle, restored policy, and trace-overflow correction |
 | [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md) | Verified installation/integration, eight PM debug cycles, zero ULPI warnings, keypad supply transitions and three-second recovery callback |
 | [59 — Diagnostic.8 preparation](59-diagnostic8-preparation.md) | Full kernel/image verification, diagnostic.7 recovery checkpoint and USB PM/keypad hardware sequence |

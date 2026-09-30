@@ -801,10 +801,22 @@ only an integrity check across this debug cycle.
 
 Initial hardware checks found that the internal keypad re-enumerates during
 devices-stage recovery, and the separate MUSB controller emits two warnings
-about an unsupported ULPI register. The recorder checks restored input names,
-not held-key state or application file handles, and rejects its listed fault
-markers rather than every driver warning. Preserve the complete journal and
-review those behaviors as described in report 55 before extending qualification.
+about an unsupported ULPI register. Reports 56–57 implement fixes for AXP
+polling lifetime and the MUSB accesses, awaiting the next image's qualification.
+The updated recorder checks an existing keypad input handle as well as the
+returned device: diagnostic.7 returns at the same path but leaves the old
+handle disconnected. A stage pass proves peripheral recovery, not uninterrupted
+input continuity. Held-button behavior still needs a physical test.
+
+`task device:keypad-inspect` saves read-only identity, stable input paths,
+persistence, wake capability and supply state. On the next diagnostic kernel,
+`task device:pm-test STAGE=devices CYCLES=1 KEYPAD_TRACE=1` additionally records
+selected USB PM messages and keypad regulator transitions. The bounded recorder
+uses a private trace instance, restores debug flags and rejects overflow.
+Current diagnostic.7 lacks the required tracing facilities and refuses that
+option before entering PM. Use `device:pm-restore` for interrupted trace/control
+recovery. [Report 58](docs/58-keypad-pm-investigation.md) records the source trace,
+live handle failure, saved commands and remaining retention/reopen comparison.
 
 The helper serializes driver callbacks with `pm_async=0`, records the original
 controls, and restores them on exit and through independent `ExecStopPost`.
@@ -823,7 +835,8 @@ owned controls still need restoration. Collection retrieves evidence and does
 not by itself repeat the network qualification. Helpers, ownership records and
 device results remain available for investigation. No remote task guarantees
 recovery from a hung kernel; physical power cycling/reflashing may be needed.
-The first hardware stage tests are deferred until the owner returns.
+The initial hardware stage tests and the updated input-handle observation have
+passed on diagnostic.7; real sleep and the new kernel changes remain unqualified.
 
 `device:battery-check ROUTE=wifi` runs the battery policy regressions against
 the **installed** guard after verifying its SHA-256 matches the tracked source.

@@ -22,9 +22,10 @@ def module(name, filename):
     return result
 
 
-def service_command(directory, stage, run_id):
+def service_command(directory, stage, run_id, keypad_trace=False):
     if (not re.fullmatch(r'/tmp/gameshellneo-pm\.[A-Za-z0-9]+', directory) or
-            stage not in ('freezer', 'devices') or not re.fullmatch(r'[0-9a-f]{32}', run_id)):
+            stage not in ('freezer', 'devices') or not re.fullmatch(r'[0-9a-f]{32}', run_id) or
+            type(keypad_trace) is not bool or (keypad_trace and stage != 'devices')):
         raise ValueError('Invalid PM stage, path or run ID')
     script = directory + '/test-pm-stages.py'
     # No SSH-owned pipe: USB may disconnect during the devices test.
@@ -34,12 +35,18 @@ def service_command(directory, stage, run_id):
             '/usr/bin/systemd-inhibit', '--what=handle-power-key:sleep:idle', '--mode=block',
             '--who=GameShellNeo PM diagnostic', '--why=Bounded freezer/devices debug test',
             '/usr/bin/python3', '-B', script, '--lock', directory + '/sources.lock.json',
-            '--stage', stage, '--run-id', run_id]
+            '--stage', stage, '--run-id', run_id] + (['--keypad-trace'] if keypad_trace else [])
 
 
 def inline(client, *args):
+    # Inline inspection/recovery also needs the same saved keypad helper.
+    program = ('import sys, types\n'
+               'keypad_helper = types.ModuleType("keypad_pm")\n'
+               'exec(' + repr((ROOT / 'tools/keypad_pm.py').read_text()) + ', keypad_helper.__dict__)\n'
+               'sys.modules["keypad_pm"] = keypad_helper\n' +
+               (ROOT / 'tools/test-pm-stages.py').read_text())
     return run(client, shlex.join(['sudo', '-n', 'python3', '-B', '-c',
-               (ROOT / 'tools/test-pm-stages.py').read_text(), *args]), display=False, timeout=40)
+               program, *args]), display=False, timeout=40)
 
 
 def wifi_proof(config, snapshot):
@@ -54,7 +61,7 @@ def collect(config, run_id):
         return json.loads(inline(client, '--collect', run_id))
 
 
-def cycle(config, capture, lock, stage):
+def cycle(config, capture, lock, stage, keypad_trace=False):
     with device(config, 'usb') as client:
         before = json.loads(inline(client, '--inspect'))
         (capture / 'before.json').write_text(json.dumps(before, indent=2) + '\n')
@@ -66,9 +73,10 @@ def cycle(config, capture, lock, stage):
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-pm.XXXXXXXX',
                         display=False).decode().strip()
         run_id = uuid.uuid4().hex
-        command = service_command(directory, stage, run_id)
+        command = service_command(directory, stage, run_id, keypad_trace)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/test-pm-stages.py', directory + '/test-pm-stages.py')
+            upload(sftp, ROOT / 'tools/keypad_pm.py', directory + '/keypad_pm.py')
             upload(sftp, ROOT / 'build/sources.lock.json', directory + '/sources.lock.json')
         (capture / 'run.json').write_text(json.dumps(dict(run_id=run_id, stage=stage, helper=directory)) + '\n')
         print('PM run:', run_id, 'helper:', directory, flush=True)
@@ -145,6 +153,9 @@ def main():
         return
     stage = os.environ.get('NEO_PM_STAGE', '')
     cycles = int(os.environ.get('NEO_PM_CYCLES', '1'))
+    trace_option = os.environ.get('NEO_KEYPAD_TRACE', '0')
+    if trace_option not in ('0', '1') or (trace_option == '1' and stage != 'devices'):
+        raise ValueError('KEYPAD_TRACE=0/1; tracing requires STAGE=devices')
     if stage not in ('freezer', 'devices') or not 1 <= cycles <= 4:
         raise ValueError('Explicit STAGE=freezer/devices and CYCLES=1..4 required')
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
@@ -154,7 +165,7 @@ def main():
         for index in range(cycles):
             directory = capture / ('cycle-' + str(index + 1))
             directory.mkdir(mode=0o700)
-            cycle(config, directory, lock, stage)
+            cycle(config, directory, lock, stage, trace_option == '1')
             if index + 1 < cycles:
                 time.sleep(20)
 

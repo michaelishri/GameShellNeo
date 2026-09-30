@@ -57,6 +57,10 @@ USB experiments remain off with their existing PM_SLEEP refusal guard intact.
 The SDIO node advertises `keep-power-in-suspend`, matching brcmfmac's retained
 power request when card power-off is not enabled; no radio wake or full card
 power-off is qualified. See [report 54](../docs/54-staged-pm-diagnostic.md).
+The next diagnostic fragment also enables dynamic debug and event tracing for
+the opt-in keypad recorder, with function instrumentation disabled. Trace
+capture and recovery are documented in [report 58](../docs/58-keypad-pm-investigation.md);
+this does not change keypad power policy or enable normal sleep.
 CPU DVFS uses upstream operating points with
 the CPU supply correctly linked. Timings, voltage behavior and peripheral
 compatibility still require physical qualification.

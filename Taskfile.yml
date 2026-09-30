@@ -28,6 +28,7 @@ env:
   NEO_PM_STAGE: '{{.STAGE | default ""}}'
   NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
   NEO_PM_RUN: '{{.RUN | default ""}}'
+  NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
   NEO_COOLING_STARTED: '{{.COOLING_STARTED | default ""}}'
   NEO_COMPARISON_CAPTURE: '{{.CAPTURE | default ""}}'
@@ -234,6 +235,10 @@ tasks:
   device:pm-inspect:
     desc: Read PM capabilities and RSB debug state over USB without entering suspend
     cmds: [python3 tools/check-pm-stages.py --inspect]
+
+  device:keypad-inspect:
+    desc: Save keypad identity, USB persistence, input paths and power state without changing policy
+    cmds: [python3 tools/check-keypad.py]
 
   device:pm-test:
     desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required

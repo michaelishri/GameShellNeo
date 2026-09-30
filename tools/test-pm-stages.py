@@ -228,9 +228,11 @@ def check_result(before, after, stage, memory_ok):
     return delta
 
 
-def test_stage(lock, stage, run_id):
+def test_stage(lock, stage, run_id, keypad_trace=False):
     if stage not in STAGES:
         raise ValueError('Only freezer and devices are permitted')
+    if keypad_trace and stage != 'devices':
+        raise ValueError('Keypad tracing is restricted to the devices debug stage')
     directory = result_dir(run_id)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     record = dict(run_id=run_id, stage=stage, passed=False, event='started',
@@ -249,14 +251,17 @@ def test_stage(lock, stage, run_id):
         save(directory / 'started.json', record)
         memory = bytearray(os.urandom(4 * 1024 * 1024))
         digest = hashlib.sha256(memory).hexdigest()
-        started = time.monotonic()
-        with stage_controls(stage):
-            os.sync()
-            enter_stage(stage)
-        record['stage_seconds'] = time.monotonic() - started
-        record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == digest
-        # Allow the USB gadget, SDIO network and periodic health cache to recover.
-        time.sleep(30)
+        from keypad_pm import observe
+        record['keypad'] = {}
+        with observe(record['keypad'], tracing=keypad_trace):
+            started = time.monotonic()
+            with stage_controls(stage):
+                os.sync()
+                enter_stage(stage)
+            record['stage_seconds'] = time.monotonic() - started
+            record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == digest
+            # Allow the USB gadget, SDIO network and health cache to recover.
+            time.sleep(30)
         after = snapshot()
         record['after'] = after
         validate(after, lock)
@@ -278,9 +283,12 @@ def main():
     mode.add_argument('--stage', choices=STAGES)
     parser.add_argument('--run-id')
     parser.add_argument('--lock', type=Path)
+    parser.add_argument('--keypad-trace', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
+        from keypad_pm import restore_trace
+        restore_trace()
         restore()
     elif args.inspect:
         print(json.dumps(snapshot()))
@@ -297,7 +305,7 @@ def main():
             raise SystemExit(128 + signum)
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(sig, interrupted)
-        test_stage(json.loads(read(args.lock)), args.stage, args.run_id)
+        test_stage(json.loads(read(args.lock)), args.stage, args.run_id, args.keypad_trace)
 
 
 if __name__ == '__main__':

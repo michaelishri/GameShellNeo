@@ -6,6 +6,9 @@ and its 270 MB archive is staged on the Mac with compressed/decompressed
 checksums passed. It has not been flashed or booted. Diagnostic.10 remains
 installed on the GameShell.
 
+Subsequent installation and boot evidence is tracked separately in
+[report 73](73-diagnostic11-installation.md).
+
 ## Candidate contents
 
 - Image version `0.1.0-diagnostic.11`; kernel `6.18.54-gameshellneo11`.

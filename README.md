@@ -314,6 +314,17 @@ setup/teardown errors. Evidence is in `.local/build/usb-suspend-tests/`.
 [report 56](docs/56-usb-suspend-work.md) records the checks and remaining hardware
 and notification-work qualification before deeper PM tests.
 
+For the Sunxi MUSB context capability fix, use:
+
+```sh
+task test:musb-context  # Compare actual old/new register operations, native + ARM32
+task check:musb-drivers # Also compile the complete MUSB core and Sunxi ARM objects
+```
+
+Evidence is in `.local/build/musb-context-tests/`; `task build` includes the
+source regression. [Report 57](docs/57-musb-context-capability.md) records the
+unsupported-register correction and pending new-image hardware checks.
+
 For the opt-in USB polling experiment, use:
 
 ```sh

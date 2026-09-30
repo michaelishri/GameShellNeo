@@ -1,0 +1,46 @@
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -143,6 +143,7 @@
+  */
+ struct musb_platform_ops {
+ 
++#define MUSB_NO_ULPI_BUSCONTROL	BIT(10)
+ #define MUSB_G_NO_SKB_RESERVE	BIT(9)
+ #define MUSB_DA8XX		BIT(8)
+ #define MUSB_PRESERVE_SESSION	BIT(7)
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2669,7 +2669,8 @@
+ 
+ 	musb->context.frame = musb_readw(musb_base, MUSB_FRAME);
+ 	musb->context.testmode = musb_readb(musb_base, MUSB_TESTMODE);
+-	musb->context.busctl = musb_readb(musb_base, MUSB_ULPI_BUSCONTROL);
++	if (!(musb->ops->quirks & MUSB_NO_ULPI_BUSCONTROL))
++		musb->context.busctl = musb_readb(musb_base, MUSB_ULPI_BUSCONTROL);
+ 	musb->context.power = musb_readb(musb_base, MUSB_POWER);
+ 	musb->context.intrusbe = musb_readb(musb_base, MUSB_INTRUSBE);
+ 	musb->context.index = musb_readb(musb_base, MUSB_INDEX);
+@@ -2735,7 +2736,8 @@
+ 
+ 	musb_writew(musb_base, MUSB_FRAME, musb->context.frame);
+ 	musb_writeb(musb_base, MUSB_TESTMODE, musb->context.testmode);
+-	musb_writeb(musb_base, MUSB_ULPI_BUSCONTROL, musb->context.busctl);
++	if (!(musb->ops->quirks & MUSB_NO_ULPI_BUSCONTROL))
++		musb_writeb(musb_base, MUSB_ULPI_BUSCONTROL, musb->context.busctl);
+ 
+ 	/* Don't affect SUSPENDM/RESUME bits in POWER reg */
+ 	power = musb_readb(musb_base, MUSB_POWER);
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -605,7 +605,7 @@
+ }
+ 
+ static const struct musb_platform_ops sunxi_musb_ops = {
+-	.quirks		= MUSB_INDEXED_EP,
++	.quirks		= MUSB_INDEXED_EP | MUSB_NO_ULPI_BUSCONTROL,
+ 	.init		= sunxi_musb_init,
+ 	.exit		= sunxi_musb_exit,
+ 	.enable		= sunxi_musb_enable,

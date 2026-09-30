@@ -70,6 +70,7 @@ tasks:
       - task: test:nkmp
       - task: test:usb-lifecycle
       - task: test:usb-suspend
+      - task: test:musb-context
       - task: test:usb-policy
       - task: test:clock-ranges
       - task: build:kernel
@@ -145,6 +146,14 @@ tasks:
   test:usb-suspend:
     desc: Test actual AXP PM/IRQ work draining, wake errors and unwind natively and on ARM32
     cmds: [bash tools/run-logged.sh usb-suspend python3 tools/check-usb-suspend.py]
+
+  test:musb-context:
+    desc: Check actual MUSB context register behavior with and without the Sunxi quirk
+    cmds: [bash tools/run-logged.sh musb-context python3 tools/check-musb-context.py]
+
+  check:musb-drivers:
+    desc: Run context regressions and compile the full ARM MUSB core and Sunxi drivers
+    cmds: [bash tools/run-logged.sh musb-drivers python3 tools/check-musb-context.py --compile-drivers]
 
   check:usb-suspend-driver:
     desc: Run AXP suspend regressions and compile the complete ARM driver in isolated scratch

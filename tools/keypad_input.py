@@ -143,7 +143,7 @@ class Session:
         if down != set(expected):
             raise ValueError('Recorded key state mismatch: ' + name)
 
-    def wait_edges(self, start, code, values, seconds=15):
+    def wait_edges(self, start, code, values, seconds=30):
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
             edges = [(e['code'], e['value']) for e in self.log.key_events(start) if e['value'] != 2]
@@ -163,13 +163,18 @@ class Session:
                         'Tap and release ' + label + ' once.', 'Wait for the next instruction.')
             self.wait_edges(start, code, [1, 0])
             self.checkpoint(phase + '-released-' + label, [])
+            self.prompt(phase + '-' + label + '-confirmed', label + ' recorded (' + str(index) + '/4).',
+                        'Press and release received.', 'Do not press it again.',
+                        'Wait for the next button prompt.')
+            time.sleep(2)
+            self.wait_edges(start, code, [1, 0])  # Extra taps during confirmation still reject the run.
         self.prompt(phase + '-done', 'Four taps recorded.', 'Leave all buttons released.')
         time.sleep(1)
         self.checkpoint(phase + '-complete', [])
 
     def before_stage(self):
-        self.prompt('countdown', 'Leave all buttons released.', 'Starting in 5 seconds...')
-        time.sleep(5)
+        self.prompt('countdown', 'Leave all buttons released.', 'Starting in 10 seconds...')
+        time.sleep(10)
         self.checkpoint('initial', [])
         if self.log.key_events(0):
             raise ValueError('Buttons pressed before the sequence started')
@@ -191,10 +196,27 @@ class Session:
 
     def after_stage(self):
         time.sleep(0.1)  # Allow the reader to drain queued PM/repeat events.
-        self.verify_hold('after-stage')
+        edges = [(e['code'], e['value']) for e in self.log.key_events(self.hold_start) if e['value'] != 2]
+        modes = {((36, 1),): 'continuous', ((36, 1), (36, 0)): 'cleared',
+                 ((36, 1), (36, 0), (36, 1)): 'reasserted'}
+        mode = modes.get(tuple(edges))
+        if mode is None:
+            raise ValueError('Unexpected held-key edge sequence across PM')
+        self.record.update(hold_resume_mode=mode, continuous_hold=mode == 'continuous')
+        expected = [] if mode == 'cleared' else [36]
+        self.checkpoint('after-stage', expected)
         _, start = self.log.state()
-        self.prompt('release', 'RELEASE A now.', 'Then leave all buttons released.')
-        self.wait_edges(start, 36, [0])
+        if mode == 'cleared':
+            self.prompt('release', 'RELEASE A now.', 'Linux cleared its held-key state.',
+                        'Next button prompt in 4 seconds.')
+            time.sleep(4)
+            if self.log.key_events(start):
+                raise ValueError('Unexpected key activity during release of cleared A')
+            self.record['physical_release_event_observed'] = False
+        else:
+            self.prompt('release', 'RELEASE A now.', 'Then leave all buttons released.')
+            self.wait_edges(start, 36, [0])
+            self.record['physical_release_event_observed'] = True
         self.checkpoint('released-after-stage', [])
         time.sleep(1)
         self.taps('after')

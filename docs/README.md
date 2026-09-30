@@ -16,9 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current physical-input work:
+Latest physical-input qualification:
 [64 — Keypad physical input](64-keypad-physical-input-validation.md) records the
-saved on-screen tap/hold/release task and its qualification status.
+saved on-screen task and successful A/B/X/Y delivery before/after a driver test.
+The original input connection survived; held A was deliberately cleared by
+Linux's input suspend callback, with fresh taps and an empty final key state.
 
 Latest hardware:
 [63 — Keypad retention hardware validation](63-keypad-retention-hardware-validation.md)

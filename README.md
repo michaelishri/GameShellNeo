@@ -105,6 +105,11 @@ earlier than the previous fastest power-off candidate; this is diagnostic timing
 not real wake latency. [Report 63](docs/63-keypad-retention-hardware-validation.md)
 records the results and remaining USB reset cost. Normal sleep stays disabled;
 retention energy and physical input behavior remain to be measured.
+[Report 64](docs/64-keypad-physical-input-validation.md) subsequently qualified
+A/B/X/Y presses and releases before and after a driver test through that same
+handle. Linux deliberately cleared held A during its input suspend callback;
+fresh taps worked afterward, with no stuck key. Other input cases and actual
+sleep remain unqualified.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -913,13 +918,19 @@ To qualify physical input on this retention image, run
 one devices debug cycle and displays the complete sequence on the GameShell:
 tap/release A, B, X and Y as prompted; press and hold A through the driver test;
 release only at `RELEASE A`; then repeat the four taps. Each button prompt has
-a 15-second deadline; the whole device service is bounded to four minutes.
+a 30-second deadline and a two-second recorded confirmation after a ten-second
+initial countdown; the whole device service is bounded to seven minutes.
 Keep all other controls untouched, including power. Both SSH routes must pass
 preflight; the device repeats its health checks after the initial button input.
 
 The recorder reads physical evdev events through the same original handle,
 temporarily grabs only the internal keypad to keep input out of the login
-console, and checks held-key bitmaps before/after PM and release. Queue loss,
+console, and checks held-key bitmaps before/after PM and release. It distinguishes
+continuous holds, a kernel-cleared hold and a cleared/reasserted hold. A cleared
+hold is accepted as an observation only when its release timestamp falls inside
+the keypad input device's traced suspend callback; it is never reported as
+continuous. If Linux already cleared A, its later physical release need not
+produce another event; successful fresh A taps still must follow. Queue loss,
 unexpected edges, a changed device or a failed cleanup reject the sequence.
 The screen contents/cursor are restored, and closing the fd releases the grab
 even if the worker is killed. Independent PM recovery also restores the owned

@@ -79,7 +79,7 @@ class EventEvidence(unittest.TestCase):
         session.log.feed(event(37, 1))
         with self.assertRaisesRegex(ValueError, 'Unexpected button'):
             session.wait_edges(0, 36, [1])
-        with patch.object(keys.time, 'monotonic', side_effect=[0, 20]), self.assertRaises(TimeoutError):
+        with patch.object(keys.time, 'monotonic', side_effect=[0, 40]), self.assertRaises(TimeoutError):
             session.wait_edges(1, 36, [0])
 
     def simulate(self):
@@ -93,7 +93,7 @@ class EventEvidence(unittest.TestCase):
                     session.log.feed(event(code, 1) + event(code, 0))
             if phase == 'hold':
                 session.log.feed(event(36, 1))
-            if phase == 'release':
+            if phase == 'release' and session.log.state()[0]:
                 session.log.feed(event(36, 0))
         return record, session, prompt
 
@@ -118,7 +118,7 @@ class EventEvidence(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'complete ordered sequence'):
             host.validate_physical_result(result, retention)
 
-    def test_release_repress_during_pm_is_not_continuous_hold(self):
+    def test_release_repress_before_pm_is_rejected(self):
         record, session, prompt = self.simulate()
         with patch.object(session, 'prompt', side_effect=prompt), \
                 patch.object(Path, 'write_text'), patch.object(keys.time, 'sleep'), \
@@ -126,8 +126,38 @@ class EventEvidence(unittest.TestCase):
             session.before_stage()
             session.log.feed(event(36, 0) + event(36, 1))
             with self.assertRaisesRegex(ValueError, 'hold interrupted'):
-                session.after_stage()
+                session.verify_hold('immediately-before-entry')
         self.assertFalse(record['passed'])
+
+    def test_kernel_clear_is_classified_and_requires_trace_correlation(self):
+        for reassert in (False, True):
+            record, session, prompt = self.simulate()
+            with patch.object(session, 'prompt', side_effect=prompt), \
+                    patch.object(Path, 'write_text'), patch.object(keys.time, 'sleep'), \
+                    patch.object(keys, 'handle_state', side_effect=lambda fd: state(session.log.state()[0])):
+                session.before_stage()
+                session.verify_hold('immediately-before-entry')
+                session.log.feed(event(36, 0))
+                if reassert:
+                    session.log.feed(event(36, 1))
+                session.after_stage()
+                session.checkpoint('final', [])
+            self.assertTrue(record['passed'])
+            self.assertFalse(record['continuous_hold'])
+            self.assertEqual(record['hold_resume_mode'], 'reasserted' if reassert else 'cleared')
+            self.assertEqual(record['physical_release_event_observed'], reassert)
+            record.update(grab_released=True, console_restored=True)
+            retention = dict(original_handle_healthy=True, usb_device_number_unchanged=True,
+                             input_sysfs_unchanged=True, keypad_disconnects=0)
+            result = dict(physical_input=record, keypad=dict(old_handle_after=state(),
+                before={'inputs': [{'sysfs': '/sys/devices/fixture/input/input1/event1'}]},
+                trace=' t [0] ... 123.000450: device_pm_callback_start: input input1, parent: hid, type [suspend]\n'
+                      ' t [0] ... 123.000460: device_pm_callback_end: input input1, err=0'))
+            host.validate_physical_result(result, retention)
+            self.assertEqual(record['suspend_release_correlation']['event_seconds'], 123.000456)
+            result['keypad']['trace'] = result['keypad']['trace'].replace('123.000460', '123.000451')
+            with self.assertRaisesRegex(ValueError, 'not correlated'):
+                host.validate_physical_result(result, retention)
 
 
 class Cleanup(unittest.TestCase):
@@ -195,7 +225,7 @@ class EntryGuards(unittest.TestCase):
                 pm.test_stage(lock, stage, 'a'*32, trace, persist, True)
             directory.assert_not_called()
         args = host.service_command('/tmp/gameshellneo-pm.test', 'devices', 'a'*32, True, None, True)
-        self.assertIn('--property=RuntimeMaxSec=240', args)
+        self.assertIn('--property=RuntimeMaxSec=420', args)
         self.assertIn('--keypad-input', args)
         self.assertTrue(any(a.startswith('--property=ExecStopPost=') for a in args))
 

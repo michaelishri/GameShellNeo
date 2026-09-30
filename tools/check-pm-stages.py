@@ -34,7 +34,7 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
     script = directory + '/test-pm-stages.py'
     # No SSH-owned pipe: USB may disconnect during the devices test.
     return ['sudo', '-n', 'systemd-run', '--quiet', '--collect', '--unit=gameshellneo-pm-test',
-            '--property=RuntimeMaxSec=' + ('240' if keypad_input else '120'), '--property=TimeoutStopSec=15',
+            '--property=RuntimeMaxSec=' + ('420' if keypad_input else '120'), '--property=TimeoutStopSec=15',
             '--property=UMask=0077', '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
             '/usr/bin/systemd-inhibit', '--what=handle-power-key:sleep:idle', '--mode=block',
             '--who=GameShellNeo PM diagnostic', '--why=Bounded freezer/devices debug test',
@@ -94,7 +94,7 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
             run(client, shlex.join(command), display=False, timeout=20)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             (capture / 'submission-error.txt').write_text(type(error).__name__ + '\n')
-    deadline = time.monotonic() + (300 if keypad_input else 180)
+    deadline = time.monotonic() + (480 if keypad_input else 180)
     while time.monotonic() < deadline:
         time.sleep(5)
         try:
@@ -193,15 +193,46 @@ def validate_physical_result(result, retention):
         raise ValueError('Physical input, original-handle continuity or cleanup failed')
     taps = [(code, value) for _, code in BUTTONS for value in (1, 0)]
     edges = [(e['code'], e['value']) for e in physical['events'] if e['type'] == 1 and e['value'] != 2]
-    if edges != taps + [(36, 1), (36, 0)] + taps:
+    mode = physical.get('hold_resume_mode')
+    hold_edges = [(36, 1), (36, 0)] * (2 if mode == 'reasserted' else 1)
+    if mode not in ('continuous', 'cleared', 'reasserted') or edges != taps + hold_edges + taps:
         raise ValueError('Physical input did not deliver the complete ordered sequence')
+    if (physical.get('continuous_hold') is not (mode == 'continuous') or
+            physical.get('physical_release_event_observed') is not (mode != 'cleared')):
+        raise ValueError('Physical held-key classification is inconsistent')
     checks = {c['name']: c['handle'] for c in physical['checkpoints']}
-    for name, expected in (('immediately-before-entry', [36]), ('after-stage', [36]),
+    for name, expected in (('immediately-before-entry', [36]), ('after-stage', [] if mode == 'cleared' else [36]),
                            ('released-after-stage', []), ('final', [])):
         state = checks.get(name, {})
         if (state.get('held_key_codes') != expected or state.get('ioctl_errno') is not None or
                 state.get('hung_up') is not False or state.get('poll_error') is not False):
             raise ValueError('Missing healthy physical-input checkpoint: ' + name)
+    if mode != 'continuous':
+        # Accept a cleared/reasserted observation only when its release falls
+        # inside the known input device's actual suspend callback. An early
+        # physical release before PM is not equivalent evidence.
+        input_name = result['keypad']['before']['inputs'][0]['sysfs'].split('/')[-2]
+        if not re.fullmatch(r'input[0-9]+', input_name):
+            raise ValueError('Unexpected input sysfs identity for release correlation')
+        start, intervals = None, []
+        for line in result['keypad']['trace'].splitlines():
+            match = re.search(r'\s([0-9]+\.[0-9]+): device_pm_callback_(start|end): input ' +
+                              input_name + r', (.*)', line)
+            if not match:
+                continue
+            if match[2] == 'start' and 'type [suspend]' in match[3]:
+                start = float(match[1])
+            elif match[2] == 'end' and start is not None:
+                if match[3] == 'err=0':
+                    intervals.append((start, float(match[1])))
+                start = None
+        key_events = [e for e in physical['events'] if e['type'] == 1 and e['value'] != 2]
+        release = key_events[len(taps) + 1]['seconds']
+        matched = [(start, end) for start, end in intervals if start <= release <= end]
+        if len(matched) != 1:
+            raise ValueError('Held-key release is not correlated with input suspend')
+        physical['suspend_release_correlation'] = dict(event_seconds=release,
+            callback_start_seconds=matched[0][0], callback_end_seconds=matched[0][1])
 
 
 def main():
@@ -272,8 +303,10 @@ def main():
                 print('Retention observation:', json.dumps(summary), flush=True)
             if args.keypad_input:
                 validate_physical_result(result, summary)
+                (directory / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
                 (directory / 'physical-input.json').write_text(json.dumps(result['physical_input'], indent=2) + '\n')
-                print('Physical tap/hold/release sequence passed on the original input handle.', flush=True)
+                print('Physical taps passed on the original input handle; held-key resume mode:',
+                      result['physical_input']['hold_resume_mode'], flush=True)
             if index + 1 < cycles:
                 time.sleep(20)
 

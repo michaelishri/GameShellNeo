@@ -26,7 +26,8 @@ FAULTS = ('WARNING:', 'Oops:', 'Kernel panic', 'Firmware has halted or crashed',
           'failed to resume', 'error -110', 'Failed to set pm_flags',
           'Failed to probe device on resume', 'Failed to remove device on suspend',
           'error while changing bus sleep state', 'HT Avail request error',
-          'HT Avail read error', 'HT Avail timeout', 'ChipClkCSR access:')
+          'HT Avail read error', 'HT Avail timeout', 'ChipClkCSR access:',
+          'sunxi-musb does not have ULPI bus control register')
 
 
 def read(path):
@@ -288,8 +289,10 @@ def main():
     os.umask(0o077)
     if args.restore:
         from keypad_pm import restore_trace
-        restore_trace()
-        restore()
+        try:
+            restore_trace()
+        finally:
+            restore()
     elif args.inspect:
         print(json.dumps(snapshot()))
     elif args.collect:

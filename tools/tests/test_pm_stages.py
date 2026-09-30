@@ -105,6 +105,18 @@ class Controls(unittest.TestCase):
         self.assertTrue(pm.STATE.exists())
         pm.restore()
 
+    def test_trace_restore_failure_still_restores_pm_controls(self):
+        pm.STATE.write_text(json.dumps(dict(boot_id='boot-one', pm_test='none', pm_async='1')))
+        (pm.POWER / 'pm_test').write_text('devices')
+        (pm.POWER / 'pm_async').write_text('0')
+        with patch.object(sys, 'argv', ['pm-test', '--restore']), \
+                patch('keypad_pm.restore_trace', side_effect=OSError('trace cleanup failure')):
+            with self.assertRaises(OSError):
+                pm.main()
+        self.assertFalse(pm.STATE.exists())
+        self.assertEqual(pm.selected(pm.read(pm.POWER / 'pm_test')), 'none')
+        self.assertEqual(pm.read(pm.POWER / 'pm_async'), '1')
+
     def test_killed_worker_can_be_restored_from_a_fresh_process(self):
         program = '''
 import runpy, sys, time
@@ -193,6 +205,7 @@ class Evidence(unittest.TestCase):
                      dict(journal=after['journal'] + 'WARNING: fault\n'),
                      dict(journal=after['journal'] + 'brcmfmac: error while changing bus sleep state -5\n'),
                      dict(journal=after['journal'] + 'brcmfmac: HT Avail timeout\n'),
+                     dict(journal=after['journal'] + 'sunxi-musb does not have ULPI bus control register\n'),
                      dict(stats=after['stats'] | {'success': '4'}),
                      dict(stats=after['stats'] | {'failed_suspend': '1'}),
                      dict(backlight={}), dict(inputs=[]), dict(pm={'pm_async': '0'}),

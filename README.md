@@ -52,7 +52,7 @@ passed the stock/experimental cable and startup tests in
 aggregate PMIC bus interrupts, with no resolved battery-power difference.
 The driver defaults off; diagnostic images explicitly opt in after
 board/topology/PMIC checks. Diagnostic.4/5 recovery images are retained.
-The installed candidate, `0.1.0-diagnostic.6` / `6.18.54-gameshellneo6`, adds direct
+The earlier candidate, `0.1.0-diagnostic.6` / `6.18.54-gameshellneo6`, adds direct
 USB callback diagnostics and the tested upstream A0 firmware candidate.
 It has passed the build/offline checks, Mac transfer verification and guarded
 card flash with full readback. [Report 51](docs/51-diagnostic6-preparation.md)
@@ -79,6 +79,13 @@ configuration from diagnostic.6's polling experiment.
 [report 55](docs/55-diagnostic7-hardware-validation.md) records hardware
 evidence and outstanding keypad/MUSB recovery work. Diagnostic.6 remains
 available as a recovery image.
+The next image, `0.1.0-diagnostic.8` / `6.18.54-gameshellneo8`, has passed the
+full kernel, device-tree and offline image checks, and its 266 MB archive is
+verified on the Mac. It adds the AXP USB polling
+suspend fix, the Sunxi MUSB unsupported-register correction, and bounded keypad
+PM tracing. Diagnostic.7's recovery image and matching metadata are retained.
+[Report 59](docs/59-diagnostic8-preparation.md) records the artifacts and next
+hardware sequence. These changes are not yet qualified on the board.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -260,6 +267,7 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task check:dt` | Binding and compiled device-tree validation in the pinned container |
 | `task image:verify` | Repeat filesystem/content checks on the current bundled image |
 | `task image:pack` | Compress the verified image and record raw/transfer checksums |
+| `task image:checkpoint NAME=diagnostic7-before-usb-pm` | Verify the current raw/gzip image and retain its matching metadata before changing build identity; use a new name for each checkpoint |
 
 Image assembly automatically runs offline verification and collects its image,
 checksums, manifests, logs and package inventory in `.local/artifacts/`.
@@ -267,6 +275,14 @@ checksums, manifests, logs and package inventory in `.local/artifacts/`.
 can select an explicit image for verification; packing requires a match to the
 current bundle's verified hash and size. The image contains private credentials
 and firmware; do not publish it.
+
+`image:checkpoint` saves the completed image's source lock, kernel/configuration,
+patch queue, verification and transfer records under `.local/recovery/NAME/`.
+It verifies both retained artifact hashes, refuses an existing checkpoint and
+shares the build-stage lock so a running build cannot replace its inputs.
+Raw/gzip files remain at their original paths; keep those files with the
+checkpoint. This preserves recovery provenance but does not change which image
+the default packing/staging commands select.
 
 Build-stage logs are `.local/build/kernel.log`, `prepare.log`, `devicetree.log`
 and `image.log`. For example, use `tail -f .local/build/image.log` while building.
@@ -782,10 +798,10 @@ RSB supplier/consumer links. It also works on diagnostic.6, where sleep support
 is absent. Full private evidence includes radio/network state and kernel logs;
 only a small capability summary is printed. The task never enters suspend.
 
-`device:pm-test` requires diagnostic.7's exact image/kernel/radio, stock USB
+`device:pm-test` requires the currently locked image/kernel/radio, stock USB
 polling, normal sleep masks, SDIO power retention, USB power, healthy services
 and working USB/Wi-Fi SSH. Be present for the initial hardware tests and retain
-the diagnostic.6 recovery card image. Leave USB connected, the Mac awake, Wi-Fi
+the preceding verified recovery image. Leave USB connected, the Mac awake, Wi-Fi
 available and the controls untouched. Start with one `STAGE=freezer`, then one
 `STAGE=devices`. After those pass and the console/backlight return normally,
 `STAGE=devices CYCLES=4` repeats four identical cycles with 20 seconds between
@@ -811,7 +827,8 @@ input continuity. Held-button behavior still needs a physical test.
 `task device:keypad-inspect` saves read-only identity, stable input paths,
 persistence, wake capability and supply state. On the next diagnostic kernel,
 `task device:pm-test STAGE=devices CYCLES=1 KEYPAD_TRACE=1` additionally records
-selected USB PM messages and keypad regulator transitions. The bounded recorder
+selected USB PM messages, keypad regulator transitions and driver callback
+timings. The bounded recorder
 uses a private trace instance, restores debug flags and rejects overflow.
 Current diagnostic.7 lacks the required tracing facilities and refuses that
 option before entering PM. Use `device:pm-restore` for interrupted trace/control

@@ -29,6 +29,7 @@ env:
   NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
+  NEO_CHECKPOINT_NAME: '{{.NAME | default ""}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
   NEO_COOLING_STARTED: '{{.COOLING_STARTED | default ""}}'
   NEO_COMPARISON_CAPTURE: '{{.CAPTURE | default ""}}'
@@ -102,6 +103,10 @@ tasks:
   kernel:reset:
     desc: Archive only kernel scratch/output state before a changed patch queue
     cmds: [bash tools/run-logged.sh kernel-reset bash tools/reset-kernel.sh]
+
+  image:checkpoint:
+    desc: Verify and retain completed image/kernel/transfer metadata before a new build; NAME required
+    cmds: [bash tools/run-logged.sh checkpoint python3 tools/checkpoint-image.py]
 
   check:
     desc: Run host regression tests and shell lint; no device access

@@ -25,7 +25,8 @@ FUNCTIONS = {
 }
 EVENTS = ('regulator/regulator_disable', 'regulator/regulator_disable_complete',
           'regulator/regulator_enable', 'regulator/regulator_enable_complete',
-          'power/suspend_resume')
+          'power/suspend_resume', 'power/device_pm_callback_start',
+          'power/device_pm_callback_end')
 
 
 def optional(path):

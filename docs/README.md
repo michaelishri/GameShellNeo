@@ -16,12 +16,22 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Latest: [53 — RSB runtime PM comparison](53-rsb-runtime-pm-comparison.md): restored 100/20 ms trials with zero runtime-suspended time, reusable recovery and investigation limits.
-
-Next image: [54 — Staged PM diagnostic](54-staged-pm-diagnostic.md): isolated freezer/devices tests, retained SDIO power, source findings, recovery and pending hardware qualification.
+Latest hardware: [55 — Diagnostic.7 validation](55-diagnostic7-hardware-validation.md)
+and [58 — Keypad PM investigation](58-keypad-pm-investigation.md). The bounded
+driver tests pass, but the old keypad input handle is lost during recovery.
+Reports 56–57 implement AXP polling and MUSB fixes;
+[59 — Diagnostic.8 preparation](59-diagnostic8-preparation.md) records the
+new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [59 — Diagnostic.8 preparation](59-diagnostic8-preparation.md) | Full kernel/image verification, diagnostic.7 recovery checkpoint and USB PM/keypad hardware sequence |
+| [58 — Keypad PM investigation](58-keypad-pm-investigation.md) | Live handle-loss proof, OHCI/PHY power path, saved input observation and bounded next-image tracing |
+| [57 — MUSB context capability](57-musb-context-capability.md) | Sunxi-only unsupported-register correction, native/ARM32 equivalence and full ARM object builds |
+| [56 — AXP USB suspend work](56-usb-suspend-work.md) | Worker quiescence, wake-IRQ failure handling, actual-source regressions and remaining PMIC ordering gates |
+| [55 — Diagnostic.7 hardware validation](55-diagnostic7-hardware-validation.md) | Verified flash/boot, freezer/devices debug stages, network recovery and keypad/MUSB findings |
+| [54 — Staged PM diagnostic](54-staged-pm-diagnostic.md) | Diagnostic.7 preparation, SDIO retention contract, bounded stage tests and recovery |
+| [53 — RSB runtime PM comparison](53-rsb-runtime-pm-comparison.md) | Restored 100/20 ms trials with zero runtime-suspended time and reusable recovery |
 | [52 — Diagnostic.6 hardware validation](52-diagnostic6-hardware-validation.md) | Verified flash/boot, 76.9% fewer direct unplugged USB callbacks, bounded errors, eight cable cycles, four A0 cold starts and installed-firmware scan/recovery tests |
 | [51 — Diagnostic.6 preparation](51-diagnostic6-preparation.md) | Direct USB counts, bounded read-error diagnostics, pinned A0 firmware and qualification sequence |
 | [49 — Connected firmware validation](49-connected-firmware-validation.md) | Candidate association, four software reconnections and independently verified original-firmware recovery |

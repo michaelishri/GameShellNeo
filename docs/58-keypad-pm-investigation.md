@@ -113,7 +113,9 @@ not uninterrupted input continuity.
 
 The trace option enables only selected USB PM dynamic-debug callsites and a
 private tracefs instance. It records the keypad regulator's enable/disable
-events and the PM stage timeline, using a 128 KiB buffer per CPU. It saves
+events, the PM stage timeline and driver callback start/end times, using a
+128 KiB buffer per CPU. Callback timestamps support attribution of recovery
+delays without enabling function instrumentation. It saves
 trace data and overflow counters in the same private result. Any overflow fails
 the trace qualification. It does not enable global function tracing or change
 power, persistence, wake or autosuspend policy.
@@ -121,8 +123,8 @@ power, persistence, wake or autosuspend policy.
 The next kernel fragment enables dynamic debug and event tracing, with function
 instrumentation disabled. The recording itself is opt-in and restricted to
 `STAGE=devices`. Current diagnostic.7 refuses this option before entering PM
-because the required facilities are absent. This trace configuration still
-needs the next full build and hardware validation.
+because the required facilities are absent. The diagnostic.8 full build passed
+in [report 59](59-diagnostic8-preparation.md); hardware tracing remains pending.
 
 An ownership file records the selected debug flags and boot ID before mutation.
 Normal/error cleanup restores those flags and removes only the private trace
@@ -130,8 +132,8 @@ instance. The existing independent `ExecStopPost` also restores tracing;
 `task device:pm-restore` retries recovery after an interruption. Existing/foreign
 ownership is refused. No userspace cleanup can recover a hung kernel.
 
-Host tests cover event-path reuse with a dead original handle, descriptor-free
-input observation, cleanup after exceptions, bounded callsite selection,
+Host tests cover event-path reuse with a dead original handle, input-handle
+observation, cleanup after exceptions, bounded callsite selection,
 missing trace events, foreign ownership, failed restoration and overflow.
 The current ordinary observer also passed the physical cycle described above.
 The detailed trace has not yet run on hardware.
@@ -147,7 +149,8 @@ that comparison.
 If keeping power still loses the device, investigate OHCI context/port recovery
 and descriptor/control-transfer failures. If power removal is the eventual
 policy, measure cold initialization and test reopening by stable identity,
-including press-across-sleep and release-during-sleep cases. Those requirements
+including press-across-sleep and release-during-sleep cases. Clear stale pressed
+state when a handle is removed and reconcile the newly opened device. These requirements
 belong to the future input integration even though a launcher is out of scope.
 Keep power-button-only wake. No source or live change here enables keypad wake,
 improves measured sleep energy, or qualifies subsecond resume.

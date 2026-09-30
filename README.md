@@ -68,7 +68,7 @@ SSH routes. The saved installed-firmware test also passed four software
 reconnections, unavailable-network scanning and connection restoration.
 Physical AP-loss Wi-Fi qualification is deferred; the random-SSID simulation
 provides the current unavailable-network evidence. Broader power/sleep work remains.
-The installed image, `0.1.0-diagnostic.7` / `6.18.54-gameshellneo7`, passed
+The previous image, `0.1.0-diagnostic.7` / `6.18.54-gameshellneo7`, passed
 flash/readback, first-boot/integration, hotspot connection and both SSH routes.
 One freezer and five devices PM debug tests passed under NEO-37, including
 the owner's confirmation of normal console/backlight return after the first
@@ -86,6 +86,9 @@ suspend fix, the Sunxi MUSB unsupported-register correction, and bounded keypad
 PM tracing. Diagnostic.7's recovery image and matching metadata are retained.
 [Report 59](docs/59-diagnostic8-preparation.md) records the artifacts and next
 hardware sequence. These changes are not yet qualified on the board.
+The DEV-card flash, full readback and safe ejection have now passed;
+[report 60](docs/60-diagnostic8-hardware-validation.md) tracks boot and hardware
+qualification, which remain pending.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

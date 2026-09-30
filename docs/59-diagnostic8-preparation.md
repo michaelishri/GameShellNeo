@@ -6,6 +6,9 @@ passed offline verification and compressed/decompressed verification on the Mac,
 but has not booted on the board. The owner confirmed regular Wi-Fi before the
 transfer. No card has been written for this image.
 
+Subsequent card installation and hardware results are recorded separately in
+[report 60](60-diagnostic8-hardware-validation.md).
+
 ## Contents and boundaries
 
 The image identity advances to `0.1.0-diagnostic.8` and the kernel release to

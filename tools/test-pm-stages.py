@@ -198,12 +198,18 @@ def validate(snapshot, lock):
             'gameshellneo_slow_poll=' in s['cmdline'] or 'gameshellneo_diagnostics=' in s['cmdline']):
         raise ValueError('PM stage isolation or ordinary sleep policy failed')
     b = s['battery']
-    if (s['taint'] != '0' or s['failed_units'] or s['usb'] != ['configured'] or
-            'wpa_state=COMPLETED' not in s['wifi'].splitlines() or
-            b.get('monitoring') != 'valid' or not 0 <= s['battery_age_seconds'] <= 25 or
-            b.get('status') not in ('Charging', 'Full', 'Not charging') or b.get('capacity_percent', 0) <= 20 or
-            any(v != {'ActiveState': 'active', 'NRestarts': '0'} for v in s['services'].values())):
-        raise ValueError('Device must be healthy, USB-powered and connected to Wi-Fi')
+    health = dict(
+        kernel_taint=s['taint'] == '0', failed_units=not s['failed_units'],
+        usb_configured=s['usb'] == ['configured'],
+        wifi_connected='wpa_state=COMPLETED' in s['wifi'].splitlines(),
+        battery_monitoring=b.get('monitoring') == 'valid',
+        battery_freshness=0 <= s['battery_age_seconds'] <= 25,
+        battery_external_power=b.get('status') in ('Charging', 'Full', 'Not charging'),
+        battery_capacity=b.get('capacity_percent', 0) > 20,
+        services=all(v == {'ActiveState': 'active', 'NRestarts': '0'} for v in s['services'].values()))
+    failed = [name for name, passed in health.items() if not passed]
+    if failed:
+        raise ValueError('Device must be healthy, USB-powered and connected to Wi-Fi; failed: ' + ', '.join(failed))
 
 
 def check_result(before, after, stage, memory_ok):
@@ -249,6 +255,7 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None):
                   limits='PM debug stage only; no actual sleep, energy, wake or DRAM-retention proof.')
     try:
         before = snapshot()
+        record['before'] = before
         validate(before, lock)
         observers = ('rsb-comparison', 'idle-sample', 'power-profile', 'governor-profile',
                      'governor-comparison', 'usb-detection', 'usb-reconnects', 'usb-diagnostics',
@@ -257,7 +264,6 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None):
                    '--state=active,activating,deactivating',
                    *['gameshellneo-' + n + '.service' for n in observers]):
             raise ValueError('Stop concurrent diagnostic observers')
-        record['before'] = before
         save(directory / 'started.json', record)
         memory = bytearray(os.urandom(4 * 1024 * 1024))
         digest = hashlib.sha256(memory).hexdigest()

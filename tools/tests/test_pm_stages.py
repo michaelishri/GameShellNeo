@@ -171,6 +171,23 @@ else:
 
 
 class Evidence(unittest.TestCase):
+    def test_rejected_preflight_is_saved_without_entering_pm(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(pm, 'result_dir', return_value=Path(temporary)/'run'), \
+                patch.object(pm, 'snapshot', return_value={'fixture': 'rejected snapshot'}), \
+                patch.object(pm, 'validate', side_effect=ValueError('rejected health gate')), \
+                patch.object(pm, 'command') as command, patch.object(pm, 'enter_stage') as enter:
+            with self.assertRaisesRegex(ValueError, 'rejected health gate'):
+                pm.test_stage({}, 'devices', 'a'*32)
+            record = json.loads((Path(temporary)/'run/result.json').read_text())
+            self.assertEqual(record['before'], {'fixture': 'rejected snapshot'})
+            self.assertFalse(record['passed'])
+            self.assertEqual(record['event'], 'failed')
+            self.assertNotIn('stage_seconds', record)
+            self.assertFalse((Path(temporary)/'run/started.json').exists())
+            command.assert_not_called()
+            enter.assert_not_called()
+
     def test_preflight_accepts_only_the_isolated_healthy_image(self):
         lock = dict(experiments={'suspend_diagnostics': True}, image_version='diagnostic-test',
                     linux={'tag': 'v6.18.54', 'localversion': '-test'},
@@ -189,6 +206,8 @@ class Evidence(unittest.TestCase):
                     battery_age_seconds=2,
                     services={n: {'ActiveState': 'active', 'NRestarts': '0'} for n in pm.SERVICES})
         pm.validate(good, lock)
+        with self.assertRaisesRegex(ValueError, 'failed: usb_configured, battery_freshness'):
+            pm.validate(good | dict(usb=['suspended'], battery_age_seconds=26), lock)
         retained = deepcopy(good)
         retained_lock = deepcopy(lock)
         retained_lock['experiments']['keypad_supply_retention'] = True

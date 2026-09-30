@@ -910,7 +910,9 @@ A temporary logind inhibitor covers power-key/sleep/idle handling. Evidence is
 written on the device under `/var/lib/gameshellneo/pm-tests/<RUN>/` before and
 after the test; the host stores copies and the source lock under
 `.local/diagnostics/`. The systemd service owns execution independently of SSH,
-and both routes must reconnect to the original boot before a host pass is
+and a rejected device preflight also preserves its snapshot in the failed
+result, with the failed health-gate names. It does not enter a PM stage.
+For completed stages, both routes must reconnect to the original boot before a host pass is
 recorded. A 120-second service limit and 180-second host collection deadline
 bound ordinary failures; **they cannot recover a kernel or driver deadlock**.
 No automatic retry is made after missing evidence.

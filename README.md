@@ -898,6 +898,14 @@ available and the controls untouched. Start with one `STAGE=freezer`, then one
 `STAGE=devices CYCLES=4` repeats four identical cycles with 20 seconds between
 them. `CYCLES` defaults to one and accepts 1–4; there is no default stage.
 
+Each snapshot records the named USB and AC supplies' type, presence and online
+state. The power gate requires the AXP USB supply to be present and online as
+well as a configured USB controller. Battery status describes battery current
+flow; it is recorded independently and is not used as proof of external power.
+Battery monitoring, freshness and capacity checks still apply. Missing input
+evidence fails the gate. [Report 75](docs/75-pm-external-power-gate.md) records
+the correction and the limitations of earlier captures.
+
 These use the kernel's **five-second debug test**: `freezer` freezes/thaws
 processes; `devices` additionally invokes ordinary driver suspend/resume
 callbacks. They stop before late/noirq/platform stages and actual s2idle.

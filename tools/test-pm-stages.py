@@ -148,6 +148,9 @@ def snapshot():
                 sleep_config=read('/etc/systemd/sleep.conf.d/50-gameshellneo.conf'),
                 services=services, battery=battery,
                 battery_age_seconds=time.monotonic() - battery['monotonic_seconds'],
+                external_power={name: {field: read('/sys/class/power_supply/' + name + '/' + field)
+                                       for field in ('type', 'present', 'online')}
+                                for name in ('axp20x-usb', 'axp22x-ac')},
                 failed_units=command('systemctl', '--failed', '--no-legend', '--plain', '--no-pager'),
                 usb=[read(p) for p in Path('/sys/class/udc').glob('*/state')],
                 wifi=command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'status'),
@@ -198,13 +201,17 @@ def validate(snapshot, lock):
             'gameshellneo_slow_poll=' in s['cmdline'] or 'gameshellneo_diagnostics=' in s['cmdline']):
         raise ValueError('PM stage isolation or ordinary sleep policy failed')
     b = s['battery']
+    # Battery status describes current flow, not whether the PMIC has USB input.
+    # Require a fresh USB supply observation as well as the configured UDC below.
+    usb_supply = s.get('external_power', {}).get('axp20x-usb', {})
     health = dict(
         kernel_taint=s['taint'] == '0', failed_units=not s['failed_units'],
         usb_configured=s['usb'] == ['configured'],
         wifi_connected='wpa_state=COMPLETED' in s['wifi'].splitlines(),
         battery_monitoring=b.get('monitoring') == 'valid',
         battery_freshness=0 <= s['battery_age_seconds'] <= 25,
-        battery_external_power=b.get('status') in ('Charging', 'Full', 'Not charging'),
+        usb_external_power=usb_supply == {'type': 'USB', 'present': '1', 'online': '1'},
+        battery_status=b.get('status') in ('Charging', 'Discharging', 'Full', 'Not charging'),
         battery_capacity=b.get('capacity_percent', 0) > 20,
         services=all(v == {'ActiveState': 'active', 'NRestarts': '0'} for v in s['services'].values()))
     failed = [name for name, passed in health.items() if not passed]

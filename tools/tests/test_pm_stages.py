@@ -204,8 +204,27 @@ class Evidence(unittest.TestCase):
                     taint='0', failed_units='', usb=['configured'], wifi='wpa_state=COMPLETED\n',
                     battery={'monitoring': 'valid', 'status': 'Charging', 'capacity_percent': 70},
                     battery_age_seconds=2,
+                    external_power={'axp20x-usb': {'type': 'USB', 'present': '1', 'online': '1'},
+                                    'axp22x-ac': {'type': 'Mains', 'present': '1', 'online': '1'}},
                     services={n: {'ActiveState': 'active', 'NRestarts': '0'} for n in pm.SERVICES})
         pm.validate(good, lock)
+        # Battery current direction is independent of external input availability.
+        for status in ('Charging', 'Discharging', 'Full', 'Not charging'):
+            with self.subTest(status=status):
+                pm.validate(good | {'battery': good['battery'] | {'status': status}}, lock)
+        for power in ({}, {'axp22x-ac': good['external_power']['axp22x-ac']},
+                      *[{'axp20x-usb': good['external_power']['axp20x-usb'] | change}
+                        for change in ({'present': '0'}, {'online': '0'}, {'online': None},
+                                       {'present': 'invalid'}, {'type': 'Battery'})]):
+            with self.subTest(power=power), self.assertRaisesRegex(ValueError, 'usb_external_power'):
+                pm.validate(good | {'external_power': power}, lock)
+        missing_power = deepcopy(good)
+        del missing_power['external_power']
+        with self.assertRaisesRegex(ValueError, 'usb_external_power'):
+            pm.validate(missing_power, lock)
+        for change in ({'status': 'Unknown'}, {'monitoring': 'degraded'}, {'capacity_percent': 20}):
+            with self.subTest(battery=change), self.assertRaises(ValueError):
+                pm.validate(good | {'battery': good['battery'] | change}, lock)
         with self.assertRaisesRegex(ValueError, 'failed: usb_configured, battery_freshness'):
             pm.validate(good | dict(usb=['suspended'], battery_age_seconds=26), lock)
         retained = deepcopy(good)

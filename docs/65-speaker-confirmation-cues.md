@@ -1,7 +1,9 @@
 # GameShell speaker confirmation cues
 
-NEO-48, 30 September 2026. The image is built and offline-verified; speaker
-playback has not yet been qualified on the owner's board.
+NEO-48, 30 September 2026. The image is built, installed and qualified for
+quiet speaker confirmations on the owner's CPI v3.1. [Report 66](66-speaker-hardware-validation.md)
+records audible playback, full mixer/idle restoration and the successful
+audio-assisted input/driver PM test. Actual sleep and idle energy remain unqualified.
 
 The owner requested a sound when a prompted button is registered and explicitly
 chose the GameShell speaker. Diagnostic.9 has `CONFIG_SOUND` disabled, so a new
@@ -41,9 +43,12 @@ Primary source inspected locally:
 - `arch/arm/boot/dts/allwinner/sun8i-a33.dtsi` for the standard codec links.
 
 The upstream analogue driver retains its 700 ms headphone-amplifier startup
-delay. A cue may therefore arrive noticeably after input acceptance. Reducing
-that delay needs pop/noise and reliable-start evidence; this change does not
-alter it. Audio-enabled idle power also needs a separate measurement.
+delay. Because the helper powers down after every cue, that delay recurs for
+every accepted input, not only the first. The owner confirmed significant
+per-keypress delay and explicitly deferred a fix. Reducing the delay needs
+pop/noise and reliable-start evidence; retaining a ready output between cues
+would need a bounded lifetime and power comparison. This change does neither.
+Audio-enabled idle power also needs a separate measurement.
 
 ## Repeatable tasks and restoration
 
@@ -80,8 +85,9 @@ never blindly submitted again.
 
 The image contains ALSA utilities but masks ALSA state-restoration services
 and removes the automatic restore udev rule, keeping test mixer ownership
-explicit. Exact mixer names, DAPM widget paths, sound output, lack of unwanted
-pops, restoration and suspend recovery all require hardware qualification.
+explicit. The actual mixer/widget names, quiet sound output, restoration and
+one driver debug recovery cycle passed on the board, with no unwanted noise
+reported by the owner. This does not qualify wider playback or actual sleep.
 These interactive runs are unsuitable as latency or energy baselines.
 
 ## Recovery and verification
@@ -146,4 +152,6 @@ the candidate and passed compressed and decompressed checksum verification on
 the Mac. The private staging log is `.local/neo48-stage.log`. Card flash, full
 4 GiB readback and eject subsequently passed; [report 66](66-speaker-hardware-validation.md)
 records installation, boot/integration, the home Wi-Fi update and initial audio
-inspection. Audible playback and audio-assisted PM qualification remain pending.
+inspection. Three quiet tones and the nine-cue physical-input/driver PM test
+passed with full mixer/idle restoration and owner-confirmed clear sound and
+normal screen return. NEO-48 is complete within that diagnostic scope.

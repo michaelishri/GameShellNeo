@@ -69,9 +69,11 @@ Diagnostic.10 brings forward the upstream A33 digital/analogue codec, DAI and
 simple sound card for speaker confirmation cues. The standard simple amplifier
 owns PL3 and follows the board's AC-coupled stereo route. Its PS supply voltage
 is deliberately unspecified; no audio driver patch is added. The upstream
-700 ms analogue startup delay is retained. Normal sleep remains disabled,
-and playback, idle power and recovery need hardware qualification.
-See [report 65](../docs/65-speaker-confirmation-cues.md).
+700 ms analogue startup delay is retained. Quiet playback, mixer/idle
+restoration and one audio-assisted input/driver PM test passed on CPI v3.1.
+Normal sleep remains disabled; actual sleep, headphones and idle power remain
+unqualified. See [preparation report 65](../docs/65-speaker-confirmation-cues.md)
+and [hardware report 66](../docs/66-speaker-hardware-validation.md).
 
 A33 temperature sensing uses `SUN4I_GPADC`, despite the misleading older-family
 name. `SUN8I_THERMAL` alone does not bind the A33 sensor. Both the A33 ADC and

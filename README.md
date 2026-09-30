@@ -110,13 +110,15 @@ A/B/X/Y presses and releases before and after a driver test through that same
 handle. Linux deliberately cleared held A during its input suspend callback;
 fresh taps worked afterward, with no stuck key. Other input cases and actual
 sleep remain unqualified.
-[Diagnostic.10 preparation](docs/65-speaker-confirmation-cues.md) adds the
-upstream A33 speaker path for audible button-registration cues. The new image
-has passed offline verification, card flash/full readback, boot and integration.
-The sound card and its idle amplifier state are verified; playback and
-audio-assisted PM tests still need qualification. Diagnostic.9 remains
-the recovery baseline. [Report 66](docs/66-speaker-hardware-validation.md)
-records installation and the remaining hardware checks.
+The installed `0.1.0-diagnostic.10` image adds the upstream A33 speaker path
+for audible button-registration cues. Offline verification, card flash/full
+readback, boot/integration, three quiet speaker cues and the audio-assisted
+physical-input/driver PM test passed. All nine input cues completed, mixer and
+idle amplifier state were restored, and the owner confirmed clear tones and
+normal screen return. Diagnostic.9 remains the recovery baseline.
+[Report 65](docs/65-speaker-confirmation-cues.md) records preparation;
+[report 66](docs/66-speaker-hardware-validation.md) records hardware results.
+Actual sleep and audio-enabled idle power remain unqualified.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -960,6 +962,9 @@ delay is retained, so confirmation is not instantaneous.
 Use `task device:audio-collect RUN=...` to retrieve an interrupted standalone
 test and `task device:audio-restore` for its owned mixer recovery. The existing
 PM recovery tasks also restore audio after an audio-assisted keypad run.
+The owner observed a significant delay on every button confirmation: each cue
+powers the amplifiers up again and repeats the upstream 700 ms startup wait.
+Improving that latency is recorded for later investigation.
 See [report 65](docs/65-speaker-confirmation-cues.md) for routing, levels,
 recovery and qualification status.
 

@@ -16,11 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current build: [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md)
+Current image: [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md)
 adds upstream A33 audio and bounded speaker cues to the physical-input task.
 The image is built and offline-verified. [66 — Speaker hardware validation](66-speaker-hardware-validation.md)
-records its verified flash/full readback, boot, home Wi-Fi and initial audio
-inspection; audible playback and audio-assisted PM qualification are pending.
+records its verified flash/full readback, boot, home Wi-Fi, clear speaker tones
+and successful audio-assisted input/driver PM test, with complete restoration.
 Diagnostic.9 remains the recovery baseline.
 
 Latest physical-input qualification:
@@ -56,7 +56,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
-| [66 — Speaker hardware validation](66-speaker-hardware-validation.md) | Diagnostic.10 installation/integration, home Wi-Fi and initial audio inspection; playback/PM checks pending |
+| [66 — Speaker hardware validation](66-speaker-hardware-validation.md) | Diagnostic.10 installation/integration, home Wi-Fi, clear quiet tones and successful nine-cue input/driver PM test with full restoration |
 | [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md) | Upstream board audio route, quiet bounded cues, mixer/PM restoration and diagnostic.10 preparation |
 | [64 — Keypad physical input](64-keypad-physical-input-validation.md) | Repeatable physical press/release and held-key test through the original retained input handle |
 | [63 — Keypad retention hardware validation](63-keypad-retention-hardware-validation.md) | Diagnostic.9 installation/integration, repeated input-handle continuity, timing comparison and remaining reset/energy work |

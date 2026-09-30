@@ -918,6 +918,35 @@ original handle remains a negative continuity observation even when the device
 recovers successfully. Regulator-disable events, trace loss and restoration
 failures reject the observation. Physical input delivery and energy are separate
 tests. `device:keypad-compare` remains scoped to the power-off image.
+
+On the retention image, compare the internal keypad port's USB reset policy:
+
+```sh
+task device:keypad-quirks QUIRK=old-scheme CYCLES=2
+task device:keypad-quirks QUIRK=fast-recovery CYCLES=2
+```
+
+Each command runs baseline/candidate/baseline, with `CYCLES=1..4` tests per
+phase. Keep USB connected and Wi-Fi available; leave the controls untouched.
+`old-scheme` selects one reset rather than two; `fast-recovery` changes the
+post-reset recovery wait from 50 ms to 10–12 ms. They are tested separately,
+using the exact internal OHCI port's `quirks` attribute. Device quirks, global
+USB policy and persistence are unchanged. Each cycle restores the original
+port value, checks the original input handle, device identity, supply retention,
+complete tracing and both SSH routes, and records the USB resume callback time.
+An interrupted test also has device-owned restoration through `ExecStopPost`;
+use `device:pm-collect RUN=...` and `device:pm-restore` if collection fails.
+Do not resubmit an uncertain PM operation. A failed restoration retains its
+ownership record rather than silently accepting a changed policy.
+
+Results are in the printed private evidence directory: `comparison.json` and
+each phase's `result.json`/`quirks.json`. The means describe instrumented driver
+debug recovery, including neither real sleep qualification nor an energy result.
+Physical qualification uses `task device:keypad-input QUIRK=old-scheme AUDIO=1`
+(or `QUIRK=fast-recovery`) with the owner ready to follow the prompts. That
+interactive run restores the candidate afterward and is not a timing comparison.
+See [report 67](docs/67-keypad-port-recovery-comparison.md) for the locked-source
+analysis, validation and measured results.
 See [report 62](docs/62-keypad-supply-retention-preparation.md) for the exact
 build/recovery sequence. This candidate reuses `6.18.54-gameshellneo8` deliberately:
 the experimental difference is in the image's DTB, not the kernel binary.

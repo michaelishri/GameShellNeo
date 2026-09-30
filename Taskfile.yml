@@ -30,6 +30,7 @@ env:
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
   NEO_KEYPAD_AUDIO: '{{.AUDIO | default "0"}}'
+  NEO_KEYPAD_QUIRK: '{{.QUIRK | default ""}}'
   NEO_AUDIO_RUN: '{{.RUN | default ""}}'
   NEO_CHECKPOINT_NAME: '{{.NAME | default ""}}'
   NEO_RECOVERY_UPLOAD: '{{.UPLOAD | default "0"}}'
@@ -255,6 +256,10 @@ tasks:
   device:keypad-retention:
     desc: Trace 1..4 devices debug cycles on the retention image; record supply and original-handle continuity
     cmds: [python3 tools/check-pm-stages.py --keypad-retention]
+
+  device:keypad-quirks:
+    desc: Compare baseline/candidate/baseline keypad port quirks; QUIRK=old-scheme/fast-recovery, CYCLES=1..4 per phase
+    cmds: [python3 tools/check-pm-stages.py --keypad-quirks]
 
   device:keypad-input:
     desc: One owner-assisted retained-keypad driver test with on-screen tap/hold/release prompts

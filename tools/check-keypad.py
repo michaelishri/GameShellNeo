@@ -16,7 +16,7 @@ def main():
     (capture / 'keypad.json').write_bytes(data)
     value = json.loads(data)
     print('Private keypad evidence:', capture)
-    print(json.dumps({key: value[key] for key in ('usb', 'inputs', 'regulators',
+    print(json.dumps({key: value[key] for key in ('usb', 'inputs', 'regulators', 'port_quirks',
                      'tracing_available', 'dynamic_debug_available')}, indent=2))
 
 

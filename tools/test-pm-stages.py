@@ -241,7 +241,8 @@ def check_result(before, after, stage, memory_ok):
     return delta
 
 
-def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False):
+def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
+               keypad_quirk=None):
     if stage not in STAGES:
         raise ValueError('Only freezer and devices are permitted')
     if keypad_trace and stage != 'devices':
@@ -254,6 +255,10 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
         raise ValueError('Physical input requires traced devices with retained supply and unchanged persistence')
     if keypad_audio and (not keypad_input or lock.get('features', {}).get('speaker_audio') is not True):
         raise ValueError('Speaker cues require physical input on the identified audio image')
+    if keypad_quirk is not None and (keypad_quirk not in ('baseline', 'old-scheme', 'fast-recovery') or
+            stage != 'devices' or not keypad_trace or keypad_persist is not None or
+            lock.get('experiments', {}).get('keypad_supply_retention') is not True):
+        raise ValueError('Port quirks require traced devices with retained supply and unchanged persistence')
     directory = result_dir(run_id)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     record = dict(run_id=run_id, stage=stage, passed=False, event='started',
@@ -272,11 +277,14 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
         save(directory / 'started.json', record)
         memory = bytearray(os.urandom(4 * 1024 * 1024))
         digest = hashlib.sha256(memory).hexdigest()
-        from keypad_pm import observe, persistence, wait_ready, keypad_identity
+        from keypad_pm import observe, persistence, wait_ready, keypad_identity, port_quirks
         record['keypad'] = {}
         record['persistence'] = {}
+        record['port_quirks'] = {}
         with (persistence(record['persistence'], keypad_persist)
-              if keypad_persist is not None else nullcontext()):
+              if keypad_persist is not None else nullcontext()), \
+             (port_quirks(record['port_quirks'], keypad_quirk)
+              if keypad_quirk is not None else nullcontext()):
             with observe(record['keypad'], tracing=keypad_trace) as original_fd:
                 from keypad_input import capture
                 from speaker_audio import session as speaker_session, idle as speaker_idle
@@ -337,14 +345,15 @@ def main():
     parser.add_argument('--keypad-persist', choices=('0', '1'))
     parser.add_argument('--keypad-input', action='store_true')
     parser.add_argument('--keypad-audio', action='store_true')
+    parser.add_argument('--keypad-quirk', choices=('baseline', 'old-scheme', 'fast-recovery'))
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
-        from keypad_pm import restore_trace, restore_persistence
+        from keypad_pm import restore_trace, restore_persistence, restore_port_quirks
         from keypad_input import restore_console
         from speaker_audio import restore as restore_audio
         failure = None
-        for operation in (restore_trace, restore_persistence, restore_audio, restore_console, restore):
+        for operation in (restore_trace, restore_persistence, restore_port_quirks, restore_audio, restore_console, restore):
             try:
                 operation()
             except BaseException as error:
@@ -367,7 +376,7 @@ def main():
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(sig, interrupted)
         test_stage(json.loads(read(args.lock)), args.stage, args.run_id,
-                   args.keypad_trace, args.keypad_persist, args.keypad_input, args.keypad_audio)
+                   args.keypad_trace, args.keypad_persist, args.keypad_input, args.keypad_audio, args.keypad_quirk)
 
 
 if __name__ == '__main__':

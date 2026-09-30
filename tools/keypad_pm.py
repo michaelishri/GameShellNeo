@@ -15,6 +15,8 @@ TRACE = Path('/sys/kernel/tracing')
 DEBUG = Path('/sys/kernel/debug/dynamic_debug/control')
 OWNED = Path('/run/gameshellneo-keypad-trace.json')
 PERSIST_OWNED = Path('/run/gameshellneo-keypad-persist.json')
+QUIRKS_OWNED = Path('/run/gameshellneo-keypad-quirks.json')
+QUIRK_MODES = {'baseline': 0, 'old-scheme': 1, 'fast-recovery': 2}
 INSTANCE = 'gameshellneo-keypad'
 TRACE_BUFFER_KB = 256  # A serialized PM cycle can place all callbacks on one CPU.
 KEY_BYTES = 96  # KEY_CNT=768 in the locked Linux input-event-codes.h.
@@ -162,6 +164,84 @@ def persist_write(info, expected, value):
     path.write_text(value + '\n')
     if path.read_text().strip() != value:
         raise ValueError('Keypad persistence readback failed')
+
+
+def port_quirks_state(info):
+    """Resolve the pinned keypad's upstream port, never its device quirks file."""
+    identity = keypad_identity(info)
+    usb = Path(identity['path'])
+    bus = usb.parent.name.removeprefix('usb')
+    port = usb.parent / (bus + '-0:1.0') / ('usb' + bus + '-port1')
+    if (not port.is_dir() or (usb / 'port').resolve() != port or
+            (port / 'device').resolve() != usb):
+        raise ValueError('Internal keypad port backlinks do not match')
+    value = (port / 'quirks').read_text().strip()
+    if not re.fullmatch(r'[0-9a-fA-F]{8}', value):
+        raise ValueError('Invalid USB port quirks readback')
+    globals_ = {name: optional('/sys/module/usbcore/parameters/' + name)
+                for name in ('old_scheme_first', 'use_both_schemes')}
+    return dict(path=str(port), value=int(value, 16), globals=globals_)
+
+
+def port_quirks_write(info, identity, expected_port, value):
+    if keypad_identity(info) != identity or type(value) is not int or not 0 <= value <= 0xffffffff:
+        raise ValueError('Invalid keypad port identity or quirks value')
+    state = port_quirks_state(info)
+    if state['path'] != expected_port:
+        raise ValueError('Keypad USB port changed')
+    path = Path(state['path']) / 'quirks'
+    path.write_text(f'{value:08x}\n')
+    if port_quirks_state(inspect())['value'] != value:
+        raise ValueError('Keypad port quirks write/readback failed')
+
+
+def restore_port_quirks():
+    if not QUIRKS_OWNED.exists():
+        return
+    saved = json.loads(QUIRKS_OWNED.read_text())
+    original, applied = saved.get('original'), saved.get('applied')
+    mode = saved.get('mode')
+    if (saved.get('boot_id') != optional('/proc/sys/kernel/random/boot_id') or
+            type(original) is not int or not 0 <= original <= 0xffffffff or original & 3 or
+            mode not in QUIRK_MODES or applied != original | QUIRK_MODES[mode]):
+        raise ValueError('Invalid keypad quirks ownership; record retained')
+    info = inspect()
+    state = port_quirks_state(info)
+    if state['value'] not in (original, applied):
+        raise ValueError('Concurrent keypad port change; ownership retained')
+    port_quirks_write(info, saved['identity'], saved['port'], original)
+    QUIRKS_OWNED.unlink()
+
+
+@contextmanager
+def port_quirks(record, mode):
+    if mode not in QUIRK_MODES:
+        raise ValueError('Explicit baseline/old-scheme/fast-recovery mode required')
+    info = inspect()
+    identity = keypad_identity(info)
+    state = port_quirks_state(info)
+    if (state['globals'] != {'old_scheme_first': 'N', 'use_both_schemes': 'Y'} or
+            state['value'] & 3 or info['usb']['power']['persist'] != '1' or
+            info['usb']['power']['control'] != 'on' or info['usb']['power']['wakeup'] is not None):
+        raise ValueError('Expected baseline port quirks and keypad power policy')
+    applied = state['value'] | QUIRK_MODES[mode]
+    save_owned(dict(boot_id=info['boot_id'], original=state['value'], applied=applied,
+                    mode=mode, identity=identity, port=state['path']), QUIRKS_OWNED)
+    record.update(mode=mode, original=state['value'], requested=applied,
+                  identity=identity, before=state, restored=False)
+    try:
+        port_quirks_write(info, identity, state['path'], applied)
+        record['applied'] = port_quirks_state(inspect())
+        yield
+        record['after_stage'] = port_quirks_state(inspect())
+        if record['after_stage'] != record['applied']:
+            raise ValueError('Keypad port policy changed during PM')
+    finally:
+        restore_port_quirks()
+        record['after_restore'] = port_quirks_state(inspect())
+        record['restored'] = not QUIRKS_OWNED.exists() and record['after_restore'] == state
+        if not record['restored']:
+            raise ValueError('Keypad port policy restoration failed')
 
 
 def restore_persistence():
@@ -329,4 +409,6 @@ def observe(record, tracing=False):
 
 
 if __name__ == '__main__':
-    print(json.dumps(inspect()))
+    info = inspect()
+    info['port_quirks'] = port_quirks_state(info)
+    print(json.dumps(info))

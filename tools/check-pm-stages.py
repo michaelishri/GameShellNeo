@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shlex
+import statistics
 import time
 import uuid
 
@@ -22,7 +23,8 @@ def module(name, filename):
     return result
 
 
-def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False):
+def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
+                    keypad_quirk=None):
     if (not re.fullmatch(r'/tmp/gameshellneo-pm\.[A-Za-z0-9]+', directory) or
             stage not in ('freezer', 'devices') or not re.fullmatch(r'[0-9a-f]{32}', run_id) or
             type(keypad_trace) is not bool or (keypad_trace and stage != 'devices') or
@@ -30,7 +32,9 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
                                             stage != 'devices' or not keypad_trace)) or
             type(keypad_input) is not bool or (keypad_input and
                 (stage != 'devices' or not keypad_trace or keypad_persist is not None)) or
-            type(keypad_audio) is not bool or (keypad_audio and not keypad_input)):
+            type(keypad_audio) is not bool or (keypad_audio and not keypad_input) or
+            (keypad_quirk is not None and (keypad_quirk not in ('baseline', 'old-scheme', 'fast-recovery') or
+                stage != 'devices' or not keypad_trace or keypad_persist is not None))):
         raise ValueError('Invalid PM stage, path or run ID')
     script = directory + '/test-pm-stages.py'
     # No SSH-owned pipe: USB may disconnect during the devices test.
@@ -42,7 +46,8 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
             '/usr/bin/python3', '-B', script, '--lock', directory + '/sources.lock.json',
             '--stage', stage, '--run-id', run_id] + (['--keypad-trace'] if keypad_trace else []) + (
                 ['--keypad-persist', keypad_persist] if keypad_persist is not None else []) + (
-                ['--keypad-input'] if keypad_input else []) + (['--keypad-audio'] if keypad_audio else [])
+                ['--keypad-input'] if keypad_input else []) + (['--keypad-audio'] if keypad_audio else []) + (
+                ['--keypad-quirk', keypad_quirk] if keypad_quirk is not None else [])
 
 
 def inline(client, *args):
@@ -69,7 +74,8 @@ def collect(config, run_id):
         return json.loads(inline(client, '--collect', run_id))
 
 
-def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False):
+def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
+          keypad_quirk=None):
     with device(config, 'usb') as client:
         before = json.loads(inline(client, '--inspect'))
         (capture / 'before.json').write_text(json.dumps(before, indent=2) + '\n')
@@ -81,7 +87,7 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-pm.XXXXXXXX',
                         display=False).decode().strip()
         run_id = uuid.uuid4().hex
-        command = service_command(directory, stage, run_id, keypad_trace, keypad_persist, keypad_input, keypad_audio)
+        command = service_command(directory, stage, run_id, keypad_trace, keypad_persist, keypad_input, keypad_audio, keypad_quirk)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/test-pm-stages.py', directory + '/test-pm-stages.py')
             upload(sftp, ROOT / 'tools/keypad_pm.py', directory + '/keypad_pm.py')
@@ -117,6 +123,8 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
             if (policy.get('requested') != keypad_persist or policy.get('applied') != keypad_persist or
                     policy.get('original') != '1' or policy.get('restored') is not True):
                 raise ValueError('Keypad persistence application/restoration was not verified')
+        if keypad_quirk is not None:
+            validate_quirk_result(result, keypad_quirk)
         wifi_proof(config, result['after'])
         # A fresh USB SSH collection above and independent Wi-Fi proof below
         # are required; kernel return alone is insufficient.
@@ -247,6 +255,90 @@ def validate_audio_result(record):
         raise ValueError('Speaker confirmation sequence or idle/restoration checks failed')
 
 
+def validate_quirk_result(result, mode):
+    from keypad_pm import QUIRK_MODES, keypad_identity
+    policy = result.get('port_quirks', {})
+    original = policy.get('original')
+    if (type(original) is not int or original & 3 or policy.get('mode') != mode or
+            policy.get('restored') is not True or policy.get('requested') != original | QUIRK_MODES[mode] or
+            policy.get('before') != policy.get('after_restore') or
+            policy.get('applied') != policy.get('after_stage') or
+            policy.get('applied', {}).get('value') != policy['requested'] or
+            policy.get('before', {}).get('value') != original or
+            policy['applied']['path'] != policy['before']['path'] or
+            policy['applied']['globals'] != policy['before']['globals'] or
+            policy['before']['globals'] != {'old_scheme_first': 'N', 'use_both_schemes': 'Y'}):
+        raise ValueError('Keypad port quirks application/restoration was not verified')
+    keypad = result['keypad']
+    if any(keypad_identity(keypad[phase]) != policy['identity'] for phase in ('before', 'after')):
+        raise ValueError('Keypad identity changed during port trial')
+    summary = retention_result(result)
+    if (not all(summary[key] for key in ('original_handle_healthy', 'usb_device_number_unchanged',
+                                       'input_sysfs_unchanged')) or summary['keypad_disconnects'] or
+            keypad['old_handle_after'].get('hung_up') or keypad['old_handle_after'].get('poll_error')):
+        raise ValueError('Keypad port trial lost input continuity')
+    for phase in ('before', 'after'):
+        power = keypad[phase]['usb']['power']
+        if power['persist'] != '1' or power['control'] != 'on' or power['wakeup'] is not None:
+            raise ValueError('Keypad port trial changed input power policy')
+    name = policy['identity']['path'].rsplit('/', 1)[1]
+    pattern = r'\s([0-9]+\.[0-9]+): device_pm_callback_(start|end): usb ' + re.escape(name) + r', (.*)'
+    start, intervals = None, []
+    for line in keypad['trace'].splitlines():
+        match = re.search(pattern, line)
+        if not match:
+            continue
+        if match[2] == 'start' and 'type [resume]' in match[3]:
+            if start is not None:
+                raise ValueError('Overlapping keypad resume callbacks')
+            start = float(match[1])
+        elif match[2] == 'end' and start is not None:
+            if match[3] != 'err=0' or float(match[1]) < start:
+                raise ValueError('Failed or invalid keypad resume callback')
+            intervals.append(float(match[1]) - start)
+            start = None
+    if start is not None or len(intervals) != 1:
+        raise ValueError('Expected exactly one complete keypad USB resume callback')
+    return summary | dict(mode=mode, usb_resume_seconds=intervals[0],
+                          port_quirks_restored=True)
+
+
+def compare_quirks(config, capture, lock, candidate, cycles):
+    if (candidate not in ('old-scheme', 'fast-recovery') or not 1 <= cycles <= 4 or
+            lock.get('experiments', {}).get('keypad_supply_retention') is not True):
+        raise ValueError('Select one port candidate and CYCLES=1..4 on the retention image')
+    report = dict(passed=False, candidate=candidate, cycles_per_phase=cycles, phases=[],
+                  limits='Instrumented driver debug recovery, not real wake latency or energy.')
+    context = None
+    try:
+        for phase, mode in (('before', 'baseline'), ('candidate', candidate), ('after', 'baseline')):
+            for index in range(cycles):
+                directory = capture / f'{phase}-{index + 1}'
+                directory.mkdir(mode=0o700)
+                print(f'Port comparison: {phase} {index + 1}/{cycles}, {mode}', flush=True)
+                result = cycle(config, directory, lock, 'devices', True, keypad_quirk=mode)
+                summary = validate_quirk_result(result, mode)
+                current = {key: result['before'][key] for key in
+                           ('boot_id', 'kernel', 'wifi_config_sha256', 'cpu_policy', 'charger', 'backlight')}
+                current.update(identity=result['port_quirks']['identity'], port=result['port_quirks']['before'])
+                if context is not None and context != current:
+                    raise ValueError('Boot, configuration or keypad changed during port comparison')
+                context = current
+                report['phases'].append(summary | dict(phase=phase))
+                (directory / 'quirks.json').write_text(json.dumps(summary, indent=2) + '\n')
+                print('Keypad USB resume:', round(summary['usb_resume_seconds'], 6), 's; policy restored.', flush=True)
+                (capture / 'comparison.json').write_text(json.dumps(report, indent=2) + '\n')
+                if phase != 'after' or index + 1 < cycles:
+                    time.sleep(20)
+        report['mean_usb_resume_seconds'] = {phase: statistics.mean(
+            r['usb_resume_seconds'] for r in report['phases'] if r['phase'] == phase)
+            for phase in ('before', 'candidate', 'after')}
+        report['passed'] = True
+    finally:
+        (capture / 'comparison.json').write_text(json.dumps(report, indent=2) + '\n')
+    print('Port comparison passed:', json.dumps(report['mean_usb_resume_seconds']), flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -257,6 +349,7 @@ def main():
     mode.add_argument('--keypad-compare', action='store_true')
     mode.add_argument('--keypad-retention', action='store_true')
     mode.add_argument('--keypad-input', action='store_true')
+    mode.add_argument('--keypad-quirks', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     config = load_env()
@@ -288,14 +381,14 @@ def main():
     stage = os.environ.get('NEO_PM_STAGE', '')
     cycles = int(os.environ.get('NEO_PM_CYCLES', '1'))
     trace_option = os.environ.get('NEO_KEYPAD_TRACE', '0')
-    if args.keypad_retention or args.keypad_input:
+    if args.keypad_retention or args.keypad_input or args.keypad_quirks:
         stage, trace_option = 'devices', '1'
     if trace_option not in ('0', '1') or (trace_option == '1' and stage != 'devices'):
         raise ValueError('KEYPAD_TRACE=0/1; tracing requires STAGE=devices')
     if not args.keypad_compare and (stage not in ('freezer', 'devices') or not 1 <= cycles <= 4):
         raise ValueError('Explicit STAGE=freezer/devices and CYCLES=1..4 required')
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
-    if (args.keypad_retention or args.keypad_input) and lock.get('experiments', {}).get('keypad_supply_retention') is not True:
+    if (args.keypad_retention or args.keypad_input or args.keypad_quirks) and lock.get('experiments', {}).get('keypad_supply_retention') is not True:
         raise ValueError('Keypad retention requires its separately identified image')
     if args.keypad_input and cycles != 1:
         raise ValueError('Physical keypad task runs one owner-assisted cycle at a time')
@@ -303,17 +396,24 @@ def main():
     if audio_option not in ('0', '1') or (audio_option == '1' and
             (not args.keypad_input or lock.get('features', {}).get('speaker_audio') is not True)):
         raise ValueError('AUDIO=1 requires physical input on the speaker-enabled image')
+    quirk = os.environ.get('NEO_KEYPAD_QUIRK', '')
+    if quirk and (quirk not in ('baseline', 'old-scheme', 'fast-recovery') or
+                  not (args.keypad_input or args.keypad_quirks)):
+        raise ValueError('QUIRK requires the port comparison or physical keypad task')
     (capture / 'sources.lock.json').write_text(json.dumps(lock, indent=2) + '\n')
     with (LOCAL / 'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.keypad_compare:
             compare_keypad(config, capture, lock)
             return
+        if args.keypad_quirks:
+            compare_quirks(config, capture, lock, quirk, cycles)
+            return
         for index in range(cycles):
             directory = capture / ('cycle-' + str(index + 1))
             directory.mkdir(mode=0o700)
             result = cycle(config, directory, lock, stage, trace_option == '1', keypad_input=args.keypad_input,
-                           keypad_audio=audio_option == '1')
+                           keypad_audio=audio_option == '1', keypad_quirk=quirk or None)
             if args.keypad_retention or args.keypad_input:
                 summary = retention_result(result)
                 (directory / 'retention.json').write_text(json.dumps(summary, indent=2) + '\n')

@@ -18,7 +18,8 @@ INSTANCE = 'gameshellneo-keypad'
 KEY_BYTES = 96  # KEY_CNT=768 in the locked Linux input-event-codes.h.
 EVIOCGKEY = (2 << 30) | (KEY_BYTES << 16) | (ord('E') << 8) | 0x18
 FUNCTIONS = {
-    'drivers/usb/core/hub.c': {'check_port_resume_type', 'finish_port_resume', 'usb_port_resume'},
+    'drivers/usb/core/hub.c': {'wait_for_connected', 'check_port_resume_type',
+                             'finish_port_resume', 'usb_port_resume'},
     'drivers/usb/core/hcd.c': {'hcd_bus_suspend', 'hcd_bus_resume'},
     'drivers/usb/host/ohci-hub.c': {'ohci_rh_suspend', 'ohci_rh_resume'},
     'drivers/usb/host/ohci-hcd.c': {'ohci_suspend', 'ohci_resume'},

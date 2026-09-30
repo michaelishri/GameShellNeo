@@ -17,8 +17,9 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Latest installation: [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md)
-records passing flash/readback/ejection, first boot, USB SSH and integration;
-Wi-Fi recovery and PM tests remain pending.
+records passing installation, integration and eight PM debug cycles. Two keypad
+traces identify software supply cycling and an exhausted USB persistence wait;
+the unsupported-ULPI warnings are gone in all seven driver cycles.
 Previous hardware: [55 — Diagnostic.7 validation](55-diagnostic7-hardware-validation.md)
 and [58 — Keypad PM investigation](58-keypad-pm-investigation.md). The bounded
 driver tests pass, but the old keypad input handle is lost during recovery.
@@ -28,7 +29,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
-| [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md) | Verified flash/readback, boot, USB SSH and integration; pending Wi-Fi and USB PM/keypad tests |
+| [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md) | Verified installation/integration, eight PM debug cycles, zero ULPI warnings, keypad supply transitions and three-second recovery callback |
 | [59 — Diagnostic.8 preparation](59-diagnostic8-preparation.md) | Full kernel/image verification, diagnostic.7 recovery checkpoint and USB PM/keypad hardware sequence |
 | [58 — Keypad PM investigation](58-keypad-pm-investigation.md) | Live handle-loss proof, OHCI/PHY power path, saved input observation and bounded next-image tracing |
 | [57 — MUSB context capability](57-musb-context-capability.md) | Sunxi-only unsupported-register correction, native/ARM32 equivalence and full ARM object builds |

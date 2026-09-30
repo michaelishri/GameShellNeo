@@ -79,16 +79,21 @@ configuration from diagnostic.6's polling experiment.
 [report 55](docs/55-diagnostic7-hardware-validation.md) records hardware
 evidence and outstanding keypad/MUSB recovery work. Diagnostic.6 remains
 available as a recovery image.
-The next image, `0.1.0-diagnostic.8` / `6.18.54-gameshellneo8`, has passed the
+The current image, `0.1.0-diagnostic.8` / `6.18.54-gameshellneo8`, has passed the
 full kernel, device-tree and offline image checks, and its 266 MB archive is
 verified on the Mac. It adds the AXP USB polling
 suspend fix, the Sunxi MUSB unsupported-register correction, and bounded keypad
 PM tracing. Diagnostic.7's recovery image and matching metadata are retained.
 [Report 59](docs/59-diagnostic8-preparation.md) records the artifacts and next
-hardware sequence. These changes are not yet qualified on the board.
+hardware sequence.
 The DEV-card flash, full readback, safe ejection, first boot, USB SSH and all six
-integration checks have now passed. Wi-Fi association and PM tests remain
-pending in [report 60](docs/60-diagnostic8-hardware-validation.md).
+integration checks passed. One freezer and seven devices debug cycles also
+passed with both SSH routes recovering, zero unsupported-ULPI warnings and no
+PM failures. Two keypad traces confirmed supply cycling and an exhausted
+persistence wait, with about three seconds in the keypad USB resume callback.
+Keypad continuity and actual sleep remain unresolved;
+[report 60](docs/60-diagnostic8-hardware-validation.md) records the evidence and
+next reversible persistence comparison.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -329,9 +334,10 @@ task check:usb-suspend-driver  # Also compile the full ARM driver in isolated sc
 
 These cover worker quiescence, IRQ/requeue arrivals, repeated cycles and wake
 setup/teardown errors. Evidence is in `.local/build/usb-suspend-tests/`.
-`task build` includes the source regression. The change is not installed yet;
-[report 56](docs/56-usb-suspend-work.md) records the checks and remaining hardware
-and notification-work qualification before deeper PM tests.
+`task build` includes the source regression. The change is installed in
+diagnostic.8 and passed ordinary PM debug stages in report 60.
+[Report 56](docs/56-usb-suspend-work.md) records the source checks and remaining
+notification-work qualification before deeper PM tests.
 
 For the Sunxi MUSB context capability fix, use:
 
@@ -342,7 +348,8 @@ task check:musb-drivers # Also compile the complete MUSB core and Sunxi ARM obje
 
 Evidence is in `.local/build/musb-context-tests/`; `task build` includes the
 source regression. [Report 57](docs/57-musb-context-capability.md) records the
-unsupported-register correction and pending new-image hardware checks.
+unsupported-register correction; report 60 records seven diagnostic.8 driver
+cycles with zero unsupported-register warnings.
 
 For the opt-in USB polling experiment, use:
 
@@ -821,19 +828,20 @@ only an integrity check across this debug cycle.
 Initial hardware checks found that the internal keypad re-enumerates during
 devices-stage recovery, and the separate MUSB controller emits two warnings
 about an unsupported ULPI register. Reports 56–57 implement fixes for AXP
-polling lifetime and the MUSB accesses, awaiting the next image's qualification.
+polling lifetime and the MUSB accesses. Diagnostic.8's ordinary driver-stage
+qualification passed in report 60, with zero unsupported-ULPI warnings.
 The updated recorder checks an existing keypad input handle as well as the
 returned device: diagnostic.7 returns at the same path but leaves the old
 handle disconnected. A stage pass proves peripheral recovery, not uninterrupted
 input continuity. Held-button behavior still needs a physical test.
 
 `task device:keypad-inspect` saves read-only identity, stable input paths,
-persistence, wake capability and supply state. On the next diagnostic kernel,
+persistence, wake capability and supply state. On diagnostic.8,
 `task device:pm-test STAGE=devices CYCLES=1 KEYPAD_TRACE=1` additionally records
 selected USB PM messages, keypad regulator transitions and driver callback
 timings. The bounded recorder
 uses a private trace instance, restores debug flags and rejects overflow.
-Current diagnostic.7 lacks the required tracing facilities and refuses that
+The older diagnostic.7 lacks the required tracing facilities and refuses that
 option before entering PM. Use `device:pm-restore` for interrupted trace/control
 recovery. [Report 58](docs/58-keypad-pm-investigation.md) records the source trace,
 live handle failure, saved commands and remaining retention/reopen comparison.
@@ -855,8 +863,9 @@ owned controls still need restoration. Collection retrieves evidence and does
 not by itself repeat the network qualification. Helpers, ownership records and
 device results remain available for investigation. No remote task guarantees
 recovery from a hung kernel; physical power cycling/reflashing may be needed.
-The initial hardware stage tests and the updated input-handle observation have
-passed on diagnostic.7; real sleep and the new kernel changes remain unqualified.
+The stage tests passed on diagnostic.7 and diagnostic.8; diagnostic.8 also
+passed two bounded keypad traces. Real sleep and later PM stages remain
+unqualified. The keypad still requires reopening after driver-stage recovery.
 
 `device:battery-check ROUTE=wifi` runs the battery policy regressions against
 the **installed** guard after verifying its SHA-256 matches the tracked source.

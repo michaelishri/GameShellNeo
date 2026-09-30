@@ -4,6 +4,12 @@
 6.18.54-gameshellneo7. The keypad disconnect is confirmed; a retention fix has
 not yet been selected. New trace support is prepared for the next image.
 
+Subsequent diagnostic.8 testing in [report 60](60-diagnostic8-hardware-validation.md)
+records the supply disable/enable commands and the USB port's missing-connection
+rejection. It also identifies an exhausted persistence wait and a roughly
+three-second keypad USB resume callback. The initial findings below are from
+diagnostic.7; the complete resume-wait description is corrected below.
+
 ## Live findings
 
 `task device:keypad-inspect` captured the following without changing policy:
@@ -66,14 +72,21 @@ The locked Linux source and board DT expose this path:
    underlying power-off until its users release it.
 4. `sun4i_usb_phy_power_off()` disables its VBUS regulator. Both host controllers
    participate in a devices-stage test. The matching power-on enables it again.
-5. `check_port_resume_type()` can reject a port with no connection even with
-   USB persistence enabled. Its connection retries are only 200–300 microseconds
-   each. Persistence is not a general wait-until-the-keypad-reboots policy.
+5. Before `check_port_resume_type()`, `usb_port_resume()` invokes
+   `wait_for_connected()` when persistence is enabled. That helper already
+   retries in nominal 20 ms sleeps up to a nominal 2,000 ms budget.
+   `check_port_resume_type()` then has three further 200–300 microsecond
+   connection retries before rejecting the disconnected port. An earlier
+   version of this report described only those final short retries, omitting
+   the preceding persistence wait; the diagnostic.8 trace prompted this
+   correction. Actual elapsed time can exceed the helper's accumulated nominal
+   sleep budget. Persistence is not an unbounded wait for the keypad to reboot.
 
 This makes keypad power cycling a strong explanation for the observed removal,
-but the exact regulator transition and port-status branch have not yet been
-recorded on this board. OHCI's platform clock shutdown alone does not prove a
-rail cut. The new trace is designed to distinguish those events.
+but those events had not yet been captured during the diagnostic.7 investigation.
+Diagnostic.8 now records both software transitions and the rejection in report
+60; it does not measure electrical voltage or establish the MCU's exact reset
+behavior. OHCI's platform clock shutdown alone does not prove a rail cut.
 
 The historical keypad source is available in
 `GameShell/Code/Keypad/` at commit
@@ -124,7 +137,8 @@ The next kernel fragment enables dynamic debug and event tracing, with function
 instrumentation disabled. The recording itself is opt-in and restricted to
 `STAGE=devices`. Current diagnostic.7 refuses this option before entering PM
 because the required facilities are absent. The diagnostic.8 full build passed
-in [report 59](59-diagnostic8-preparation.md); hardware tracing remains pending.
+in [report 59](59-diagnostic8-preparation.md), followed by two successful
+hardware captures in report 60.
 
 An ownership file records the selected debug flags and boot ID before mutation.
 Normal/error cleanup restores those flags and removes only the private trace
@@ -136,7 +150,8 @@ Host tests cover event-path reuse with a dead original handle, input-handle
 observation, cleanup after exceptions, bounded callsite selection,
 missing trace events, foreign ownership, failed restoration and overflow.
 The current ordinary observer also passed the physical cycle described above.
-The detailed trace has not yet run on hardware.
+Both detailed diagnostic.8 captures subsequently passed on hardware in report
+60, including no lost trace events and restored debug controls.
 
 ## Decision after the trace
 

@@ -98,7 +98,8 @@ The next candidate, `0.1.0-diagnostic.9`, retains that same kernel binary and
 modules while adding one experimental device-tree property to retain the
 internal keypad supply. [Report 62](docs/62-keypad-supply-retention-preparation.md)
 records its preparation, diagnostic.8 recovery path and repeatable continuity
-test. It has not yet been flashed or hardware-qualified. Normal sleep stays
+test. Its flash and full readback have passed; boot and driver tests are tracked
+in [report 63](docs/63-keypad-retention-hardware-validation.md). Normal sleep stays
 disabled; retention energy and physical input behavior remain to be measured.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path

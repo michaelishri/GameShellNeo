@@ -245,7 +245,8 @@ stages wait until the owner returns and explicitly confirms readiness.
 ## Remaining boundaries
 
 The intermittent authentication/backoff delay remains NEO-55; passing later
-cycles do not resolve it. The indicator-light identity/meaning remains a
+cycles do not resolve it. [Report 76](76-wifi-resume-authentication-source-audit.md)
+records the subsequent source audit and passing awake comparison. The indicator-light identity/meaning remains a
 follow-up. No missing data in the earlier power-status rejection is inferred
 from later captures. The complete late/noirq bus-client inventory, wake/error
 contract and other sleep prerequisites remain in `FOLLOW-UP.md`.

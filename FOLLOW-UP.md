@@ -1,6 +1,6 @@
 # GameShellNeo follow-up activities
 
-Record deferred questions and activities here as they arise. Diagnostic.8 has been flashed to the owner-confirmed Samsung spare with full readback and safe ejection; boot and PM qualification remain pending in [report 60](docs/60-diagnostic8-hardware-validation.md). Diagnostic.7's earlier qualification includes bounded freezer/devices PM debug tests; actual sleep remains untested and disabled for normal use.
+Record deferred questions and activities here as they arise. Diagnostic.8 has been flashed to the owner-confirmed Samsung spare with full readback and safe ejection; first boot, USB SSH and integration passed. Wi-Fi association and PM qualification remain pending in [report 60](docs/60-diagnostic8-hardware-validation.md). Diagnostic.7's earlier qualification includes bounded freezer/devices PM debug tests; actual sleep remains untested and disabled for normal use.
 
 **Implementation update, 27 September 2026:** the owner approved [the first-build specification](docs/23-first-build-spec.md) and authorized implementation. Kaneo NEO-1 through NEO-5 track source locks, kernel support, diagnostic runtime, image assembly and hardware qualification. This authorization does not identify a physical card to overwrite. Sleep remains disabled for the first image; short power presses shut down, and Wi-Fi is privately preconfigured. Historical completion statements below remain evidence of their respective research stages.
 

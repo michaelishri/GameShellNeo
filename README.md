@@ -86,9 +86,9 @@ suspend fix, the Sunxi MUSB unsupported-register correction, and bounded keypad
 PM tracing. Diagnostic.7's recovery image and matching metadata are retained.
 [Report 59](docs/59-diagnostic8-preparation.md) records the artifacts and next
 hardware sequence. These changes are not yet qualified on the board.
-The DEV-card flash, full readback and safe ejection have now passed;
-[report 60](docs/60-diagnostic8-hardware-validation.md) tracks boot and hardware
-qualification, which remain pending.
+The DEV-card flash, full readback, safe ejection, first boot, USB SSH and all six
+integration checks have now passed. Wi-Fi association and PM tests remain
+pending in [report 60](docs/60-diagnostic8-hardware-validation.md).
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

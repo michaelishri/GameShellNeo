@@ -76,6 +76,7 @@ tasks:
       - task: test:nkmp
       - task: test:usb-lifecycle
       - task: test:usb-suspend
+      - task: test:usb-phy-suspend
       - task: test:musb-context
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -168,6 +169,14 @@ tasks:
   check:usb-suspend-driver:
     desc: Run AXP suspend regressions and compile the complete ARM driver in isolated scratch
     cmds: [bash tools/run-logged.sh usb-suspend-driver python3 tools/check-usb-suspend.py --compile-driver]
+
+  test:usb-phy-suspend:
+    desc: Check actual Sun4i PHY scan, IRQ, notifier and suspend callbacks natively and on ARM32
+    cmds: [bash tools/run-logged.sh usb-phy-suspend python3 tools/check-usb-phy-suspend.py]
+
+  check:usb-phy-driver:
+    desc: Run PHY suspend regressions and compile the complete ARM driver in isolated scratch
+    cmds: [bash tools/run-logged.sh usb-phy-driver python3 tools/check-usb-phy-suspend.py --compile-driver]
 
   check:usb-policy-driver:
     desc: Run USB policy regressions and compile the complete ARM driver in isolated scratch

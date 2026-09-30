@@ -381,6 +381,22 @@ diagnostic.8 and passed ordinary PM debug stages in report 60.
 [Report 56](docs/56-usb-suspend-work.md) records the source checks and remaining
 notification-work qualification before deeper PM tests.
 
+For the Sun4i USB PHY detection worker's suspend lifecycle, use:
+
+```sh
+task test:usb-phy-suspend # Actual scan/IRQ/notifier/PM functions, native + ARM32
+task check:usb-phy-driver # Also compile the complete ARM PHY driver in isolated scratch
+```
+
+The regression checks pending/running work, requeue attempts, repeated cycles,
+resume cable-state reconciliation and scans of an exited PHY. Evidence is in
+`.local/build/usb-phy-suspend-tests/`; `task build` includes the source regression.
+[Report 69](docs/69-usb-phy-suspend-work.md) records patch 0012's source/ARM
+validation. It is not installed in diagnostic.10. The
+[PMIC ordering audit](docs/68-pmic-suspend-ordering-audit.md) identifies the
+remaining power-supply notification and wake-policy gates before deeper sleep
+tests. Use `task kernel:reset` before the next full build with the changed queue.
+
 For the Sunxi MUSB context capability fix, use:
 
 ```sh

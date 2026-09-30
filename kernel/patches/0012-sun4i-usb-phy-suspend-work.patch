@@ -1,0 +1,74 @@
+diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
+--- a/drivers/phy/allwinner/phy-sun4i-usb.c
++++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+@@ -26,6 +26,7 @@
+ #include <linux/phy/phy.h>
+ #include <linux/phy/phy-sun4i-usb.h>
+ #include <linux/platform_device.h>
++#include <linux/pm.h>
+ #include <linux/power_supply.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/reset.h>
+@@ -592,15 +593,16 @@
+ 		return;
+ 
+ 	phy = phy_get_drvdata(phy0);
+-	id_det = sun4i_usb_phy0_get_id_det(data);
+-	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
+-
+ 	mutex_lock(&phy0->mutex);
+ 
+ 	if (!data->phy0_init) {
+ 		mutex_unlock(&phy0->mutex);
+ 		return;
+ 	}
++
++	/* PHY exit holds this mutex too; do not access its suppliers after exit. */
++	id_det = sun4i_usb_phy0_get_id_det(data);
++	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
+ 
+ 	force_session_end = data->force_session_end;
+ 	data->force_session_end = false;
+@@ -694,6 +696,34 @@
+ 
+ 	return data->phys[args->args[0]].phy;
+ }
++
++static int sun4i_usb_phy_suspend(struct device *dev)
++{
++	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
++
++	/* A power-supply notifier or IRQ may queue detection after the
++	 * controller suspends. Drain it before suppliers become unavailable,
++	 * and keep it disabled so arrivals cannot requeue it during sleep.
++	 * Do not hold the PHY mutex while waiting for the worker.
++	 */
++	disable_delayed_work_sync(&data->detect);
++
++	return 0;
++}
++
++static int sun4i_usb_phy_resume(struct device *dev)
++{
++	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
++
++	enable_delayed_work(&data->detect);
++	/* Reconcile cable changes whose notifications arrived while disabled. */
++	mod_delayed_work(system_wq, &data->detect, DEBOUNCE_TIME);
++
++	return 0;
++}
++
++static DEFINE_SIMPLE_DEV_PM_OPS(sun4i_usb_phy_pm_ops, sun4i_usb_phy_suspend,
++			      sun4i_usb_phy_resume);
+ 
+ static void sun4i_usb_phy_remove(struct platform_device *pdev)
+ {
+@@ -1041,6 +1071,7 @@
+ 	.driver = {
+ 		.of_match_table= sun4i_usb_phy_of_match,
+ 		.name = "sun4i-usb-phy",
++		.pm = pm_sleep_ptr(&sun4i_usb_phy_pm_ops),
+ 	}
+ };
+ module_platform_driver(sun4i_usb_phy_driver);

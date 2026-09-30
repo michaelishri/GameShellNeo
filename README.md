@@ -68,15 +68,17 @@ SSH routes. The saved installed-firmware test also passed four software
 reconnections, unavailable-network scanning and connection restoration.
 Physical AP-loss Wi-Fi qualification is deferred; the random-SSID simulation
 provides the current unavailable-network evidence. Broader power/sleep work remains.
-The next image, `0.1.0-diagnostic.7` / `6.18.54-gameshellneo7`, is built,
-offline-verified and checksum-verified on the Mac. It prepares manual
-freezer/device PM debug tests and advanced runtime-PM inspection. Normal sleep
-stays disabled. It uses stock USB polling and retains SDIO power for the first
-driver tests; this is a separate configuration from diagnostic.6's polling
-experiment. [Report 54](docs/54-staged-pm-diagnostic.md) records the source audit,
-build evidence and owner-present test sequence. It has not been flashed or
-hardware-qualified. Diagnostic.6 remains installed and available for recovery;
-NEO-37 tracks the owner-present flash and staged tests.
+The installed image, `0.1.0-diagnostic.7` / `6.18.54-gameshellneo7`, passed
+flash/readback, first-boot/integration, hotspot connection and both SSH routes.
+One freezer and five devices PM debug tests passed under NEO-37, including
+the owner's confirmation of normal console/backlight return after the first
+driver test and repeated batch. Normal sleep stays disabled. This image uses stock
+USB polling and retains SDIO power for driver tests; it is a separate
+configuration from diagnostic.6's polling experiment.
+[Report 54](docs/54-staged-pm-diagnostic.md) records preparation and
+[report 55](docs/55-diagnostic7-hardware-validation.md) records hardware
+evidence and outstanding keypad/MUSB recovery work. Diagnostic.6 remains
+available as a recovery image.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -744,8 +746,10 @@ retain the printed helper directory and ownership record until recovery passes.
 The device service is bounded to `3 * (SECONDS + 15) + 90` seconds, assuming a
 functioning kernel/systemd. The [first comparison](docs/53-rsb-runtime-pm-comparison.md)
 found zero runtime-suspended time at both 100 ms and 20 ms; the default remains
-1,000 ms. Outstanding runtime-PM references/policy need inspection before a
-shorter delay can be justified.
+1,000 ms. Diagnostic.7's initial advanced counters show RSB usage 1 and
+Wi-Fi-host usage 2 with runtime PM forbidden; these sequential reads support
+further dependency analysis, not an energy-saving claim. See
+[report 55](docs/55-diagnostic7-hardware-validation.md).
 
 ### Staged power-management diagnostics
 
@@ -770,6 +774,13 @@ The task refuses `none`, `platform`, `processors`, `core`, `mem` and other
 stages. It does not implement normal sleep, wake-button testing, DRAM retention
 or the desired low-power runtime. The temporary process-memory checksum is
 only an integrity check across this debug cycle.
+
+Initial hardware checks found that the internal keypad re-enumerates during
+devices-stage recovery, and the separate MUSB controller emits two warnings
+about an unsupported ULPI register. The recorder checks restored input names,
+not held-key state or application file handles, and rejects its listed fault
+markers rather than every driver warning. Preserve the complete journal and
+review those behaviors as described in report 55 before extending qualification.
 
 The helper serializes driver callbacks with `pm_async=0`, records the original
 controls, and restores them on exit and through independent `ExecStopPost`.

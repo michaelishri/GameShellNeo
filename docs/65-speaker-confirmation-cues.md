@@ -143,6 +143,7 @@ The pre-flash USB status capture is
 
 The owner confirmed regular Wi-Fi for the transfer. `task mac:stage` uploaded
 the candidate and passed compressed and decompressed checksum verification on
-the Mac. The private staging log is `.local/neo48-stage.log`. Card installation,
-live speaker routing, audibility and audio-assisted input/PM qualification
-remain outstanding. No speaker test has run yet.
+the Mac. The private staging log is `.local/neo48-stage.log`. Card flash, full
+4 GiB readback and eject subsequently passed; [report 66](66-speaker-hardware-validation.md)
+records installation and the pending boot/audio qualification. No speaker test
+has run yet.

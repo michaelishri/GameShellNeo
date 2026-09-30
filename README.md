@@ -94,7 +94,7 @@ persistence wait, with about three seconds in the keypad USB resume callback.
 That power-off image did not preserve keypad input continuity;
 [report 60](docs/60-diagnostic8-hardware-validation.md) records the evidence and
 next reversible persistence comparison.
-The installed image, `0.1.0-diagnostic.9`, retains that same kernel binary and
+The qualified keypad-retention image, `0.1.0-diagnostic.9`, retains that same kernel binary and
 modules while adding one experimental device-tree property to retain the
 internal keypad supply. [Report 62](docs/62-keypad-supply-retention-preparation.md)
 records its preparation, diagnostic.8 recovery path and repeatable continuity
@@ -112,8 +112,10 @@ fresh taps worked afterward, with no stuck key. Other input cases and actual
 sleep remain unqualified.
 [Diagnostic.10 preparation](docs/65-speaker-confirmation-cues.md) adds the
 upstream A33 speaker path for audible button-registration cues. The new image
-has passed offline verification; playback and audio-assisted PM tests still need hardware
-qualification. The running diagnostic.9 image remains the recovery baseline.
+has passed offline verification and card flash/full readback; boot, playback
+and audio-assisted PM tests still need qualification. Diagnostic.9 remains
+the recovery baseline. [Report 66](docs/66-speaker-hardware-validation.md)
+records installation and the remaining hardware checks.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

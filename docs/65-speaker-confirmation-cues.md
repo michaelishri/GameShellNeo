@@ -141,6 +141,8 @@ and `.local/build/{kernel,devicetree,image,image-verify}.log`.
 The pre-flash USB status capture is
 `.local/diagnostics/20260930T084043.493376Z/status.txt`.
 
-The owner confirmed regular Wi-Fi for the transfer. Mac staging is in progress;
-card installation, live speaker routing, audibility and audio-assisted input/PM
-qualification remain outstanding. No speaker test has run yet.
+The owner confirmed regular Wi-Fi for the transfer. `task mac:stage` uploaded
+the candidate and passed compressed and decompressed checksum verification on
+the Mac. The private staging log is `.local/neo48-stage.log`. Card installation,
+live speaker routing, audibility and audio-assisted input/PM qualification
+remain outstanding. No speaker test has run yet.

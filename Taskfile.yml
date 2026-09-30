@@ -29,6 +29,7 @@ env:
   NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
+  NEO_WIFI_TRACE: '{{.WIFI_TRACE | default "0"}}'
   NEO_KEYPAD_AUDIO: '{{.AUDIO | default "0"}}'
   NEO_KEYPAD_QUIRK: '{{.QUIRK | default ""}}'
   NEO_AUDIO_RUN: '{{.RUN | default ""}}'
@@ -302,6 +303,10 @@ tasks:
   device:pm-test:
     desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required
     cmds: [python3 tools/check-pm-stages.py --test]
+
+  device:wifi-trace-smoke:
+    desc: One awake Wi-Fi reconnect with bounded metadata capture; USB required, logging restored
+    cmds: [python3 tools/check-pm-stages.py --wifi-smoke]
 
   device:pm-collect:
     desc: Retrieve a PM stage's persistent device evidence after reconnection; RUN required

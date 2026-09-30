@@ -24,7 +24,7 @@ def module(name, filename):
 
 
 def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
-                    keypad_quirk=None):
+                    keypad_quirk=None, wifi_trace=False):
     if (not re.fullmatch(r'/tmp/gameshellneo-pm\.[A-Za-z0-9]+', directory) or
             stage not in ('freezer', 'devices') or not re.fullmatch(r'[0-9a-f]{32}', run_id) or
             type(keypad_trace) is not bool or (keypad_trace and stage != 'devices') or
@@ -34,7 +34,9 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
                 (stage != 'devices' or not keypad_trace or keypad_persist is not None)) or
             type(keypad_audio) is not bool or (keypad_audio and not keypad_input) or
             (keypad_quirk is not None and (keypad_quirk not in ('baseline', 'old-scheme', 'fast-recovery') or
-                stage != 'devices' or not keypad_trace or keypad_persist is not None))):
+                stage != 'devices' or not keypad_trace or keypad_persist is not None)) or
+            type(wifi_trace) is not bool or (wifi_trace and (stage != 'devices' or keypad_input or
+                keypad_persist is not None or keypad_quirk is not None))):
         raise ValueError('Invalid PM stage, path or run ID')
     script = directory + '/test-pm-stages.py'
     # No SSH-owned pipe: USB may disconnect during the devices test.
@@ -47,13 +49,14 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
             '--stage', stage, '--run-id', run_id] + (['--keypad-trace'] if keypad_trace else []) + (
                 ['--keypad-persist', keypad_persist] if keypad_persist is not None else []) + (
                 ['--keypad-input'] if keypad_input else []) + (['--keypad-audio'] if keypad_audio else []) + (
-                ['--keypad-quirk', keypad_quirk] if keypad_quirk is not None else [])
+                ['--keypad-quirk', keypad_quirk] if keypad_quirk is not None else []) + (
+                ['--wifi-trace'] if wifi_trace else [])
 
 
 def inline(client, *args):
     # Inline inspection/recovery also needs the same saved keypad helper.
     program = 'import sys, types\n'
-    for name in ('keypad_pm', 'keypad_input', 'speaker_audio'):
+    for name in ('keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace'):
         program += ('keypad_helper = types.ModuleType(' + repr(name) + ')\n'
                     'exec(' + repr((ROOT / 'tools' / (name + '.py')).read_text()) + ', keypad_helper.__dict__)\n'
                     'sys.modules[' + repr(name) + '] = keypad_helper\n')
@@ -75,7 +78,7 @@ def collect(config, run_id):
 
 
 def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
-          keypad_quirk=None):
+          keypad_quirk=None, wifi_trace=False):
     with device(config, 'usb') as client:
         before = json.loads(inline(client, '--inspect'))
         (capture / 'before.json').write_text(json.dumps(before, indent=2) + '\n')
@@ -87,12 +90,14 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-pm.XXXXXXXX',
                         display=False).decode().strip()
         run_id = uuid.uuid4().hex
-        command = service_command(directory, stage, run_id, keypad_trace, keypad_persist, keypad_input, keypad_audio, keypad_quirk)
+        command = service_command(directory, stage, run_id, keypad_trace, keypad_persist, keypad_input, keypad_audio,
+                                  keypad_quirk, wifi_trace)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/test-pm-stages.py', directory + '/test-pm-stages.py')
             upload(sftp, ROOT / 'tools/keypad_pm.py', directory + '/keypad_pm.py')
             upload(sftp, ROOT / 'tools/keypad_input.py', directory + '/keypad_input.py')
             upload(sftp, ROOT / 'tools/speaker_audio.py', directory + '/speaker_audio.py')
+            upload(sftp, ROOT / 'tools/wifi_trace.py', directory + '/wifi_trace.py')
             upload(sftp, ROOT / 'build/sources.lock.json', directory + '/sources.lock.json')
         (capture / 'run.json').write_text(json.dumps(dict(run_id=run_id, stage=stage, helper=directory)) + '\n')
         print('PM run:', run_id, 'helper:', directory, flush=True)
@@ -125,6 +130,10 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
                 raise ValueError('Keypad persistence application/restoration was not verified')
         if keypad_quirk is not None:
             validate_quirk_result(result, keypad_quirk)
+        if wifi_trace:
+            trace = result.get('wifi_trace', {})
+            if trace.get('restored') is not True or trace.get('trace_lost') is not False:
+                raise ValueError('Wi-Fi trace completeness/restoration failed')
         wifi_proof(config, result['after'])
         # A fresh USB SSH collection above and independent Wi-Fi proof below
         # are required; kernel return alone is insufficient.
@@ -339,6 +348,49 @@ def compare_quirks(config, capture, lock, candidate, cycles):
     print('Port comparison passed:', json.dumps(report['mean_usb_resume_seconds']), flush=True)
 
 
+def wifi_smoke(config, capture, lock):
+    with device(config, 'usb') as client:
+        before = json.loads(inline(client, '--inspect'))
+        module('pm_wifi_smoke', 'test-pm-stages.py').validate(before, lock)
+        wifi_proof(config, before)
+        active = run(client, 'systemctl list-units --all --plain --no-legend --state=active,activating,deactivating '
+                     'gameshellneo-pm-test.service gameshellneo-firmware-trial.service '
+                     'gameshellneo-scan-test.service gameshellneo-wifi-trace-smoke.service', display=False)
+        if active.strip():
+            raise ValueError('Stop concurrent radio/PM diagnostics before the awake capture')
+        directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-wifi-trace.XXXXXXXX',
+                        display=False).decode().strip()
+        if not re.fullmatch(r'/tmp/gameshellneo-wifi-trace\.[A-Za-z0-9]+', directory):
+            raise ValueError('Unexpected Wi-Fi trace helper directory')
+        script = directory + '/wifi_trace.py'
+        with client.open_sftp() as sftp:
+            upload(sftp, ROOT / 'tools/wifi_trace.py', script)
+        command = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe', '--collect',
+                   '--unit=gameshellneo-wifi-trace-smoke', '--property=RuntimeMaxSec=90',
+                   '--property=TimeoutStopSec=15', '--property=UMask=0077',
+                   '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
+                   '/usr/bin/python3', '-B', script, '--smoke']
+        # Preserve failed device output and its helper for independent recovery.
+        with (capture / 'wifi-smoke.json').open('wb') as output:
+            data = run(client, shlex.join(command), output=output, display=False, timeout=120)
+        result = json.loads(data)
+        after = json.loads(inline(client, '--inspect'))
+        (capture / 'before.json').write_text(json.dumps(before, indent=2) + '\n')
+        (capture / 'after.json').write_text(json.dumps(after, indent=2) + '\n')
+        module('pm_wifi_smoke_after', 'test-pm-stages.py').validate(after, lock)
+        for name in ('boot_id', 'pm', 'stats', 'wifi_config_sha256', 'firmware_sha256', 'nvram_sha256'):
+            if before[name] != after[name]:
+                raise ValueError('Awake Wi-Fi test changed ' + name)
+        wifi_proof(config, after)
+        if result.get('passed') is not True or result.get('restored') is not True:
+            raise ValueError('Incomplete awake Wi-Fi metadata capture')
+        with client.open_sftp() as sftp:
+            sftp.remove(script)
+            sftp.rmdir(directory)
+        print('Awake capture passed; EAPOL tx/rx:', result['eapol_tx'], result['eapol_rx'],
+              '; logging/tracing restored and both SSH routes verified.', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -350,6 +402,7 @@ def main():
     mode.add_argument('--keypad-retention', action='store_true')
     mode.add_argument('--keypad-input', action='store_true')
     mode.add_argument('--keypad-quirks', action='store_true')
+    mode.add_argument('--wifi-smoke', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     config = load_env()
@@ -385,7 +438,7 @@ def main():
         stage, trace_option = 'devices', '1'
     if trace_option not in ('0', '1') or (trace_option == '1' and stage != 'devices'):
         raise ValueError('KEYPAD_TRACE=0/1; tracing requires STAGE=devices')
-    if not args.keypad_compare and (stage not in ('freezer', 'devices') or not 1 <= cycles <= 4):
+    if not (args.keypad_compare or args.wifi_smoke) and (stage not in ('freezer', 'devices') or not 1 <= cycles <= 4):
         raise ValueError('Explicit STAGE=freezer/devices and CYCLES=1..4 required')
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
     if (args.keypad_retention or args.keypad_input or args.keypad_quirks) and lock.get('experiments', {}).get('keypad_supply_retention') is not True:
@@ -400,9 +453,16 @@ def main():
     if quirk and (quirk not in ('baseline', 'old-scheme', 'fast-recovery') or
                   not (args.keypad_input or args.keypad_quirks)):
         raise ValueError('QUIRK requires the port comparison or physical keypad task')
+    wifi_option = os.environ.get('NEO_WIFI_TRACE', '0')
+    if wifi_option not in ('0', '1') or (wifi_option == '1' and
+            (not args.test or stage != 'devices' or quirk)):
+        raise ValueError('WIFI_TRACE=1 requires the ordinary devices test task')
     (capture / 'sources.lock.json').write_text(json.dumps(lock, indent=2) + '\n')
     with (LOCAL / 'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.wifi_smoke:
+            wifi_smoke(config, capture, lock)
+            return
         if args.keypad_compare:
             compare_keypad(config, capture, lock)
             return
@@ -413,7 +473,7 @@ def main():
             directory = capture / ('cycle-' + str(index + 1))
             directory.mkdir(mode=0o700)
             result = cycle(config, directory, lock, stage, trace_option == '1', keypad_input=args.keypad_input,
-                           keypad_audio=audio_option == '1', keypad_quirk=quirk or None)
+                           keypad_audio=audio_option == '1', keypad_quirk=quirk or None, wifi_trace=wifi_option == '1')
             if args.keypad_retention or args.keypad_input:
                 summary = retention_result(result)
                 (directory / 'retention.json').write_text(json.dumps(summary, indent=2) + '\n')

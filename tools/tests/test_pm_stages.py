@@ -300,6 +300,42 @@ class Evidence(unittest.TestCase):
         with self.assertRaises(ValueError):
             pm.result_dir('../escape')
 
+    def test_wifi_trace_is_opt_in_and_does_not_weaken_service_bounds(self):
+        args = host.service_command('/tmp/gameshellneo-pm.good', 'devices', 'a' * 32, wifi_trace=True)
+        self.assertIn('--wifi-trace', args)
+        self.assertIn('--property=RuntimeMaxSec=120', args)
+        self.assertIn('--property=ExecStopPost=/usr/bin/python3 -B /tmp/gameshellneo-pm.good/test-pm-stages.py --restore', args)
+        for options in ({'stage': 'freezer', 'wifi_trace': True},
+                        {'stage': 'devices', 'wifi_trace': True, 'keypad_input': True, 'keypad_trace': True},
+                        {'stage': 'devices', 'wifi_trace': True, 'keypad_quirk': 'old-scheme', 'keypad_trace': True}):
+            with self.assertRaises(ValueError):
+                host.service_command('/tmp/gameshellneo-pm.good', run_id='a'*32, **options)
+        with self.assertRaises(ValueError):
+            pm.test_stage({}, 'freezer', 'a'*32, wifi_trace=True)
+
+    def test_wifi_restore_failure_does_not_prevent_pm_restoration(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            boot, state, power = root/'boot', root/'state', root/'power'
+            boot.write_text('same')
+            power.mkdir()
+            (power/'pm_test').write_text('devices')
+            (power/'pm_async').write_text('0')
+            state.write_text(json.dumps(dict(boot_id='same', pm_test='none', pm_async='1')))
+            actual = pm.read
+            def read(path):
+                value = actual(path)
+                return '['+value+']' if Path(path).name == 'pm_test' else value
+            with patch.object(pm, 'BOOT', boot), patch.object(pm, 'STATE', state), \
+                    patch.object(pm, 'POWER', power), patch.object(pm, 'read', side_effect=read), \
+                    patch.object(sys, 'argv', ['pm-test', '--restore']), \
+                    patch('wifi_trace.restore', side_effect=OSError('radio cleanup failed')):
+                with self.assertRaises(OSError):
+                    pm.main()
+            self.assertFalse(state.exists())
+            self.assertEqual((power/'pm_test').read_text().strip(), 'none')
+            self.assertEqual((power/'pm_async').read_text().strip(), '1')
+
 
 class HostRecovery(unittest.TestCase):
     def test_ambiguous_submission_and_collection_disconnect_do_not_resubmit(self):

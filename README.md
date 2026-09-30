@@ -488,6 +488,8 @@ task device:rsb-restore # Stop/recover an interrupted RSB comparison
 task device:pm-inspect # Read-only capabilities, counters and device links over USB
 task device:pm-test STAGE=freezer # Diagnostic.7 only, owner present; one debug cycle
 task device:pm-test STAGE=devices CYCLES=1 # Only after the freezer test passes
+task device:wifi-trace-smoke # One awake reconnect; verify metadata recorder and restoration first
+task device:pm-test STAGE=devices CYCLES=1 WIFI_TRACE=1 # Owner ready; trace intermittent Wi-Fi recovery
 task device:pm-collect RUN=<32-character-run-id> # Recover saved evidence after SSH loss
 task device:pm-restore # Stop a test and restore its owned debug controls
 task device:idle-sample ROUTE=wifi SECONDS=600 # USB unplugged; leave controls alone for 11 minutes
@@ -913,6 +915,39 @@ The task refuses `none`, `platform`, `processors`, `core`, `mem` and other
 stages. It does not implement normal sleep, wake-button testing, DRAM retention
 or the desired low-power runtime. The temporary process-memory checksum is
 only an integrity check across this debug cycle.
+
+For an intermittent Wi-Fi recovery failure, first run `device:wifi-trace-smoke`
+with USB connected. It performs one awake software reassociation and requires
+EAPOL observations in both directions, a supplicant security-completion event,
+restored logging/tracing, unchanged PM counters/configuration and both SSH
+routes. It does not suspend or modify the saved network. The service has a
+90-second runtime limit and independent cleanup; its private `wifi-smoke.json`
+contains the metadata capture. A failed run retains its helper and evidence.
+
+After that passes, `device:pm-test STAGE=devices CYCLES=1 WIFI_TRACE=1` adds the
+same recorder to one owner-observed ordinary driver cycle. Wait for explicit
+readiness before starting, keep USB connected and leave controls untouched.
+The existing 30-second postflight is sampled before metadata collection, so
+the additional collection time does not extend the acceptance window. The
+option cannot be combined with physical button prompts or keypad policy
+experiments; `KEYPAD_TRACE=1` may be added for the existing observational trace.
+
+The recorder uses its own 256 KiB/CPU trace instance, filtered to `wlan0` EAPOL
+metadata plus ordinary PM callbacks. It temporarily selects supplicant DEBUG,
+preserving its timestamp setting and restoring the original level. It requires
+the exact installed launch arguments without key display or D-Bus debug
+controls. Raw debug messages remain in the device's private journal; exported
+supplicant evidence uses an allowlist of state/handshake/timer events without
+network names, addresses, keys or packet contents. Trace loss and oversized
+journal captures fail. Transmit events establish host submission, not delivery
+over the radio; absent userspace messages alone do not establish frame loss.
+
+Both recorders use a saved ownership record and `ExecStopPost` cleanup. After
+an interrupted PM run, use the usual `device:pm-collect RUN=...` and
+`device:pm-restore`. If the awake recorder is still active, stop its named
+`gameshellneo-wifi-trace-smoke` unit over USB first, then use `device:pm-restore`
+to retry owned logging/trace cleanup. Keep its private helper until cleanup
+passes. Neither task changes firmware, credentials or authentication timers.
 
 Initial hardware checks found that the internal keypad re-enumerates during
 devices-stage recovery, and the separate MUSB controller emits two warnings

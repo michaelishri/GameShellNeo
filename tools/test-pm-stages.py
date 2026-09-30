@@ -249,11 +249,13 @@ def check_result(before, after, stage, memory_ok):
 
 
 def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
-               keypad_quirk=None):
+               keypad_quirk=None, wifi_trace=False):
     if stage not in STAGES:
         raise ValueError('Only freezer and devices are permitted')
     if keypad_trace and stage != 'devices':
         raise ValueError('Keypad tracing is restricted to the devices debug stage')
+    if wifi_trace and (stage != 'devices' or keypad_input or keypad_persist is not None or keypad_quirk is not None):
+        raise ValueError('Wi-Fi tracing requires ordinary devices without other experimental changes')
     if keypad_persist is not None and (keypad_persist not in ('0', '1') or
                                       stage != 'devices' or not keypad_trace):
         raise ValueError('Persistence comparison requires a traced devices debug stage')
@@ -276,7 +278,8 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
         validate(before, lock)
         observers = ('rsb-comparison', 'idle-sample', 'power-profile', 'governor-profile',
                      'governor-comparison', 'usb-detection', 'usb-reconnects', 'usb-diagnostics',
-                     'scan-test', 'firmware-trial', 'stability-test', 'backlight-test', 'keypad-capture', 'audio-test')
+                     'scan-test', 'firmware-trial', 'stability-test', 'backlight-test', 'keypad-capture', 'audio-test',
+                     'wifi-trace-smoke')
         if command('systemctl', 'list-units', '--all', '--plain', '--no-legend',
                    '--state=active,activating,deactivating',
                    *['gameshellneo-' + n + '.service' for n in observers]):
@@ -288,10 +291,13 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
         record['keypad'] = {}
         record['persistence'] = {}
         record['port_quirks'] = {}
+        record['wifi_trace'] = {}
+        from wifi_trace import capture as capture_wifi
         with (persistence(record['persistence'], keypad_persist)
               if keypad_persist is not None else nullcontext()), \
              (port_quirks(record['port_quirks'], keypad_quirk)
-              if keypad_quirk is not None else nullcontext()):
+              if keypad_quirk is not None else nullcontext()), \
+             (capture_wifi(record['wifi_trace']) if wifi_trace else nullcontext()):
             with observe(record['keypad'], tracing=keypad_trace) as original_fd:
                 from keypad_input import capture
                 from speaker_audio import session as speaker_session, idle as speaker_idle
@@ -327,7 +333,12 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
                         inputs.after_stage()
                     # Physical input runs include human interaction and are not latency comparisons.
                     time.sleep(max(0, 30 - (time.monotonic() - resumed)))
-        after = snapshot()
+                    if wifi_trace:
+                        # Sample the existing postflight before recorder collection
+                        # and restoration; diagnostic overhead must not extend the
+                        # Wi-Fi qualification window.
+                        record['after'] = snapshot()
+        after = record['after'] if wifi_trace else snapshot()
         record['after'] = after
         validate(after, lock)
         record['journal_delta'] = check_result(before, after, stage, record['process_memory_ok'])
@@ -353,14 +364,17 @@ def main():
     parser.add_argument('--keypad-input', action='store_true')
     parser.add_argument('--keypad-audio', action='store_true')
     parser.add_argument('--keypad-quirk', choices=('baseline', 'old-scheme', 'fast-recovery'))
+    parser.add_argument('--wifi-trace', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
         from keypad_pm import restore_trace, restore_persistence, restore_port_quirks
         from keypad_input import restore_console
         from speaker_audio import restore as restore_audio
+        from wifi_trace import restore as restore_wifi_trace
         failure = None
-        for operation in (restore_trace, restore_persistence, restore_port_quirks, restore_audio, restore_console, restore):
+        for operation in (restore_wifi_trace, restore_trace, restore_persistence, restore_port_quirks,
+                          restore_audio, restore_console, restore):
             try:
                 operation()
             except BaseException as error:
@@ -383,7 +397,8 @@ def main():
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(sig, interrupted)
         test_stage(json.loads(read(args.lock)), args.stage, args.run_id,
-                   args.keypad_trace, args.keypad_persist, args.keypad_input, args.keypad_audio, args.keypad_quirk)
+                   args.keypad_trace, args.keypad_persist, args.keypad_input, args.keypad_audio, args.keypad_quirk,
+                   args.wifi_trace)
 
 
 if __name__ == '__main__':

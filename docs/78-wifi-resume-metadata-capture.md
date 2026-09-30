@@ -102,7 +102,57 @@ The saved awake check then passed at
 
 The trace context lasted about 4.04 seconds, including setup, polling and
 collection; this is not a precise association latency or an overhead benchmark.
-The observed driver capture is the next step after explicit owner readiness.
+The subsequent driver capture is recorded below.
+
+## First owner-ready driver capture
+
+After the owner explicitly replied “Ready,” the saved task ran exactly one
+`STAGE=devices CYCLES=1 WIFI_TRACE=1` cycle. Run
+`f03a79d12fd5472694381617d93a5a84` passed its automated checks on the same
+diagnostic.11 boot. Private evidence is
+`.local/diagnostics/20260930T213555.868664Z/cycle-1/result.json`; host transcript:
+`.local/neo55-observed-wifi-pm.log`.
+
+The driver debug stage took 7.744 seconds, including its deliberate five-second
+pause. The original keypad handle remained healthy, with unchanged USB/input
+identity and no held keys. Process-memory verification and independent USB
+and Wi-Fi SSH passed. One transient USB collection failure was retried for
+this same run ID; the stage was not resubmitted.
+
+The metadata trace contains two EAPOL receives and two transmit submissions.
+The supplicant timeline shows message 1 received, 2 sent, 3 received, 4 sent,
+then key-negotiation completion and `COMPLETED`. No authentication timeout,
+association rejection or retry-backoff event was recorded during this capture.
+
+| Observation | Monotonic seconds |
+| --- | ---: |
+| Kernel PM exit | 34978.508656 |
+| First EAPOL receive at host network path | 34979.393084 |
+| First EAPOL transmit submission | 34979.517126 |
+| Second EAPOL receive | 34979.557208 |
+| Second EAPOL transmit submission | 34979.558281 |
+| Supplicant key-negotiation completion logged | 34979.573042 |
+
+Logged authentication completion was about **1.064 seconds after kernel PM
+exit**. That excludes the debug-stage duration and does not measure physical
+wake, radio transmission time or the first usable application connection.
+The kernel again logged `xmit rejected state=0`, at 34978.501876, before the
+captured authentication exchange. Its occurrence in this passing run further
+supports keeping that warning separate from proof of a failed handshake.
+
+All four CPUs reported zero trace loss. The metadata trace was 409,562 bytes;
+517 journal rows reduced to 22 allowlisted supplicant events. INFO logging
+with timestamps off and the private trace instance were restored. PM returned
+to `none`/async `1`; the success counter increased from 12 to 13, with every
+failure counter zero. Firmware-load count remained one. USB and AC were both
+present/online; battery monitoring was valid at 100%/Charging. Network profile,
+firmware/NVRAM hashes, charger settings, CPU policy and backlight matched the
+preflight snapshot.
+
+The owner confirmed that the dim console and brightness returned normally.
+No further cycle starts without readiness for its stated sequence. This run supplies a successful
+resume-authentication reference, but did not reproduce the intermittent
+failure and does not resolve NEO-55.
 
 ## Interpretation limits
 

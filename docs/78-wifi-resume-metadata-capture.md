@@ -150,9 +150,62 @@ firmware/NVRAM hashes, charger settings, CPU policy and backlight matched the
 preflight snapshot.
 
 The owner confirmed that the dim console and brightness returned normally.
-No further cycle starts without readiness for its stated sequence. This run supplies a successful
-resume-authentication reference, but did not reproduce the intermittent
-failure and does not resolve NEO-55.
+This run supplies a successful resume-authentication reference, but did not
+reproduce the intermittent failure and does not resolve NEO-55.
+
+## Four-cycle owner-ready batch
+
+After a separate explicit ready response, the saved task ran
+`STAGE=devices CYCLES=4 WIFI_TRACE=1`. All four cycles passed the unchanged
+postflight and independent USB/Wi-Fi SSH checks on the same boot. The owner
+confirmed that the dim login console and brightness were normal after the
+batch. No additional cycle was started afterward.
+
+Private evidence: `.local/diagnostics/20260930T221137.921024Z/cycle-1/` through
+`cycle-4/`, with the derived `batch-analysis.json` in their parent directory.
+The host transcript is `.local/neo55-observed-wifi-batch.log`.
+
+| Cycle | Run ID | Debug stage (s) | Authentication completion after kernel PM exit (s) | EAPOL RX/TX observations |
+| --- | --- | ---: | ---: | ---: |
+| 1 | `54c9fa865dd644a1940d2dd08638ef28` | 7.701 | 1.885 | 3 / 2 |
+| 2 | `0969d9ad580e4a3699765ce98307c96c` | 7.687 | 0.551 | 2 / 2 |
+| 3 | `ac1182536bc14a84a490f240bc78e11f` | 7.496 | 0.541 | 2 / 2 |
+| 4 | `f1681416cc9f48a5bcfb66a347cfb4de` | 7.528 | 0.599 | 2 / 2 |
+
+Each timeline recorded message 1 received, message 2 sent, message 3 received,
+message 4 sent and key-negotiation completion. None contained an authentication
+timeout, association rejection or retry-backoff event. Cycle one's extra
+receive observation is metadata only; it is not a decoded retransmission or
+proof of any particular packet contents. All four exported timelines contain
+22 allowlisted events, drawn from 515–517 journal rows.
+
+All four CPUs reported zero trace loss in every cycle. Cycle one recorded
+3,819 trace events; the others recorded 3,818 each. INFO/timestamp-off logging
+and the private trace instance were restored each time. The original keypad
+handle stayed healthy and its USB/input identity was unchanged; process-memory
+verification passed. Network profile, firmware/NVRAM hashes, charger settings,
+CPU policy, radio power-save setting and backlight matched before/after each
+cycle and across the batch.
+
+The PM success counter advanced from 13 to 17, with all failure counters zero.
+Firmware-load count remained one. USB supply presence/online flags stayed
+`1` in each pre/postflight, and each postflight reported a valid battery
+estimate of 100%. PM controls returned to `none`/async `1`, and normal sleep
+remained masked. Temporary USB collection failures in cycles one and three
+were retried for their existing run IDs; neither stage was resubmitted.
+
+The transmit-rejected warning occurred once in cycle two and not in the other
+three. The slowest authentication in this batch occurred without that warning.
+Together with the first traced pass, this supplies **five successful observed
+driver captures**, not a fix for the earlier failure. DEBUG logging and tracing
+can also change scheduling; these results do not exclude an instrumentation
+effect on an intermittent problem.
+
+The bounded batch is complete. Keep the saved recorder available for subsequent
+justified PM investigations, preserve the original failed run and leave
+NEO-55 open. More identical successful cycles alone would not establish the
+cause, and no timeout, retry, firmware or driver policy is changed on this
+evidence.
 
 ## Interpretation limits
 

@@ -19,7 +19,8 @@ def requirements(requested, lock):
     if suspend_tests:
         if 'usb_absent_poll' in experiments or 'usb_diagnostics' in experiments:
             raise ValueError('Suspend-test images must omit the USB experiment selectors')
-        requested.update(CONFIG_SUSPEND='y', CONFIG_PM_SLEEP='y', CONFIG_PM_DEBUG='y',
+        requested.update(CONFIG_SUSPEND='y', CONFIG_SUSPEND_FREEZER='y', CONFIG_FREEZER='y',
+                         CONFIG_PM_SLEEP='y', CONFIG_PM_DEBUG='y',
                          CONFIG_PM_SLEEP_DEBUG='y', CONFIG_PM_ADVANCED_DEBUG='y',
                          CONFIG_HIBERNATION='n', CONFIG_PM_AUTOSLEEP='n', CONFIG_PM_WAKELOCKS='n',
                          CONFIG_ARM_PSCI_CPUIDLE='n', CONFIG_PM_TEST_SUSPEND='n')

@@ -1,0 +1,17 @@
+diff --git a/drivers/power/supply/power_supply_core.c b/drivers/power/supply/power_supply_core.c
+--- a/drivers/power/supply/power_supply_core.c
++++ b/drivers/power/supply/power_supply_core.c
+@@ -158,6 +158,12 @@ void power_supply_changed(struct power_supply *psy)
+ 	pm_stay_awake(&psy->dev);
+ 	spin_unlock_irqrestore(&psy->changed_lock, flags);
+-	schedule_work(&psy->changed_work);
++
++	/*
++	 * Notifications can read properties through suspended suppliers. Drain
++	 * active work before device suspend and defer new work until thaw, while
++	 * retaining the changed flag and wakeup source for pending notifications.
++	 */
++	queue_work(system_freezable_wq, &psy->changed_work);
+ }
+ EXPORT_SYMBOL_GPL(power_supply_changed);
+ 

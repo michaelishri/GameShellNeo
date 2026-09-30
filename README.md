@@ -126,6 +126,14 @@ button test with the single-reset candidate passed; all experimental settings
 were restored. These are driver debug measurements, not actual wake latency.
 [Report 67](docs/67-keypad-port-recovery-comparison.md) records the evidence.
 Actual sleep and audio-enabled idle power remain unqualified.
+
+The next candidate, `0.1.0-diagnostic.11`, is built, verified and staged on the
+Mac. It drains USB PHY detection during suspend and defers power-supply
+notification work until suppliers have resumed. Diagnostic.10 remains installed
+and is preserved as the verified recovery checkpoint. [Report 72](docs/72-diagnostic11-preparation.md)
+records artifacts, checks and the next hardware sequence; [report 71](docs/71-power-supply-notification-freeze.md)
+explains the notification fix. No card write or actual sleep test has occurred
+for this candidate.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -396,6 +404,21 @@ validation. It is not installed in diagnostic.10. The
 [PMIC ordering audit](docs/68-pmic-suspend-ordering-audit.md) identifies the
 remaining power-supply notification and wake-policy gates before deeper sleep
 tests. Use `task kernel:reset` before the next full build with the changed queue.
+
+For power-supply notification freeze/replay, use:
+
+```sh
+task test:power-supply-suspend # Actual producer/worker, native + ARM32
+task check:power-supply-driver # Also compile the full ARM power-supply core
+```
+
+The regression checks freeze-boundary arrivals, notification coalescing,
+concurrent changes, wake holds, abort/thaw replay and repeated cycles.
+`task build` includes it; evidence is saved under
+`.local/build/power-supply-suspend-tests/`.
+[Report 71](docs/71-power-supply-notification-freeze.md) explains patch 0013's
+use of the kernel freezer and the remaining hardware/wake-policy qualification.
+Both freezer options are required by the diagnostic configuration checks.
 
 For the Sunxi MUSB context capability fix, use:
 

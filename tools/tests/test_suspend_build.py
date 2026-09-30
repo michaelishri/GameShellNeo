@@ -30,7 +30,8 @@ class SuspendBuildTests(unittest.TestCase):
 
     def test_sleep_image_requires_debug_gates_and_excludes_automatic_sleep(self):
         required = config.requirements({}, {'experiments': {'suspend_diagnostics': True}})
-        for option in ('CONFIG_SUSPEND', 'CONFIG_PM_SLEEP', 'CONFIG_PM_DEBUG', 'CONFIG_PM_SLEEP_DEBUG'):
+        for option in ('CONFIG_SUSPEND', 'CONFIG_SUSPEND_FREEZER', 'CONFIG_FREEZER',
+                       'CONFIG_PM_SLEEP', 'CONFIG_PM_DEBUG', 'CONFIG_PM_SLEEP_DEBUG'):
             self.assertEqual(required[option], 'y')
         for option in ('CONFIG_HIBERNATION', 'CONFIG_PM_AUTOSLEEP', 'CONFIG_PM_WAKELOCKS',
                        'CONFIG_ARM_PSCI_CPUIDLE', 'CONFIG_PM_TEST_SUSPEND'):

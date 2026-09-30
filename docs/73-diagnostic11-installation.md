@@ -8,6 +8,9 @@ covers verified installation and subsequent boot/access checks. Owner-observed
 PM stages, button input and cable cycles are deferred until the owner returns.
 Normal sleep remains disabled; this is not suspend qualification.
 
+Subsequent owner-assisted qualification, interrupted batches and follow-ups
+are recorded in [report 74](74-diagnostic11-pm-validation.md).
+
 ## Installation
 
 Fresh `task mac:status` and `task mac:inspect DISK=disk16` identified the sole

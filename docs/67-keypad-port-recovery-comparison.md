@@ -173,9 +173,47 @@ had failed and kernel taint was zero. Private evidence:
 - `.local/diagnostics/20260930T103208.886998Z/inspection.json`
 - `.local/diagnostics/20260930T103208.876387Z/keypad.json`
 
-The single-reset option is the preferred candidate for the next physical input
-check because it produced the larger measured improvement. This check is still
-pending. No candidate is installed as a permanent policy.
+With the owner ready, `task device:keypad-input QUIRK=old-scheme AUDIO=1`
+passed run `b7d855e62a4a46d08446529c86b9cfb7` on the same boot:
+
+- All A/B/X/Y taps before and after the driver stage arrived through the original
+  input handle. USB device number 2 and input sysfs identity were unchanged;
+  there were no keypad disconnects or supply-disable events.
+- Held A was cleared during generic input suspend, as in the previous
+  qualification. The release timestamp, 3476.020919 seconds, falls inside its
+  traced suspend callback at 3476.020893–3476.020925 seconds. Fresh presses worked
+  afterward and the final key bitmap was empty. Continuous key-down delivery
+  and a distinct physical release event were not observed in this cleared mode.
+- All nine speaker cues passed, with both amplifiers off before PM and after
+  each cue. Mixer, console, exclusive grab, tracing, port mask and PM controls
+  were restored. All 217 input events and the complete PM trace were retained.
+- USB/Wi-Fi SSH recovered, every PM failure counter stayed zero, and the owner
+  confirmed correct buttons, tones and the normal dim login console.
+
+The USB callback took 0.752973 seconds in this interactive run. Its whole debug
+stage took 7.177799 seconds and a fresh healthy handle was observed 0.216157
+seconds afterward. These figures are recorded separately from the automatic
+comparison; human input and audio instrumentation differ.
+
+Private evidence: `.local/diagnostics/20260930T103413.111602Z/cycle-1/`, with
+`result.json`, `retention.json` and `physical-input.json`;
+host log `.local/neo49-physical-input.log`.
+
+Independent final captures confirmed the same boot, original port mask zero,
+default global enumeration settings, `pm_test=none`, `pm_async=1`, all seven
+services active with no restarts, no failed units or kernel taint, and PM success
+15 with every failure counter zero. Both audio PCMs were closed, both amplifiers
+were off and the complete mixer dump matched the preceding qualified idle state:
+
+- `.local/diagnostics/20260930T103714.656605Z/inspection.json`
+- `.local/diagnostics/20260930T103714.681680Z/keypad.json`
+- `.local/diagnostics/20260930T103714.727927Z/audio.json`
+
+NEO-49 is complete for these scoped driver-debug comparisons and single-reset
+physical qualification. No candidate is installed as a permanent policy. The
+fast-recovery option has automatic continuity evidence but has not received its
+own physical button sequence. Normal sleep remains disabled; the audio-latency
+investigation remains explicitly deferred.
 
 These trials do not test both bits together. Their separately measured savings
 must not be added: selecting the old scheme removes one reset and therefore

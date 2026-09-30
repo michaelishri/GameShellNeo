@@ -118,6 +118,13 @@ idle amplifier state were restored, and the owner confirmed clear tones and
 normal screen return. Diagnostic.9 remains the recovery baseline.
 [Report 65](docs/65-speaker-confirmation-cues.md) records preparation;
 [report 66](docs/66-speaker-hardware-validation.md) records hardware results.
+
+The saved keypad port comparison subsequently measured ~359 ms (33%) faster
+USB resume with a single-reset enumeration sequence, and ~90 ms (8%) with a
+separate shorter-recovery-wait trial. Twelve automatic cycles and a physical
+button test with the single-reset candidate passed; all experimental settings
+were restored. These are driver debug measurements, not actual wake latency.
+[Report 67](docs/67-keypad-port-recovery-comparison.md) records the evidence.
 Actual sleep and audio-enabled idle power remain unqualified.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path

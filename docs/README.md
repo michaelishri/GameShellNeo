@@ -56,6 +56,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [82 — Wi-Fi freezer lifecycle](82-brcmfmac-freezer-lifecycle.md) | Bounded worker collection, timeout cleanup, completion reuse protection, concurrent source tests and ARM driver compilation; hardware error recovery remains open |
 | [66 — Speaker hardware validation](66-speaker-hardware-validation.md) | Diagnostic.10 installation/integration, home Wi-Fi, clear quiet tones and successful nine-cue input/driver PM test with full restoration |
 | [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md) | Upstream board audio route, quiet bounded cues, mixer/PM restoration and diagnostic.10 preparation |
 | [64 — Keypad physical input](64-keypad-physical-input-validation.md) | Repeatable physical press/release and held-key test through the original retained input handle |

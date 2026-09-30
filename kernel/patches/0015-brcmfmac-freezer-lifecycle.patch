@@ -1,0 +1,262 @@
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+@@ -10,6 +10,7 @@
+ #include <linux/pci_ids.h>
+ #include <linux/sched.h>
+ #include <linux/completion.h>
++#include <linux/spinlock.h>
+ #include <linux/interrupt.h>
+ #include <linux/scatterlist.h>
+ #include <linux/mmc/sdio.h>
+@@ -51,9 +52,14 @@
+ 
+ #define BRCMF_DEFAULT_RXGLOM_SIZE	32  /* max rx frames in glom chain */
+ 
++#define BRCMF_SDIO_FREEZE_TIMEOUT_MS	5000
++
+ struct brcmf_sdiod_freezer {
+-	atomic_t freezing;
+-	atomic_t thread_count;
++	/* Protects admission, both counts and completion reuse. */
++	spinlock_t lock;
++	bool freezing;
++	u32 thread_count;
++	/* Includes signaled waiters until wait_for_completion() has returned. */
+ 	u32 frozen_count;
+ 	wait_queue_head_t thread_freeze;
+ 	struct completion resumed;
+@@ -797,8 +803,7 @@
+ 	sdiodev->freezer = kzalloc(sizeof(*sdiodev->freezer), GFP_KERNEL);
+ 	if (!sdiodev->freezer)
+ 		return -ENOMEM;
+-	atomic_set(&sdiodev->freezer->thread_count, 0);
+-	atomic_set(&sdiodev->freezer->freezing, 0);
++	spin_lock_init(&sdiodev->freezer->lock);
+ 	init_waitqueue_head(&sdiodev->freezer->thread_freeze);
+ 	init_completion(&sdiodev->freezer->resumed);
+ 	return 0;
+@@ -807,63 +812,129 @@
+ static void brcmf_sdiod_freezer_detach(struct brcmf_sdio_dev *sdiodev)
+ {
+ 	if (sdiodev->freezer) {
+-		WARN_ON(atomic_read(&sdiodev->freezer->freezing));
++		WARN_ON(sdiodev->freezer->freezing ||
++			sdiodev->freezer->frozen_count);
+ 		kfree(sdiodev->freezer);
+ 		sdiodev->freezer = NULL;
+ 	}
+ }
+ 
++static bool brcmf_sdiod_freezer_frozen(struct brcmf_sdiod_freezer *freezer)
++{
++	unsigned long flags;
++	bool frozen;
++
++	spin_lock_irqsave(&freezer->lock, flags);
++	frozen = freezer->thread_count == freezer->frozen_count;
++	spin_unlock_irqrestore(&freezer->lock, flags);
++	return frozen;
++}
++
++static void brcmf_sdiod_freezer_thaw(struct brcmf_sdiod_freezer *freezer)
++{
++	unsigned long flags;
++
++	/* Serialize admission, signaling and the next completion reinit. */
++	spin_lock_irqsave(&freezer->lock, flags);
++	freezer->freezing = false;
++	complete_all(&freezer->resumed);
++	spin_unlock_irqrestore(&freezer->lock, flags);
++}
++
+ static int brcmf_sdiod_freezer_on(struct brcmf_sdio_dev *sdiodev)
+ {
+-	atomic_t *expect = &sdiodev->freezer->thread_count;
+-	int res = 0;
+-
+-	sdiodev->freezer->frozen_count = 0;
+-	reinit_completion(&sdiodev->freezer->resumed);
+-	atomic_set(&sdiodev->freezer->freezing, 1);
++	struct brcmf_sdiod_freezer *freezer = sdiodev->freezer;
++	unsigned long flags;
++
++	spin_lock_irqsave(&freezer->lock, flags);
++	/* complete_all() does not mean the previous waiters have returned. */
++	if (freezer->freezing || freezer->frozen_count) {
++		spin_unlock_irqrestore(&freezer->lock, flags);
++		return -EBUSY;
++	}
++	reinit_completion(&freezer->resumed);
++	freezer->freezing = true;
++	spin_unlock_irqrestore(&freezer->lock, flags);
+ 	brcmf_sdio_trigger_dpc(sdiodev->bus);
+-	wait_event(sdiodev->freezer->thread_freeze,
+-		   atomic_read(expect) == sdiodev->freezer->frozen_count);
+-	sdio_claim_host(sdiodev->func1);
+-	res = brcmf_sdio_sleep(sdiodev->bus, true);
+-	sdio_release_host(sdiodev->func1);
+-	return res;
++	if (!wait_event_timeout(freezer->thread_freeze,
++				brcmf_sdiod_freezer_frozen(freezer),
++				msecs_to_jiffies(BRCMF_SDIO_FREEZE_TIMEOUT_MS))) {
++		brcmf_sdiod_freezer_thaw(freezer);
++		return -ETIMEDOUT;
++	}
++	return 0;
+ }
+ 
+ static void brcmf_sdiod_freezer_off(struct brcmf_sdio_dev *sdiodev)
+ {
+ 	sdio_claim_host(sdiodev->func1);
+ 	brcmf_sdio_sleep(sdiodev->bus, false);
++	brcmf_sdiod_change_state(sdiodev, BRCMF_SDIOD_DATA);
++	brcmf_sdio_wd_timer(sdiodev->bus, true);
+ 	sdio_release_host(sdiodev->func1);
+-	atomic_set(&sdiodev->freezer->freezing, 0);
+-	complete_all(&sdiodev->freezer->resumed);
+-}
+-
+-bool brcmf_sdiod_freezing(struct brcmf_sdio_dev *sdiodev)
+-{
+-	return IS_ENABLED(CONFIG_PM_SLEEP) &&
+-		atomic_read(&sdiodev->freezer->freezing);
++	brcmf_sdiod_freezer_thaw(sdiodev->freezer);
++}
++
++static bool brcmf_sdiod_freezing(struct brcmf_sdio_dev *sdiodev)
++{
++	struct brcmf_sdiod_freezer *freezer = sdiodev->freezer;
++	unsigned long flags;
++	bool freezing;
++
++	spin_lock_irqsave(&freezer->lock, flags);
++	freezing = freezer->freezing;
++	spin_unlock_irqrestore(&freezer->lock, flags);
++	return freezing;
+ }
+ 
+ void brcmf_sdiod_try_freeze(struct brcmf_sdio_dev *sdiodev)
+ {
+-	if (!brcmf_sdiod_freezing(sdiodev))
++	struct brcmf_sdiod_freezer *freezer;
++	unsigned long flags;
++
++	if (!IS_ENABLED(CONFIG_PM_SLEEP))
+ 		return;
+-	sdiodev->freezer->frozen_count++;
+-	wake_up(&sdiodev->freezer->thread_freeze);
+-	wait_for_completion(&sdiodev->freezer->resumed);
++	freezer = sdiodev->freezer;
++	spin_lock_irqsave(&freezer->lock, flags);
++	if (!freezer->freezing) {
++		spin_unlock_irqrestore(&freezer->lock, flags);
++		return;
++	}
++	freezer->frozen_count++;
++	spin_unlock_irqrestore(&freezer->lock, flags);
++	wake_up(&freezer->thread_freeze);
++	wait_for_completion(&freezer->resumed);
++	spin_lock_irqsave(&freezer->lock, flags);
++	freezer->frozen_count--;
++	spin_unlock_irqrestore(&freezer->lock, flags);
+ }
+ 
+ void brcmf_sdiod_freezer_count(struct brcmf_sdio_dev *sdiodev)
+ {
+-	if (IS_ENABLED(CONFIG_PM_SLEEP))
+-		atomic_inc(&sdiodev->freezer->thread_count);
++	struct brcmf_sdiod_freezer *freezer;
++	unsigned long flags;
++
++	if (!IS_ENABLED(CONFIG_PM_SLEEP))
++		return;
++	freezer = sdiodev->freezer;
++	spin_lock_irqsave(&freezer->lock, flags);
++	freezer->thread_count++;
++	spin_unlock_irqrestore(&freezer->lock, flags);
++	wake_up(&freezer->thread_freeze);
+ }
+ 
+ void brcmf_sdiod_freezer_uncount(struct brcmf_sdio_dev *sdiodev)
+ {
+-	if (IS_ENABLED(CONFIG_PM_SLEEP))
+-		atomic_dec(&sdiodev->freezer->thread_count);
++	struct brcmf_sdiod_freezer *freezer;
++	unsigned long flags;
++
++	if (!IS_ENABLED(CONFIG_PM_SLEEP))
++		return;
++	freezer = sdiodev->freezer;
++	spin_lock_irqsave(&freezer->lock, flags);
++	freezer->thread_count--;
++	spin_unlock_irqrestore(&freezer->lock, flags);
++	wake_up(&freezer->thread_freeze);
+ }
+ 
+ int brcmf_sdiod_remove(struct brcmf_sdio_dev *sdiodev)
+@@ -1196,7 +1267,13 @@
+ 	sdiodev = bus_if->bus_priv.sdio;
+ 
+ 	if (sdiodev->wowl_enabled || !cap_power_off) {
+-		brcmf_sdiod_freezer_on(sdiodev);
++		ret = brcmf_sdiod_freezer_on(sdiodev);
++		if (ret)
++			return ret;
++		sdio_claim_host(sdiodev->func1);
++		brcmf_sdiod_change_state(sdiodev, BRCMF_SDIOD_DOWN);
++		brcmf_sdio_sleep(sdiodev->bus, true);
++		sdio_release_host(sdiodev->func1);
+ 		brcmf_sdio_wd_timer(sdiodev->bus, 0);
+ 
+ 		sdio_flags = MMC_PM_KEEP_POWER;
+@@ -1244,6 +1321,9 @@
+ 		else
+ 			brcmf_bus_allow_reset_work(bus_if);
+ 	} else {
++		/* F2 can resume after F1 failed worker collection and thawed. */
++		if (!brcmf_sdiod_freezing(sdiodev))
++			return 0;
+ 		if (sdiodev->wowl_enabled && sdiodev->settings->bus.sdio.oob_irq_supported)
+ 			disable_irq_wake(sdiodev->settings->bus.sdio.oob_irq_nr);
+ 
+@@ -1279,4 +1359,3 @@
+ 
+ 	sdio_unregister_driver(&brcmf_sdmmc_driver);
+ }
+-
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -3809,11 +3809,7 @@
+ 		bus->idlecount = 0;
+ 	}
+ 	bus->dpc_running = false;
+-	if (brcmf_sdiod_freezing(bus->sdiodev)) {
+-		brcmf_sdiod_change_state(bus->sdiodev, BRCMF_SDIOD_DOWN);
+-		brcmf_sdiod_try_freeze(bus->sdiodev);
+-		brcmf_sdiod_change_state(bus->sdiodev, BRCMF_SDIOD_DATA);
+-	}
++	brcmf_sdiod_try_freeze(bus->sdiodev);
+ }
+ 
+ static void
+@@ -4161,6 +4157,7 @@
+ 		} else
+ 			break;
+ 	}
++	brcmf_sdiod_freezer_uncount(bus->sdiodev);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+@@ -350,7 +350,6 @@
+ void brcmf_sdiod_sgtable_alloc(struct brcmf_sdio_dev *sdiodev);
+ void brcmf_sdiod_change_state(struct brcmf_sdio_dev *sdiodev,
+ 			      enum brcmf_sdiod_state state);
+-bool brcmf_sdiod_freezing(struct brcmf_sdio_dev *sdiodev);
+ void brcmf_sdiod_try_freeze(struct brcmf_sdio_dev *sdiodev);
+ void brcmf_sdiod_freezer_count(struct brcmf_sdio_dev *sdiodev);
+ void brcmf_sdiod_freezer_uncount(struct brcmf_sdio_dev *sdiodev);

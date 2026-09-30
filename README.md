@@ -436,6 +436,22 @@ records the scope and results. This does not qualify real sleep or implement
 the freezer transaction and failed-wake recovery work in
 [report 80](docs/80-brcmfmac-suspend-failure-audit.md).
 
+For Wi-Fi worker collection, timeout cleanup and repeated suspend attempts:
+
+```sh
+task test:brcmfmac-freezer          # Actual C workers/callbacks, concurrent native + ARM32 tests
+task check:brcmfmac-freezer-drivers # Also compile both complete changed ARM driver objects
+```
+
+These check late workers, timeout/thaw, completion reuse, participant withdrawal,
+watchdog exit accounting and successful resume ordering. The collector has a
+five-second wait budget; workers still retiring from a previous thaw make a new
+attempt return `-EBUSY`. `task build` includes this source regression. Evidence
+is in `.local/build/brcmfmac-freezer-tests/`.
+[Report 82](docs/82-brcmfmac-freezer-lifecycle.md) records patch 0015 and its
+limits: hardware sleep/wake failure recovery and image qualification remain
+separate work. Neither task accesses the GameShell or rebuilds its image.
+
 For the Sunxi MUSB context capability fix, use:
 
 ```sh

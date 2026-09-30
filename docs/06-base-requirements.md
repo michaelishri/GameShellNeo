@@ -15,6 +15,8 @@ Create a reliable, power-efficient Linux foundation before working on a launcher
 
 Existing ClockworkPi and community code is reference material for hardware behavior, known problems and prior solutions. It is not a prescribed implementation. The owner welcomes redesigned or newly written drivers where that provides better efficiency, functionality or reliability. Evaluate reuse, upstream extension and new implementation on their merits; justify changes with hardware evidence and tests. Maintainability and standard Linux interfaces remain design goals. New driver work does not bring deferred peripherals into the initial milestone automatically.
 
+**Standing authorization, confirmed 1 October 2026:** driver changes are acceptable across the project, including fixes, refactoring, extensions and replacements. Prefer a stable, fast, power-efficient driver stack with underlying defects corrected at the appropriate layer over accumulating workarounds around faulty drivers. Separate approval is not needed merely because a proposed fix changes a driver. Preserve maintainability and validate changes with repeatable tests and relevant hardware evidence. Where a hardware constraint or unresolved cause requires a temporary workaround, document its justification, limitations and removal criteria, and track the underlying work in `FOLLOW-UP.md`.
+
 The owner identifies the Nintendo Switch experience as an inspiration: quick startup, over-the-air updates and dependable sleep/resume. This is a product-experience target, not a verified statement about Nintendo hardware timings or an assumption that GameShell can reproduce its implementation.
 
 | Long-term target | Interpretation and validation needed |

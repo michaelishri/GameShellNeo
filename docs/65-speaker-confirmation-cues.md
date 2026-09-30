@@ -145,5 +145,5 @@ The owner confirmed regular Wi-Fi for the transfer. `task mac:stage` uploaded
 the candidate and passed compressed and decompressed checksum verification on
 the Mac. The private staging log is `.local/neo48-stage.log`. Card flash, full
 4 GiB readback and eject subsequently passed; [report 66](66-speaker-hardware-validation.md)
-records installation and the pending boot/audio qualification. No speaker test
-has run yet.
+records installation, boot/integration, the home Wi-Fi update and initial audio
+inspection. Audible playback and audio-assisted PM qualification remain pending.

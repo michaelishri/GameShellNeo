@@ -112,8 +112,9 @@ fresh taps worked afterward, with no stuck key. Other input cases and actual
 sleep remain unqualified.
 [Diagnostic.10 preparation](docs/65-speaker-confirmation-cues.md) adds the
 upstream A33 speaker path for audible button-registration cues. The new image
-has passed offline verification and card flash/full readback; boot, playback
-and audio-assisted PM tests still need qualification. Diagnostic.9 remains
+has passed offline verification, card flash/full readback, boot and integration.
+The sound card and its idle amplifier state are verified; playback and
+audio-assisted PM tests still need qualification. Diagnostic.9 remains
 the recovery baseline. [Report 66](docs/66-speaker-hardware-validation.md)
 records installation and the remaining hardware checks.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the

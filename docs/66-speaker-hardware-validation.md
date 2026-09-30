@@ -40,10 +40,52 @@ Diagnostic.9 recovery remains available using
 identification. That archive's compressed/decompressed verification passed
 before staging diagnostic.10.
 
+## Boot, home Wi-Fi and integration
+
+The owner confirmed the normal login screen and supplied updated home-network
+settings in `.env`. USB SSH reached `6.18.54-gameshellneo10`, image
+`0.1.0-diagnostic.10`, boot ID `5bac9cdf-d98f-42ec-a3f3-7454e0c6d92d`.
+All seven inspected services were active with zero restarts, no failed units
+or kernel taint. Battery telemetry reported 100% and charging over USB.
+
+`task device:wifi-config` refreshed private provisioning, applied the new
+credentials through USB, verified independent Wi-Fi SSH to the same boot,
+committed the configuration, verified transaction cleanup and updated
+`GAMESHELL_IP` privately in `.env`. No reboot or manual credential exposure was
+needed. The live network configuration now reflects the home settings rather
+than the credentials initially embedded in the image.
+
+`task device:check ROUTE=usb ACTIVE_COUNTRY=AU` passed all six integration
+groups: image identity, service state, database/policy, journal ACLs, BPF
+enforcement and country checks. The configured country remains NZ; the home
+access point advertises AU, which the owner previously asked to leave as-is.
+Global regulatory state was AU and the radio domain was 99. This does not
+establish the firmware's complete regulatory behavior.
+
+Private evidence:
+
+- `.local/diagnostics/20260930T093816.032464Z/status.txt`
+- `.local/diagnostics/20260930T093841.125569Z/wifi-change.json`
+- `.local/diagnostics/20260930T093923.867019Z/inspection.json`
+- `.local/diagnostics/20260930T093957.642730Z/integration.json`
+
+## Initial audio inspection
+
+`task device:audio-inspect` found exactly one `GameShellNeo` simple-card, with
+one playback and one capture PCM. Both PCM handles were closed; DAPM reported
+`Speaker Amp DRV: Off` and `Headphone Amp: Off`. The amplifier owns R_PIO pin 3
+and its GPIO readback was output-low. All seven selected mixer controls
+matched the helper's expected names and value formats. Initial headphone and
+digital DAC volumes were zero, their playback switches off, the headphone
+route direct-DAC and the card's speaker pin switch on.
+
+The read-only capture is
+`.local/diagnostics/20260930T093923.873470Z/audio.json`. These are software
+state observations, not a measurement of analogue voltage or idle current.
+
 ## Pending qualification
 
-The owner has been asked to reinstall the card, reconnect USB and power on.
-Boot and integration, sound-card/control inspection, quiet cue audibility,
-amplifier/mixer restoration and audio-assisted physical-input/PM qualification
-remain outstanding. No speaker playback has run, and no audible-output or
-idle-power claim follows from the successful flash.
+The owner has been asked to listen to the saved three-tone speaker check.
+Quiet cue audibility, mixer/amplifier restoration after playback and
+audio-assisted physical-input/PM qualification remain outstanding. No speaker
+playback has run yet.

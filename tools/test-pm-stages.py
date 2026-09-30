@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Inspect PM or exercise only the freezer/devices debug stages; never real sleep."""
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import gzip
 import hashlib
 import json
@@ -229,11 +229,14 @@ def check_result(before, after, stage, memory_ok):
     return delta
 
 
-def test_stage(lock, stage, run_id, keypad_trace=False):
+def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None):
     if stage not in STAGES:
         raise ValueError('Only freezer and devices are permitted')
     if keypad_trace and stage != 'devices':
         raise ValueError('Keypad tracing is restricted to the devices debug stage')
+    if keypad_persist is not None and (keypad_persist not in ('0', '1') or
+                                      stage != 'devices' or not keypad_trace):
+        raise ValueError('Persistence comparison requires a traced devices debug stage')
     directory = result_dir(run_id)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     record = dict(run_id=run_id, stage=stage, passed=False, event='started',
@@ -252,17 +255,25 @@ def test_stage(lock, stage, run_id, keypad_trace=False):
         save(directory / 'started.json', record)
         memory = bytearray(os.urandom(4 * 1024 * 1024))
         digest = hashlib.sha256(memory).hexdigest()
-        from keypad_pm import observe
+        from keypad_pm import observe, persistence, wait_ready
         record['keypad'] = {}
-        with observe(record['keypad'], tracing=keypad_trace):
-            started = time.monotonic()
-            with stage_controls(stage):
-                os.sync()
-                enter_stage(stage)
-            record['stage_seconds'] = time.monotonic() - started
-            record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == digest
-            # Allow the USB gadget, SDIO network and health cache to recover.
-            time.sleep(30)
+        record['persistence'] = {}
+        with (persistence(record['persistence'], keypad_persist)
+              if keypad_persist is not None else nullcontext()):
+            with observe(record['keypad'], tracing=keypad_trace):
+                started = time.monotonic()
+                with stage_controls(stage):
+                    os.sync()
+                    enter_stage(stage)
+                resumed = time.monotonic()
+                record['stage_seconds'] = resumed - started
+                record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == digest
+                if keypad_persist is not None:
+                    record['keypad_ready_after_stage'] = {}
+                    wait_ready(record['keypad_ready_after_stage'], resumed,
+                               record['persistence']['identity'])
+                # Keep the same minimum recovery window for every comparison phase.
+                time.sleep(max(0, 30 - (time.monotonic() - resumed)))
         after = snapshot()
         record['after'] = after
         validate(after, lock)
@@ -285,14 +296,18 @@ def main():
     parser.add_argument('--run-id')
     parser.add_argument('--lock', type=Path)
     parser.add_argument('--keypad-trace', action='store_true')
+    parser.add_argument('--keypad-persist', choices=('0', '1'))
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
-        from keypad_pm import restore_trace
+        from keypad_pm import restore_trace, restore_persistence
         try:
             restore_trace()
         finally:
-            restore()
+            try:
+                restore_persistence()
+            finally:
+                restore()
     elif args.inspect:
         print(json.dumps(snapshot()))
     elif args.collect:
@@ -308,7 +323,8 @@ def main():
             raise SystemExit(128 + signum)
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(sig, interrupted)
-        test_stage(json.loads(read(args.lock)), args.stage, args.run_id, args.keypad_trace)
+        test_stage(json.loads(read(args.lock)), args.stage, args.run_id,
+                   args.keypad_trace, args.keypad_persist)
 
 
 if __name__ == '__main__':

@@ -117,6 +117,18 @@ class Controls(unittest.TestCase):
         self.assertEqual(pm.selected(pm.read(pm.POWER / 'pm_test')), 'none')
         self.assertEqual(pm.read(pm.POWER / 'pm_async'), '1')
 
+    def test_persistence_and_trace_errors_still_restore_pm_controls(self):
+        pm.STATE.write_text(json.dumps(dict(boot_id='boot-one', pm_test='none', pm_async='1')))
+        (pm.POWER / 'pm_test').write_text('devices')
+        with patch.object(sys, 'argv', ['pm-test', '--restore']), \
+                patch('keypad_pm.restore_trace', side_effect=OSError('trace failure')), \
+                patch('keypad_pm.restore_persistence', side_effect=OSError('persistence failure')) as recover:
+            with self.assertRaises(OSError):
+                pm.main()
+        recover.assert_called_once_with()
+        self.assertFalse(pm.STATE.exists())
+        self.assertEqual(pm.selected(pm.read(pm.POWER / 'pm_test')), 'none')
+
     def test_killed_worker_can_be_restored_from_a_fresh_process(self):
         program = '''
 import runpy, sys, time

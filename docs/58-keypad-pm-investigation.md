@@ -127,7 +127,10 @@ not uninterrupted input continuity.
 The trace option enables only selected USB PM dynamic-debug callsites and a
 private tracefs instance. It records the keypad regulator's enable/disable
 events, the PM stage timeline and driver callback start/end times, using a
-128 KiB buffer per CPU. Callback timestamps support attribution of recovery
+128 KiB buffer per CPU in NEO-40/42. NEO-43 increased the saved recorder to
+256 KiB per CPU after a later serialized run overflowed one CPU's buffer;
+[report 61](61-keypad-persistence-comparison.md) preserves that failed capture.
+Callback timestamps support attribution of recovery
 delays without enabling function instrumentation. It saves
 trace data and overflow counters in the same private result. Any overflow fails
 the trace qualification. It does not enable global function tracing or change

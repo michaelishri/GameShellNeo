@@ -245,6 +245,10 @@ tasks:
     desc: Save keypad identity, USB persistence, input paths and power state without changing policy
     cmds: [python3 tools/check-keypad.py]
 
+  device:keypad-compare:
+    desc: Three traced devices debug cycles with internal keypad persistence on/off/on; restore each phase
+    cmds: [python3 tools/check-pm-stages.py --keypad-compare]
+
   device:pm-test:
     desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required
     cmds: [python3 tools/check-pm-stages.py --test]

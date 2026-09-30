@@ -143,6 +143,18 @@ class TraceRecovery(unittest.TestCase):
             (self.instance / 'per_cpu/cpu0/stats').write_text('overrun: 12\ndropped events: 0\n')
         self.assertTrue(result['trace_overrun'])
 
+    def test_commit_overrun_or_missing_cpu_stats_cannot_pass(self):
+        for missing in (False, True):
+            keypad.DEBUG.write_text(DEBUG_TEXT)
+            result = {}
+            with keypad.trace(result):
+                stats = self.instance / 'per_cpu/cpu0/stats'
+                if missing:
+                    stats.unlink()
+                else:
+                    stats.write_text('overrun: 0\ncommit overrun: 1\ndropped events: 0\n')
+            self.assertTrue(result['trace_overrun'])
+
     def test_selector_injection_is_rejected(self):
         for site in (dict(file='drivers/usb/core/hub.c; +p', line=1, flags='_'),
                      dict(file='drivers/usb/core/hub.c', line=-1, flags='_'),

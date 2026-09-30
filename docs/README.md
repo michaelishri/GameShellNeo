@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+Latest comparison: [61 — Keypad persistence](61-keypad-persistence-comparison.md)
+found roughly 1.8 seconds earlier healthy-handle availability with persistence
+off in an accepted on/off/on debug sequence. The original policy is restored;
+keypad disconnection and real sleep remain unresolved.
+
 Latest installation: [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md)
 records passing installation, integration and eight PM debug cycles. Two keypad
 traces identify software supply cycling and an exhausted USB persistence wait;
@@ -29,6 +34,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [61 — Keypad persistence comparison](61-keypad-persistence-comparison.md) | Verified on/off/on sequence, ~1.8 s earlier healthy input handle, restored policy, and trace-overflow correction |
 | [60 — Diagnostic.8 hardware validation](60-diagnostic8-hardware-validation.md) | Verified installation/integration, eight PM debug cycles, zero ULPI warnings, keypad supply transitions and three-second recovery callback |
 | [59 — Diagnostic.8 preparation](59-diagnostic8-preparation.md) | Full kernel/image verification, diagnostic.7 recovery checkpoint and USB PM/keypad hardware sequence |
 | [58 — Keypad PM investigation](58-keypad-pm-investigation.md) | Live handle-loss proof, OHCI/PHY power path, saved input observation and bounded next-image tracing |

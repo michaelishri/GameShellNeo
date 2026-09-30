@@ -846,6 +846,33 @@ option before entering PM. Use `device:pm-restore` for interrupted trace/control
 recovery. [Report 58](docs/58-keypad-pm-investigation.md) records the source trace,
 live handle failure, saved commands and remaining retention/reopen comparison.
 
+`task device:keypad-compare` runs three traced devices debug cycles with the
+internal keypad's USB persistence **on, off, then on**. It requires the normal
+PM preflight and an initial persistence value of `1`; it validates the known
+low-speed HID identity and internal OHCI port before touching that device's
+`power/persist`. Each phase restores the original value with readback, including
+after re-enumeration or failure. Independent service cleanup retries restoration;
+`task device:pm-restore` recovers an interrupted owned change. A failed restore
+retains its ownership record and prevents a new comparison.
+
+Leave USB connected, Wi-Fi available and controls untouched during the roughly
+three-minute automatic sequence. The recorder checks a fresh input handle every
+100 ms for up to ten seconds after the PM stage, without grabbing the keypad or
+injecting events. That measures healthy-handle availability, not the first
+physical button event. Every phase retains the same 30-second minimum recovery
+window, trace configuration, rail policy and independent USB/Wi-Fi SSH checks.
+Private results and the incomplete/complete summary are stored in the printed
+diagnostic directory. No storage-device persistence, keypad power/wake policy,
+boot setting or normal sleep policy is changed.
+
+[Report 61](docs/61-keypad-persistence-comparison.md) records the comparison,
+recovery checks and recorder qualification. The accepted on/off/on run found
+roughly 1.8 seconds earlier healthy-handle availability with persistence off:
+about 3.3 seconds shorter in the debug stage, offset by about 1.5 seconds more
+re-enumeration delay afterwards. All three phases passed and restored the
+original policy. This does not yet fix input continuity or establish real
+sleep/wake latency; persistence remains enabled by default.
+
 The helper serializes driver callbacks with `pm_async=0`, records the original
 controls, and restores them on exit and through independent `ExecStopPost`.
 A temporary logind inhibitor covers power-key/sleep/idle handling. Evidence is

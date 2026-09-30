@@ -14,7 +14,9 @@ INPUT = Path('/sys/class/input')
 TRACE = Path('/sys/kernel/tracing')
 DEBUG = Path('/sys/kernel/debug/dynamic_debug/control')
 OWNED = Path('/run/gameshellneo-keypad-trace.json')
+PERSIST_OWNED = Path('/run/gameshellneo-keypad-persist.json')
 INSTANCE = 'gameshellneo-keypad'
+TRACE_BUFFER_KB = 256  # A serialized PM cycle can place all callbacks on one CPU.
 KEY_BYTES = 96  # KEY_CNT=768 in the locked Linux input-event-codes.h.
 EVIOCGKEY = (2 << 30) | (KEY_BYTES << 16) | (ord('E') << 8) | 0x18
 FUNCTIONS = {
@@ -130,12 +132,114 @@ def set_site(site, flags):
     DEBUG.write_text(f"file *{site['file']} line {site['line']} ={flags}\n")
 
 
-def save_owned(record):
-    with OWNED.open('x') as output:
+def save_owned(record, path=None):
+    with (OWNED if path is None else path).open('x') as output:
         os.fchmod(output.fileno(), 0o600)
         json.dump(record, output)
         output.flush()
         os.fsync(output.fileno())
+
+
+def keypad_identity(info):
+    """Pin the known internal HID and physical port, not its recycled event number."""
+    usb = info['usb']
+    attributes = usb['attributes']
+    path = usb['path']
+    if (not re.fullmatch(r'/sys/devices/platform/soc/1c1a400[.]usb/usb([0-9]+)/\1-1', path) or
+            attributes['manufacturer'] != 'rancidbacon.com' or
+            attributes['product'] != 'UsbKeyboard' or attributes['bcdDevice'] != '0100' or
+            attributes['speed'] != '1.5' or
+            info['inputs'][0]['name'] != 'rancidbacon.com UsbKeyboard'):
+        raise ValueError('Refusing a keypad outside the qualified internal OHCI topology')
+    # inspect() already requires exactly one 4242:e131 device and one input interface.
+    return dict(path=path, descriptors_hex=usb['descriptors_hex'])
+
+
+def persist_write(info, expected, value):
+    if value not in ('0', '1') or keypad_identity(info) != expected:
+        raise ValueError('Keypad identity or persistence value changed')
+    path = Path(info['usb']['path']) / 'power/persist'
+    path.write_text(value + '\n')
+    if path.read_text().strip() != value:
+        raise ValueError('Keypad persistence readback failed')
+
+
+def restore_persistence():
+    if not PERSIST_OWNED.exists():
+        return
+    saved = json.loads(PERSIST_OWNED.read_text())
+    if (saved.get('boot_id') != optional('/proc/sys/kernel/random/boot_id') or
+            saved.get('original') != '1' or not isinstance(saved.get('identity'), dict)):
+        raise ValueError('Invalid keypad persistence ownership; record retained')
+    # Re-enumeration can remove the evdev node briefly. Never restore by a stale fd
+    # or write a path supplied by the ownership file without fresh identity checks.
+    deadline = time.monotonic() + 10
+    while True:
+        try:
+            info = inspect()
+            break
+        except (FileNotFoundError, ValueError):
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.1)
+    persist_write(info, saved['identity'], saved['original'])
+    PERSIST_OWNED.unlink()
+
+
+@contextmanager
+def persistence(record, value):
+    if value not in ('0', '1'):
+        raise ValueError('Explicit keypad persistence 0/1 required')
+    info = inspect()
+    identity = keypad_identity(info)
+    if (info['usb']['power']['persist'] != '1' or
+            info['usb']['power']['control'] != 'on' or
+            info['usb']['power']['wakeup'] is not None):
+        raise ValueError('Expected original keypad persistence/wake/runtime policy')
+    save_owned(dict(boot_id=info['boot_id'], original='1', identity=identity), PERSIST_OWNED)
+    record.update(original='1', requested=value, identity=identity, restored=False)
+    try:
+        persist_write(info, identity, value)
+        record['applied'] = inspect()['usb']['power']['persist']
+        if record['applied'] != value:
+            raise ValueError('Keypad persistence changed before PM')
+        yield
+    finally:
+        restore_persistence()
+        record['restored'] = not PERSIST_OWNED.exists()
+
+
+def wait_ready(record, started, expected):
+    """Bounded fresh-handle readiness; no key injection, reads or exclusive grab."""
+    deadline = time.monotonic() + 10
+    attempts = 0
+    while True:
+        attempts += 1
+        try:
+            info = inspect()
+            if keypad_identity(info) != expected:
+                raise ValueError('Keypad identity changed while waiting for input')
+            fd = os.open(info['inputs'][0]['event'], os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+            try:
+                state = handle_state(fd)
+            finally:
+                os.close(fd)
+            if state['ioctl_errno'] is None and not state['hung_up'] and not state['poll_error']:
+                record.update(seconds=time.monotonic() - started, attempts=attempts,
+                              poll_interval_seconds=0.1, input_sysfs=info['inputs'][0]['sysfs'],
+                              handle=state)
+                return
+        except (FileNotFoundError, OSError):
+            pass
+        except ValueError as error:
+            # Missing evdev/device can be transient. A different identified keypad
+            # must fail, rather than accepting its healthy handle.
+            if str(error) not in ('Expected exactly one 4242:e131 keypad',
+                                  'Expected exactly one keypad evdev interface'):
+                raise
+        if time.monotonic() >= deadline:
+            raise TimeoutError('No healthy keypad input handle within ten seconds')
+        time.sleep(0.1)
 
 
 def restore_trace():
@@ -172,7 +276,8 @@ def trace(record):
         instance.mkdir()
         (instance / 'tracing_on').write_text('0\n')
         (instance / 'current_tracer').write_text('nop\n')
-        (instance / 'buffer_size_kb').write_text('128\n')
+        (instance / 'buffer_size_kb').write_text(str(TRACE_BUFFER_KB) + '\n')
+        record['trace_buffer_kb_per_cpu'] = TRACE_BUFFER_KB
         (instance / 'trace_clock').write_text('mono\n')
         for name in EVENTS:
             event = instance / 'events' / name
@@ -190,8 +295,9 @@ def trace(record):
                 record['trace'] = (instance / 'trace').read_text()
                 record['trace_stats'] = {p.parent.name: p.read_text()
                                          for p in (instance / 'per_cpu').glob('cpu*/stats')}
-                record['trace_overrun'] = any(re.search(r'(?:^|\n)(?:overrun|dropped events):\s*[1-9]', s)
-                                              for s in record['trace_stats'].values())
+                record['trace_overrun'] = not record['trace_stats'] or any(
+                    re.search(r'(?:^|\n)(?:overrun|commit overrun|dropped events):\s*[1-9]', s)
+                    for s in record['trace_stats'].values())
         finally:
             restore_trace()
         record['trace_restored'] = not OWNED.exists() and not instance.exists()

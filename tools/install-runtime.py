@@ -20,7 +20,8 @@ MASKED = ['sleep.target', 'suspend.target', 'hibernate.target', 'hybrid-sleep.ta
           'armbian-disable-autologin.service', 'armbian-disable-autologin.timer',
           'cron.service', 'rsyslog.service', 'apt-daily.timer', 'apt-daily-upgrade.timer',
           'man-db.timer', 'fstrim.timer', 'e2scrub_all.timer',
-          'wpa_supplicant.service', 'dbus-fi.w1.wpa_supplicant1.service']
+          'wpa_supplicant.service', 'dbus-fi.w1.wpa_supplicant1.service',
+          'alsa-restore.service', 'alsa-state.service']
 
 
 def main():
@@ -78,6 +79,9 @@ def main():
         destination.unlink(missing_ok=True)
         destination.symlink_to(link)
     (target / 'root/.no_rootfs_resize').touch()
+    # Diagnostic speaker controls are explicitly owned/restored by the test.
+    # Do not load an unrelated persistent mixer state at boot or hotplug.
+    (target / 'usr/lib/udev/rules.d/90-alsa-restore.rules').unlink(missing_ok=True)
     (target / 'root/.not_logged_in_yet').unlink(missing_ok=True)
     for name in SERVICES:
         subprocess.run(['systemctl', '--root', str(target), 'enable', name], check=True,

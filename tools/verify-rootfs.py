@@ -62,6 +62,13 @@ def main():
     args = parser.parse_args()
     root, boot = args.root, args.boot
     identity = json.loads((root / 'etc/gameshellneo/image.json').read_text())
+    if identity['sources'].get('features', {}).get('speaker_audio'):
+        for binary in ('aplay', 'amixer', 'alsactl'):
+            require(any((root / location / binary).is_file() for location in ('usr/bin', 'usr/sbin')),
+                    'Missing speaker diagnostic utility: ' + binary)
+        for unit in ('alsa-restore.service', 'alsa-state.service'):
+            require((root / 'etc/systemd/system' / unit).readlink() == Path('/dev/null'),
+                    'Unowned ALSA state service is not masked: ' + unit)
     project = Path(__file__).resolve().parents[1]
     built = json.loads((project / '.local/build/kernel-completed.json').read_text())
     require(identity['kernel'] == identity['sources']['linux']['tag'][1:] + identity['sources']['linux']['localversion'],

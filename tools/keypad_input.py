@@ -101,8 +101,9 @@ class EventLog:
 
 
 class Session:
-    def __init__(self, fd, record):
+    def __init__(self, fd, record, cue=None):
         self.fd, self.record = fd, record
+        self.cue = cue
         self.log = EventLog(record)
         self.stop = threading.Event()
         self.thread = threading.Thread(target=self.read_events, daemon=True)
@@ -166,6 +167,8 @@ class Session:
             self.prompt(phase + '-' + label + '-confirmed', label + ' recorded (' + str(index) + '/4).',
                         'Press and release received.', 'Do not press it again.',
                         'Wait for the next button prompt.')
+            if self.cue:
+                self.cue.play(phase + '-' + label)
             time.sleep(2)
             self.wait_edges(start, code, [1, 0])  # Extra taps during confirmation still reject the run.
         self.prompt(phase + '-done', 'Four taps recorded.', 'Leave all buttons released.')
@@ -185,6 +188,8 @@ class Session:
         self.wait_edges(self.hold_start, 36, [1])
         time.sleep(1)
         self.verify_hold('before-stage')
+        if self.cue:
+            self.cue.play('hold-A')
         self.prompt('suspend', 'KEEP HOLDING A.', 'Driver test starting...',
                     'Screen may go dark briefly.')
 
@@ -226,11 +231,11 @@ class Session:
 
 
 @contextmanager
-def capture(record, fd):
+def capture(record, fd, cue=None):
     # Exclusive grab affects only this internal keypad, never the separate power key.
     # Closing the fd releases the grab even if the worker is killed.
     grabbed = False
-    session = Session(fd, record)
+    session = Session(fd, record, cue)
     try:
         state = handle_state(fd)
         if (state['ioctl_errno'] is not None or state['hung_up'] or state['poll_error'] or

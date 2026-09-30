@@ -241,7 +241,7 @@ def check_result(before, after, stage, memory_ok):
     return delta
 
 
-def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False):
+def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False):
     if stage not in STAGES:
         raise ValueError('Only freezer and devices are permitted')
     if keypad_trace and stage != 'devices':
@@ -252,6 +252,8 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
     if keypad_input and (stage != 'devices' or not keypad_trace or keypad_persist is not None or
                          lock.get('experiments', {}).get('keypad_supply_retention') is not True):
         raise ValueError('Physical input requires traced devices with retained supply and unchanged persistence')
+    if keypad_audio and (not keypad_input or lock.get('features', {}).get('speaker_audio') is not True):
+        raise ValueError('Speaker cues require physical input on the identified audio image')
     directory = result_dir(run_id)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     record = dict(run_id=run_id, stage=stage, passed=False, event='started',
@@ -262,7 +264,7 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
         validate(before, lock)
         observers = ('rsb-comparison', 'idle-sample', 'power-profile', 'governor-profile',
                      'governor-comparison', 'usb-detection', 'usb-reconnects', 'usb-diagnostics',
-                     'scan-test', 'firmware-trial', 'stability-test', 'backlight-test', 'keypad-capture')
+                     'scan-test', 'firmware-trial', 'stability-test', 'backlight-test', 'keypad-capture', 'audio-test')
         if command('systemctl', 'list-units', '--all', '--plain', '--no-legend',
                    '--state=active,activating,deactivating',
                    *['gameshellneo-' + n + '.service' for n in observers]):
@@ -277,10 +279,13 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
               if keypad_persist is not None else nullcontext()):
             with observe(record['keypad'], tracing=keypad_trace) as original_fd:
                 from keypad_input import capture
+                from speaker_audio import session as speaker_session, idle as speaker_idle
                 record['physical_input'] = {}
+                record['speaker_audio'] = {}
                 if keypad_input:
                     keypad_identity(record['keypad']['before'])
-                with capture(record['physical_input'], original_fd) if keypad_input else nullcontext() as inputs:
+                with (speaker_session(record['speaker_audio']) if keypad_audio else nullcontext()) as cue, \
+                     (capture(record['physical_input'], original_fd, cue) if keypad_input else nullcontext()) as inputs:
                     if inputs:
                         inputs.before_stage()
                         record['entry_preflight'] = snapshot()
@@ -293,6 +298,8 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
                         os.sync()
                         if inputs:
                             inputs.verify_hold('immediately-before-entry')
+                        if cue:
+                            record['speaker_audio']['idle_before_pm'] = speaker_idle()
                         enter_stage(stage)
                     resumed = time.monotonic()
                     record['stage_seconds'] = resumed - started
@@ -329,21 +336,21 @@ def main():
     parser.add_argument('--keypad-trace', action='store_true')
     parser.add_argument('--keypad-persist', choices=('0', '1'))
     parser.add_argument('--keypad-input', action='store_true')
+    parser.add_argument('--keypad-audio', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
         from keypad_pm import restore_trace, restore_persistence
         from keypad_input import restore_console
-        try:
-            restore_trace()
-        finally:
+        from speaker_audio import restore as restore_audio
+        failure = None
+        for operation in (restore_trace, restore_persistence, restore_audio, restore_console, restore):
             try:
-                restore_persistence()
-            finally:
-                try:
-                    restore_console()
-                finally:
-                    restore()
+                operation()
+            except BaseException as error:
+                failure = failure or error
+        if failure:
+            raise failure
     elif args.inspect:
         print(json.dumps(snapshot()))
     elif args.collect:
@@ -360,7 +367,7 @@ def main():
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(sig, interrupted)
         test_stage(json.loads(read(args.lock)), args.stage, args.run_id,
-                   args.keypad_trace, args.keypad_persist, args.keypad_input)
+                   args.keypad_trace, args.keypad_persist, args.keypad_input, args.keypad_audio)
 
 
 if __name__ == '__main__':

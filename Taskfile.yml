@@ -29,6 +29,8 @@ env:
   NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
+  NEO_KEYPAD_AUDIO: '{{.AUDIO | default "0"}}'
+  NEO_AUDIO_RUN: '{{.RUN | default ""}}'
   NEO_CHECKPOINT_NAME: '{{.NAME | default ""}}'
   NEO_RECOVERY_UPLOAD: '{{.UPLOAD | default "0"}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
@@ -257,6 +259,22 @@ tasks:
   device:keypad-input:
     desc: One owner-assisted retained-keypad driver test with on-screen tap/hold/release prompts
     cmds: [python3 tools/check-pm-stages.py --keypad-input]
+
+  device:audio-inspect:
+    desc: Save speaker card, mixer, amplifier and PCM state without changing controls
+    cmds: [python3 tools/check-audio.py --inspect]
+
+  device:audio-test:
+    desc: Three bounded quiet speaker cues at increasing conservative levels; owner listens
+    cmds: [python3 tools/check-audio.py --test]
+
+  device:audio-collect:
+    desc: Retrieve a saved speaker test result; RUN required
+    cmds: [python3 tools/check-audio.py --collect]
+
+  device:audio-restore:
+    desc: Stop a speaker test and restore its owned mixer controls
+    cmds: [python3 tools/check-audio.py --restore]
 
   device:pm-test:
     desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required

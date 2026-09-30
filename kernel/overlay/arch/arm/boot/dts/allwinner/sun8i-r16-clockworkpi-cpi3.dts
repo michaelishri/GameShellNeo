@@ -76,6 +76,40 @@
 		compatible = "mmc-pwrseq-simple";
 		reset-gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* WL_REG_ON */
 	};
+
+	/* PA_5V follows board PS through FB12; no programmable voltage/enable.
+	 * Do not assign a fixed voltage to this battery/external-power-fed rail.
+	 */
+	reg_speaker_ps: regulator-speaker-supply {
+		compatible = "regulator-fixed";
+		regulator-name = "speaker-ps";
+		regulator-always-on;
+	};
+
+	speaker_amp: speaker-amplifier {
+		compatible = "simple-audio-amplifier";
+		enable-gpios = <&r_pio 0 3 GPIO_ACTIVE_HIGH>; /* PL3 / PA-SHDN */
+		VCC-supply = <&reg_speaker_ps>;
+		sound-name-prefix = "Speaker Amp";
+	};
+};
+
+&codec { status = "okay"; };
+&dai { status = "okay"; };
+&sound {
+	simple-audio-card,name = "GameShellNeo";
+	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
+	simple-audio-card,widgets = "Speaker", "Speaker";
+	simple-audio-card,pin-switches = "Speaker";
+	/* AC-coupled HPL/HPR feed the two external amplifier channels. */
+	simple-audio-card,routing =
+		"Left DAC", "DACL",
+		"Right DAC", "DACR",
+		"Speaker Amp INL", "HP",
+		"Speaker Amp INR", "HP",
+		"Speaker", "Speaker Amp OUTL",
+		"Speaker", "Speaker Amp OUTR";
+	status = "okay";
 };
 
 &cpu0 { cpu-supply = <&reg_dcdc3>; };
@@ -126,12 +160,6 @@
 };
 
 &r_pio {
-	amplifier-disable-hog {
-		gpio-hog;
-		gpios = <0 3 GPIO_ACTIVE_HIGH>;
-		output-low;
-		line-name = "audio-amplifier-off";
-	};
 	bt-reset-hog {
 		gpio-hog;
 		gpios = <0 10 GPIO_ACTIVE_LOW>;

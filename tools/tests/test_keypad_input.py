@@ -235,7 +235,7 @@ class EntryGuards(unittest.TestCase):
             record['before'] = {'fixture': 'keypad'}
             yield 17
         @contextmanager
-        def capture(record, fd):
+        def capture(record, fd, cue=None):
             class Input:
                 def before_stage(self):
                     raise ValueError('physical sequence rejected')

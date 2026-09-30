@@ -52,8 +52,11 @@ The image selects the upstream-signed wireless-regdb alternative to match the
 upstream kernel keys; cfg80211 loads as a module after the root filesystem is
 available. Offline verification checks the signature against those kernel keys.
 Only `wpa_supplicant@wlan0` is enabled; the unused global/D-Bus daemon is masked.
-DHCP cannot replace the fixed hostname. Audio remains deferred and `alsa-utils`
-is excluded. A sysctl override tolerates the deliberately absent SysRq facility.
+DHCP cannot replace the fixed hostname. Diagnostic.10 includes `alsa-utils`
+for bounded speaker cues, with automatic ALSA state restoration disabled so
+each diagnostic can own and restore its mixer settings. Broader audio policy
+remains deferred; see [report 65](../docs/65-speaker-confirmation-cues.md).
+A sysctl override tolerates the deliberately absent SysRq facility.
 
 Run host regressions with `task check` from the project root.
 USB enumeration, actual shutdown and power readings require NEO-5 hardware tests.

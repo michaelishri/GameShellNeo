@@ -22,14 +22,15 @@ def module(name, filename):
     return result
 
 
-def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False):
+def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False):
     if (not re.fullmatch(r'/tmp/gameshellneo-pm\.[A-Za-z0-9]+', directory) or
             stage not in ('freezer', 'devices') or not re.fullmatch(r'[0-9a-f]{32}', run_id) or
             type(keypad_trace) is not bool or (keypad_trace and stage != 'devices') or
             (keypad_persist is not None and (keypad_persist not in ('0', '1') or
                                             stage != 'devices' or not keypad_trace)) or
             type(keypad_input) is not bool or (keypad_input and
-                (stage != 'devices' or not keypad_trace or keypad_persist is not None))):
+                (stage != 'devices' or not keypad_trace or keypad_persist is not None)) or
+            type(keypad_audio) is not bool or (keypad_audio and not keypad_input)):
         raise ValueError('Invalid PM stage, path or run ID')
     script = directory + '/test-pm-stages.py'
     # No SSH-owned pipe: USB may disconnect during the devices test.
@@ -41,13 +42,13 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
             '/usr/bin/python3', '-B', script, '--lock', directory + '/sources.lock.json',
             '--stage', stage, '--run-id', run_id] + (['--keypad-trace'] if keypad_trace else []) + (
                 ['--keypad-persist', keypad_persist] if keypad_persist is not None else []) + (
-                ['--keypad-input'] if keypad_input else [])
+                ['--keypad-input'] if keypad_input else []) + (['--keypad-audio'] if keypad_audio else [])
 
 
 def inline(client, *args):
     # Inline inspection/recovery also needs the same saved keypad helper.
     program = 'import sys, types\n'
-    for name in ('keypad_pm', 'keypad_input'):
+    for name in ('keypad_pm', 'keypad_input', 'speaker_audio'):
         program += ('keypad_helper = types.ModuleType(' + repr(name) + ')\n'
                     'exec(' + repr((ROOT / 'tools' / (name + '.py')).read_text()) + ', keypad_helper.__dict__)\n'
                     'sys.modules[' + repr(name) + '] = keypad_helper\n')
@@ -68,7 +69,7 @@ def collect(config, run_id):
         return json.loads(inline(client, '--collect', run_id))
 
 
-def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False):
+def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False):
     with device(config, 'usb') as client:
         before = json.loads(inline(client, '--inspect'))
         (capture / 'before.json').write_text(json.dumps(before, indent=2) + '\n')
@@ -80,11 +81,12 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-pm.XXXXXXXX',
                         display=False).decode().strip()
         run_id = uuid.uuid4().hex
-        command = service_command(directory, stage, run_id, keypad_trace, keypad_persist, keypad_input)
+        command = service_command(directory, stage, run_id, keypad_trace, keypad_persist, keypad_input, keypad_audio)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/test-pm-stages.py', directory + '/test-pm-stages.py')
             upload(sftp, ROOT / 'tools/keypad_pm.py', directory + '/keypad_pm.py')
             upload(sftp, ROOT / 'tools/keypad_input.py', directory + '/keypad_input.py')
+            upload(sftp, ROOT / 'tools/speaker_audio.py', directory + '/speaker_audio.py')
             upload(sftp, ROOT / 'build/sources.lock.json', directory + '/sources.lock.json')
         (capture / 'run.json').write_text(json.dumps(dict(run_id=run_id, stage=stage, helper=directory)) + '\n')
         print('PM run:', run_id, 'helper:', directory, flush=True)
@@ -235,6 +237,16 @@ def validate_physical_result(result, retention):
             callback_start_seconds=matched[0][0], callback_end_seconds=matched[0][1])
 
 
+def validate_audio_result(record):
+    expected = ['before-' + button for button in ('A', 'B', 'X', 'Y')] + ['hold-A'] + [
+        'after-' + button for button in ('A', 'B', 'X', 'Y')]
+    off = {'Speaker Amp DRV': 'Off', 'Headphone Amp': 'Off'}
+    if (record.get('restored') is not True or record.get('idle_before_pm') != off or
+            [c['label'] for c in record.get('cues', [])] != expected or
+            any(c['amplifiers_after'] != off for c in record['cues'])):
+        raise ValueError('Speaker confirmation sequence or idle/restoration checks failed')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -287,6 +299,10 @@ def main():
         raise ValueError('Keypad retention requires its separately identified image')
     if args.keypad_input and cycles != 1:
         raise ValueError('Physical keypad task runs one owner-assisted cycle at a time')
+    audio_option = os.environ.get('NEO_KEYPAD_AUDIO', '0')
+    if audio_option not in ('0', '1') or (audio_option == '1' and
+            (not args.keypad_input or lock.get('features', {}).get('speaker_audio') is not True)):
+        raise ValueError('AUDIO=1 requires physical input on the speaker-enabled image')
     (capture / 'sources.lock.json').write_text(json.dumps(lock, indent=2) + '\n')
     with (LOCAL / 'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -296,13 +312,16 @@ def main():
         for index in range(cycles):
             directory = capture / ('cycle-' + str(index + 1))
             directory.mkdir(mode=0o700)
-            result = cycle(config, directory, lock, stage, trace_option == '1', keypad_input=args.keypad_input)
+            result = cycle(config, directory, lock, stage, trace_option == '1', keypad_input=args.keypad_input,
+                           keypad_audio=audio_option == '1')
             if args.keypad_retention or args.keypad_input:
                 summary = retention_result(result)
                 (directory / 'retention.json').write_text(json.dumps(summary, indent=2) + '\n')
                 print('Retention observation:', json.dumps(summary), flush=True)
             if args.keypad_input:
                 validate_physical_result(result, summary)
+                if audio_option == '1':
+                    validate_audio_result(result['speaker_audio'])
                 (directory / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
                 (directory / 'physical-input.json').write_text(json.dumps(result['physical_input'], indent=2) + '\n')
                 print('Physical taps passed on the original input handle; held-key resume mode:',

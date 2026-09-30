@@ -110,6 +110,10 @@ A/B/X/Y presses and releases before and after a driver test through that same
 handle. Linux deliberately cleared held A during its input suspend callback;
 fresh taps worked afterward, with no stuck key. Other input cases and actual
 sleep remain unqualified.
+[Diagnostic.10 preparation](docs/65-speaker-confirmation-cues.md) adds the
+upstream A33 speaker path for audible button-registration cues. The new image
+has passed offline verification; playback and audio-assisted PM tests still need hardware
+qualification. The running diagnostic.9 image remains the recovery baseline.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -941,6 +945,20 @@ Evidence is in `result.json`, `retention.json` and, after full success,
 comparisons. This exercises four face buttons and one held key, not every
 chord, physical release during the dark interval, actual sleep or energy.
 See [report 64](docs/64-keypad-physical-input-validation.md) for qualification.
+
+On the audio-enabled diagnostic.10 image, first use
+`task device:audio-inspect`, then `task device:audio-test` with the owner
+listening. The latter plays three bounded quiet cues after a ten-second
+lead-in and checks mixer restoration and amplifier power-down. Once sound is
+confirmed, `task device:keypad-input AUDIO=1` adds a speaker cue for each
+accepted tap and hold. The default remains silent. Playback closes and both
+amplifiers must be idle before entering PM. The upstream amplifier startup
+delay is retained, so confirmation is not instantaneous.
+Use `task device:audio-collect RUN=...` to retrieve an interrupted standalone
+test and `task device:audio-restore` for its owned mixer recovery. The existing
+PM recovery tasks also restore audio after an audio-assisted keypad run.
+See [report 65](docs/65-speaker-confirmation-cues.md) for routing, levels,
+recovery and qualification status.
 
 The helper serializes driver callbacks with `pm_async=0`, records the original
 controls, and restores them on exit and through independent `ExecStopPost`.

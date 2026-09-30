@@ -5,9 +5,9 @@ function extension_prepare_config__gameshellneo() {
     DEBIAN_MIRROR="snapshot.debian.org/archive/debian/${NEO_DEBIAN_SNAPSHOT}"
     DEBIAN_SECURITY="snapshot.debian.org/archive/debian-security/${NEO_SECURITY_SNAPSHOT}"
     add_packages_to_image systemd-resolved systemd-timesyncd openssh-server wpasupplicant \
-        sudo python3 usbutils iproute2 iw wireless-regdb evtest stress-ng
-    remove_packages armbian-config armbian-zsh network-manager netplan.io fake-hwclock alsa-utils
-    PACKAGE_LIST_RM="${PACKAGE_LIST_RM} armbian-zsh alsa-utils"
+        sudo python3 usbutils iproute2 iw wireless-regdb evtest stress-ng alsa-utils
+    remove_packages armbian-config armbian-zsh network-manager netplan.io fake-hwclock
+    PACKAGE_LIST_RM="${PACKAGE_LIST_RM} armbian-zsh"
 }
 
 function custom_apt_repo__gameshellneo() {

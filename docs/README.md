@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+Current build: [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md)
+adds upstream A33 audio and bounded speaker cues to the physical-input task.
+The image is built and offline-verified. Hardware qualification is pending;
+diagnostic.9 remains the running recovery baseline.
+
 Latest physical-input qualification:
 [64 — Keypad physical input](64-keypad-physical-input-validation.md) records the
 saved on-screen task and successful A/B/X/Y delivery before/after a driver test.
@@ -49,6 +54,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md) | Upstream board audio route, quiet bounded cues, mixer/PM restoration and diagnostic.10 preparation |
 | [64 — Keypad physical input](64-keypad-physical-input-validation.md) | Repeatable physical press/release and held-key test through the original retained input handle |
 | [63 — Keypad retention hardware validation](63-keypad-retention-hardware-validation.md) | Diagnostic.9 installation/integration, repeated input-handle continuity, timing comparison and remaining reset/energy work |
 | [62 — Keypad supply-retention preparation](62-keypad-supply-retention-preparation.md) | Single-property diagnostic.9 DTB, unchanged kernel, checkpoint-based recovery and repeatable continuity qualification |

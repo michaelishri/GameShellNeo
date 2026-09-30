@@ -65,6 +65,14 @@ CPU DVFS uses upstream operating points with
 the CPU supply correctly linked. Timings, voltage behavior and peripheral
 compatibility still require physical qualification.
 
+Diagnostic.10 brings forward the upstream A33 digital/analogue codec, DAI and
+simple sound card for speaker confirmation cues. The standard simple amplifier
+owns PL3 and follows the board's AC-coupled stereo route. Its PS supply voltage
+is deliberately unspecified; no audio driver patch is added. The upstream
+700 ms analogue startup delay is retained. Normal sleep remains disabled,
+and playback, idle power and recovery need hardware qualification.
+See [report 65](../docs/65-speaker-confirmation-cues.md).
+
 A33 temperature sensing uses `SUN4I_GPADC`, despite the misleading older-family
 name. `SUN8I_THERMAL` alone does not bind the A33 sensor. Both the A33 ADC and
 the IIO hwmon bridge are explicitly enabled and asserted in the fragment.

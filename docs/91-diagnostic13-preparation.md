@@ -11,6 +11,9 @@ archive is staged on the Mac with both compressed and decompressed hashes
 verified. Diagnostic.12 remains installed; no candidate
 hardware qualification is claimed.
 
+Subsequent installation and baseline results are in
+[report 93](93-diagnostic13-installation.md).
+
 ## Change being qualified
 
 Image `0.1.0-diagnostic.13` uses kernel `6.18.54-gameshellneo13`. Patch 0018

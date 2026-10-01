@@ -16,7 +16,13 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current installed image: diagnostic.12.
+Current installed image: diagnostic.13.
+[93 — Installation](93-diagnostic13-installation.md) records full card readback,
+owner-confirmed startup, independent USB/Wi-Fi access, six passing integration
+groups and read-only PM/keypad/audio baselines. Observed PM/input/cable
+qualification remains ahead; normal sleep remains disabled.
+
+Previous diagnostic.12:
 [85 — Preparation](85-diagnostic12-preparation.md) integrates four Wi-Fi
 suspend patches and preserves diagnostic.11 recovery.
 [86 — Installation](86-diagnostic12-installation.md) records verified card
@@ -38,7 +44,8 @@ next source candidate with fault isolation, command completion and checked
 clock/status operations. It is not installed in diagnostic.12.
 [91 — Diagnostic.13 preparation](91-diagnostic13-preparation.md) records the
 complete candidate build, offline verification, recovery and prepared hardware
-sequence. Installation and physical qualification remain separate.
+sequence. Installation is recorded in report 93; physical PM/input/cable
+qualification remains separate.
 
 Previous diagnostic.11 hardware: [74 — PM validation](74-diagnostic11-pm-validation.md)
 records driver/input/cable results and an intermittent Wi-Fi recovery failure;
@@ -83,6 +90,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [93 — Diagnostic.13 installation](93-diagnostic13-installation.md) | Verified flash/boot, USB and Wi-Fi access, integration and read-only PM/keypad/audio baseline |
 | [92 — Build-artifact retention](92-build-artifact-retention.md) | Guarded image/kernel pruning, verified compressed recovery, preserved provenance and abandoned-fixture cleanup |
 | [91 — Diagnostic.13 preparation](91-diagnostic13-preparation.md) | Verified Wi-Fi worker-error candidate, diagnostic.12 recovery, unchanged configuration/packages and planned guided hardware session |
 | [90 — Diagnostic.12 input and USB](90-diagnostic12-input-usb-validation.md) | Owner-confirmed speaker-assisted physical input, held-key clearing, four USB reconnects and final restored health |

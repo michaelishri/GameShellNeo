@@ -136,7 +136,7 @@ failure. Five subsequent traced driver cycles passed in
 [report 78](docs/78-wifi-resume-metadata-capture.md), but the original failure
 remains unresolved. Normal sleep stays disabled.
 
-The installed `0.1.0-diagnostic.12` passed full card readback, owner-confirmed
+Diagnostic.12 passed full card readback, owner-confirmed
 login, independent USB/Wi-Fi access and all six integration groups. It integrates
 four brcmfmac patches for truthful transition errors, bounded worker collection,
 failed-wake isolation and PM/reset/removal/IRQ ordering. Diagnostic.11 is preserved as the verified
@@ -151,11 +151,13 @@ input and four USB reconnects also passed in
 [report 90](docs/90-diagnostic12-input-usb-validation.md). The intermittent
 recovery failure and actual sleep remain open.
 
-The next candidate, `0.1.0-diagnostic.13`, adds packet-worker error isolation
-and checked interrupt rearm ownership. It has passed the full build and offline
-checks; [report 91](docs/91-diagnostic13-preparation.md) records its artifacts,
-diagnostic.12 recovery and next hardware sequence. Fatal checked radio errors
-still require a cold restart. Diagnostic.12 remains installed.
+The installed `0.1.0-diagnostic.13` adds packet-worker error isolation and
+checked interrupt rearm ownership. [Report 91](docs/91-diagnostic13-preparation.md)
+records the verified build and diagnostic.12 recovery;
+[report 93](docs/93-diagnostic13-installation.md) records full card readback,
+owner-confirmed startup, both SSH routes, integration and read-only peripheral
+baselines. Observed PM/input/cable qualification remains ahead. Fatal checked
+radio errors still require a cold restart.
 
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
@@ -568,8 +570,9 @@ task check:brcmfmac-worker-drivers # Also compile complete normal/debug ARM driv
 This adds patch 0018 to the source tests and is included in `task build`.
 [Report 89](docs/89-wifi-worker-error-handling.md) explains the checked errors,
 IRQ cleanup and cold-restart failure policy.
-Diagnostic.12 remains the installed image; diagnostic.13 preparation is recorded
-in [report 91](docs/91-diagnostic13-preparation.md). Source-test evidence is under
+Diagnostic.13 is installed; [report 91](docs/91-diagnostic13-preparation.md)
+records preparation and [report 93](docs/93-diagnostic13-installation.md) records
+the running baseline. Source-test evidence is under
 `.local/build/brcmfmac-{irq,lifecycle}-worker-tests/`.
 
 For the Sunxi MUSB context capability fix, use:

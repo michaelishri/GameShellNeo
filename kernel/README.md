@@ -32,6 +32,8 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 Patches 0014–0017 are integrated for image qualification in
 [diagnostic.12 preparation](../docs/85-diagnostic12-preparation.md). The ledger's
 source-test results do not establish hardware recovery or energy savings.
+[Installation and baseline checks](../docs/86-diagnostic12-installation.md)
+now pass; the new patches still require driver-stage hardware qualification.
 
 ## Provenance and limits
 

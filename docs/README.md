@@ -16,17 +16,18 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current installed image: diagnostic.11.
-[73 — Installation](73-diagnostic11-installation.md) records verified card
-readback, boot and integration. [74 — PM validation](74-diagnostic11-pm-validation.md)
+Current installed image: diagnostic.12.
+[85 — Preparation](85-diagnostic12-preparation.md) integrates four Wi-Fi
+suspend patches and preserves diagnostic.11 recovery.
+[86 — Installation](86-diagnostic12-installation.md) records verified card
+readback, owner-confirmed login, independent USB/Wi-Fi access, integration and
+the read-only PM/keypad/audio baseline. Owner-ready driver-stage qualification
+is next; normal sleep remains disabled.
+
+Previous diagnostic.11 hardware: [74 — PM validation](74-diagnostic11-pm-validation.md)
 records driver/input/cable results and an intermittent Wi-Fi recovery failure;
 [78 — Wi-Fi metadata capture](78-wifi-resume-metadata-capture.md) records five
-later passing traced driver cycles. Normal sleep remains disabled.
-
-Next candidate: [85 — Diagnostic.12 preparation](85-diagnostic12-preparation.md)
-integrates four Wi-Fi suspend patches, preserves diagnostic.11 recovery and
-sets out the next physical qualification sequence. The image is built,
-offline-verified and staged on the Mac; installation and hardware tests remain.
+later passing traced driver cycles. The original outage remains unresolved.
 
 Speaker baseline: [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md)
 and [66 — Speaker hardware validation](66-speaker-hardware-validation.md) record
@@ -66,6 +67,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [86 — Diagnostic.12 installation](86-diagnostic12-installation.md) | Verified flash/full readback, boot, independent USB/Wi-Fi access, integration and read-only PM/keypad/audio baselines |
 | [85 — Diagnostic.12 preparation](85-diagnostic12-preparation.md) | Wi-Fi suspend patch integration, verified recovery checkpoint, build evidence, saved interrupt/CPU observations and staged hardware qualification |
 | [84 — Wi-Fi PM lifecycle](84-brcmfmac-pm-lifecycle.md) | Shared PM/reset/removal exclusion, parked-worker removal and interrupt deferral across retained sleep; source tests and remaining hardware qualification |
 | [83 — Wi-Fi PM rollback](83-brcmfmac-pm-rollback.md) | Checked hardware transitions, owned wake cleanup, failed-wake I/O isolation and control-request completion; cold-restart recovery policy and pending hardware qualification |

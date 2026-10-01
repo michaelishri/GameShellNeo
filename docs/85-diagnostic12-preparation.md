@@ -7,6 +7,9 @@ compressed and decompressed checksums verified. Diagnostic.11 remains on the
 DEV card; this preparation slice did not run a GameShell command, PM test or
 card write. Installation and hardware qualification follow separately.
 
+Subsequent installation and baseline results are in
+[report 86](86-diagnostic12-installation.md).
+
 ## Candidate contents
 
 Image `0.1.0-diagnostic.12` uses kernel `6.18.54-gameshellneo12` with the

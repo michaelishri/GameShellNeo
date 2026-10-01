@@ -1,5 +1,6 @@
 """Recovery selection must use matching provenance, not the latest build metadata."""
 from copy import deepcopy
+import gzip
 import json
 from pathlib import Path
 import sys
@@ -22,11 +23,11 @@ class RecoveryTests(unittest.TestCase):
         self.directory.mkdir(parents=True)
         self.raw = self.root / '.local/artifacts/old.img'
         self.gz = self.root / '.local/flash/old.img.gz'
-        for path, data in ((self.raw, b'raw'), (self.gz, b'compressed')):
+        for path, data in ((self.raw, b'raw'), (self.gz, gzip.compress(b'raw'))):
             path.parent.mkdir(parents=True)
             path.write_bytes(data)
         self.transfer = dict(image='old.img', image_bytes=3, image_sha256=recovery.digest(self.raw),
-                             compressed_file='old.img.gz', compressed_bytes=10,
+                             compressed_file='old.img.gz', compressed_bytes=self.gz.stat().st_size,
                              compressed_sha256=recovery.digest(self.gz))
         lock = dict(image_version='previous')
         self.records = {
@@ -81,7 +82,7 @@ class RecoveryTests(unittest.TestCase):
 
     def test_remote_selection_waits_for_verification_and_reuses_archive(self):
         sftp = MagicMock()
-        sftp.stat.return_value = SimpleNamespace(st_size=10)
+        sftp.stat.return_value = SimpleNamespace(st_size=self.gz.stat().st_size)
         selected = recovery.resolve(self.root, 'previous')
         with patch.object(remote, 'upload') as upload, patch.object(remote, 'run') as run:
             run.side_effect = RuntimeError('bad compressed or decompressed hash')
@@ -103,6 +104,29 @@ class RecoveryTests(unittest.TestCase):
                 remote.stage_recovery(None, sftp, '/private', recovery.resolve(self.root, 'previous'))
             upload.assert_not_called()
         sftp.posix_rename.assert_not_called()
+
+    def test_pruned_raw_image_remains_recoverable(self):
+        self.raw.unlink()
+        self.assertEqual(recovery.resolve(self.root, 'previous'),
+                         (self.gz, self.directory/'transfer.json', self.transfer))
+
+    def test_rehashed_archive_must_expand_to_the_recorded_image(self):
+        self.raw.unlink()
+        for data in (gzip.compress(b'bad'), gzip.compress(b'ra'),
+                     gzip.compress(b'raw!'), gzip.compress(b'raw')[:-1], b'not gzip'):
+            self.gz.write_bytes(data)
+            self.transfer['compressed_bytes'] = len(data)
+            self.transfer['compressed_sha256'] = recovery.digest(self.gz)
+            self.records['artifacts.json']['compressed_sha256'] = self.transfer['compressed_sha256']
+            self.save()
+            with self.subTest(data=data), self.assertRaises(ValueError):
+                recovery.resolve(self.root, 'previous')
+
+    def test_missing_both_artifacts_is_rejected(self):
+        self.raw.unlink()
+        self.gz.unlink()
+        with self.assertRaises(FileNotFoundError):
+            recovery.resolve(self.root, 'previous')
 
 
 if __name__ == '__main__':

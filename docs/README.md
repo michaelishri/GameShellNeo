@@ -83,6 +83,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [92 — Build-artifact retention](92-build-artifact-retention.md) | Guarded image/kernel pruning, verified compressed recovery, preserved provenance and abandoned-fixture cleanup |
 | [91 — Diagnostic.13 preparation](91-diagnostic13-preparation.md) | Verified Wi-Fi worker-error candidate, diagnostic.12 recovery, unchanged configuration/packages and planned guided hardware session |
 | [90 — Diagnostic.12 input and USB](90-diagnostic12-input-usb-validation.md) | Owner-confirmed speaker-assisted physical input, held-key clearing, four USB reconnects and final restored health |
 | [89 — Wi-Fi worker errors](89-wifi-worker-error-handling.md) | Checked wake/clock/status failures, process-context IRQ cleanup, command completion, clock waits and OOB teardown/rearm ownership |

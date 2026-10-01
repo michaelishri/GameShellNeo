@@ -333,6 +333,7 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task kernel:reset` | After changing the patch queue; archives old kernel source/output and artifact metadata/logs under `.local/previous-kernels/`, then run `task build`. Recovery images stay in `.local/artifacts/` |
 | `task build:rootfs` | Exercise Debian bootstrap/cache preparation independently |
 | `task build:prune-driver-scratch SUITE=brcmfmac-pm-tests` | Preview superseded compiler trees; add `APPLY=1` to remove them while retaining current normal/debug build evidence |
+| `task build:prune-retained KEEP=3` | Preview older raw images and full kernel snapshots; `APPLY=1` verifies compressed recovery and preserves compact provenance before removal |
 | `task check` | Python and C regressions, Bash syntax and ShellCheck |
 | `task test:nkmp` | Compare original/patched clock searches natively and under ARM32 emulation; also runs before the kernel in `task build` |
 | `task check:kernel` | Resolved Kconfig assertions and kernel artifact manifest |
@@ -353,12 +354,16 @@ and firmware; do not publish it.
 patch queue, verification and transfer records under `.local/recovery/NAME/`.
 It verifies both retained artifact hashes, refuses an existing checkpoint and
 shares the build-stage lock so a running build cannot replace its inputs.
-Raw/gzip files remain at their original paths; keep those files with the
-checkpoint. This preserves recovery provenance but does not change which image
+Raw/gzip files initially remain at their original paths. The saved retention
+task can remove older raw copies after verifying their gzip expansion; retain
+the gzip and checkpoint metadata together. This preserves recovery provenance
+but does not change which image
 the default packing/staging commands select.
 
-`mac:stage-recovery NAME=...` rechecks the checkpoint metadata and both retained
-artifact hashes, then verifies the compressed and decompressed archive on the
+`mac:stage-recovery NAME=...` rechecks the checkpoint metadata and compressed
+hash. It verifies the raw copy when present, or streams and verifies the gzip
+expansion when the raw copy has been pruned. A damaged present raw file still
+fails verification. It then verifies compressed and decompressed hashes on the
 Mac before selecting its transfer manifest. It reuses an existing Mac archive.
 If absent, it stops; explicitly add `UPLOAD=1` on an appropriate network to
 allow the large transfer. Current local build/transfer metadata remains intact.
@@ -390,6 +395,27 @@ active tests, symlinks or unexpected scratch contents stop cleanup. Only older
 removed; recovery images, archived full kernels, downloads, provisioning and
 diagnostic captures remain outside its scope. Each application saves an
 incremental `prune-*.json` record alongside the retained suite evidence.
+
+To prune older diagnostic images and full kernel snapshots, wait until the
+entire build/pack/staging workflow finishes, then run:
+
+```sh
+task build:prune-retained KEEP=3         # Preview only
+task build:prune-retained KEEP=3 APPLY=1
+```
+
+This keeps the newest three raw images and three timestamped kernel snapshots;
+the currently verified raw image is always protected. `KEEP` must be at least
+two. Every named recovery checkpoint and each candidate's full gzip expansion
+must verify before deletion. All gzip images remain, and older kernel metadata
+is copied and checksum-verified under `.local/retention/kernel-metadata/` before
+its source/output/module trees are removed. The task holds the build-stage
+lock, refuses unexpected paths/layouts, updates the artifact checksum catalog
+and saves incremental `.local/retention/prune-*.json` records. It excludes
+credentials, original-card backups, downloads, test captures and the current
+kernel trees. See [report 92](docs/92-build-artifact-retention.md) for the policy,
+recovery behavior and cleanup evidence. This task does not prune arbitrary
+workspace temporary directories.
 
 `test:nkmp` verifies (or downloads and verifies) the locked Linux archive, applies
 the clock-search patch to a separate test copy, and compiles the actual old/new

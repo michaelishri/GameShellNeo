@@ -34,6 +34,8 @@ env:
   NEO_KEYPAD_QUIRK: '{{.QUIRK | default ""}}'
   NEO_AUDIO_RUN: '{{.RUN | default ""}}'
   NEO_CHECKPOINT_NAME: '{{.NAME | default ""}}'
+  NEO_SCRATCH_SUITE: '{{.SUITE | default ""}}'
+  NEO_SCRATCH_APPLY: '{{.APPLY | default "0"}}'
   NEO_RECOVERY_UPLOAD: '{{.UPLOAD | default "0"}}'
   NEO_USB_POLICY_DTB: '{{.DTB | default ".local/build/kernel/arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb"}}'
   NEO_COOLING_STARTED: '{{.COOLING_STARTED | default ""}}'
@@ -116,6 +118,10 @@ tasks:
   kernel:reset:
     desc: Archive only kernel scratch/output state before a changed patch queue
     cmds: [bash tools/run-logged.sh kernel-reset bash tools/reset-kernel.sh]
+
+  build:prune-driver-scratch:
+    desc: Preview superseded brcmfmac compiler trees for SUITE; APPLY=1 removes them under the suite lock
+    cmds: [python3 tools/prune-driver-scratch.py]
 
   image:checkpoint:
     desc: Verify and retain completed image/kernel/transfer metadata before a new build; NAME required

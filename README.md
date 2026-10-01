@@ -323,6 +323,7 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task build:kernel` | Kernel source/configuration work; preserves incremental build outputs |
 | `task kernel:reset` | After changing the patch queue; archives old kernel source/output and artifact metadata/logs under `.local/previous-kernels/`, then run `task build`. Recovery images stay in `.local/artifacts/` |
 | `task build:rootfs` | Exercise Debian bootstrap/cache preparation independently |
+| `task build:prune-driver-scratch SUITE=brcmfmac-pm-tests` | Preview superseded compiler trees; add `APPLY=1` to remove them while retaining current normal/debug build evidence |
 | `task check` | Python and C regressions, Bash syntax and ShellCheck |
 | `task test:nkmp` | Compare original/patched clock searches natively and under ARM32 emulation; also runs before the kernel in `task build` |
 | `task check:kernel` | Resolved Kconfig assertions and kernel artifact manifest |
@@ -361,6 +362,25 @@ and `image.log`. For example, use `tail -f .local/build/image.log` while buildin
 Older logs are retained under `.local/build/logs/`. A failed stage returns a
 failure and prints the log tail. The wrappers reject overlapping build stages;
 run build tasks sequentially on this memory-constrained host.
+
+To reclaim superseded Wi-Fi driver compiler trees, first preview the named
+suite, then apply the reviewed selection:
+
+```sh
+task build:prune-driver-scratch SUITE=brcmfmac-pm-tests
+task build:prune-driver-scratch SUITE=brcmfmac-pm-tests APPLY=1
+```
+
+Supported suites are `brcmfmac-pm-tests`, `brcmfmac-lifecycle-tests`,
+`brcmfmac-irq-tests`, `brcmfmac-irq-worker-tests` and
+`brcmfmac-lifecycle-worker-tests`. The task requires a completed normal/debug
+`compile-evidence.json`, preserves both referenced trees and all parent evidence,
+and holds the same lock as that suite's source/build tests. Missing evidence,
+active tests, symlinks or unexpected scratch contents stop cleanup. Only older
+`kernel-<16 hex digits>` source/output directories in the selected suite are
+removed; recovery images, archived full kernels, downloads, provisioning and
+diagnostic captures remain outside its scope. Each application saves an
+incremental `prune-*.json` record alongside the retained suite evidence.
 
 `test:nkmp` verifies (or downloads and verifies) the locked Linux archive, applies
 the clock-search patch to a separate test copy, and compiles the actual old/new

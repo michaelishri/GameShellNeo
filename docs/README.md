@@ -19,7 +19,9 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 Current installed image: diagnostic.13.
 [93 — Installation](93-diagnostic13-installation.md) records full card readback,
 owner-confirmed startup, independent USB/Wi-Fi access, six passing integration
-groups and read-only PM/keypad/audio baselines. Observed PM/input/cable
+groups and read-only PM/keypad/audio baselines.
+[94 — Unattended validation](94-unattended-diagnostic13-validation.md) records
+passing awake Wi-Fi, storage/load, battery-policy and final health checks. Observed PM/input/cable
 qualification remains ahead; normal sleep remains disabled.
 
 Previous diagnostic.12:
@@ -90,6 +92,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [94 — Unattended diagnostic.13 validation](94-unattended-diagnostic13-validation.md) | Awake Wi-Fi recovery/scanning, verified storage and CPU/memory load, battery-policy tests and restored final health |
 | [93 — Diagnostic.13 installation](93-diagnostic13-installation.md) | Verified flash/boot, USB and Wi-Fi access, integration and read-only PM/keypad/audio baseline |
 | [92 — Build-artifact retention](92-build-artifact-retention.md) | Guarded image/kernel pruning, verified compressed recovery, preserved provenance and abandoned-fixture cleanup |
 | [91 — Diagnostic.13 preparation](91-diagnostic13-preparation.md) | Verified Wi-Fi worker-error candidate, diagnostic.12 recovery, unchanged configuration/packages and planned guided hardware session |

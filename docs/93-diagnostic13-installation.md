@@ -105,8 +105,8 @@ Private evidence under `.local/diagnostics/`:
 | Integration | `20261001T103802.426259Z/integration.json` |
 
 Host task transcripts are `.local/neo73-*.log`. Installation and running
-baseline checks passed. NEO-74 continues the saved bounded awake radio,
-storage/load and battery-policy checks unattended. The observed freezer/devices,
+baseline checks passed. Subsequent bounded awake radio, storage/load and
+battery-policy checks passed in [report 94](94-unattended-diagnostic13-validation.md). The observed freezer/devices,
 physical input and USB sequence in report 91 remains for an attended session.
 Patch 0018's fatal-error policy still requires cold restart. These baseline
 checks do not resolve NEO-55 or qualify actual sleep, injected driver faults,

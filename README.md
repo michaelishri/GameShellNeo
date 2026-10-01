@@ -156,7 +156,9 @@ checked interrupt rearm ownership. [Report 91](docs/91-diagnostic13-preparation.
 records the verified build and diagnostic.12 recovery;
 [report 93](docs/93-diagnostic13-installation.md) records full card readback,
 owner-confirmed startup, both SSH routes, integration and read-only peripheral
-baselines. Observed PM/input/cable qualification remains ahead. Fatal checked
+baselines. [Report 94](docs/94-unattended-diagnostic13-validation.md) records
+passing unattended Wi-Fi recovery/scanning, storage/load, battery-policy and
+final health checks. Observed PM/input/cable qualification remains ahead. Fatal checked
 radio errors still require a cold restart.
 
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the

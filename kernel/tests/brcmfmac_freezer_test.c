@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -20,13 +21,17 @@
 #define IS_ENABLED(option) (option)
 #define GFP_KERNEL 0
 #define WARN_ON(condition) assert(!(condition))
-#define brcmf_dbg(...) ((void)0)
-#define brcmf_err(...) ((void)0)
+#define brcmf_dbg(level, ...) do { if (0) fprintf(stderr, __VA_ARGS__); } while (0)
+#define brcmf_err(...) do { if (0) fprintf(stderr, __VA_ARGS__); } while (0)
 #define READ_ONCE(value) (value)
+#define WRITE_ONCE(value, new_value) ((value) = (new_value))
+#define unlikely(value) (value)
+#define atomic_set(ptr, value) atomic_store(ptr, value)
 #define wmb() atomic_thread_fence(memory_order_seq_cst)
 #define container_of(ptr, type, member) ((type *)((char *)(ptr) - offsetof(type, member)))
 #define msecs_to_jiffies(ms) (ms)
 typedef uint32_t u32;
+typedef unsigned char u8;
 typedef unsigned int mmc_pm_flag_t;
 typedef pthread_mutex_t spinlock_t;
 static _Thread_local unsigned lock_depth;
@@ -56,7 +61,7 @@ struct gate {
  bool armed, reached, released;
 };
 static struct gate entry_gate, return_gate, watchdog_gate;
-enum role { CONTROL, DATAWORK, WATCHDOG };
+enum role { CONTROL, DATAWORK, WATCHDOG, TXCONTROL };
 static _Thread_local enum role role;
 static enum role gated_role;
 static void gate_init(struct gate *g)
@@ -196,33 +201,50 @@ static void completion_destroy(struct completion *c)
 
 #include "brcmfmac_freezer_types.h"
 
-enum { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA };
+enum brcmf_sdiod_state { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA, BRCMF_SDIOD_NOMEDIUM };
 enum { MMC_CAP_POWER_OFF_CARD = 1, MMC_PM_KEEP_POWER = 2, MMC_PM_WAKE_SDIO_IRQ = 4 };
 struct device { void *data; };
-struct mmc_host { unsigned caps; };
+struct mmc_host { unsigned caps, pm_caps; };
 struct mmc_card { struct mmc_host *host; };
 struct sdio_func { struct device dev; unsigned num; struct mmc_card *card; };
 struct work_struct { int unused; };
 struct brcmf_sdio_dev;
 struct brcmf_bus { struct { struct brcmf_sdio_dev *sdio; } bus_priv; };
-struct settings { struct { struct {
+struct brcmfmac_sdio_pd {
  bool oob_irq_supported; int oob_irq_nr;
-} sdio; } bus; };
+};
+struct settings { struct { struct brcmfmac_sdio_pd sdio; } bus; };
 struct brcmf_sdio {
  struct brcmf_sdio_dev *sdiodev;
  struct work_struct datawork;
  atomic_bool dpc_running, dpc_triggered;
  unsigned idlecount;
  struct completion watchdog_wait;
- struct { unsigned tickcnt; } sdcnt;
+ wait_queue_head_t ctrl_wait, dcmd_resp_wait;
+ unsigned char *ctrl_frame_buf, *rxctl, *rxctl_orig;
+ unsigned ctrl_frame_len, rxlen;
+ atomic_bool ctrl_frame_stat;
+ int ctrl_frame_err;
+ spinlock_t rxctl_lock;
+ atomic_int intstatus, ipend;
+ bool intr;
+ void *brcmf_wq;
+ struct { unsigned tickcnt, intrcount, tx_ctlerrs, tx_ctlpkts, rx_ctlerrs, rx_ctlpkts; } sdcnt;
 };
 struct brcmf_sdio_dev {
  struct brcmf_sdiod_freezer *freezer;
  struct brcmf_sdio *bus;
  struct sdio_func *func1;
+ struct sdio_func *func2;
+ struct brcmf_bus *bus_if;
  struct settings *settings;
  bool wowl_enabled;
- atomic_int state;
+ bool pm_suspended, pm_oob_irq_wake;
+ atomic_bool pm_failed;
+ bool oob_irq_requested, sd_irq_requested, irq_en;
+ spinlock_t irq_en_lock;
+ u32 sbwad;
+ _Atomic enum brcmf_sdiod_state state;
 };
 struct counters {
  atomic_uint trigger, claims, releases, sleep, wake, down, up, wd_stop, wd_start;
@@ -230,7 +252,19 @@ struct counters {
 };
 static struct counters seen;
 static unsigned pm_flags;
-static _Thread_local bool host_claimed;
+static _Thread_local unsigned host_depth;
+#define host_claimed (host_depth != 0)
+static pthread_mutex_t host_lock;
+static pthread_once_t host_once = PTHREAD_ONCE_INIT;
+static void host_init(void)
+{
+ pthread_mutexattr_t attr;
+ assert(!pthread_mutexattr_init(&attr));
+ assert(!pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE));
+ assert(!pthread_mutex_init(&host_lock, &attr));
+ assert(!pthread_mutexattr_destroy(&attr));
+}
+static struct { int sleep, wake, enable, disable, flags, release_irq; } faults;
 static bool allocation_fails;
 static unsigned watchdog_mode, watchdog_loops;
 static void *kzalloc(size_t size, int flags)
@@ -245,9 +279,17 @@ static void kfree(struct brcmf_sdiod_freezer *f)
 }
 static void *dev_get_drvdata(struct device *d) { return d->data; }
 static void sdio_claim_host(struct sdio_func *f)
-{ (void)f; assert(!lock_depth && !host_claimed); host_claimed = true; seen.claims++; }
+{
+ (void)f; assert(!lock_depth);
+ assert(!pthread_once(&host_once, host_init));
+ assert(!pthread_mutex_lock(&host_lock)); host_depth++; seen.claims++;
+}
 static void sdio_release_host(struct sdio_func *f)
-{ (void)f; assert(!lock_depth && host_claimed); host_claimed = false; seen.releases++; }
+{
+ (void)f; assert(!lock_depth && host_claimed);
+ host_depth--; seen.releases++; assert(!pthread_mutex_unlock(&host_lock));
+}
+#ifndef NEO_PM_TRANSACTION
 static void brcmf_sdio_trigger_dpc(struct brcmf_sdio *b)
 { assert(!lock_depth); b->dpc_triggered = true; seen.trigger++; }
 static void brcmf_sdiod_change_state(struct brcmf_sdio_dev *d, int state)
@@ -256,11 +298,12 @@ static void brcmf_sdiod_change_state(struct brcmf_sdio_dev *d, int state)
  if (state == BRCMF_SDIOD_DATA) seen.up++; else seen.down++;
  d->state = state;
 }
+#endif
 static int brcmf_sdio_sleep(struct brcmf_sdio *b, bool sleep)
 {
  assert(!lock_depth && host_claimed && b->sdiodev->state == BRCMF_SDIOD_DOWN);
  if (sleep) seen.sleep++; else seen.wake++;
- return 0;
+ return sleep ? faults.sleep : faults.wake;
 }
 static void brcmf_sdio_wd_timer(struct brcmf_sdio *b, bool active)
 {
@@ -268,10 +311,10 @@ static void brcmf_sdio_wd_timer(struct brcmf_sdio *b, bool active)
  if (active) { assert(b->sdiodev->state == BRCMF_SDIOD_DATA); seen.wd_start++; }
  else seen.wd_stop++;
 }
-static int enable_irq_wake(int irq) { (void)irq; seen.irq_on++; return 0; }
-static int disable_irq_wake(int irq) { (void)irq; seen.irq_off++; return 0; }
+static int enable_irq_wake(int irq) { (void)irq; seen.irq_on++; return faults.enable; }
+static int disable_irq_wake(int irq) { (void)irq; seen.irq_off++; return faults.disable; }
 static int sdio_set_host_pm_flags(struct sdio_func *f, mmc_pm_flag_t flags)
-{ (void)f; pm_flags = flags; seen.flags++; return 0; }
+{ (void)f; seen.flags++; if (!faults.flags) pm_flags |= flags; return faults.flags; }
 static void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev *d) { (void)d; seen.cancel++; }
 static void brcmf_sdio_cancel_datawork(struct brcmf_sdio *b) { (void)b; seen.cancel++; }
 static void brcmf_bus_cancel_reset_work(struct brcmf_bus *b) { (void)b; seen.cancel++; }
@@ -287,6 +330,9 @@ static bool kthread_should_stop(void) { return !watchdog_mode || watchdog_loops+
 static int wait_for_completion_interruptible(struct completion *c)
 { (void)c; gate_pass(&watchdog_gate); return watchdog_mode == 1 ? -EINTR : 0; }
 
+#ifdef NEO_PM_TRANSACTION
+#include "brcmfmac_pm_shims.h"
+#endif
 #include "brcmfmac_freezer_functions.h"
 
 static struct {
@@ -305,6 +351,7 @@ static void setup(void)
 {
  fixture = (typeof(fixture)){0};
  seen = (struct counters){0};
+ faults = (typeof(faults)){0};
  expire_wait = false;
  allocation_fails = false;
  pm_done = false;
@@ -314,13 +361,19 @@ static void setup(void)
  gate_init(&entry_gate); gate_init(&return_gate); gate_init(&watchdog_gate);
  gated_role = DATAWORK;
  fixture.card.host = &fixture.host;
+ fixture.host.pm_caps = MMC_PM_KEEP_POWER | MMC_PM_WAKE_SDIO_IRQ;
  fixture.f1 = (struct sdio_func){ .num = 1, .card = &fixture.card, .dev.data = &fixture.interface };
  fixture.f2 = (struct sdio_func){ .num = 2, .card = &fixture.card, .dev.data = &fixture.interface };
  fixture.interface.bus_priv.sdio = &fixture.dev;
  fixture.dev = (struct brcmf_sdio_dev){ .bus = &fixture.bus, .func1 = &fixture.f1,
+  .func2 = &fixture.f2, .bus_if = &fixture.interface,
   .settings = &fixture.settings, .state = BRCMF_SDIOD_DATA };
  fixture.bus.sdiodev = &fixture.dev;
  init_completion(&fixture.bus.watchdog_wait);
+ init_waitqueue_head(&fixture.bus.ctrl_wait);
+ init_waitqueue_head(&fixture.bus.dcmd_resp_wait);
+ spin_lock_init(&fixture.bus.rxctl_lock);
+ spin_lock_init(&fixture.dev.irq_en_lock);
  assert(!brcmf_sdiod_freezer_attach(&fixture.dev));
  brcmf_sdiod_freezer_count(&fixture.dev); /* Persistent datawork registration. */
 }
@@ -343,6 +396,12 @@ static void teardown(void)
  assert(seen.claims == seen.releases && !host_claimed && !lock_depth);
  brcmf_sdiod_freezer_detach(&fixture.dev);
  completion_destroy(&fixture.bus.watchdog_wait);
+ assert(!pthread_cond_destroy(&fixture.bus.ctrl_wait.cond));
+ assert(!pthread_mutex_destroy(&fixture.bus.ctrl_wait.lock));
+ assert(!pthread_cond_destroy(&fixture.bus.dcmd_resp_wait.cond));
+ assert(!pthread_mutex_destroy(&fixture.bus.dcmd_resp_wait.lock));
+ assert(!pthread_mutex_destroy(&fixture.bus.rxctl_lock));
+ assert(!pthread_mutex_destroy(&fixture.dev.irq_en_lock));
  gate_destroy(&entry_gate); gate_destroy(&return_gate); gate_destroy(&watchdog_gate);
  scenarios++;
 }
@@ -375,9 +434,15 @@ static void join(pthread_t thread) { assert(!pthread_join(thread, NULL)); }
 static pthread_t start_suspend(void)
 {
  pm_done = false;
+#ifndef NEO_PM_TRANSACTION
  unsigned count = seen.trigger;
+#endif
  pthread_t t = start(suspend_thread);
+#ifdef NEO_PM_TRANSACTION
+ UNTIL(brcmf_sdiod_freezing(&fixture.dev) || pm_done);
+#else
  UNTIL(seen.trigger == count + 1);
+#endif
  return t;
 }
 static void collect_result(pthread_t pm, int expected)
@@ -401,6 +466,9 @@ static void successful_cycle(unsigned mode)
  if (mode) fixture.host.caps = MMC_CAP_POWER_OFF_CARD; /* WOWL still retains. */
  pthread_t pm = start_suspend(), data = start(data_thread);
  collect_result(pm, 0);
+#ifdef NEO_PM_TRANSACTION
+ assert(fixture.dev.pm_suspended);
+#endif
  assert(frozen() == 1 && fixture.dev.state == BRCMF_SDIOD_DOWN);
  assert(seen.down == 1 && seen.sleep == 1 && seen.wd_stop == 1);
  assert(pm_flags == (MMC_PM_KEEP_POWER | (mode == 1 ? MMC_PM_WAKE_SDIO_IRQ : 0)));
@@ -410,6 +478,9 @@ static void successful_cycle(unsigned mode)
  assert(brcmf_ops_sdio_suspend(&fixture.f1.dev) == -EBUSY);
  assert(seen.sleep == 1 && !seen.wake);
  resume(); join(data);
+#ifdef NEO_PM_TRANSACTION
+ assert(!fixture.dev.pm_suspended);
+#endif
  assert(seen.up == 1 && seen.wake == 1 && seen.wd_start == 1);
  assert(seen.irq_off == (mode == 2));
  resume(); assert(seen.wake == 1);
@@ -441,7 +512,12 @@ static void late_worker_after_timeout(void)
  pm = start_suspend();
  pthread_t data = start(data_thread);
  collect_result(pm, 0); resume(); join(data);
- assert(seen.trigger == 2 && seen.dpc == 1 && seen.sleep == 1 && seen.up == 1);
+#ifdef NEO_PM_TRANSACTION
+ assert(seen.trigger == 1); /* The real trigger coalesces the already queued work. */
+#else
+ assert(seen.trigger == 2);
+#endif
+ assert(seen.dpc == 1 && seen.sleep == 1 && seen.up == 1);
  teardown();
 }
 

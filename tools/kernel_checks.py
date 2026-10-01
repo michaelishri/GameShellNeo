@@ -39,19 +39,24 @@ def archive_for(lock):
     return archive
 
 
-def compile_objects(archive, lock, work, objects):
+def compile_objects(archive, lock, work, objects, *, extra_config=()):
     # Content-addressed scratch source/output; never overwrite diagnostic.3's
     # source tree, kernel objects, installed modules or completed image.
     if not objects or any(not re.fullmatch(r'drivers/[A-Za-z0-9_./-]+[.]o', name) or
                           '..' in Path(name).parts for name in objects):
         raise ValueError('Expected driver object paths')
+    if any(not re.fullmatch(r'CONFIG_[A-Z0-9_]+=[ymn]', line) for line in extra_config):
+        raise ValueError('Expected boolean/tristate kernel configuration assignments')
+    extra_text = ''.join(line + '\n' for line in extra_config)
     queue = work / 'patches'
     run(['python3', str(ROOT / 'tools/kernel-inputs.py'), '--export', str(queue)])
     identity = hashlib.sha256((queue / 'manifest.json').read_bytes() +
                               (ROOT / 'kernel/gameshellneo.config').read_bytes() +
-                              json.dumps(lock, sort_keys=True).encode()).hexdigest()[:16]
+                              json.dumps(lock, sort_keys=True).encode() +
+                              extra_text.encode()).hexdigest()[:16]
     scratch = work / ('kernel-' + identity)
     scratch.mkdir(exist_ok=True)
+    (scratch / 'extra.config').write_text(extra_text)
     source = scratch / 'source'
     if not source.exists():
         print('Extracting verified kernel to isolated driver-check scratch...', flush=True)
@@ -77,7 +82,7 @@ def compile_objects(archive, lock, work, objects):
          'output="$NEO_DRIVER_SCRATCH/output"\n'
          'make O="$output" sunxi_defconfig\n'
          'scripts/kconfig/merge_config.sh -m -O "$output" "$output/.config" '
-         '/project/kernel/gameshellneo.config\n'
+         '/project/kernel/gameshellneo.config "$NEO_DRIVER_SCRATCH/extra.config"\n'
          'make O="$output" olddefconfig\n'
          'python3 /project/tools/check-kernel-config.py "$output/.config"\n'
          'read -ra objects <<< "$NEO_DRIVER_OBJECTS"\n'
@@ -86,6 +91,13 @@ def compile_objects(archive, lock, work, objects):
          'for object in "${objects[@]}"; do\n'
          '    "${NEO_DRIVER_CROSS}readelf" -h "$output/$object"\n'
          'done > "$NEO_DRIVER_SCRATCH/elf-info.txt"\n'])
+    actual_config = set((scratch / 'output/.config').read_text().splitlines())
+    for setting in extra_config:
+        name, value = setting.split('=')
+        expected = f'# {name} is not set' if value == 'n' else setting
+        if expected not in actual_config:
+            raise RuntimeError('Requested driver-check configuration was not applied: ' + setting)
     return dict(scratch=relative,
                 objects={name: sha256(scratch / 'output' / name) for name in objects},
-                config_sha256=sha256(scratch / 'output/.config'), builder=builder)
+                config_sha256=sha256(scratch / 'output/.config'),
+                extra_config=list(extra_config), builder=builder)

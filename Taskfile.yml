@@ -81,6 +81,7 @@ tasks:
       - task: test:power-supply-suspend
       - task: test:brcmfmac-sleep
       - task: test:brcmfmac-freezer
+      - task: test:brcmfmac-pm
       - task: test:musb-context
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -205,6 +206,14 @@ tasks:
   check:brcmfmac-freezer-drivers:
     desc: Run Wi-Fi freezer regressions and compile both complete ARM SDIO objects in isolated scratch
     cmds: [bash tools/run-logged.sh brcmfmac-freezer-drivers python3 tools/check-brcmfmac-freezer.py --compile-driver]
+
+  test:brcmfmac-pm:
+    desc: Check actual Wi-Fi PM rollback, failed-wake I/O gates and control requests, native and ARM32
+    cmds: [bash tools/run-logged.sh brcmfmac-pm python3 tools/check-brcmfmac-pm.py]
+
+  check:brcmfmac-pm-drivers:
+    desc: Run Wi-Fi PM fault regressions and compile the full ARM driver in normal and debug configurations
+    cmds: [bash tools/run-logged.sh brcmfmac-pm-drivers python3 tools/check-brcmfmac-pm.py --compile-driver]
 
   check:usb-policy-driver:
     desc: Run USB policy regressions and compile the complete ARM driver in isolated scratch

@@ -1,0 +1,577 @@
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+@@ -69,16 +69,19 @@
+ {
+ 	struct brcmf_bus *bus_if = dev_get_drvdata(dev_id);
+ 	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
++	unsigned long flags;
+ 
+ 	brcmf_dbg(INTR, "OOB intr triggered\n");
+ 
+ 	/* out-of-band interrupt is level-triggered which won't
+ 	 * be cleared until dpc
+ 	 */
++	spin_lock_irqsave(&sdiodev->irq_en_lock, flags);
+ 	if (sdiodev->irq_en) {
+ 		disable_irq_nosync(irq);
+ 		sdiodev->irq_en = false;
+ 	}
++	spin_unlock_irqrestore(&sdiodev->irq_en_lock, flags);
+ 
+ 	brcmf_sdio_isr(sdiodev->bus, true);
+ 
+@@ -171,6 +174,46 @@
+ 	return 0;
+ }
+ 
++static int brcmf_sdiod_pm_disarm(struct brcmf_sdio_dev *sdiodev)
++{
++	int ret;
++
++	if (!sdiodev->pm_oob_irq_wake)
++		return 0;
++	ret = disable_irq_wake(sdiodev->settings->bus.sdio.oob_irq_nr);
++	if (ret)
++		brcmf_err("PM wake reference cleanup failed: %d\n", ret);
++	else
++		sdiodev->pm_oob_irq_wake = false;
++	return ret;
++}
++
++/* Host is claimed. Stop producers after an unrecoverable PM transition. */
++static void brcmf_sdiod_pm_quiesce_irqs(struct brcmf_sdio_dev *sdiodev)
++{
++	unsigned long flags;
++	int ret;
++
++	if (sdiodev->oob_irq_requested) {
++		spin_lock_irqsave(&sdiodev->irq_en_lock, flags);
++		if (sdiodev->irq_en) {
++			disable_irq_nosync(sdiodev->settings->bus.sdio.oob_irq_nr);
++			sdiodev->irq_en = false;
++		}
++		spin_unlock_irqrestore(&sdiodev->irq_en_lock, flags);
++	}
++	if (sdiodev->sd_irq_requested) {
++		/* The core detaches each handler even if clearing IENx fails. */
++		ret = sdio_release_irq(sdiodev->func2);
++		if (ret)
++			brcmf_err("PM F2 IRQ disable failed: %d\n", ret);
++		ret = sdio_release_irq(sdiodev->func1);
++		if (ret)
++			brcmf_err("PM F1 IRQ disable failed: %d\n", ret);
++		sdiodev->sd_irq_requested = false;
++	}
++}
++
+ void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev *sdiodev)
+ {
+ 
+@@ -182,6 +225,8 @@
+ 		struct brcmfmac_sdio_pd *pdata;
+ 
+ 		pdata = &sdiodev->settings->bus.sdio;
++		/* A failed PM disable still owns its wake reference. */
++		brcmf_sdiod_pm_disarm(sdiodev);
+ 		sdio_claim_host(sdiodev->func1);
+ 		brcmf_sdiod_func0_wb(sdiodev, SDIO_CCCR_BRCM_SEPINT, 0, NULL);
+ 		brcmf_sdiod_func0_wb(sdiodev, SDIO_CCCR_IENx, 0, NULL);
+@@ -205,6 +250,8 @@
+ void brcmf_sdiod_change_state(struct brcmf_sdio_dev *sdiodev,
+ 			      enum brcmf_sdiod_state state)
+ {
++	if (state == BRCMF_SDIOD_DATA && brcmf_sdiod_io_blocked(sdiodev))
++		return;
+ 	if (sdiodev->state == BRCMF_SDIOD_NOMEDIUM ||
+ 	    state == sdiodev->state)
+ 		return;
+@@ -232,6 +279,8 @@
+ 	u32 v, bar0 = addr & SBSDIO_SBWINDOW_MASK;
+ 	int err = 0, i;
+ 
++	if (brcmf_sdiod_io_blocked(sdiodev))
++		return -EHOSTDOWN;
+ 	if (bar0 == sdiodev->sbwad)
+ 		return 0;
+ 
+@@ -294,6 +343,8 @@
+ 	unsigned int req_sz;
+ 	int err;
+ 
++	if (brcmf_sdiod_io_blocked(sdiodev))
++		return -EHOSTDOWN;
+ 	/* Single skb use the standard mmc interface */
+ 	req_sz = skb->len + 3;
+ 	req_sz &= (uint)~3;
+@@ -325,6 +376,8 @@
+ 	unsigned int req_sz;
+ 	int err;
+ 
++	if (brcmf_sdiod_io_blocked(sdiodev))
++		return -EHOSTDOWN;
+ 	/* Single skb use the standard mmc interface */
+ 	req_sz = skb->len + 3;
+ 	req_sz &= (uint)~3;
+@@ -345,6 +398,8 @@
+ {
+ 	int ret;
+ 
++	if (brcmf_sdiod_io_blocked(sdiodev))
++		return -EHOSTDOWN;
+ 	md->sg_len = sg_cnt;
+ 	md->blocks = req_sz / func_blk_sz;
+ 	mc->arg |= (*addr & 0x1FFFF) << 9;	/* address */
+@@ -865,14 +920,29 @@
+ 	return 0;
+ }
+ 
+-static void brcmf_sdiod_freezer_off(struct brcmf_sdio_dev *sdiodev)
+-{
++static int brcmf_sdiod_pm_restore(struct brcmf_sdio_dev *sdiodev)
++{
++	int ret;
++
+ 	sdio_claim_host(sdiodev->func1);
+-	brcmf_sdio_sleep(sdiodev->bus, false);
+-	brcmf_sdiod_change_state(sdiodev, BRCMF_SDIOD_DATA);
+-	brcmf_sdio_wd_timer(sdiodev->bus, true);
++	if (sdiodev->state != BRCMF_SDIOD_DOWN)
++		ret = -ENODEV;
++	else
++		ret = brcmf_sdio_sleep(sdiodev->bus, false);
++	if (!ret && sdiodev->state != BRCMF_SDIOD_DOWN)
++		ret = -ENODEV;
++	if (ret) {
++		brcmf_sdio_pm_failed(sdiodev->bus);
++		brcmf_sdiod_pm_quiesce_irqs(sdiodev);
++		brcmf_err("PM restore failed (%d); Wi-Fi unavailable until cold restart\n",
++			  ret);
++	} else {
++		brcmf_sdiod_change_state(sdiodev, BRCMF_SDIOD_DATA);
++		brcmf_sdio_wd_timer(sdiodev->bus, true);
++	}
+ 	sdio_release_host(sdiodev->func1);
+ 	brcmf_sdiod_freezer_thaw(sdiodev->freezer);
++	return ret;
+ }
+ 
+ static bool brcmf_sdiod_freezing(struct brcmf_sdio_dev *sdiodev)
+@@ -1254,7 +1324,7 @@
+ 	struct brcmf_sdio_dev *sdiodev;
+ 	mmc_pm_flag_t sdio_flags;
+ 	bool cap_power_off;
+-	int ret = 0;
++	int ret = 0, restore;
+ 
+ 	func = container_of(dev, struct sdio_func, dev);
+ 	brcmf_dbg(SDIO, "Enter: F%d\n", func->num);
+@@ -1266,28 +1336,60 @@
+ 	bus_if = dev_get_drvdata(dev);
+ 	sdiodev = bus_if->bus_priv.sdio;
+ 
++	if (sdiodev->pm_suspended)
++		return -EBUSY;
++	/* A policy change must not bypass a latched failure via remove/probe. */
++	if (brcmf_sdiod_io_blocked(sdiodev)) {
++		ret = brcmf_sdiod_pm_disarm(sdiodev);
++		return ret ? ret : -EHOSTDOWN;
++	}
+ 	if (sdiodev->wowl_enabled || !cap_power_off) {
++		if (brcmf_sdiod_freezing(sdiodev))
++			return -EBUSY;
++		/* Retry only an outstanding IRQ cleanup, never acquire it twice. */
++		ret = brcmf_sdiod_pm_disarm(sdiodev);
++		if (ret)
++			return ret;
++		if (sdiodev->state != BRCMF_SDIOD_DATA)
++			return -ENODEV;
++		sdio_flags = MMC_PM_KEEP_POWER;
++		if (sdiodev->wowl_enabled &&
++		    !sdiodev->settings->bus.sdio.oob_irq_supported)
++			sdio_flags |= MMC_PM_WAKE_SDIO_IRQ;
++		if (sdio_flags & ~sdio_get_host_pm_caps(sdiodev->func1))
++			return -EINVAL;
++
+ 		ret = brcmf_sdiod_freezer_on(sdiodev);
+ 		if (ret)
+ 			return ret;
++		brcmf_sdio_wd_timer(sdiodev->bus, false);
+ 		sdio_claim_host(sdiodev->func1);
++		if (sdiodev->state != BRCMF_SDIOD_DATA) {
++			brcmf_sdio_pm_failed(sdiodev->bus);
++			brcmf_sdiod_pm_quiesce_irqs(sdiodev);
++			sdio_release_host(sdiodev->func1);
++			brcmf_sdiod_freezer_thaw(sdiodev->freezer);
++			return -ENODEV;
++		}
+ 		brcmf_sdiod_change_state(sdiodev, BRCMF_SDIOD_DOWN);
+-		brcmf_sdio_sleep(sdiodev->bus, true);
++		ret = brcmf_sdio_sleep(sdiodev->bus, true);
+ 		sdio_release_host(sdiodev->func1);
+-		brcmf_sdio_wd_timer(sdiodev->bus, 0);
+-
+-		sdio_flags = MMC_PM_KEEP_POWER;
+-
+-		if (sdiodev->wowl_enabled) {
+-			if (sdiodev->settings->bus.sdio.oob_irq_supported)
+-				enable_irq_wake(sdiodev->settings->bus.sdio.oob_irq_nr);
+-			else
+-				sdio_flags |= MMC_PM_WAKE_SDIO_IRQ;
++		if (ret)
++			goto rollback;
++
++		if (sdiodev->wowl_enabled &&
++		    sdiodev->settings->bus.sdio.oob_irq_supported) {
++			ret = enable_irq_wake(sdiodev->settings->bus.sdio.oob_irq_nr);
++			if (ret)
++				goto rollback;
++			sdiodev->pm_oob_irq_wake = true;
+ 		}
+ 
+-		if (sdio_set_host_pm_flags(sdiodev->func1, sdio_flags))
+-			brcmf_err("Failed to set pm_flags %x\n", sdio_flags);
+-
++		/* The setter changes shared host flags only on success. Keep last. */
++		ret = sdio_set_host_pm_flags(sdiodev->func1, sdio_flags);
++		if (ret)
++			goto rollback;
++		sdiodev->pm_suspended = true;
+ 	} else {
+ 		/* power will be cut so remove device, probe again in resume */
+ 		brcmf_sdiod_intr_unregister(sdiodev);
+@@ -1299,6 +1401,13 @@
+ 	}
+ 
+ 	return ret;
++
++rollback:
++	brcmf_sdiod_pm_disarm(sdiodev);
++	restore = brcmf_sdiod_pm_restore(sdiodev);
++	if (restore)
++		brcmf_err("Suspend error %d; rollback also failed: %d\n", ret, restore);
++	return ret;
+ }
+ 
+ static int brcmf_ops_sdio_resume(struct device *dev)
+@@ -1306,14 +1415,15 @@
+ 	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
+ 	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
+ 	struct sdio_func *func = container_of(dev, struct sdio_func, dev);
+-	int ret = 0;
++	int ret = 0, cleanup;
+ 	bool cap_power_off = !!(func->card->host->caps & MMC_CAP_POWER_OFF_CARD);
+ 
+ 	brcmf_dbg(SDIO, "Enter: F%d\n", func->num);
+ 	if (func->num != 2)
+ 		return 0;
+ 
+-	if (!sdiodev->wowl_enabled && cap_power_off) {
++	if (!sdiodev->wowl_enabled && cap_power_off &&
++	    !sdiodev->pm_suspended && !brcmf_sdiod_io_blocked(sdiodev)) {
+ 		/* bus was powered off and device removed, probe again */
+ 		ret = brcmf_sdiod_probe(sdiodev);
+ 		if (ret)
+@@ -1321,13 +1431,14 @@
+ 		else
+ 			brcmf_bus_allow_reset_work(bus_if);
+ 	} else {
+-		/* F2 can resume after F1 failed worker collection and thawed. */
+-		if (!brcmf_sdiod_freezing(sdiodev))
+-			return 0;
+-		if (sdiodev->wowl_enabled && sdiodev->settings->bus.sdio.oob_irq_supported)
+-			disable_irq_wake(sdiodev->settings->bus.sdio.oob_irq_nr);
+-
+-		brcmf_sdiod_freezer_off(sdiodev);
++		cleanup = brcmf_sdiod_pm_disarm(sdiodev);
++		/* F2 may resume after F1 already rolled back its failed suspend. */
++		if (!sdiodev->pm_suspended)
++			return cleanup;
++		sdiodev->pm_suspended = false;
++		ret = brcmf_sdiod_pm_restore(sdiodev);
++		if (!ret)
++			ret = cleanup;
+ 	}
+ 
+ 	return ret;
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -1777,7 +1777,8 @@
+ 	add_wait_queue(&bus->dcmd_resp_wait, &wait);
+ 	set_current_state(TASK_INTERRUPTIBLE);
+ 
+-	while (!(*condition) && (!signal_pending(current) && timeout))
++	while (!(*condition) && !brcmf_sdiod_io_blocked(bus->sdiodev) &&
++	       !signal_pending(current) && timeout)
+ 		timeout = schedule_timeout(timeout);
+ 
+ 	if (signal_pending(current))
+@@ -1795,6 +1796,7 @@
+ 
+ 	return 0;
+ }
++
+ static void
+ brcmf_sdio_read_control(struct brcmf_sdio *bus, u8 *hdr, uint len, uint doff)
+ {
+@@ -2123,6 +2125,23 @@
+ 	return;
+ }
+ 
++/* Host is claimed and workers are parked. Release them only after this latch. */
++void brcmf_sdio_pm_failed(struct brcmf_sdio *bus)
++{
++	WRITE_ONCE(bus->sdiodev->pm_failed, true);
++	brcmf_sdiod_change_state(bus->sdiodev, BRCMF_SDIOD_DOWN);
++	atomic_set(&bus->intstatus, 0);
++	atomic_set(&bus->ipend, 0);
++	if (bus->ctrl_frame_stat) {
++		bus->ctrl_frame_err = -EHOSTDOWN;
++		/* Publish the error before the TX waiter observes completion. */
++		wmb();
++		bus->ctrl_frame_stat = false;
++		brcmf_sdio_wait_event_wakeup(bus);
++	}
++	brcmf_sdio_dcmd_resp_wake(bus);
++}
++
+ static int brcmf_sdio_txpkt_hdalign(struct brcmf_sdio *bus, struct sk_buff *pkt)
+ {
+ 	struct brcmf_bus_stats *stats;
+@@ -2983,14 +3002,21 @@
+ 	int ret;
+ 
+ 	brcmf_dbg(TRACE, "Enter\n");
+-	if (sdiodev->state != BRCMF_SDIOD_DATA)
+-		return -EIO;
++	/* Serialize publication with PM failure and the DPC's completion. */
++	sdio_claim_host(sdiodev->func1);
++	if (brcmf_sdiod_io_blocked(sdiodev) ||
++	    sdiodev->state != BRCMF_SDIOD_DATA) {
++		ret = brcmf_sdiod_io_blocked(sdiodev) ? -EHOSTDOWN : -EIO;
++		sdio_release_host(sdiodev->func1);
++		return ret;
++	}
+ 
+ 	/* Send from dpc */
+ 	bus->ctrl_frame_buf = msg;
+ 	bus->ctrl_frame_len = msglen;
+ 	wmb();
+ 	bus->ctrl_frame_stat = true;
++	sdio_release_host(sdiodev->func1);
+ 
+ 	brcmf_sdio_trigger_dpc(bus);
+ 	wait_event_interruptible_timeout(bus->ctrl_wait, !bus->ctrl_frame_stat,
+@@ -3146,15 +3172,18 @@
+ 		error = brcmf_sdiod_ramrw(bus->sdiodev, false,
+ 					  sh->assert_file_addr, (u8 *)file, 80);
+ 		if (error < 0)
+-			return error;
++			goto release_host;
+ 	}
+ 	if (sh->assert_exp_addr != 0) {
+ 		error = brcmf_sdiod_ramrw(bus->sdiodev, false,
+ 					  sh->assert_exp_addr, (u8 *)expr, 80);
+ 		if (error < 0)
+-			return error;
+-	}
++			goto release_host;
++	}
++release_host:
+ 	sdio_release_host(bus->sdiodev->func1);
++	if (error < 0)
++		return error;
+ 
+ 	seq_printf(seq, "dongle assert: %s:%d: assert(%s)\n",
+ 		   file, sh->assert_line, expr);
+@@ -3289,13 +3318,15 @@
+ {
+ 	int timeleft;
+ 	uint rxlen = 0;
+-	bool pending;
++	bool pending = false;
+ 	u8 *buf;
+ 	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
+ 	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
+ 	struct brcmf_sdio *bus = sdiodev->bus;
+ 
+ 	brcmf_dbg(TRACE, "Enter\n");
++	if (brcmf_sdiod_io_blocked(sdiodev))
++		return -EHOSTDOWN;
+ 	if (sdiodev->state != BRCMF_SDIOD_DATA)
+ 		return -EIO;
+ 
+@@ -3312,6 +3343,10 @@
+ 	spin_unlock_bh(&bus->rxctl_lock);
+ 	vfree(buf);
+ 
++	if (brcmf_sdiod_io_blocked(sdiodev)) {
++		bus->sdcnt.rx_ctlerrs++;
++		return -EHOSTDOWN;
++	}
+ 	if (rxlen) {
+ 		brcmf_dbg(CTL, "resumed on rxctl frame, got %d expected %d\n",
+ 			  rxlen, msglen);
+@@ -3679,6 +3714,8 @@
+ 
+ void brcmf_sdio_trigger_dpc(struct brcmf_sdio *bus)
+ {
++	if (brcmf_sdiod_io_blocked(bus->sdiodev))
++		return;
+ 	if (!bus->dpc_triggered) {
+ 		bus->dpc_triggered = true;
+ 		queue_work(bus->brcmf_wq, &bus->datawork);
+@@ -3693,6 +3730,8 @@
+ 		brcmf_err("bus is null pointer, exiting\n");
+ 		return;
+ 	}
++	if (brcmf_sdiod_io_blocked(bus->sdiodev))
++		return;
+ 
+ 	/* Count the interrupt call */
+ 	bus->sdcnt.intrcount++;
+@@ -3805,7 +3844,8 @@
+ 	wmb();
+ 	while (READ_ONCE(bus->dpc_triggered)) {
+ 		bus->dpc_triggered = false;
+-		brcmf_sdio_dpc(bus);
++		if (!brcmf_sdiod_io_blocked(bus->sdiodev))
++			brcmf_sdio_dpc(bus);
+ 		bus->idlecount = 0;
+ 	}
+ 	bus->dpc_running = false;
+@@ -4150,9 +4190,11 @@
+ 		brcmf_sdiod_freezer_count(bus->sdiodev);
+ 		brcmf_sdiod_try_freeze(bus->sdiodev);
+ 		if (!wait) {
+-			brcmf_sdio_bus_watchdog(bus);
+-			/* Count the tick for reference */
+-			bus->sdcnt.tickcnt++;
++			if (!brcmf_sdiod_io_blocked(bus->sdiodev)) {
++				brcmf_sdio_bus_watchdog(bus);
++				/* Count the tick for reference */
++				bus->sdcnt.tickcnt++;
++			}
+ 			reinit_completion(&bus->watchdog_wait);
+ 		} else
+ 			break;
+@@ -4202,6 +4244,9 @@
+ 	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
+ 
+ 	brcmf_dbg(SDIO, "Enter\n");
++	/* PM quarantine requires a fresh device lifetime, not this reset path. */
++	if (brcmf_sdiod_io_blocked(sdiodev))
++		return -EHOSTDOWN;
+ 
+ 	/* start by unregistering irqs */
+ 	brcmf_sdiod_intr_unregister(sdiodev);
+@@ -4669,7 +4714,8 @@
+ 	}
+ 
+ 	/* don't start the wd until fw is loaded */
+-	if (bus->sdiodev->state != BRCMF_SDIOD_DATA)
++	if (bus->sdiodev->state != BRCMF_SDIOD_DATA ||
++	    brcmf_sdiod_io_blocked(bus->sdiodev))
+ 		return;
+ 
+ 	if (active) {
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+@@ -7,7 +7,10 @@
+ #define	BRCMFMAC_SDIO_H
+ 
+ #include <linux/skbuff.h>
++#include <linux/compiler.h>
++#include <linux/errno.h>
+ #include <linux/firmware.h>
++#include <linux/mmc/sdio_func.h>
+ #include "firmware.h"
+ 
+ #define SDIOD_FBR_SIZE		0x100
+@@ -188,6 +191,11 @@
+ 	char nvram_name[BRCMF_FW_NAME_LEN];
+ 	char clm_name[BRCMF_FW_NAME_LEN];
+ 	bool wowl_enabled;
++	/* PM callbacks own the retained transaction and its wake reference. */
++	bool pm_suspended;
++	bool pm_oob_irq_wake;
++	/* Latched under the SDIO host lock until this device is destroyed. */
++	bool pm_failed;
+ 	bool func1_power_manageable;
+ 	bool func2_power_manageable;
+ 	enum brcmf_sdiod_state state;
+@@ -289,19 +297,51 @@
+ void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev *sdiodev);
+ 
+ /* SDIO device register access interface */
+-/* Accessors for SDIO Function 0 */
+-#define brcmf_sdiod_func0_rb(sdiodev, addr, r) \
+-	sdio_f0_readb((sdiodev)->func1, (addr), (r))
+-
+-#define brcmf_sdiod_func0_wb(sdiodev, addr, v, ret) \
+-	sdio_f0_writeb((sdiodev)->func1, (v), (addr), (ret))
+-
+-/* Accessors for SDIO Function 1 */
+-#define brcmf_sdiod_readb(sdiodev, addr, r) \
+-	sdio_readb((sdiodev)->func1, (addr), (r))
+-
+-#define brcmf_sdiod_writeb(sdiodev, addr, v, ret) \
+-	sdio_writeb((sdiodev)->func1, (v), (addr), (ret))
++static inline bool brcmf_sdiod_io_blocked(struct brcmf_sdio_dev *sdiodev)
++{
++	return unlikely(READ_ONCE(sdiodev->pm_failed));
++}
++
++/* Callers hold the host lock, which also serializes latching pm_failed. */
++static inline bool brcmf_sdiod_io_check(struct brcmf_sdio_dev *sdiodev,
++					int *ret)
++{
++	if (!brcmf_sdiod_io_blocked(sdiodev))
++		return true;
++	if (ret)
++		*ret = -EHOSTDOWN;
++	return false;
++}
++
++static inline u8 brcmf_sdiod_func0_rb(struct brcmf_sdio_dev *sdiodev,
++				      uint addr, int *ret)
++{
++	if (!brcmf_sdiod_io_check(sdiodev, ret))
++		return 0xff;
++	return sdio_f0_readb(sdiodev->func1, addr, ret);
++}
++
++static inline void brcmf_sdiod_func0_wb(struct brcmf_sdio_dev *sdiodev,
++					uint addr, u8 value, int *ret)
++{
++	if (brcmf_sdiod_io_check(sdiodev, ret))
++		sdio_f0_writeb(sdiodev->func1, value, addr, ret);
++}
++
++static inline u8 brcmf_sdiod_readb(struct brcmf_sdio_dev *sdiodev,
++				   uint addr, int *ret)
++{
++	if (!brcmf_sdiod_io_check(sdiodev, ret))
++		return 0xff;
++	return sdio_readb(sdiodev->func1, addr, ret);
++}
++
++static inline void brcmf_sdiod_writeb(struct brcmf_sdio_dev *sdiodev,
++				      uint addr, u8 value, int *ret)
++{
++	if (brcmf_sdiod_io_check(sdiodev, ret))
++		sdio_writeb(sdiodev->func1, value, addr, ret);
++}
+ 
+ u32 brcmf_sdiod_readl(struct brcmf_sdio_dev *sdiodev, u32 addr, int *ret);
+ void brcmf_sdiod_writel(struct brcmf_sdio_dev *sdiodev, u32 addr, u32 data,
+@@ -365,6 +405,7 @@
+ void brcmf_sdio_wd_timer(struct brcmf_sdio *bus, bool active);
+ void brcmf_sdio_wowl_config(struct device *dev, bool enabled);
+ int brcmf_sdio_sleep(struct brcmf_sdio *bus, bool sleep);
++void brcmf_sdio_pm_failed(struct brcmf_sdio *bus);
+ void brcmf_sdio_trigger_dpc(struct brcmf_sdio *bus);
+ 
+ #endif /* BRCMFMAC_SDIO_H */

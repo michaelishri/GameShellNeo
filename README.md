@@ -452,6 +452,22 @@ is in `.local/build/brcmfmac-freezer-tests/`.
 limits: hardware sleep/wake failure recovery and image qualification remain
 separate work. Neither task accesses the GameShell or rebuilds its image.
 
+For checked Wi-Fi PM transitions, rollback and failed-wake isolation:
+
+```sh
+task test:brcmfmac-pm          # Actual callbacks, workers, IRQs, control paths and I/O guards
+task check:brcmfmac-pm-drivers # Also compile the full ARM driver, normal + CONFIG_BRCMDBG=y
+```
+
+These inject sleep/wake, IRQ-wake and host-flag failures and exercise late
+workers and control requests. They verify that an unrecoverable restore reports
+Wi-Fi unavailable and blocks further firmware I/O. The current recovery policy
+for that exceptional case is a cold restart; automatic radio reset remains
+separate work. Evidence is in `.local/build/brcmfmac-pm-tests/`; `task build`
+includes the regression. [Report 83](docs/83-brcmfmac-pm-rollback.md) explains
+the source validation, recovery limits and remaining hardware gates. The debug
+build is isolated and does not change the image's kernel configuration.
+
 For the Sunxi MUSB context capability fix, use:
 
 ```sh

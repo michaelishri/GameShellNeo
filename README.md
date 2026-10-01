@@ -159,7 +159,10 @@ owner-confirmed startup, both SSH routes, integration and read-only peripheral
 baselines. [Report 94](docs/94-unattended-diagnostic13-validation.md) records
 passing unattended Wi-Fi recovery/scanning, storage/load, battery-policy and
 final health checks. Observed PM/input/cable qualification remains ahead. Fatal checked
-radio errors still require a cold restart.
+radio errors still require a cold restart. The saved
+`task device:qualify-awake` now combines the awake sequence into one command
+with persistent progress and a final report; its full live run passed in about
+eleven minutes ([report 95](docs/95-awake-qualification-workflow.md)).
 
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
@@ -632,6 +635,9 @@ task device:usb-rapid CYCLES=4 # Immediate unplug/replug, then stay connected 30
 task device:usb-detect CYCLES=0 SECONDS=8 # Unplugged smoke capture; no cable actions
 task device:usb-detect CYCLES=4 # Start unplugged; detailed IRQ/events over Wi-Fi
 task device:stability ROUTE=usb # Keep the board connected throughout
+task device:qualify-awake-plan # Show the unattended sequence without connecting
+task device:qualify-awake ACTIVE_COUNTRY=AU # Whole awake sequence; USB connected, Mac awake, Wi-Fi available
+task report:awake CAPTURE='.local/diagnostics/awake-<timestamp>' # Read progress/report; never resumes tests
 task device:battery-check ROUTE=wifi # Isolated simulation; no real power-off or charger writes
 task device:wifi-config             # Apply .env Wi-Fi over USB and verify Wi-Fi SSH; no reflash
 task device:wifi-visibility         # Cached target visibility; no network names in output
@@ -875,6 +881,51 @@ under `discarded_phases`, its logs and original report remain available, and the
 replacement starts after fresh settling. This never joins partial samples into
 a complete measurement. Resolve the interruption first and keep the same
 physical setup; the thirty-minute continuation limit still applies.
+
+`task device:qualify-awake` runs the saved unattended awake qualification on
+the current locked suspend-diagnostic image with retained keypad supply and
+speaker audio. Keep USB connected, the Mac awake, the configured Wi-Fi network
+available and controls untouched; do not run other diagnostic/configuration
+commands concurrently. Connection credentials remain in `.env`. Use
+`ACTIVE_COUNTRY=AU` for this board's accepted AP announcement; omit the override
+when the active country matches `GAMESHELL_WIFI_COUNTRY`.
+
+The fixed sequence checks the current boot and both SSH routes, saves read-only
+PM/keypad/audio baselines, runs installed-firmware recovery with four software
+reconnections and two 120-second windows, verifies restoration, then runs the
+storage/load, simulated battery-policy and integration checks. Final snapshots
+must retain the same boot, firmware, configuration, charging/CPU/display policy,
+PM counters, keypad identity and idle mixer state. This command never enters a
+PM stage, plays a tone, requests physical input, reboots or replaces firmware.
+It takes approximately 12–15 minutes under normal conditions. Inherited
+`ROUTE`, `CYCLES` and `SECONDS` cannot change its fixed USB control route,
+zero physical boot cycles or observation windows.
+
+`device:qualify-awake-plan` lists the exact commands and host deadlines without
+connecting. Each run creates one private `.local/diagnostics/awake-<timestamp>/`
+folder with atomically saved `progress.json`, `report.md`, source hashes and
+per-step controller logs/raw evidence. Progress is written before starting each
+step. `task report:awake CAPTURE=<that-folder>` reads it without connecting or
+resuming anything; a saved `running` state remains incomplete if the host died.
+There is no automatic retry or resume. Old evidence cannot satisfy a new step.
+
+The first failure stops the sequence and marks later steps skipped. Child
+controllers have wall-clock deadlines; interruption first allows their existing
+cleanup hooks to run, then kills an unresponsive controller after a bounded
+grace period. The Wi-Fi trial's device-owned service and `ExecStopPost` remain
+responsible for network restoration even if the host disappears. The load
+service also has its own runtime limit. Losing the host does **not** prove
+cleanup succeeded: failed/interrupted runs report restoration as unverified.
+Inspect the retained logs and recovery records before starting another test;
+follow the `device:wifi-recovery` recovery instructions below when applicable.
+The initial/final guard refuses other active diagnostic services or leftover
+ownership records and never deletes them. Source changes during a run also
+stop it. A local lock excludes a second copy of this workflow; it is not a
+global lock shared by every legacy diagnostic command.
+
+A pass qualifies this bounded awake sequence only. Sleep/wake, physical
+buttons/cables, visual/audio quality, battery endurance, charge calibration and
+energy savings still need their own evidence. See [report 95](docs/95-awake-qualification-workflow.md).
 
 `device:stability ROUTE=usb` writes a new temporary 128 MiB random file, flushes
 it to storage and checks its SHA-256 with a direct read that bypasses the file

@@ -436,6 +436,18 @@ tasks:
     desc: Check a temporary 128 MiB file and run five minutes of CPU/memory load; keep USB connected
     cmds: [python3 tools/remote.py device stability]
 
+  device:qualify-awake:
+    desc: Run bounded awake checks over USB with one private progress/report folder; keep Mac and Wi-Fi available
+    cmds: [python3 tools/qualify-awake.py]
+
+  device:qualify-awake-plan:
+    desc: Show the fixed unattended awake sequence without connecting
+    cmds: [python3 tools/qualify-awake.py --plan]
+
+  report:awake:
+    desc: Read awake qualification progress from CAPTURE=directory; no device access or automatic resume
+    cmds: [python3 tools/qualify-awake.py --report "$NEO_COMPARISON_CAPTURE"]
+
   device:battery-check:
     desc: Simulate critical and invalid readings against the installed guard without shutting down
     cmds: [python3 tools/remote.py device battery-check]

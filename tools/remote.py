@@ -124,7 +124,14 @@ def run(client, command, password=None, output=None, display=True, timeout=300):
 
 def evidence_directory():
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S.%fZ')
-    directory = LOCAL / 'diagnostics' / stamp
+    root = LOCAL / 'diagnostics'
+    if os.environ.get('NEO_EVIDENCE_ROOT'):
+        # A workflow may group fresh captures beneath its private step directory.
+        # Never redirect diagnostics into the repository or an unrelated path.
+        root = Path(os.environ['NEO_EVIDENCE_ROOT']).resolve(strict=True)
+        if not root.is_dir() or not root.is_relative_to((LOCAL / 'diagnostics').resolve()):
+            raise ValueError('Evidence root must exist inside .local/diagnostics')
+    directory = root / stamp
     directory.mkdir(mode=0o700, parents=True)
     return directory
 

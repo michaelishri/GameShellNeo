@@ -92,6 +92,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [95 — Saved unattended awake qualification](95-awake-qualification-workflow.md) | One bounded awake sequence, persistent evidence/progress, fail-stop behavior and verified final state |
 | [94 — Unattended diagnostic.13 validation](94-unattended-diagnostic13-validation.md) | Awake Wi-Fi recovery/scanning, verified storage and CPU/memory load, battery-policy tests and restored final health |
 | [93 — Diagnostic.13 installation](93-diagnostic13-installation.md) | Verified flash/boot, USB and Wi-Fi access, integration and read-only PM/keypad/audio baseline |
 | [92 — Build-artifact retention](92-build-artifact-retention.md) | Guarded image/kernel pruning, verified compressed recovery, preserved provenance and abandoned-fixture cleanup |

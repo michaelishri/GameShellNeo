@@ -33,7 +33,11 @@ Patches 0014–0017 are integrated for image qualification in
 [diagnostic.12 preparation](../docs/85-diagnostic12-preparation.md). The ledger's
 source-test results do not establish hardware recovery or energy savings.
 [Installation and baseline checks](../docs/86-diagnostic12-installation.md)
-now pass; the new patches still require driver-stage hardware qualification.
+pass. [Ordinary PM-stage hardware checks](../docs/87-diagnostic12-pm-validation.md)
+also pass across five driver cycles, with both network routes and original
+keypad connection retained. Failure injection, precise sleep-gap IRQ behaviour
+and actual sleep remain unqualified; transient Wi-Fi retries remain under
+investigation.
 
 ## Provenance and limits
 

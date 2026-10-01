@@ -9,6 +9,9 @@ and Wi-Fi access, integration and read-only baseline checks passed. No PM
 debug stage was entered in this slice. Owner-observed stages require a
 separate ready response; normal sleep remains disabled.
 
+Subsequent supervised driver-stage results are in
+[report 87](87-diagnostic12-pm-validation.md).
+
 ## Card identification and installation
 
 The owner confirmed shutdown and placement of the DEV card in the Mac reader.

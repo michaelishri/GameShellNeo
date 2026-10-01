@@ -142,8 +142,12 @@ four brcmfmac patches for truthful transition errors, bounded worker collection,
 failed-wake isolation and PM/reset/removal/IRQ ordering. Diagnostic.11 is preserved as the verified
 recovery checkpoint. [Report 85](docs/85-diagnostic12-preparation.md) records
 preparation; [report 86](docs/86-diagnostic12-installation.md) records installation
-and the read-only PM/keypad/audio baseline. Driver-stage qualification remains
-next; the intermittent recovery failure is not established as fixed.
+and the read-only PM/keypad/audio baseline. One freezer and five traced driver
+cycles subsequently passed, including a four-cycle batch with the original
+keypad connection retained and both SSH routes recovered each time.
+[Report 87](docs/87-diagnostic12-pm-validation.md) records the results, transient
+Wi-Fi retries and aggregate IRQ/CPU observations. The intermittent recovery
+failure remains unresolved; actual sleep and the next input/cable checks remain.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.

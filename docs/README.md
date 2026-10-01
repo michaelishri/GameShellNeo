@@ -21,8 +21,12 @@ Current installed image: diagnostic.12.
 suspend patches and preserves diagnostic.11 recovery.
 [86 — Installation](86-diagnostic12-installation.md) records verified card
 readback, owner-confirmed login, independent USB/Wi-Fi access, integration and
-the read-only PM/keypad/audio baseline. Owner-ready driver-stage qualification
-is next; normal sleep remains disabled.
+the read-only PM/keypad/audio baseline.
+[87 — PM validation](87-diagnostic12-pm-validation.md) records one passing
+freezer and five traced driver cycles, both network routes, retained keypad
+identity and owner-confirmed console return. Transient Wi-Fi retries remain
+under investigation; physical input/cable checks are next and normal sleep
+remains disabled.
 
 Previous diagnostic.11 hardware: [74 — PM validation](74-diagnostic11-pm-validation.md)
 records driver/input/cable results and an intermittent Wi-Fi recovery failure;
@@ -67,6 +71,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [87 — Diagnostic.12 PM validation](87-diagnostic12-pm-validation.md) | Supervised freezer/devices checks, Wi-Fi recovery metadata, retained keypad connection and cumulative interrupt/CPU observations |
 | [86 — Diagnostic.12 installation](86-diagnostic12-installation.md) | Verified flash/full readback, boot, independent USB/Wi-Fi access, integration and read-only PM/keypad/audio baselines |
 | [85 — Diagnostic.12 preparation](85-diagnostic12-preparation.md) | Wi-Fi suspend patch integration, verified recovery checkpoint, build evidence, saved interrupt/CPU observations and staged hardware qualification |
 | [84 — Wi-Fi PM lifecycle](84-brcmfmac-pm-lifecycle.md) | Shared PM/reset/removal exclusion, parked-worker removal and interrupt deferral across retained sleep; source tests and remaining hardware qualification |

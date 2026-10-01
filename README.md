@@ -146,8 +146,17 @@ and the read-only PM/keypad/audio baseline. One freezer and five traced driver
 cycles subsequently passed, including a four-cycle batch with the original
 keypad connection retained and both SSH routes recovered each time.
 [Report 87](docs/87-diagnostic12-pm-validation.md) records the results, transient
-Wi-Fi retries and aggregate IRQ/CPU observations. The intermittent recovery
-failure remains unresolved; actual sleep and the next input/cable checks remain.
+Wi-Fi retries and aggregate IRQ/CPU observations. Speaker-assisted physical
+input and four USB reconnects also passed in
+[report 90](docs/90-diagnostic12-input-usb-validation.md). The intermittent
+recovery failure and actual sleep remain open.
+
+The next candidate, `0.1.0-diagnostic.13`, adds packet-worker error isolation
+and checked interrupt rearm ownership. It has passed the full build and offline
+checks; [report 91](docs/91-diagnostic13-preparation.md) records its artifacts,
+diagnostic.12 recovery and next hardware sequence. Fatal checked radio errors
+still require a cold restart. Diagnostic.12 remains installed.
+
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -532,8 +541,9 @@ task check:brcmfmac-worker-drivers # Also compile complete normal/debug ARM driv
 
 This adds patch 0018 to the source tests and is included in `task build`.
 [Report 89](docs/89-wifi-worker-error-handling.md) explains the checked errors,
-IRQ cleanup and cold-restart failure policy. It is a source candidate;
-diagnostic.12 remains the installed image. Evidence is under
+IRQ cleanup and cold-restart failure policy.
+Diagnostic.12 remains the installed image; diagnostic.13 preparation is recorded
+in [report 91](docs/91-diagnostic13-preparation.md). Source-test evidence is under
 `.local/build/brcmfmac-{irq,lifecycle}-worker-tests/`.
 
 For the Sunxi MUSB context capability fix, use:

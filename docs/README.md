@@ -36,6 +36,9 @@ explicit error-path follow-ups. No image or device change was made.
 [89 — Worker error handling](89-wifi-worker-error-handling.md) implements the
 next source candidate with fault isolation, command completion and checked
 clock/status operations. It is not installed in diagnostic.12.
+[91 — Diagnostic.13 preparation](91-diagnostic13-preparation.md) records the
+complete candidate build, offline verification, recovery and prepared hardware
+sequence. Installation and physical qualification remain separate.
 
 Previous diagnostic.11 hardware: [74 — PM validation](74-diagnostic11-pm-validation.md)
 records driver/input/cable results and an intermittent Wi-Fi recovery failure;
@@ -80,6 +83,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [91 — Diagnostic.13 preparation](91-diagnostic13-preparation.md) | Verified Wi-Fi worker-error candidate, diagnostic.12 recovery, unchanged configuration/packages and planned guided hardware session |
 | [90 — Diagnostic.12 input and USB](90-diagnostic12-input-usb-validation.md) | Owner-confirmed speaker-assisted physical input, held-key clearing, four USB reconnects and final restored health |
 | [89 — Wi-Fi worker errors](89-wifi-worker-error-handling.md) | Checked wake/clock/status failures, process-context IRQ cleanup, command completion, clock waits and OOB teardown/rearm ownership |
 | [88 — Wi-Fi deferred interrupt service](88-wifi-deferred-interrupt-service.md) | Actual status/DPC source tests, MMC interrupt handoff and reproduced wake/read/acknowledgement error limitations |

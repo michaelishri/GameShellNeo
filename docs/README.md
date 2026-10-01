@@ -25,8 +25,10 @@ the read-only PM/keypad/audio baseline.
 [87 — PM validation](87-diagnostic12-pm-validation.md) records one passing
 freezer and five traced driver cycles, both network routes, retained keypad
 identity and owner-confirmed console return. Transient Wi-Fi retries remain
-under investigation; physical input/cable checks are next and normal sleep
-remains disabled.
+under investigation, and normal sleep remains disabled.
+[90 — Input and USB validation](90-diagnostic12-input-usb-validation.md)
+completes the speaker-assisted face-button/held-A check and four USB reconnects
+on diagnostic.12, with both network routes and final restoration verified.
 
 [88 — Deferred interrupt service](88-wifi-deferred-interrupt-service.md)
 adds offline tests of the actual Wi-Fi status reader and packet worker, with
@@ -78,6 +80,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [90 — Diagnostic.12 input and USB](90-diagnostic12-input-usb-validation.md) | Owner-confirmed speaker-assisted physical input, held-key clearing, four USB reconnects and final restored health |
 | [89 — Wi-Fi worker errors](89-wifi-worker-error-handling.md) | Checked wake/clock/status failures, process-context IRQ cleanup, command completion, clock waits and OOB teardown/rearm ownership |
 | [88 — Wi-Fi deferred interrupt service](88-wifi-deferred-interrupt-service.md) | Actual status/DPC source tests, MMC interrupt handoff and reproduced wake/read/acknowledgement error limitations |
 | [87 — Diagnostic.12 PM validation](87-diagnostic12-pm-validation.md) | Supervised freezer/devices checks, Wi-Fi recovery metadata, retained keypad connection and cumulative interrupt/CPU observations |

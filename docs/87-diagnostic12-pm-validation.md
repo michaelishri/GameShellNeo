@@ -180,6 +180,8 @@ All three tasks are finished, and both requested visual confirmations passed.
 
 Hardware failure injection, reset/removal races, precise sleep-gap IRQ
 behaviour, physical input/cable checks and actual sleep remain unqualified.
+The subsequent physical-input and four USB reconnect checks passed in
+[report 90](90-diagnostic12-input-usb-validation.md); the other limits remain.
 The diagnostic.11 recovery checkpoint remains available as described in
 report 85. No driver or policy change was made during this test slice.
 The first-attempt status 16 and repeated final-cycle handshake remain useful

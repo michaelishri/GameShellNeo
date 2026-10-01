@@ -143,6 +143,9 @@ def snapshot():
                 rsb={p.name: read(p) for p in rsb.glob('*') if p.is_file()},
                 rsb_links=links,
                 wakeup_sources=optional('/sys/kernel/debug/wakeup_sources'),
+                # Raw cumulative counters for before/after activity comparison.
+                # These snapshots do not isolate the radio's sleep interval.
+                interrupts=read('/proc/interrupts'), cpu_statistics=read('/proc/stat'),
                 kernel_config=config, cmdline=read('/proc/cmdline'),
                 masks={name: os.path.realpath('/etc/systemd/system/' + name) for name in MASKS},
                 sleep_config=read('/etc/systemd/sleep.conf.d/50-gameshellneo.conf'),

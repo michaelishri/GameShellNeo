@@ -16,12 +16,22 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current image: [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md)
-adds upstream A33 audio and bounded speaker cues to the physical-input task.
-The image is built and offline-verified. [66 — Speaker hardware validation](66-speaker-hardware-validation.md)
-records its verified flash/full readback, boot, home Wi-Fi, clear speaker tones
-and successful audio-assisted input/driver PM test, with complete restoration.
-Diagnostic.9 remains the recovery baseline.
+Current installed image: diagnostic.11.
+[73 — Installation](73-diagnostic11-installation.md) records verified card
+readback, boot and integration. [74 — PM validation](74-diagnostic11-pm-validation.md)
+records driver/input/cable results and an intermittent Wi-Fi recovery failure;
+[78 — Wi-Fi metadata capture](78-wifi-resume-metadata-capture.md) records five
+later passing traced driver cycles. Normal sleep remains disabled.
+
+Next candidate: [85 — Diagnostic.12 preparation](85-diagnostic12-preparation.md)
+integrates four Wi-Fi suspend patches, preserves diagnostic.11 recovery and
+sets out the next physical qualification sequence. The image is built,
+offline-verified and staged on the Mac; installation and hardware tests remain.
+
+Speaker baseline: [65 — Speaker confirmation cues](65-speaker-confirmation-cues.md)
+and [66 — Speaker hardware validation](66-speaker-hardware-validation.md) record
+the diagnostic.10 audio addition, clear speaker tones and successful
+audio-assisted input/driver PM test, with complete restoration.
 
 Latest physical-input qualification:
 [64 — Keypad physical input](64-keypad-physical-input-validation.md) records the
@@ -56,6 +66,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [85 — Diagnostic.12 preparation](85-diagnostic12-preparation.md) | Wi-Fi suspend patch integration, verified recovery checkpoint, build evidence, saved interrupt/CPU observations and staged hardware qualification |
 | [84 — Wi-Fi PM lifecycle](84-brcmfmac-pm-lifecycle.md) | Shared PM/reset/removal exclusion, parked-worker removal and interrupt deferral across retained sleep; source tests and remaining hardware qualification |
 | [83 — Wi-Fi PM rollback](83-brcmfmac-pm-rollback.md) | Checked hardware transitions, owned wake cleanup, failed-wake I/O isolation and control-request completion; cold-restart recovery policy and pending hardware qualification |
 | [82 — Wi-Fi freezer lifecycle](82-brcmfmac-freezer-lifecycle.md) | Bounded worker collection, timeout cleanup, completion reuse protection, concurrent source tests and ARM driver compilation; hardware error recovery remains open |

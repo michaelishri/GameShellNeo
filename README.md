@@ -110,7 +110,7 @@ A/B/X/Y presses and releases before and after a driver test through that same
 handle. Linux deliberately cleared held A during its input suspend callback;
 fresh taps worked afterward, with no stuck key. Other input cases and actual
 sleep remain unqualified.
-The installed `0.1.0-diagnostic.10` image adds the upstream A33 speaker path
+The `0.1.0-diagnostic.10` image added the upstream A33 speaker path
 for audible button-registration cues. Offline verification, card flash/full
 readback, boot/integration, three quiet speaker cues and the audio-assisted
 physical-input/driver PM test passed. All nine input cues completed, mixer and
@@ -127,13 +127,22 @@ were restored. These are driver debug measurements, not actual wake latency.
 [Report 67](docs/67-keypad-port-recovery-comparison.md) records the evidence.
 Actual sleep and audio-enabled idle power remain unqualified.
 
-The next candidate, `0.1.0-diagnostic.11`, is built, verified and staged on the
-Mac. It drains USB PHY detection during suspend and defers power-supply
-notification work until suppliers have resumed. Diagnostic.10 remains installed
-and is preserved as the verified recovery checkpoint. [Report 72](docs/72-diagnostic11-preparation.md)
-records artifacts, checks and the next hardware sequence; [report 71](docs/71-power-supply-notification-freeze.md)
-explains the notification fix. No card write or actual sleep test has occurred
-for this candidate.
+The installed `0.1.0-diagnostic.11` drains USB PHY detection during suspend
+and defers power-supply notification work until suppliers have resumed.
+[Report 73](docs/73-diagnostic11-installation.md) records verified installation
+and integration; [report 74](docs/74-diagnostic11-pm-validation.md) records
+driver, input and cable qualification, including an intermittent Wi-Fi recovery
+failure. Five subsequent traced driver cycles passed in
+[report 78](docs/78-wifi-resume-metadata-capture.md), but the original failure
+remains unresolved. Normal sleep stays disabled.
+
+The next candidate, `0.1.0-diagnostic.12`, is built, offline-verified and staged
+on the Mac with compressed/decompressed checksums passed. It integrates four
+brcmfmac patches for truthful transition errors, bounded worker collection, failed-wake isolation
+and PM/reset/removal/IRQ ordering. Diagnostic.11 is preserved as the verified
+recovery checkpoint. [Report 85](docs/85-diagnostic12-preparation.md) records
+preparation and the next hardware sequence; it makes no claim that the
+intermittent recovery failure is fixed.
 [USB status polling](docs/34-usb-status-polling-investigation.md) traces the
 next optimization candidate. The PMIC can miss interrupts in some power-path
 modes; reducing its polling requires board-specific detection tests first.
@@ -969,6 +978,12 @@ flow; it is recorded independently and is not used as proof of external power.
 Battery monitoring, freshness and capacity checks still apply. Missing input
 evidence fails the gate. [Report 75](docs/75-pm-external-power-gate.md) records
 the correction and the limitations of earlier captures.
+
+Each before/after snapshot also saves raw interrupt and CPU counters from
+`/proc/interrupts` and `/proc/stat`. Differences cover the complete observation,
+including awake work and the network recovery wait; they do not isolate the
+radio's sleep interval or establish energy savings. The recorder adds no
+periodic polling for these counters.
 
 These use the kernel's **five-second debug test**: `freezer` freezes/thaws
 processes; `devices` additionally invokes ordinary driver suspend/resume

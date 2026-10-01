@@ -82,6 +82,7 @@ tasks:
       - task: test:brcmfmac-sleep
       - task: test:brcmfmac-freezer
       - task: test:brcmfmac-pm
+      - task: test:brcmfmac-lifecycle
       - task: test:musb-context
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -214,6 +215,14 @@ tasks:
   check:brcmfmac-pm-drivers:
     desc: Run Wi-Fi PM fault regressions and compile the full ARM driver in normal and debug configurations
     cmds: [bash tools/run-logged.sh brcmfmac-pm-drivers python3 tools/check-brcmfmac-pm.py --compile-driver]
+
+  test:brcmfmac-lifecycle:
+    desc: Check SDIO PM/reset/removal exclusion and sleeping IRQ deferral, native and ARM32
+    cmds: [bash tools/run-logged.sh brcmfmac-lifecycle python3 tools/check-brcmfmac-pm.py --lifecycle]
+
+  check:brcmfmac-lifecycle-drivers:
+    desc: Run SDIO lifecycle regressions and compile the full ARM driver in normal and debug configurations
+    cmds: [bash tools/run-logged.sh brcmfmac-lifecycle-drivers python3 tools/check-brcmfmac-pm.py --lifecycle --compile-driver]
 
   check:usb-policy-driver:
     desc: Run USB policy regressions and compile the complete ARM driver in isolated scratch

@@ -468,6 +468,20 @@ includes the regression. [Report 83](docs/83-brcmfmac-pm-rollback.md) explains
 the source validation, recovery limits and remaining hardware gates. The debug
 build is isolated and does not change the image's kernel configuration.
 
+For suspend/reset/removal ordering and interrupts arriving while Wi-Fi sleeps:
+
+```sh
+task test:brcmfmac-lifecycle
+task check:brcmfmac-lifecycle-drivers # Also compile normal/debug ARM drivers
+```
+
+These rerun the PM regressions against patch 0017 and exercise competing device
+callbacks, reset rejection, removal of parked workers and deferred interrupt
+status reads. Evidence is saved in `.local/build/brcmfmac-lifecycle-tests/`.
+`task build` includes the regression. [Report 84](docs/84-brcmfmac-pm-lifecycle.md)
+records the lock ordering and qualification limits; these tasks do not access
+the device or change its image.
+
 For the Sunxi MUSB context capability fix, use:
 
 ```sh

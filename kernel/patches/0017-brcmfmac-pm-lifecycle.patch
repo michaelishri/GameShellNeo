@@ -1,0 +1,226 @@
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+@@ -938,6 +938,7 @@
+ 			  ret);
+ 	} else {
+ 		brcmf_sdiod_change_state(sdiodev, BRCMF_SDIOD_DATA);
++		WRITE_ONCE(sdiodev->pm_irq_blocked, false);
+ 		brcmf_sdio_wd_timer(sdiodev->bus, true);
+ 	}
+ 	sdio_release_host(sdiodev->func1);
+@@ -1253,10 +1254,26 @@
+ 	return err;
+ }
+ 
++/* F2 device lock held; retire parked workers before any synchronous drain. */
++static void brcmf_sdiod_pm_abort(struct brcmf_sdio_dev *sdiodev)
++{
++	if (!sdiodev->pm_suspended)
++		return;
++
++	sdio_claim_host(sdiodev->func1);
++	brcmf_sdio_pm_failed(sdiodev->bus);
++	brcmf_sdiod_pm_quiesce_irqs(sdiodev);
++	sdio_release_host(sdiodev->func1);
++	brcmf_sdiod_pm_disarm(sdiodev);
++	sdiodev->pm_suspended = false;
++	brcmf_sdiod_freezer_thaw(sdiodev->freezer);
++}
++
+ static void brcmf_ops_sdio_remove(struct sdio_func *func)
+ {
+ 	struct brcmf_bus *bus_if;
+ 	struct brcmf_sdio_dev *sdiodev;
++	struct device *f2dev;
+ 
+ 	brcmf_dbg(SDIO, "Enter\n");
+ 	brcmf_dbg(SDIO, "sdio vendor ID: 0x%04x\n", func->vendor);
+@@ -1266,6 +1283,12 @@
+ 	bus_if = dev_get_drvdata(&func->dev);
+ 	if (bus_if) {
+ 		sdiodev = bus_if->bus_priv.sdio;
++		f2dev = &sdiodev->func2->dev;
++		/* F1 owns final teardown; F2 owns the shared lifecycle lock. */
++		if (func->num == 1)
++			mutex_lock_nested(&f2dev->mutex, SINGLE_DEPTH_NESTING);
++		device_lock_assert(f2dev);
++		brcmf_sdiod_pm_abort(sdiodev);
+ 
+ 		/* start by unregistering irqs */
+ 		brcmf_sdiod_intr_unregister(sdiodev);
+@@ -1289,6 +1312,7 @@
+ 
+ 		kfree(bus_if);
+ 		kfree(sdiodev);
++		device_unlock(f2dev);
+ 	}
+ 
+ 	brcmf_dbg(SDIO, "Exit\n");
+@@ -1317,7 +1341,7 @@
+ 	brcmf_dbg(SDIO, "WOWL not supported\n");
+ }
+ 
+-static int brcmf_ops_sdio_suspend(struct device *dev)
++static int brcmf_sdiod_suspend(struct device *dev)
+ {
+ 	struct sdio_func *func;
+ 	struct brcmf_bus *bus_if;
+@@ -1336,8 +1360,10 @@
+ 	bus_if = dev_get_drvdata(dev);
+ 	sdiodev = bus_if->bus_priv.sdio;
+ 
+-	if (sdiodev->pm_suspended)
++	if (sdiodev->pm_suspended || sdiodev->pm_powered_off)
+ 		return -EBUSY;
++	if (!sdiodev->bus)
++		return -ENODEV;
+ 	/* A policy change must not bypass a latched failure via remove/probe. */
+ 	if (brcmf_sdiod_io_blocked(sdiodev)) {
+ 		ret = brcmf_sdiod_pm_disarm(sdiodev);
+@@ -1372,6 +1398,8 @@
+ 			return -ENODEV;
+ 		}
+ 		brcmf_sdiod_change_state(sdiodev, BRCMF_SDIOD_DOWN);
++		/* In-band handlers already own the host, so this closes the gap. */
++		WRITE_ONCE(sdiodev->pm_irq_blocked, true);
+ 		ret = brcmf_sdio_sleep(sdiodev->bus, true);
+ 		sdio_release_host(sdiodev->func1);
+ 		if (ret)
+@@ -1398,6 +1426,8 @@
+ 		ret = brcmf_sdiod_remove(sdiodev);
+ 		if (ret)
+ 			brcmf_err("Failed to remove device on suspend\n");
++		else
++			sdiodev->pm_powered_off = true;
+ 	}
+ 
+ 	return ret;
+@@ -1410,27 +1440,54 @@
+ 	return ret;
+ }
+ 
++static int brcmf_ops_sdio_suspend(struct device *dev)
++{
++	struct sdio_func *func = container_of(dev, struct sdio_func, dev);
++	struct brcmf_bus *bus_if;
++	struct device *f2dev;
++	int ret;
++
++	if (func->num != 1)
++		return 0;
++	/* The PM core holds F1; F2 removal never frees shared state. */
++	device_lock_assert(dev);
++	bus_if = dev_get_drvdata(dev);
++	if (!bus_if)
++		return -ENODEV;
++	f2dev = &bus_if->bus_priv.sdio->func2->dev;
++	mutex_lock_nested(&f2dev->mutex, SINGLE_DEPTH_NESTING);
++	ret = brcmf_sdiod_suspend(dev);
++	device_unlock(f2dev);
++	return ret;
++}
++
+ static int brcmf_ops_sdio_resume(struct device *dev)
+ {
+-	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
+-	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
++	struct brcmf_bus *bus_if;
++	struct brcmf_sdio_dev *sdiodev;
+ 	struct sdio_func *func = container_of(dev, struct sdio_func, dev);
+ 	int ret = 0, cleanup;
+-	bool cap_power_off = !!(func->card->host->caps & MMC_CAP_POWER_OFF_CARD);
+ 
+ 	brcmf_dbg(SDIO, "Enter: F%d\n", func->num);
+ 	if (func->num != 2)
+ 		return 0;
+-
+-	if (!sdiodev->wowl_enabled && cap_power_off &&
+-	    !sdiodev->pm_suspended && !brcmf_sdiod_io_blocked(sdiodev)) {
++	device_lock_assert(dev);
++	bus_if = dev_get_drvdata(dev);
++	if (!bus_if)
++		return -ENODEV;
++	sdiodev = bus_if->bus_priv.sdio;
++
++	if (sdiodev->pm_powered_off) {
+ 		/* bus was powered off and device removed, probe again */
++		sdiodev->pm_powered_off = false;
+ 		ret = brcmf_sdiod_probe(sdiodev);
+ 		if (ret)
+ 			brcmf_err("Failed to probe device on resume\n");
+ 		else
+ 			brcmf_bus_allow_reset_work(bus_if);
+ 	} else {
++		if (!sdiodev->bus)
++			return -ENODEV;
+ 		cleanup = brcmf_sdiod_pm_disarm(sdiodev);
+ 		/* F2 may resume after F1 already rolled back its failed suspend. */
+ 		if (!sdiodev->pm_suspended)
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -3735,7 +3735,8 @@
+ 
+ 	/* Count the interrupt call */
+ 	bus->sdcnt.intrcount++;
+-	if (in_isr)
++	/* The MMC core can deliver an IRQ before the F2 resume callback. */
++	if (in_isr || READ_ONCE(bus->sdiodev->pm_irq_blocked))
+ 		atomic_set(&bus->ipend, 1);
+ 	else
+ 		if (brcmf_sdio_intr_rstatus(bus)) {
+@@ -4242,11 +4243,26 @@
+ {
+ 	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
+ 	struct brcmf_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
++	struct device *f2dev = &sdiodev->func2->dev;
++	int ret = 0;
+ 
+ 	brcmf_dbg(SDIO, "Enter\n");
++	/* Removal may hold F2 while cancel_work_sync() drains this worker. */
++	if (!device_trylock(f2dev))
++		return -EBUSY;
+ 	/* PM quarantine requires a fresh device lifetime, not this reset path. */
+-	if (brcmf_sdiod_io_blocked(sdiodev))
+-		return -EHOSTDOWN;
++	if (brcmf_sdiod_io_blocked(sdiodev)) {
++		ret = -EHOSTDOWN;
++		goto unlock;
++	}
++	if (sdiodev->pm_suspended || sdiodev->pm_powered_off) {
++		ret = -EBUSY;
++		goto unlock;
++	}
++	if (!sdiodev->bus) {
++		ret = -ENODEV;
++		goto unlock;
++	}
+ 
+ 	/* start by unregistering irqs */
+ 	brcmf_sdiod_intr_unregister(sdiodev);
+@@ -4259,7 +4275,9 @@
+ 	sdio_release_host(sdiodev->func1);
+ 
+ 	brcmf_bus_change_state(sdiodev->bus_if, BRCMF_BUS_DOWN);
+-	return 0;
++unlock:
++	device_unlock(f2dev);
++	return ret;
+ }
+ 
+ static void brcmf_sdio_bus_remove(struct device *dev)
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+@@ -193,7 +193,10 @@
+ 	bool wowl_enabled;
+ 	/* PM callbacks own the retained transaction and its wake reference. */
+ 	bool pm_suspended;
++	bool pm_powered_off;
+ 	bool pm_oob_irq_wake;
++	/* Host-serialized in-band IRQ deferral across retained sleep/wake. */
++	bool pm_irq_blocked;
+ 	/* Latched under the SDIO host lock until this device is destroyed. */
+ 	bool pm_failed;
+ 	bool func1_power_manageable;

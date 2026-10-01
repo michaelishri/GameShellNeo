@@ -372,7 +372,11 @@ static void queued_access_failure(void)
 	pm_finish();
 }
 
+#ifdef NEO_SDIO_LIFECYCLE
+static int pm_suite(void)
+#else
 int main(void)
+#endif
 {
 	assert(!freezer_suite()); /* Also rerun all 44 original lifecycle scenarios. */
 	for (unsigned stage = 0; stage < 3; stage++) {

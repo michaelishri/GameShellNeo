@@ -71,7 +71,13 @@ static void wake_up_interruptible(wait_queue_head_t *q)
 static bool queue_work(void *queue, struct work_struct *work)
 { (void)queue; (void)work; seen.trigger++; pm_seen.queue++; return true; }
 static int brcmf_sdio_intr_rstatus(struct brcmf_sdio *b)
-{ (void)b; raw_io(); return 0; }
+{
+ (void)b;
+#ifdef NEO_SDIO_LIFECYCLE
+ assert(!b->sdiodev->pm_irq_blocked);
+#endif
+ raw_io(); return 0;
+}
 static void brcmf_sdio_trigger_dpc(struct brcmf_sdio *bus);
 static void seq_printf(struct seq_file *seq, const char *format, ...)
 { (void)seq; (void)format; }

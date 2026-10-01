@@ -56,6 +56,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [84 — Wi-Fi PM lifecycle](84-brcmfmac-pm-lifecycle.md) | Shared PM/reset/removal exclusion, parked-worker removal and interrupt deferral across retained sleep; source tests and remaining hardware qualification |
 | [83 — Wi-Fi PM rollback](83-brcmfmac-pm-rollback.md) | Checked hardware transitions, owned wake cleanup, failed-wake I/O isolation and control-request completion; cold-restart recovery policy and pending hardware qualification |
 | [82 — Wi-Fi freezer lifecycle](82-brcmfmac-freezer-lifecycle.md) | Bounded worker collection, timeout cleanup, completion reuse protection, concurrent source tests and ARM driver compilation; hardware error recovery remains open |
 | [66 — Speaker hardware validation](66-speaker-hardware-validation.md) | Diagnostic.10 installation/integration, home Wi-Fi, clear quiet tones and successful nine-cue input/driver PM test with full restoration |

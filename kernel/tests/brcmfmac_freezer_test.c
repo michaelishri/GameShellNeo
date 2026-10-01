@@ -203,10 +203,10 @@ static void completion_destroy(struct completion *c)
 
 enum brcmf_sdiod_state { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA, BRCMF_SDIOD_NOMEDIUM };
 enum { MMC_CAP_POWER_OFF_CARD = 1, MMC_PM_KEEP_POWER = 2, MMC_PM_WAKE_SDIO_IRQ = 4 };
-struct device { void *data; };
+struct device { void *data; pthread_mutex_t mutex; };
 struct mmc_host { unsigned caps, pm_caps; };
 struct mmc_card { struct mmc_host *host; };
-struct sdio_func { struct device dev; unsigned num; struct mmc_card *card; };
+struct sdio_func { struct device dev; unsigned num, vendor, device; struct mmc_card *card; };
 struct work_struct { int unused; };
 struct brcmf_sdio_dev;
 struct brcmf_bus { struct { struct brcmf_sdio_dev *sdio; } bus_priv; };
@@ -240,6 +240,8 @@ struct brcmf_sdio_dev {
  struct settings *settings;
  bool wowl_enabled;
  bool pm_suspended, pm_oob_irq_wake;
+ bool pm_powered_off;
+ atomic_bool pm_irq_blocked;
  atomic_bool pm_failed;
  bool oob_irq_requested, sd_irq_requested, irq_en;
  spinlock_t irq_en_lock;
@@ -269,8 +271,13 @@ static bool allocation_fails;
 static unsigned watchdog_mode, watchdog_loops;
 static void *kzalloc(size_t size, int flags)
 { (void)flags; return allocation_fails ? NULL : calloc(1, size); }
-static void kfree(struct brcmf_sdiod_freezer *f)
+static void kfree(void *ptr)
 {
+#ifdef NEO_SDIO_LIFECYCLE
+ extern bool lifecycle_free(void *ptr);
+ if (lifecycle_free(ptr)) return;
+#endif
+ struct brcmf_sdiod_freezer *f = ptr;
  completion_destroy(&f->resumed);
  assert(!pthread_cond_destroy(&f->thread_freeze.cond));
  assert(!pthread_mutex_destroy(&f->thread_freeze.lock));
@@ -316,10 +323,34 @@ static int disable_irq_wake(int irq) { (void)irq; seen.irq_off++; return faults.
 static int sdio_set_host_pm_flags(struct sdio_func *f, mmc_pm_flag_t flags)
 { (void)f; seen.flags++; if (!faults.flags) pm_flags |= flags; return faults.flags; }
 static void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev *d) { (void)d; seen.cancel++; }
-static void brcmf_sdio_cancel_datawork(struct brcmf_sdio *b) { (void)b; seen.cancel++; }
-static void brcmf_bus_cancel_reset_work(struct brcmf_bus *b) { (void)b; seen.cancel++; }
+#ifdef NEO_SDIO_LIFECYCLE
+static void lifecycle_drain(struct brcmf_sdio *b);
+static void lifecycle_cancel_reset(struct brcmf_bus *b);
+static void lifecycle_remove(struct brcmf_sdio_dev *d);
+#endif
+static void brcmf_sdio_cancel_datawork(struct brcmf_sdio *b)
+{
+ (void)b; seen.cancel++;
+#ifdef NEO_SDIO_LIFECYCLE
+ lifecycle_drain(b);
+#endif
+}
+static void brcmf_bus_cancel_reset_work(struct brcmf_bus *b)
+{
+ (void)b; seen.cancel++;
+#ifdef NEO_SDIO_LIFECYCLE
+ lifecycle_cancel_reset(b);
+#endif
+}
 static void brcmf_bus_allow_reset_work(struct brcmf_bus *b) { (void)b; seen.allow++; }
-static int brcmf_sdiod_remove(struct brcmf_sdio_dev *d) { (void)d; seen.remove++; return 0; }
+static int brcmf_sdiod_remove(struct brcmf_sdio_dev *d)
+{
+ (void)d; seen.remove++;
+#ifdef NEO_SDIO_LIFECYCLE
+ lifecycle_remove(d);
+#endif
+ return 0;
+}
 static int brcmf_sdiod_probe(struct brcmf_sdio_dev *d) { (void)d; seen.probe++; return 0; }
 static void brcmf_sdio_dpc(struct brcmf_sdio *b)
 { assert(!lock_depth && b->sdiodev->state == BRCMF_SDIOD_DATA); seen.dpc++; }
@@ -333,7 +364,21 @@ static int wait_for_completion_interruptible(struct completion *c)
 #ifdef NEO_PM_TRANSACTION
 #include "brcmfmac_pm_shims.h"
 #endif
+#ifdef NEO_SDIO_LIFECYCLE
+#include "brcmfmac_lifecycle_shims.h"
+#endif
 #include "brcmfmac_freezer_functions.h"
+#ifdef NEO_SDIO_LIFECYCLE
+/* Model the driver core's per-callback device locking, outside actual bodies. */
+static int brcmf_ops_sdio_suspend(struct device *dev)
+{
+ device_lock(dev); int ret = callback_suspend(dev); device_unlock(dev); return ret;
+}
+static int brcmf_ops_sdio_resume(struct device *dev)
+{
+ device_lock(dev); int ret = callback_resume(dev); device_unlock(dev); return ret;
+}
+#endif
 
 static struct {
  struct mmc_host host;
@@ -364,6 +409,9 @@ static void setup(void)
  fixture.host.pm_caps = MMC_PM_KEEP_POWER | MMC_PM_WAKE_SDIO_IRQ;
  fixture.f1 = (struct sdio_func){ .num = 1, .card = &fixture.card, .dev.data = &fixture.interface };
  fixture.f2 = (struct sdio_func){ .num = 2, .card = &fixture.card, .dev.data = &fixture.interface };
+#ifdef NEO_SDIO_LIFECYCLE
+ lifecycle_setup(&fixture.f1.dev, &fixture.f2.dev);
+#endif
  fixture.interface.bus_priv.sdio = &fixture.dev;
  fixture.dev = (struct brcmf_sdio_dev){ .bus = &fixture.bus, .func1 = &fixture.f1,
   .func2 = &fixture.f2, .bus_if = &fixture.interface,
@@ -388,6 +436,9 @@ static unsigned frozen(void)
 }
 static void teardown(void)
 {
+#ifdef NEO_SDIO_LIFECYCLE
+ lifecycle_teardown(&fixture.f1.dev, &fixture.f2.dev);
+#endif
  if (IS_ENABLED(CONFIG_PM_SLEEP)) {
   assert(!brcmf_sdiod_freezing(&fixture.dev));
   assert(!frozen());

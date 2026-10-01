@@ -28,6 +28,10 @@ identity and owner-confirmed console return. Transient Wi-Fi retries remain
 under investigation; physical input/cable checks are next and normal sleep
 remains disabled.
 
+[88 — Deferred interrupt service](88-wifi-deferred-interrupt-service.md)
+adds offline tests of the actual Wi-Fi status reader and packet worker, with
+explicit error-path follow-ups. No image or device change was made.
+
 Previous diagnostic.11 hardware: [74 — PM validation](74-diagnostic11-pm-validation.md)
 records driver/input/cable results and an intermittent Wi-Fi recovery failure;
 [78 — Wi-Fi metadata capture](78-wifi-resume-metadata-capture.md) records five
@@ -71,6 +75,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [88 — Wi-Fi deferred interrupt service](88-wifi-deferred-interrupt-service.md) | Actual status/DPC source tests, MMC interrupt handoff and reproduced wake/read/acknowledgement error limitations |
 | [87 — Diagnostic.12 PM validation](87-diagnostic12-pm-validation.md) | Supervised freezer/devices checks, Wi-Fi recovery metadata, retained keypad connection and cumulative interrupt/CPU observations |
 | [86 — Diagnostic.12 installation](86-diagnostic12-installation.md) | Verified flash/full readback, boot, independent USB/Wi-Fi access, integration and read-only PM/keypad/audio baselines |
 | [85 — Diagnostic.12 preparation](85-diagnostic12-preparation.md) | Wi-Fi suspend patch integration, verified recovery checkpoint, build evidence, saved interrupt/CPU observations and staged hardware qualification |

@@ -39,6 +39,11 @@ keypad connection retained. Failure injection, precise sleep-gap IRQ behaviour
 and actual sleep remain unqualified; transient Wi-Fi retries remain under
 investigation.
 
+[Deferred status/DPC tests](../docs/88-wifi-deferred-interrupt-service.md)
+extend this with 23 native/ARM32 scenarios and 14 negative controls against
+unchanged diagnostic.12 sources. Four scenarios characterize existing worker
+error limitations; they do not qualify recovery or hardware IRQ timing.
+
 ## Provenance and limits
 
 - Board wiring, regulator settings, LCD timings and four register/value pairs

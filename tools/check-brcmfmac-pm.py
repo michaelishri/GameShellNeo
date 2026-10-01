@@ -76,14 +76,20 @@ def main():
     global WORK, PATCHES, CONTRACT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--compile-driver', action='store_true')
-    parser.add_argument('--lifecycle', action='store_true')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--lifecycle', action='store_true')
+    mode.add_argument('--irq-service', action='store_true')
     args = parser.parse_args()
-    if args.lifecycle:
-        WORK = ROOT / '.local/build/brcmfmac-lifecycle-tests'
+    if args.lifecycle or args.irq_service:
+        WORK = ROOT / ('.local/build/brcmfmac-irq-tests' if args.irq_service
+                       else '.local/build/brcmfmac-lifecycle-tests')
         PATCHES += (ROOT / 'kernel/patches/0017-brcmfmac-pm-lifecycle.patch',)
         CONTRACT += ('drivers/base/power/main.c', 'drivers/base/dd.c',
                      'include/linux/device.h', 'drivers/mmc/core/sdio.c',
                      'drivers/mmc/core/sdio_bus.c', BASE + 'core.c', BASE + 'bus.h')
+        if args.irq_service:
+            CONTRACT += ('include/linux/mmc/host.h', 'drivers/mmc/host/sunxi-mmc.c',
+                         'kernel/workqueue.c')
     WORK.mkdir(parents=True, exist_ok=True)
     with (WORK / '.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -138,10 +144,17 @@ def main():
         header = WORK / 'brcmfmac_freezer_functions.h'
         harness = ROOT / 'kernel/tests' / ('brcmfmac_lifecycle_test.c' if args.lifecycle
                                          else 'brcmfmac_pm_test.c')
+        if args.irq_service:
+            import brcmfmac_irq_checks as irq_checks
+            good = irq_checks.extracted(sdio, driver_header, function)
+            (WORK / 'brcmfmac_irq_types.h').write_text(irq_checks.definitions(sdio, driver_header))
+            harness = ROOT / 'kernel/tests/brcmfmac_irq_test.c'
         # The upstream debug string "<???>" is intentionally not a trigraph.
         flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-trigraphs', '-pthread',
                  '-I', str(WORK), str(harness)]
-        if args.lifecycle:
+        if args.irq_service:
+            cases = irq_checks.variants(good, function, mutate_once)
+        elif args.lifecycle:
             # The same source regressions run in lifecycle mode, with its own
             # mutation targets for the new callbacks and interrupt boundary.
             from brcmfmac_lifecycle_checks import variants
@@ -189,6 +202,9 @@ def main():
             inputs += (ROOT / 'kernel/tests/brcmfmac_pm_test.c',
                        ROOT / 'kernel/tests/brcmfmac_lifecycle_shims.h',
                        ROOT / 'tools/brcmfmac_lifecycle_checks.py')
+        if args.irq_service:
+            inputs = (*PATCHES, harness, Path(__file__),
+                      ROOT / 'tools/brcmfmac_irq_checks.py', ROOT / 'tools/kernel_checks.py')
         evidence = dict(linux=lock['linux']['tag'], archive_sha256=sha256(archive),
                         original=original,
                         patched={name: sha256(WORK / 'patched' / name) for name in DRIVERS},
@@ -199,6 +215,12 @@ def main():
                                'scripted SDIO seams. No hardware, complete PM scheduling, electrical '
                                'state or automatic recovery qualification. Lifecycle mode exercises '
                                'selected device-lock, reset/removal and IRQ interleavings.')
+        if args.irq_service:
+            evidence['limits'] = ('Actual ISR/status/DPC/dataworker/OOB-rearm bodies; scripted '
+                'register, clock, packet, workqueue and freezer seams. PM callback/freezer '
+                'ordering is qualified separately by the lifecycle suite. No MMC controller '
+                'execution, firmware, RF, Linux scheduling, electrical IRQ rate or energy proof. '
+                'Error-characterization scenarios preserve existing limitations, not recovery guarantees.')
         if args.compile_driver:
             evidence['arm_build'] = compile_objects(archive, lock, WORK, [BASE + 'brcmfmac.o'])
             evidence['arm_debug_build'] = compile_objects(archive, lock, WORK,

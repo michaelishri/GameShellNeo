@@ -496,6 +496,13 @@ status reads. Evidence is saved in `.local/build/brcmfmac-lifecycle-tests/`.
 records the lock ordering and qualification limits; these tasks do not access
 the device or change its image.
 
+For deferred interrupt consumption through the actual status reader and packet
+worker, use `task test:brcmfmac-irq`. It runs native/ARM32 scenarios and negative
+controls, with evidence in `.local/build/brcmfmac-irq-tests/`, and is included in
+`task build`. [Report 88](docs/88-wifi-deferred-interrupt-service.md) distinguishes
+successful service from existing wake/read/acknowledgement error limitations.
+It uses modeled hardware and scheduling; it does not measure live IRQ rates.
+
 For the Sunxi MUSB context capability fix, use:
 
 ```sh

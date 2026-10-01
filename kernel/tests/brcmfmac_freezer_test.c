@@ -227,6 +227,8 @@ struct brcmf_sdio {
  int ctrl_frame_err;
  spinlock_t rxctl_lock;
  atomic_int intstatus, ipend;
+ unsigned clkstate;
+ bool io_error_handled;
  bool intr;
  void *brcmf_wq;
  struct { unsigned tickcnt, intrcount, tx_ctlerrs, tx_ctlpkts, rx_ctlerrs, rx_ctlpkts; } sdcnt;
@@ -243,6 +245,7 @@ struct brcmf_sdio_dev {
  bool pm_powered_off;
  atomic_bool pm_irq_blocked;
  atomic_bool pm_failed;
+ atomic_int io_error;
  bool oob_irq_requested, sd_irq_requested, irq_en;
  spinlock_t irq_en_lock;
  u32 sbwad;
@@ -363,6 +366,9 @@ static int wait_for_completion_interruptible(struct completion *c)
 
 #ifdef NEO_PM_TRANSACTION
 #include "brcmfmac_pm_shims.h"
+#endif
+#ifdef NEO_WORKER_ERRORS
+#define brcmf_sdiod_quiesce_irqs brcmf_sdiod_pm_quiesce_irqs
 #endif
 #ifdef NEO_SDIO_LIFECYCLE
 #include "brcmfmac_lifecycle_shims.h"

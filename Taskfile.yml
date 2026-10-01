@@ -84,6 +84,7 @@ tasks:
       - task: test:brcmfmac-pm
       - task: test:brcmfmac-lifecycle
       - task: test:brcmfmac-irq
+      - task: test:brcmfmac-worker
       - task: test:musb-context
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -228,6 +229,16 @@ tasks:
   test:brcmfmac-irq:
     desc: Exercise actual deferred Wi-Fi status/DPC service and error boundaries, native and ARM32
     cmds: [bash tools/run-logged.sh brcmfmac-irq python3 tools/check-brcmfmac-pm.py --irq-service]
+
+  test:brcmfmac-worker:
+    desc: Test Wi-Fi worker failure isolation, clock waits and control completion, native and ARM32
+    cmds:
+      - bash tools/run-logged.sh brcmfmac-worker python3 tools/check-brcmfmac-pm.py --irq-service --worker-errors
+      - bash tools/run-logged.sh brcmfmac-worker-lifecycle python3 tools/check-brcmfmac-pm.py --lifecycle --worker-errors
+
+  check:brcmfmac-worker-drivers:
+    desc: Test worker errors and compile the complete ARM driver in normal/debug configurations
+    cmds: [bash tools/run-logged.sh brcmfmac-worker-drivers python3 tools/check-brcmfmac-pm.py --irq-service --worker-errors --compile-driver]
 
   check:usb-policy-driver:
     desc: Run USB policy regressions and compile the complete ARM driver in isolated scratch

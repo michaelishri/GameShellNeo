@@ -10,6 +10,10 @@ No driver, image, firmware or live-device setting changed. No command was sent
 to the GameShell or Mac. The physical input/cable checks following
 [report 87](87-diagnostic12-pm-validation.md) remain pending.
 
+The subsequent source fix and its separate tests are in
+[report 89](89-wifi-worker-error-handling.md); this report remains the
+diagnostic.12 baseline characterization.
+
 ## Why extend the tests
 
 [Report 84's lifecycle harness](84-brcmfmac-pm-lifecycle.md) executes the real

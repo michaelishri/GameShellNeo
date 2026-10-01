@@ -222,6 +222,38 @@ static void no_unowned_probe(void)
 	life_finish();
 }
 
+#ifdef NEO_WORKER_ERRORS
+static void worker_error_waiter(unsigned mode)
+{
+	life_setup(); command_entered = false;
+	if (mode == 0) sdio_claim_host(&fixture.f1);
+	pthread_t command = start(mode == 2 ? rx_thread : tx_thread);
+	if (mode == 0) UNTIL(command_entered);
+	else {
+		UNTIL(atomic_load(mode == 2 ? &fixture.bus.dcmd_resp_wait.sleepers :
+				 &fixture.bus.ctrl_wait.sleepers));
+		sdio_claim_host(&fixture.f1);
+	}
+	brcmf_sdio_dpc_failed(&fixture.bus, -ETIMEDOUT);
+	sdio_release_host(&fixture.f1); join(command);
+	assert(command_result == (mode == 1 ? -ETIMEDOUT : -EHOSTDOWN));
+	assert(fixture.dev.io_error == -ETIMEDOUT && !fixture.dev.pm_failed);
+	assert(pm_seen.ctrl_wake == (mode == 1) && pm_seen.resp_wake == 1);
+	assert(!fixture.bus.ctrl_frame_stat && !pm_seen.raw);
+	assert(brcmf_ops_sdio_suspend(&fixture.f1.dev) == -EHOSTDOWN);
+	assert(brcmf_sdio_bus_reset(&fixture.f1.dev) == -EHOSTDOWN);
+	assert(brcmf_sdio_bus_txctl(&fixture.f1.dev, message, sizeof(message)) == -EHOSTDOWN);
+	assert(brcmf_sdio_bus_rxctl(&fixture.f1.dev, message, sizeof(message)) == -EHOSTDOWN);
+	sdio_claim_host(&fixture.f1);
+	int err = 0;
+	assert(brcmf_sdiod_readb(&fixture.dev, 1, &err) == 0xff && err == -EHOSTDOWN);
+	brcmf_sdiod_readl(&fixture.dev, 0x10004, &err);
+	assert(err == -EHOSTDOWN && !pm_seen.raw);
+	sdio_release_host(&fixture.f1);
+	life_finish();
+}
+#endif
+
 int main(void)
 {
 	assert(!pm_suite());
@@ -232,6 +264,9 @@ int main(void)
 	remove_retained(1, false); remove_retained(2, false);
 	remove_retained(2, true);
 	poweroff_ownership(); no_unowned_probe();
+#ifdef NEO_WORKER_ERRORS
+	for (unsigned mode = 0; mode < 3; mode++) worker_error_waiter(mode);
+#endif
 	printf("%u reset/removal/IRQ scenarios passed\n", lifecycle_scenarios);
 	return 0;
 }

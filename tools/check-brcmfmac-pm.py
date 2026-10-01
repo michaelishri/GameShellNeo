@@ -37,11 +37,14 @@ def mutate_once(source, before, after):
 def extracted(bcmsdh, sdio, header, lifecycle=False):
     text = header[header.index('static inline bool brcmf_sdiod_io_blocked('):
                   header.index('\nu32 brcmf_sdiod_readl(')]
-    for name in ('void brcmf_sdiod_change_state(', 'static int brcmf_sdiod_pm_disarm(',
-                 'static void brcmf_sdiod_pm_quiesce_irqs('):
+    quiesce = ('void brcmf_sdiod_quiesce_irqs(' if 'void brcmf_sdiod_quiesce_irqs(' in bcmsdh
+               else 'static void brcmf_sdiod_pm_quiesce_irqs(')
+    for name in ('void brcmf_sdiod_change_state(', 'static int brcmf_sdiod_pm_disarm(', quiesce):
         text += function(bcmsdh, name)
     text += function(sdio, 'static int brcmf_sdio_dcmd_resp_wake(')
     text += function(sdio, 'void brcmf_sdio_pm_failed(')
+    if 'static void brcmf_sdio_dpc_failed(' in sdio:
+        text += function(sdio, 'static void brcmf_sdio_dpc_failed(')
     text += bcmsdh[bcmsdh.index('static int brcmf_sdiod_freezer_attach('):
                    bcmsdh.index('\nint brcmf_sdiod_remove(')]
     if lifecycle:
@@ -76,10 +79,13 @@ def main():
     global WORK, PATCHES, CONTRACT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--compile-driver', action='store_true')
+    parser.add_argument('--worker-errors', action='store_true')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--lifecycle', action='store_true')
     mode.add_argument('--irq-service', action='store_true')
     args = parser.parse_args()
+    if args.worker_errors and not (args.irq_service or args.lifecycle):
+        parser.error('--worker-errors requires --irq-service or --lifecycle')
     if args.lifecycle or args.irq_service:
         WORK = ROOT / ('.local/build/brcmfmac-irq-tests' if args.irq_service
                        else '.local/build/brcmfmac-lifecycle-tests')
@@ -90,6 +96,10 @@ def main():
         if args.irq_service:
             CONTRACT += ('include/linux/mmc/host.h', 'drivers/mmc/host/sunxi-mmc.c',
                          'kernel/workqueue.c')
+    if args.worker_errors:
+        WORK = WORK.with_name(WORK.name.replace('-tests', '-worker-tests'))
+        PATCHES += (ROOT / 'kernel/patches/0018-brcmfmac-worker-errors.patch',)
+        CONTRACT += ('drivers/mmc/core/core.c',)
     WORK.mkdir(parents=True, exist_ok=True)
     with (WORK / '.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -137,7 +147,7 @@ def main():
                     continue
                 while line.endswith('\\\n'):
                     line += next(lines)
-                if match[1] in wanted or match[1].startswith('SBSDIO_'):
+                if match[1] in wanted or match[1].startswith(('SBSDIO_', 'CLK_')):
                     definitions += line
         (WORK / 'brcmfmac_freezer_types.h').write_text(definitions)
         good = extracted(bcmsdh, sdio, driver_header, args.lifecycle)
@@ -146,14 +156,18 @@ def main():
                                          else 'brcmfmac_pm_test.c')
         if args.irq_service:
             import brcmfmac_irq_checks as irq_checks
-            good = irq_checks.extracted(sdio, driver_header, function)
+            good = irq_checks.extracted(sdio, driver_header, function, bcmsdh, args.worker_errors)
             (WORK / 'brcmfmac_irq_types.h').write_text(irq_checks.definitions(sdio, driver_header))
             harness = ROOT / 'kernel/tests/brcmfmac_irq_test.c'
         # The upstream debug string "<???>" is intentionally not a trigraph.
         flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-trigraphs', '-pthread',
                  '-I', str(WORK), str(harness)]
+        if args.worker_errors:
+            flags += ['-DNEO_WORKER_ERRORS']
         if args.irq_service:
-            cases = irq_checks.variants(good, function, mutate_once)
+            cases = irq_checks.variants(good, function, mutate_once, args.worker_errors)
+            if args.worker_errors:
+                cases['candidate_debug'] = '#define DEBUG\n' + good
         elif args.lifecycle:
             # The same source regressions run in lifecycle mode, with its own
             # mutation targets for the new callbacks and interrupt boundary.
@@ -172,7 +186,7 @@ def main():
                 run(['cc', *flags, '-o', str(binary)])
                 result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=60)
                 (WORK / (name + '.txt')).write_text(result.stdout + result.stderr)
-                if name == 'candidate':
+                if name in {'candidate', 'candidate_debug'}:
                     result.check_returncode()
                 elif result.returncode == 0 or 'Assertion' not in result.stderr:
                     raise RuntimeError('Negative control did not fail by assertion: ' + name)
@@ -190,11 +204,26 @@ def main():
             '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
             'set -euo pipefail\n'
             'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-trigraphs -pthread -static '
+            + ('-DNEO_WORKER_ERRORS ' if args.worker_errors else '') +
             f'-I{work_relative} {harness_relative} -o {work_relative}/arm\n'
             f'qemu-arm {work_relative}/arm'], text=True, timeout=120).strip()
         if arm != results['candidate']['output']:
             raise RuntimeError('Native and ARM32 results differ')
         print('ARM32: ' + arm, flush=True)
+        arm_debug = None
+        if args.worker_errors and args.irq_service:
+            arm_debug = subprocess.check_output([
+                'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
+                '--platform', builder['platform'], '--entrypoint', 'bash',
+                '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
+                'set -euo pipefail\n'
+                'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror '
+                '-Wno-trigraphs -pthread -static -DNEO_WORKER_ERRORS -DDEBUG '
+                f'-I{work_relative} {harness_relative} -o {work_relative}/arm-debug\n'
+                f'qemu-arm {work_relative}/arm-debug'], text=True, timeout=120).strip()
+            if arm_debug != results['candidate_debug']['output']:
+                raise RuntimeError('Native and ARM32 DEBUG results differ')
+            print('ARM32 DEBUG: ' + arm_debug, flush=True)
         inputs = (*PATCHES, harness, ROOT / 'kernel/tests/brcmfmac_pm_shims.h',
                   ROOT / 'kernel/tests/brcmfmac_freezer_test.c', Path(__file__),
                   ROOT / 'tools/kernel_checks.py', ROOT / 'tools/check-kernel-config.py')
@@ -221,6 +250,13 @@ def main():
                 'ordering is qualified separately by the lifecycle suite. No MMC controller '
                 'execution, firmware, RF, Linux scheduling, electrical IRQ rate or energy proof. '
                 'Error-characterization scenarios preserve existing limitations, not recovery guarantees.')
+        if args.worker_errors:
+            evidence['worker_errors'] = True
+            evidence['arm32_debug'] = arm_debug
+            evidence['limits'] = ('Actual selected worker/PM/IRQ/control bodies with modeled hardware '
+                'and scheduling. Cold restart after a fatal wake/status fault; no automatic '
+                'reset/reprobe or hardware/energy qualification. Other nested packet/mailbox '
+                'transport-error paths remain separate.')
         if args.compile_driver:
             evidence['arm_build'] = compile_objects(archive, lock, WORK, [BASE + 'brcmfmac.o'])
             evidence['arm_debug_build'] = compile_objects(archive, lock, WORK,

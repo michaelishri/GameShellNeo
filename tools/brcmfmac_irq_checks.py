@@ -2,8 +2,11 @@
 import re
 
 
-def extracted(sdio, header, function):
+def extracted(sdio, header, function, bcmsdh='', hardened=False):
     text = function(header, 'static inline bool brcmf_sdiod_io_blocked(')
+    if hardened:
+        text += function(bcmsdh, 'void brcmf_sdiod_quiesce_irqs(')
+        text += function(sdio, 'static void brcmf_sdio_dpc_failed(')
     for name in ('static inline void brcmf_sdio_clrintr(',
                  'static int brcmf_sdio_intr_rstatus(',
                  'static void brcmf_sdio_dpc(', 'void brcmf_sdio_trigger_dpc(',
@@ -32,7 +35,7 @@ def definitions(sdio, header):
     return text
 
 
-def variants(good, function, mutate_once):
+def variants(good, function, mutate_once, hardened=False):
     isr = function(good, 'void brcmf_sdio_isr(')
     status = function(good, 'static int brcmf_sdio_intr_rstatus(')
     dpc = function(good, 'static void brcmf_sdio_dpc(')
@@ -58,12 +61,60 @@ def variants(good, function, mutate_once):
          'if (false) intstatus |= brcmf_sdio_hostmail(bus);'),
         ('lost_leftover_status', dpc, 'atomic_or(intstatus, &bus->intstatus);', ''),
         ('lost_worker_failure_gate', worker,
+         'if (!READ_ONCE(bus->sdiodev->pm_failed))' if hardened else
          'if (!brcmf_sdiod_io_blocked(bus->sdiodev))', 'if (true)'),
         ('lost_isr_failure_gate', isr,
          'if (brcmf_sdiod_io_blocked(bus->sdiodev))',
          'if (false && brcmf_sdiod_io_blocked(bus->sdiodev))'),
         ('lost_oob_pending_gate', clear,
-         '!sdiodev->irq_en && !atomic_read(&bus->ipend)', '!sdiodev->irq_en'),
+         '!atomic_read(&bus->ipend) || bus->clkstate == CLK_PENDING' if hardened else
+         '!sdiodev->irq_en && !atomic_read(&bus->ipend)',
+         'true' if hardened else '!sdiodev->irq_en'),
     ):
         cases[name] = mutate_once(good, body, mutate_once(body, before, after))
+    if hardened:
+        failed = function(good, 'static void brcmf_sdio_dpc_failed(')
+        for name, body, before, after in (
+            ('lost_wake_error', dpc, 'err = brcmf_sdio_bus_sleep(bus, false, true);',
+             'err = 0 * brcmf_sdio_bus_sleep(bus, false, true);'),
+            ('lost_ack_error', status, 'if (ret)\n\t\t\treturn ret;',
+             'if (false && ret)\n\t\t\treturn ret;'),
+            ('lost_status_error_exit', dpc,
+             'err = brcmf_sdio_intr_rstatus(bus);\n\t\tif (err)',
+             'err = brcmf_sdio_intr_rstatus(bus);\n\t\tif (false && err)'),
+            ('lost_isr_error_latch', isr, 'WRITE_ONCE(bus->sdiodev->io_error, err);',
+             'WRITE_ONCE(bus->sdiodev->io_error, 0);'),
+            ('lost_failure_latch', failed, 'WRITE_ONCE(sdiod->io_error, err);',
+             'WRITE_ONCE(sdiod->io_error, 0 * err);'),
+            ('lost_irq_shutdown', failed, 'brcmf_sdiod_quiesce_irqs(sdiod);', ''),
+            ('lost_watchdog_stop', failed, 'brcmf_sdio_wd_timer(bus, false);',
+             'if (false) brcmf_sdio_wd_timer(bus, false);'),
+            ('lost_tx_completion', failed, 'bus->ctrl_frame_stat = false;', ''),
+            ('lost_response_wakeup', failed, 'brcmf_sdio_dcmd_resp_wake(bus);',
+             'if (false) brcmf_sdio_dcmd_resp_wake(bus);'),
+            ('lost_cleanup_idempotence', failed, 'if (bus->io_error_handled)',
+             'if (false && bus->io_error_handled)'),
+            ('lost_clock_pending_exit', dpc, 'if (bus->clkstate == CLK_PENDING) {',
+             'if (false && bus->clkstate == CLK_PENDING) {'),
+            ('lost_clock_oob_rearm', clear,
+             '!atomic_read(&bus->ipend) || bus->clkstate == CLK_PENDING',
+             '!atomic_read(&bus->ipend)'),
+            ('lost_oob_ownership_recheck', clear,
+             'if (sdiodev->oob_irq_requested &&', 'if (true &&'),
+            ('lost_clock_read_error', dpc,
+             'SBSDIO_FUNC1_CHIPCLKCSR, &err);\n\t\tif (err)',
+             'SBSDIO_FUNC1_CHIPCLKCSR, &err);\n\t\tif (false && err)'),
+            ('lost_clock_write_error', dpc,
+             'SBSDIO_DEVICE_CTL, devctl, &err);\n\t\t\tif (err)',
+             'SBSDIO_DEVICE_CTL, devctl, &err);\n\t\t\tif (false && err)'),
+            ('lost_flow_ack_error', dpc,
+             'I_HMB_FC_CHANGE, &err);\n\t\tbus->sdcnt.f1regdata++;\n\t\tif (err)',
+             'I_HMB_FC_CHANGE, &err);\n\t\tbus->sdcnt.f1regdata++;\n\t\tif (false && err)'),
+            ('lost_flow_read_error', dpc,
+             'newstatus = brcmf_sdiod_readl(sdiod, intstat_addr, &err);\n\n'
+             '\t\tbus->sdcnt.f1regdata++;\n\t\tif (err)',
+             'newstatus = brcmf_sdiod_readl(sdiod, intstat_addr, &err);\n\n'
+             '\t\tbus->sdcnt.f1regdata++;\n\t\tif (false && err)'),
+        ):
+            cases[name] = mutate_once(good, body, mutate_once(body, before, after))
     return cases

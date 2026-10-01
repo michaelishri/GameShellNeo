@@ -31,6 +31,9 @@ remains disabled.
 [88 — Deferred interrupt service](88-wifi-deferred-interrupt-service.md)
 adds offline tests of the actual Wi-Fi status reader and packet worker, with
 explicit error-path follow-ups. No image or device change was made.
+[89 — Worker error handling](89-wifi-worker-error-handling.md) implements the
+next source candidate with fault isolation, command completion and checked
+clock/status operations. It is not installed in diagnostic.12.
 
 Previous diagnostic.11 hardware: [74 — PM validation](74-diagnostic11-pm-validation.md)
 records driver/input/cable results and an intermittent Wi-Fi recovery failure;
@@ -75,6 +78,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [89 — Wi-Fi worker errors](89-wifi-worker-error-handling.md) | Checked wake/clock/status failures, process-context IRQ cleanup, command completion, clock waits and OOB teardown/rearm ownership |
 | [88 — Wi-Fi deferred interrupt service](88-wifi-deferred-interrupt-service.md) | Actual status/DPC source tests, MMC interrupt handoff and reproduced wake/read/acknowledgement error limitations |
 | [87 — Diagnostic.12 PM validation](87-diagnostic12-pm-validation.md) | Supervised freezer/devices checks, Wi-Fi recovery metadata, retained keypad connection and cumulative interrupt/CPU observations |
 | [86 — Diagnostic.12 installation](86-diagnostic12-installation.md) | Verified flash/full readback, boot, independent USB/Wi-Fi access, integration and read-only PM/keypad/audio baselines |

@@ -503,6 +503,19 @@ controls, with evidence in `.local/build/brcmfmac-irq-tests/`, and is included i
 successful service from existing wake/read/acknowledgement error limitations.
 It uses modeled hardware and scheduling; it does not measure live IRQ rates.
 
+The follow-up worker fix is tested with:
+
+```sh
+task test:brcmfmac-worker          # Faults, clock waits and concurrent control completion
+task check:brcmfmac-worker-drivers # Also compile complete normal/debug ARM drivers
+```
+
+This adds patch 0018 to the source tests and is included in `task build`.
+[Report 89](docs/89-wifi-worker-error-handling.md) explains the checked errors,
+IRQ cleanup and cold-restart failure policy. It is a source candidate;
+diagnostic.12 remains the installed image. Evidence is under
+`.local/build/brcmfmac-{irq,lifecycle}-worker-tests/`.
+
 For the Sunxi MUSB context capability fix, use:
 
 ```sh

@@ -1,0 +1,328 @@
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+@@ -188,8 +188,8 @@
+ 	return ret;
+ }
+ 
+-/* Host is claimed. Stop producers after an unrecoverable PM transition. */
+-static void brcmf_sdiod_pm_quiesce_irqs(struct brcmf_sdio_dev *sdiodev)
++/* Host claimed, process context: stop producers after a PM or I/O fault. */
++void brcmf_sdiod_quiesce_irqs(struct brcmf_sdio_dev *sdiodev)
+ {
+ 	unsigned long flags;
+ 	int ret;
+@@ -206,45 +206,40 @@
+ 		/* The core detaches each handler even if clearing IENx fails. */
+ 		ret = sdio_release_irq(sdiodev->func2);
+ 		if (ret)
+-			brcmf_err("PM F2 IRQ disable failed: %d\n", ret);
++			brcmf_err("F2 IRQ disable failed: %d\n", ret);
+ 		ret = sdio_release_irq(sdiodev->func1);
+ 		if (ret)
+-			brcmf_err("PM F1 IRQ disable failed: %d\n", ret);
++			brcmf_err("F1 IRQ disable failed: %d\n", ret);
+ 		sdiodev->sd_irq_requested = false;
+ 	}
+ }
+ 
+ void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev *sdiodev)
+ {
+-
+-	brcmf_dbg(SDIO, "Entering oob=%d sd=%d\n",
+-		  sdiodev->oob_irq_requested,
+-		  sdiodev->sd_irq_requested);
+-
++	bool free_oob = false;
++	unsigned long flags;
++
++	/* Serialize registration flags against worker failure cleanup. */
++	sdio_claim_host(sdiodev->func1);
+ 	if (sdiodev->oob_irq_requested) {
+-		struct brcmfmac_sdio_pd *pdata;
+-
+-		pdata = &sdiodev->settings->bus.sdio;
+ 		/* A failed PM disable still owns its wake reference. */
+ 		brcmf_sdiod_pm_disarm(sdiodev);
+-		sdio_claim_host(sdiodev->func1);
+ 		brcmf_sdiod_func0_wb(sdiodev, SDIO_CCCR_BRCM_SEPINT, 0, NULL);
+ 		brcmf_sdiod_func0_wb(sdiodev, SDIO_CCCR_IENx, 0, NULL);
+-		sdio_release_host(sdiodev->func1);
+-
++		brcmf_sdiod_quiesce_irqs(sdiodev);
++		/* Close rearm under the same lock before releasing the IRQ. */
++		spin_lock_irqsave(&sdiodev->irq_en_lock, flags);
+ 		sdiodev->oob_irq_requested = false;
+-		free_irq(pdata->oob_irq_nr, &sdiodev->func1->dev);
+-		sdiodev->irq_en = false;
+-		sdiodev->oob_irq_requested = false;
+-	}
+-
+-	if (sdiodev->sd_irq_requested) {
+-		sdio_claim_host(sdiodev->func1);
+-		sdio_release_irq(sdiodev->func2);
+-		sdio_release_irq(sdiodev->func1);
+-		sdio_release_host(sdiodev->func1);
+-		sdiodev->sd_irq_requested = false;
+-	}
++		spin_unlock_irqrestore(&sdiodev->irq_en_lock, flags);
++		free_oob = true;
++	}
++	if (sdiodev->sd_irq_requested)
++		brcmf_sdiod_quiesce_irqs(sdiodev);
++	sdio_release_host(sdiodev->func1);
++
++	if (free_oob)
++		free_irq(sdiodev->settings->bus.sdio.oob_irq_nr,
++			 &sdiodev->func1->dev);
+ }
+ 
+ void brcmf_sdiod_change_state(struct brcmf_sdio_dev *sdiodev,
+@@ -933,7 +928,7 @@
+ 		ret = -ENODEV;
+ 	if (ret) {
+ 		brcmf_sdio_pm_failed(sdiodev->bus);
+-		brcmf_sdiod_pm_quiesce_irqs(sdiodev);
++		brcmf_sdiod_quiesce_irqs(sdiodev);
+ 		brcmf_err("PM restore failed (%d); Wi-Fi unavailable until cold restart\n",
+ 			  ret);
+ 	} else {
+@@ -1262,7 +1257,7 @@
+ 
+ 	sdio_claim_host(sdiodev->func1);
+ 	brcmf_sdio_pm_failed(sdiodev->bus);
+-	brcmf_sdiod_pm_quiesce_irqs(sdiodev);
++	brcmf_sdiod_quiesce_irqs(sdiodev);
+ 	sdio_release_host(sdiodev->func1);
+ 	brcmf_sdiod_pm_disarm(sdiodev);
+ 	sdiodev->pm_suspended = false;
+@@ -1392,7 +1387,7 @@
+ 		sdio_claim_host(sdiodev->func1);
+ 		if (sdiodev->state != BRCMF_SDIOD_DATA) {
+ 			brcmf_sdio_pm_failed(sdiodev->bus);
+-			brcmf_sdiod_pm_quiesce_irqs(sdiodev);
++			brcmf_sdiod_quiesce_irqs(sdiodev);
+ 			sdio_release_host(sdiodev->func1);
+ 			brcmf_sdiod_freezer_thaw(sdiodev->freezer);
+ 			return -ENODEV;
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -478,6 +478,7 @@
+ 	bool intr;		/* Use interrupts */
+ 	bool poll;		/* Use polling */
+ 	atomic_t ipend;		/* Device interrupt is pending */
++	bool io_error_handled;	/* Host-serialized fatal worker cleanup */
+ 	uint spurious;		/* Count of spurious interrupts */
+ 	uint pollrate;		/* Ticks between device polls */
+ 	uint polltick;		/* Tick counter */
+@@ -2608,7 +2609,10 @@
+ 	sdiodev = bus->sdiodev;
+ 	if (sdiodev->oob_irq_requested) {
+ 		spin_lock_irqsave(&sdiodev->irq_en_lock, flags);
+-		if (!sdiodev->irq_en && !atomic_read(&bus->ipend)) {
++		/* CLK_PENDING has the clock-available-only filter armed. */
++		if (sdiodev->oob_irq_requested &&
++		    !brcmf_sdiod_io_blocked(sdiodev) && !sdiodev->irq_en &&
++		    (!atomic_read(&bus->ipend) || bus->clkstate == CLK_PENDING)) {
+ 			enable_irq(sdiodev->settings->bus.sdio.oob_irq_nr);
+ 			sdiodev->irq_en = true;
+ 		}
+@@ -2637,10 +2641,39 @@
+ 	if (val) {
+ 		brcmf_sdiod_writel(bus->sdiodev, addr, val, &ret);
+ 		bus->sdcnt.f1regdata++;
++		if (ret)
++			return ret;
+ 		atomic_or(val, &bus->intstatus);
+ 	}
+ 
+ 	return ret;
++}
++
++/* Host claimed, process context. Never release SDIO IRQs in their own thread. */
++static void brcmf_sdio_dpc_failed(struct brcmf_sdio *bus, int err)
++{
++	struct brcmf_sdio_dev *sdiod = bus->sdiodev;
++
++	if (!sdiod->io_error)
++		WRITE_ONCE(sdiod->io_error, err);
++	if (bus->io_error_handled)
++		return;
++	bus->io_error_handled = true;
++	brcmf_sdiod_change_state(sdiod, BRCMF_SDIOD_DOWN);
++	brcmf_sdio_wd_timer(bus, false);
++	atomic_set(&bus->intstatus, 0);
++	atomic_set(&bus->ipend, 0);
++	if (bus->ctrl_frame_stat) {
++		bus->ctrl_frame_err = sdiod->io_error;
++		/* Publish the error before completing the control request. */
++		wmb();
++		bus->ctrl_frame_stat = false;
++		brcmf_sdio_wait_event_wakeup(bus);
++	}
++	brcmf_sdio_dcmd_resp_wake(bus);
++	brcmf_sdiod_quiesce_irqs(sdiod);
++	brcmf_err("SDIO worker failed (%d); Wi-Fi unavailable until cold restart\n",
++		  sdiod->io_error);
+ }
+ 
+ static void brcmf_sdio_dpc(struct brcmf_sdio *bus)
+@@ -2656,6 +2689,9 @@
+ 	brcmf_dbg(SDIO, "Enter\n");
+ 
+ 	sdio_claim_host(bus->sdiodev->func1);
++	err = READ_ONCE(sdiod->io_error);
++	if (err)
++		goto failed;
+ 
+ 	/* If waiting for HTAVAIL, check status */
+ 	if (!bus->sr_enabled && bus->clkstate == CLK_PENDING) {
+@@ -2665,11 +2701,15 @@
+ 		/* Check for inconsistent device control */
+ 		devctl = brcmf_sdiod_readb(bus->sdiodev, SBSDIO_DEVICE_CTL,
+ 					   &err);
++		if (err)
++			goto failed;
+ #endif				/* DEBUG */
+ 
+ 		/* Read CSR, if clock on switch to AVAIL, else ignore */
+ 		clkctl = brcmf_sdiod_readb(bus->sdiodev,
+ 					   SBSDIO_FUNC1_CHIPCLKCSR, &err);
++		if (err)
++			goto failed;
+ 
+ 		brcmf_dbg(SDIO, "DPC: PENDING, devctl 0x%02x clkctl 0x%02x\n",
+ 			  devctl, clkctl);
+@@ -2677,20 +2717,34 @@
+ 		if (SBSDIO_HTAV(clkctl)) {
+ 			devctl = brcmf_sdiod_readb(bus->sdiodev,
+ 						   SBSDIO_DEVICE_CTL, &err);
++			if (err)
++				goto failed;
+ 			devctl &= ~SBSDIO_DEVCTL_CA_INT_ONLY;
+ 			brcmf_sdiod_writeb(bus->sdiodev,
+ 					   SBSDIO_DEVICE_CTL, devctl, &err);
++			if (err)
++				goto failed;
+ 			bus->clkstate = CLK_AVAIL;
+ 		}
+ 	}
+ 
+ 	/* Make sure backplane clock is on */
+-	brcmf_sdio_bus_sleep(bus, false, true);
++	err = brcmf_sdio_bus_sleep(bus, false, true);
++	if (err)
++		goto failed;
++	if (bus->clkstate == CLK_PENDING) {
++		/* Preserve pending status; let the clock IRQ schedule the next pass. */
++		brcmf_sdio_clrintr(bus);
++		sdio_release_host(sdiod->func1);
++		return;
++	}
+ 
+ 	/* Pending interrupt indicates new device status */
+ 	if (atomic_read(&bus->ipend) > 0) {
+ 		atomic_set(&bus->ipend, 0);
+ 		err = brcmf_sdio_intr_rstatus(bus);
++		if (err)
++			goto failed;
+ 	}
+ 
+ 	/* Start with leftover status bits */
+@@ -2703,10 +2757,15 @@
+ 	if (intstatus & I_HMB_FC_CHANGE) {
+ 		intstatus &= ~I_HMB_FC_CHANGE;
+ 		brcmf_sdiod_writel(sdiod, intstat_addr, I_HMB_FC_CHANGE, &err);
++		bus->sdcnt.f1regdata++;
++		if (err)
++			goto failed;
+ 
+ 		newstatus = brcmf_sdiod_readl(sdiod, intstat_addr, &err);
+ 
+-		bus->sdcnt.f1regdata += 2;
++		bus->sdcnt.f1regdata++;
++		if (err)
++			goto failed;
+ 		atomic_set(&bus->fcstate,
+ 			   !!(newstatus & (I_HMB_FC_STATE | I_HMB_FC_CHANGE)));
+ 		intstatus |= (newstatus & bus->hostintmask);
+@@ -2804,6 +2863,11 @@
+ 		    data_ok(bus))) {
+ 		bus->dpc_triggered = true;
+ 	}
++	return;
++
++failed:
++	brcmf_sdio_dpc_failed(bus, err);
++	sdio_release_host(sdiod->func1);
+ }
+ 
+ static struct pktq *brcmf_sdio_bus_gettxq(struct device *dev)
+@@ -3724,6 +3788,8 @@
+ 
+ void brcmf_sdio_isr(struct brcmf_sdio *bus, bool in_isr)
+ {
++	int err;
++
+ 	brcmf_dbg(TRACE, "Enter\n");
+ 
+ 	if (!bus) {
+@@ -3736,12 +3802,15 @@
+ 	/* Count the interrupt call */
+ 	bus->sdcnt.intrcount++;
+ 	/* The MMC core can deliver an IRQ before the F2 resume callback. */
+-	if (in_isr || READ_ONCE(bus->sdiodev->pm_irq_blocked))
++	if (in_isr || READ_ONCE(bus->sdiodev->pm_irq_blocked) ||
++	    bus->clkstate == CLK_PENDING) {
+ 		atomic_set(&bus->ipend, 1);
+-	else
+-		if (brcmf_sdio_intr_rstatus(bus)) {
+-			brcmf_err("failed backplane access\n");
+-		}
++	} else {
++		err = brcmf_sdio_intr_rstatus(bus);
++		/* Already under the host lock; cleanup belongs to the worker. */
++		if (err)
++			WRITE_ONCE(bus->sdiodev->io_error, err);
++	}
+ 
+ 	/* Disable additional interrupts (is this needed now)? */
+ 	if (!bus->intr)
+@@ -3845,7 +3914,8 @@
+ 	wmb();
+ 	while (READ_ONCE(bus->dpc_triggered)) {
+ 		bus->dpc_triggered = false;
+-		if (!brcmf_sdiod_io_blocked(bus->sdiodev))
++		/* A latched I/O fault still needs process-context IRQ cleanup. */
++		if (!READ_ONCE(bus->sdiodev->pm_failed))
+ 			brcmf_sdio_dpc(bus);
+ 		bus->idlecount = 0;
+ 	}
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.h
+@@ -199,6 +199,8 @@
+ 	bool pm_irq_blocked;
+ 	/* Latched under the SDIO host lock until this device is destroyed. */
+ 	bool pm_failed;
++	/* First fatal worker/IRQ transport error, latched under the host lock. */
++	int io_error;
+ 	bool func1_power_manageable;
+ 	bool func2_power_manageable;
+ 	enum brcmf_sdiod_state state;
+@@ -298,11 +300,13 @@
+ /* Register/deregister interrupt handler. */
+ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev);
+ void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev *sdiodev);
++void brcmf_sdiod_quiesce_irqs(struct brcmf_sdio_dev *sdiodev);
+ 
+ /* SDIO device register access interface */
+ static inline bool brcmf_sdiod_io_blocked(struct brcmf_sdio_dev *sdiodev)
+ {
+-	return unlikely(READ_ONCE(sdiodev->pm_failed));
++	return unlikely(READ_ONCE(sdiodev->pm_failed) ||
++			READ_ONCE(sdiodev->io_error));
+ }
+ 
+ /* Callers hold the host lock, which also serializes latching pm_failed. */

@@ -16,10 +16,11 @@ remains disabled.
 Four additional observed late/noirq cycles passed, for five on this boot;
 [report 105](docs/105-diagnostic14-late-noirq-repeats.md) records their traces,
 restoration and the radio control errors still being investigated.
-The [country-request suspend fix](docs/106-brcmfmac-regulatory-suspend.md)
-now passes native/ARM32 regression tests and complete ARM driver compilation.
-Patch 0020 is awaiting a new image and hardware qualification; diagnostic.14
-does not contain it.
+Diagnostic.15 is built, offline-verified and staged on the Mac with the
+[country-request suspend fix](docs/106-brcmfmac-regulatory-suspend.md).
+[Preparation and the hardware comparison sequence](docs/107-diagnostic15-preparation.md)
+record recovery, checksums and passing source/image checks. Diagnostic.14
+remains installed; card flashing and diagnostic.15 hardware qualification are next.
 
 Start with the [first-build specification](docs/23-first-build-spec.md),
 [build workflow](docs/24-building-and-testing.md),

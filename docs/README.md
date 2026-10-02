@@ -210,6 +210,8 @@ new image build and the next hardware qualification sequence.
 
 - [106 — Wi-Fi country requests across suspend](106-brcmfmac-regulatory-suspend.md): regulatory worker exclusion, deferred country updates, error policy and native/ARM32 source validation; hardware qualification remains ahead.
 
+- [107 — Diagnostic.15 preparation](107-diagnostic15-preparation.md): preserved diagnostic.14 recovery, complete kernel/image build, offline verification, Mac staging and the prepared country-request hardware comparison.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

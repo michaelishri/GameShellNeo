@@ -218,6 +218,10 @@ tasks:
     desc: Check actual IRQ-core/regmap/PEK/RTC/AC wake ownership and failures, native and ARM32
     cmds: [bash tools/run-logged.sh wake-irqs python3 tools/check-wake-irqs.py]
 
+  test:power-key-events:
+    desc: Reproduce PEK/input-core synthetic release and duplicate filtering, native and ARM32; no hardware
+    cmds: [bash tools/run-logged.sh power-key-events python3 tools/check-power-key-events.py]
+
   check:wake-drivers:
     desc: Run wake ownership regressions and compile all four complete ARM drivers in isolated scratch
     cmds: [bash tools/run-logged.sh wake-drivers python3 tools/check-wake-irqs.py --compile-drivers]
@@ -453,6 +457,10 @@ tasks:
   device:pm-power-key:
     desc: Attended debug stage with exclusive power-key ownership; explicit STAGE and owner readiness required
     cmds: [python3 tools/check-pm-stages.py --test --power-key]
+
+  device:pm-power-key-input:
+    desc: Attended one-second POWER release during devices debug, then fresh awake tap; explicit readiness required
+    cmds: [python3 tools/check-pm-stages.py --test --power-key-input]
 
   device:pm-collect:
     desc: Retrieve a PM stage's persistent device evidence after reconnection; RUN required

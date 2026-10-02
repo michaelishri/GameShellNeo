@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import signal
 import subprocess
+import sys
 import time
 
 POWER = Path('/sys/power')
@@ -252,11 +253,19 @@ def check_result(before, after, stage, memory_ok):
 
 
 def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
-               keypad_quirk=None, wifi_trace=False, power_key=False):
+               keypad_quirk=None, wifi_trace=False, power_key=False, power_key_input=False):
     if stage not in STAGES:
         raise ValueError('Only guarded freezer/devices/platform debug stages are permitted')
     if type(power_key) is not bool:
         raise ValueError('Invalid power-key ownership option')
+    if type(power_key_input) is not bool:
+        raise ValueError('Invalid physical power-key option')
+    if power_key_input:
+        if (stage != 'devices' or not power_key or not keypad_trace or keypad_input or keypad_audio or
+                keypad_persist is not None or keypad_quirk is not None or wifi_trace):
+            raise ValueError('Physical power release requires its isolated traced devices test')
+        from power_key_pm import test
+        return test(sys.modules[__name__], lock, run_id)
     if stage == 'platform' and (power_key is not True or keypad_trace is not True):
         raise ValueError('Platform requires power-key ownership and trace')
     if keypad_trace and stage not in ('devices', 'platform'):
@@ -393,9 +402,14 @@ def main():
     parser.add_argument('--keypad-quirk', choices=('baseline', 'old-scheme', 'fast-recovery'))
     parser.add_argument('--wifi-trace', action='store_true')
     parser.add_argument('--power-key', action='store_true')
+    parser.add_argument('--power-key-input', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
+        if args.power_key_input:
+            from power_key_pm import restore as restore_power_input
+            restore_power_input(sys.modules[__name__], args.run_id)
+            return
         from keypad_pm import restore_trace, restore_persistence, restore_port_quirks
         from keypad_input import restore_console
         from speaker_audio import restore as restore_audio
@@ -428,7 +442,7 @@ def main():
             signal.signal(sig, interrupted)
         test_stage(json.loads(read(args.lock)), args.stage, args.run_id,
                    args.keypad_trace, args.keypad_persist, args.keypad_input, args.keypad_audio, args.keypad_quirk,
-                   args.wifi_trace, args.power_key)
+                   args.wifi_trace, args.power_key, args.power_key_input)
 
 
 if __name__ == '__main__':

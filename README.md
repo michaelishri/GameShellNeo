@@ -1754,6 +1754,28 @@ policy files to bypass a failure. `device:power-policy-collect` retrieves the
 original printed run ID after a collection failure. [Report 114](docs/114-awake-power-key-input.md)
 describes the checks, evidence and remaining wake qualification.
 
+The separate PM-release task uses a different hold instruction:
+
+```sh
+task test:power-key-events    # Locked C event semantics; no hardware
+# One attended devices debug cycle, after fresh operator readiness:
+task device:pm-power-key-input
+```
+
+Follow two POWER taps, then hold POWER for **one second and release even if
+the screen is dark**. Never wait for resume or a tone and never hold longer
+than two seconds. Follow the fresh tap prompt after return. The existing
+five-second debug pause is too long for a hold-until-resume test with the
+currently configured six-second cutoff. The task records Linux's synthetic
+clear and the release IRQ evidence, then requires a separate fresh awake pair
+before restoring shutdown handling. It does not enter real sleep. See
+[source findings](docs/115-power-key-release-semantics.md) and
+[the sequence and recovery contract](docs/116-bounded-power-key-pm-release.md).
+The attended logical-clear and fresh awake handoff passed on diagnostic.16;
+the owner's approximate release does not prove physical hold through the
+callback. Report 116 also records a separate SDIO runtime-reference increase
+across seven saved PM cycles, queued for driver investigation in NEO-92.
+
 RTC and late/noirq preparation is repeatable:
 
 ```sh

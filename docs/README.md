@@ -226,6 +226,10 @@ new image build and the next hardware qualification sequence.
 
 - [114 — Awake power-key input](114-awake-power-key-input.md): four attended press/release pairs passed, including a short hold through disposable-worker death; checked awake handoff restored policy/console/audio without PM entry.
 
+- [115 — Power-key release semantics](115-power-key-release-semantics.md): input-core clearing, PMIC edge coalescing, IRQ-counter limits and a bounded-release diagnostic recommendation.
+
+- [116 — Bounded power-key PM release](116-bounded-power-key-pm-release.md): attended logical-clear and fresh awake handoff passed with approximate physical-release timing; saved tasks/source tests and separate repeated SDIO reference growth tracked in NEO-92.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

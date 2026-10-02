@@ -91,6 +91,7 @@ tasks:
       - task: test:brcmfmac-worker
       - task: test:brcmfmac-regulatory
       - task: test:brcmfmac-tx-suspend
+      - task: test:brcmfmac-band-queries
       - task: test:wake-irqs
       - task: test:musb-context
       - task: test:usb-policy
@@ -244,6 +245,14 @@ tasks:
   check:brcmfmac-tx-suspend-driver:
     desc: Run transmit admission regressions and compile complete ARM core/cfg80211 objects
     cmds: [bash tools/run-logged.sh brcmfmac-tx-suspend-driver python3 tools/check-brcmfmac-tx-suspend.py --compile-driver]
+
+  test:brcmfmac-band-queries:
+    desc: Check actual Wi-Fi band queries, transport errors and legacy fallbacks natively and on ARM32
+    cmds: [bash tools/run-logged.sh brcmfmac-band-queries python3 tools/check-brcmfmac-band-queries.py]
+
+  check:brcmfmac-band-query-driver:
+    desc: Run capability-query regressions and compile the complete ARM cfg80211 object
+    cmds: [bash tools/run-logged.sh brcmfmac-band-query-driver python3 tools/check-brcmfmac-band-queries.py --compile-driver]
 
   check:brcmfmac-freezer-drivers:
     desc: Run Wi-Fi freezer regressions and compile both complete ARM SDIO objects in isolated scratch

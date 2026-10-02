@@ -629,6 +629,18 @@ records patch 0021, its lock ordering, failed-resume behavior and source-test
 limits. Evidence is under `.local/build/brcmfmac-tx-suspend-tests/`.
 The source candidate is not installed in diagnostic.15.
 
+Band-capability query failures have a separate saved regression:
+
+```sh
+task test:brcmfmac-band-queries
+task check:brcmfmac-band-query-driver
+```
+
+[Report 110](docs/110-wifi-band-query-errors.md) records patch 0022's required
+read checks, optional firmware-rejection defaults, transport errors and remaining
+channel-transaction limits. `task build` includes the test; private evidence is
+under `.local/build/brcmfmac-band-query-tests/`. This candidate is not installed.
+
 Wake-reference ownership and parent-error propagation have saved checks:
 
 ```sh

@@ -216,6 +216,8 @@ new image build and the next hardware qualification sequence.
 
 - [109 — Wi-Fi transmit suspend ownership](109-wifi-transmit-suspend-ownership.md): queue admission/drain, independent stop reasons, checked resume release and native/ARM32 validation; hardware comparison remains ahead.
 
+- [110 — Wi-Fi band query errors](110-wifi-band-query-errors.md): checked required/optional capability reads, legacy defaults, chain bounds and source validation; channel transactions and hardware comparison remain open.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

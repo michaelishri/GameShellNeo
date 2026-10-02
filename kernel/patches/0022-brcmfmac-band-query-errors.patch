@@ -1,0 +1,136 @@
+From: GameShellNeo contributors
+Subject: [PATCH] brcmfmac: propagate band capability transport errors
+
+Fail required nmode reads instead of using an indeterminate result. Preserve
+legacy firmware-rejection defaults for optional queries, but propagate transport
+errors and invalid legacy bandwidth values. Finish scalar queries before
+channel/capability mutation and reject chain counts that exceed the HT/VHT
+representation. EBADE remains a generic firmware rejection, not proof that a
+command is unsupported; no interface-wide firmware-error mode is changed.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+@@ -7221,7 +7221,7 @@
+ 	return err;
+ }
+ 
+-static void brcmf_get_bwcap(struct brcmf_if *ifp, u32 bw_cap[])
++static int brcmf_get_bwcap(struct brcmf_if *ifp, u32 bw_cap[])
+ {
+ 	struct brcmf_pub *drvr = ifp->drvr;
+ 	u32 band, mimo_bwcap;
+@@ -7233,18 +7233,23 @@
+ 		bw_cap[NL80211_BAND_2GHZ] = band;
+ 		band = WLC_BAND_5G;
+ 		err = brcmf_fil_iovar_int_query(ifp, "bw_cap", &band);
+-		if (!err) {
++		if (!err)
+ 			bw_cap[NL80211_BAND_5GHZ] = band;
+-			return;
+-		}
+-		WARN_ON(1);
+-		return;
+-	}
++		/* Preserve the default for a firmware-rejected optional band,
++		 * but do not turn transport failure into capability success.
++		 */
++		return err == -EBADE ? 0 : err;
++	}
++	if (err != -EBADE)
++		return err;
+ 	brcmf_dbg(INFO, "fallback to mimo_bw_cap info\n");
+ 	err = brcmf_fil_iovar_int_get(ifp, "mimo_bw_cap", &mimo_bwcap);
+-	if (err)
+-		/* assume 20MHz if firmware does not give a clue */
++	if (err) {
++		if (err != -EBADE)
++			return err;
++		/* Preserve the legacy firmware-rejection fallback to 20 MHz. */
+ 		mimo_bwcap = WLC_N_BW_20ALL;
++	}
+ 
+ 	switch (mimo_bwcap) {
+ 	case WLC_N_BW_40ALL:
+@@ -7259,7 +7264,9 @@
+ 		break;
+ 	default:
+ 		bphy_err(drvr, "invalid mimo_bw_cap value\n");
+-	}
++		return -EINVAL;
++	}
++	return 0;
+ }
+ 
+ static void brcmf_update_ht_cap(struct ieee80211_supported_band *band,
+@@ -7348,13 +7355,17 @@
+ 	u32 txbf_bfe_cap = 0;
+ 	u32 txbf_bfr_cap = 0;
+ 
+-	(void)brcmf_fil_iovar_int_get(ifp, "vhtmode", &vhtmode);
++	err = brcmf_fil_iovar_int_get(ifp, "vhtmode", &vhtmode);
++	if (err && err != -EBADE)
++		return err;
+ 	err = brcmf_fil_iovar_int_get(ifp, "nmode", &nmode);
+ 	if (err) {
+ 		bphy_err(drvr, "nmode error (%d)\n", err);
+-	} else {
+-		brcmf_get_bwcap(ifp, bw_cap);
+-	}
++		return err;
++	}
++	err = brcmf_get_bwcap(ifp, bw_cap);
++	if (err)
++		return err;
+ 	brcmf_dbg(INFO, "nmode=%d, vhtmode=%d, bw_cap=(%d, %d)\n",
+ 		  nmode, vhtmode, bw_cap[NL80211_BAND_2GHZ],
+ 		  bw_cap[NL80211_BAND_5GHZ]);
+@@ -7364,8 +7375,10 @@
+ 		/* rxchain unsupported by firmware of older chips */
+ 		if (err == -EBADE)
+ 			bphy_info_once(drvr, "rxchain unsupported\n");
+-		else
++		else {
+ 			bphy_err(drvr, "rxchain error (%d)\n", err);
++			return err;
++		}
+ 
+ 		nchain = 1;
+ 	} else {
+@@ -7374,18 +7387,28 @@
+ 	}
+ 	brcmf_dbg(INFO, "nchain=%d\n", nchain);
+ 
++	if (vhtmode) {
++		err = brcmf_fil_iovar_int_get(ifp, "txstreams", &txstreams);
++		if (err && err != -EBADE)
++			return err;
++		err = brcmf_fil_iovar_int_get(ifp, "txbf_bfe_cap", &txbf_bfe_cap);
++		if (err && err != -EBADE)
++			return err;
++		err = brcmf_fil_iovar_int_get(ifp, "txbf_bfr_cap", &txbf_bfr_cap);
++		if (err && err != -EBADE)
++			return err;
++	}
++
++	/* Validate all scalar queries before changing advertised channels/caps.
++	 * HT rx_mask has ten bytes; VHT encodes at most eight spatial streams.
++	 */
++	if (nchain > 8)
++		return -EINVAL;
++
+ 	err = brcmf_construct_chaninfo(cfg, bw_cap);
+ 	if (err) {
+ 		bphy_err(drvr, "brcmf_construct_chaninfo failed (%d)\n", err);
+ 		return err;
+-	}
+-
+-	if (vhtmode) {
+-		(void)brcmf_fil_iovar_int_get(ifp, "txstreams", &txstreams);
+-		(void)brcmf_fil_iovar_int_get(ifp, "txbf_bfe_cap",
+-					      &txbf_bfe_cap);
+-		(void)brcmf_fil_iovar_int_get(ifp, "txbf_bfr_cap",
+-					      &txbf_bfr_cap);
+ 	}
+ 
+ 	for (i = 0; i < ARRAY_SIZE(wiphy->bands); i++) {

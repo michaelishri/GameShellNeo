@@ -206,6 +206,8 @@ new image build and the next hardware qualification sequence.
 
 - [104 — Diagnostic.14 hardware qualification](104-diagnostic14-hardware-qualification.md): card readback, startup/journal/awake gates, first observed late/noirq pass and unresolved radio control timeouts.
 
+- [105 — Late/noirq repeats](105-diagnostic14-late-noirq-repeats.md): four further observed passes, retained keypad, callback ordering, final health and radio error evidence.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

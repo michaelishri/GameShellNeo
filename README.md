@@ -13,6 +13,9 @@ observed late/noirq debug cycle.
 its wake-IRQ and journal fixes; [hardware qualification](docs/104-diagnostic14-hardware-qualification.md)
 records the attended gates and unresolved Wi-Fi control timeouts. Actual sleep
 remains disabled.
+Four additional observed late/noirq cycles passed, for five on this boot;
+[report 105](docs/105-diagnostic14-late-noirq-repeats.md) records their traces,
+restoration and the radio control errors still being investigated.
 
 Start with the [first-build specification](docs/23-first-build-spec.md),
 [build workflow](docs/24-building-and-testing.md),

@@ -15,6 +15,8 @@ from keypad_pm import handle_state, save_owned
 EVENT = struct.Struct('@llHHi')
 KEY_POWER = 116
 OWNED = Path('/run/gameshellneo-power-key.json')
+POLICY_OWNED = Path('/run/gameshellneo-power-policy.json')
+POLICY_DROPIN = Path('/run/systemd/logind.conf.d/zz-gameshellneo-pm-guard.conf')
 BOOT = Path('/proc/sys/kernel/random/boot_id')
 WHO = 'GameShellNeo PM diagnostic'
 
@@ -145,7 +147,7 @@ class Guard:
 
 @contextmanager
 def own(record, persist):
-    if OWNED.exists():
+    if any(os.path.lexists(path) for path in (OWNED, POLICY_OWNED, POLICY_DROPIN)):
         raise ValueError('Unresolved power-key ownership record; cold restart required')
     record['inhibitor'] = verify_inhibitor()
     record['identity'] = identity()

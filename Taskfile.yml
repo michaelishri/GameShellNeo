@@ -428,6 +428,20 @@ tasks:
     desc: Verify inhibitor and exclusive power-key ownership while awake; leave power key untouched
     cmds: [python3 tools/check-power-key.py --smoke]
 
+  device:power-policy-inspect:
+    desc: Read effective logind power-key policy and retained diagnostic ownership
+    cmds: [python3 tools/check-power-key-policy.py]
+
+  device:power-policy-smoke:
+    desc: Awake untouched-key policy/worker-death/restoration check; no sleep
+    cmds: [python3 tools/check-power-key-policy.py --smoke]
+
+  device:power-policy-collect:
+    desc: Retrieve the original power-policy result after uncertain SSH; RUN required
+    env:
+      NEO_POLICY_RUN: '{{.RUN | default ""}}'
+    cmds: [python3 tools/check-power-key-policy.py --collect]
+
   device:pm-platform:
     desc: One attended late/noirq debug cycle; checked image, same-boot RTC smoke, power-key ownership and traces required
     cmds: [python3 tools/check-pm-stages.py --platform]

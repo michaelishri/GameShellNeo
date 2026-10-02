@@ -1714,6 +1714,23 @@ bounded cleanup and abnormal-termination limits. The final short/2-second/
 8-second gestures remain the agreed product policy; these commands do not
 implement normal sleep or a power menu.
 
+For a diagnostic policy that survives worker failure:
+
+```sh
+task device:power-policy-inspect # Effective logind policy and unresolved owner
+task device:power-policy-smoke   # Awake only; keep the power button untouched
+task device:power-policy-collect RUN=<original-run-id> # Evidence retrieval only
+```
+
+The smoke task temporarily ignores both logind power-key actions, kills a
+disposable worker, verifies the policy survived and restores the original
+settings while the parent retains untouched-key ownership. It passed on
+diagnostic.16. Failed/uncertain handoff retains the boot-local policy for
+inspection and cold-restart recovery; do not remove its files or resubmit blindly.
+[Report 113](docs/113-diagnostic-power-key-policy.md) records the design, tests
+and remaining physical-release/real-sleep gates. The normal diagnostic shutdown
+policy is restored after a successful run; this does not enable product gestures.
+
 RTC and late/noirq preparation is repeatable:
 
 ```sh

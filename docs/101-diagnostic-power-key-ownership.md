@@ -46,6 +46,10 @@ another guarded test; it does not keep logind inhibited after process death.
 The normal error path is bounded and recorded, but a persistent, independently
 supervised gesture owner and physical held-key/forced-exit qualification are
 still required before real sleep is enabled. No real-sleep command is added.
+The later [NEO-89 policy guard](113-diagnostic-power-key-policy.md) adds a
+boot-local ignore policy that outlives worker failure and passes an untouched
+awake restoration check. Physical held-key/waking-event handoff remains a gate;
+the original PM helper is not made into a real-sleep command by that addition.
 The ordinary debug service retains its runtime limit and independent PM-control
 restoration. A platform debug test must keep the power key untouched.
 

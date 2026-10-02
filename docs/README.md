@@ -222,6 +222,8 @@ new image build and the next hardware qualification sequence.
 
 - [112 — Diagnostic.16 hardware qualification](112-diagnostic16-hardware-qualification.md): guarded flash/readback, startup/awake checks, one freezer/driver and five observed late/noirq passes; no recurring transmit warning, restored settings/idle audio and bounded qualification limits.
 
+- [113 — Diagnostic power-key policy](113-diagnostic-power-key-policy.md): owned boot-local logind suppression surviving worker SIGKILL, checked untouched awake restoration and saved tasks; physical-release/real-sleep gates remain open.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

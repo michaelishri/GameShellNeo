@@ -4,6 +4,7 @@ The ignore drop-in outlives the experiment process. Uncertain cleanup retains
 ownership; there is deliberately no unconditional remove/restore command.
 """
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -156,13 +157,18 @@ def restore_untouched(token, guard):
     This is NOT a waking/held-key handoff: input-core clears need separate proof.
     There is no CLI bypass for a lost guard or interrupted ownership record.
     """
-    guard.before_entry()  # Checks inhibitor, untouched stream and empty bitmap.
+    _restore_checked(token, guard.before_entry)
+
+
+def _restore_checked(token, check_handoff):
+    # Callers must supply their qualified handoff validator, never a CLI bypass.
+    check_handoff()
     record = verify(token)
-    guard.before_entry()
+    check_handoff()
     DROPIN.unlink()
     try:
         reload_policy(record['before']['policy'], record['before']['logind'])
-        guard.before_entry()
+        check_handoff()
         if config() != record['before']['config']:
             raise ValueError('Unowned configuration changed during restoration')
         if (os.path.lexists(DROPIN) or json.loads(read_owned(OWNED)) != record or
@@ -178,35 +184,50 @@ def restore_untouched(token, guard):
     OWNED.unlink()
 
 
+@contextmanager
+def worker(token, boot, directory):
+    """Disposable policy worker; killing it never removes suppression."""
+    with (directory/'worker.stderr').open('wb') as errors:
+        child = subprocess.Popen([sys.executable, '-B', __file__, '--worker',
+            '--run-id', token, '--boot-id', boot], stdout=subprocess.PIPE, stderr=errors)
+    try:
+        ready, _, _ = select.select([child.stdout], [], [], 25)
+        if not ready:
+            raise TimeoutError('Policy worker did not become ready; inspect retained ownership')
+        if json.loads(child.stdout.readline()) != dict(run_id=token, armed=True):
+            raise ValueError('Unexpected policy-worker readiness record')
+        yield child
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=5)
+        child.stdout.close()
+
+
+def kill_worker(child, timeout=5):
+    child.kill()
+    result = child.wait(timeout=timeout)
+    if result != -signal.SIGKILL:
+        raise ValueError('Disposable worker did not terminate with SIGKILL')
+    return result
+
+
 def smoke(token, directory):
     """Parent owns the untouched key; a disposable policy worker is SIGKILLed."""
     record = dict(run_id=run_id(token), passed=False, mode='awake-policy-worker-death',
                   restored=False, power_key={})
-    child = None
     try:
         record['before'] = inspect()
         save_owned(record, directory/'started.json')
         with exclusive_pm(OWNED.parent), power_key.own(record['power_key'], lambda: None) as guard:
             guard.before_entry()
-            with (directory/'worker.stderr').open('wb') as errors:
-                child = subprocess.Popen([sys.executable, '-B', __file__, '--worker',
-                    '--run-id', token, '--boot-id', record['before']['boot_id']],
-                    stdout=subprocess.PIPE, stderr=errors)
-            ready, _, _ = select.select([child.stdout], [], [], 25)
-            if not ready:
-                raise TimeoutError('Policy worker did not become ready; inspect retained ownership')
-            row = json.loads(child.stdout.readline())
-            if row != dict(run_id=token, armed=True):
-                raise ValueError('Unexpected policy-worker readiness record')
-            child.kill()
-            record['worker_returncode'] = child.wait(timeout=5)
-            if record['worker_returncode'] != -signal.SIGKILL:
-                raise ValueError('Disposable worker did not terminate with SIGKILL')
-            verify(token)
-            record['survived_worker_death'] = inspect()
-            guard.before_entry()
-            restore_untouched(token, guard)
-            record['restored'] = True
+            with worker(token, record['before']['boot_id'], directory) as child:
+                record['worker_returncode'] = kill_worker(child)
+                verify(token)
+                record['survived_worker_death'] = inspect()
+                guard.before_entry()
+                restore_untouched(token, guard)
+                record['restored'] = True
         record['after'] = inspect()
         if record['after'] != record['before']:
             raise ValueError('Final policy/process/configuration state differs from baseline')
@@ -215,11 +236,6 @@ def smoke(token, directory):
         record['error'] = type(error).__name__ + ': ' + str(error)
         raise
     finally:
-        if child is not None:
-            if child.poll() is None:
-                child.kill()
-                child.wait(timeout=5)
-            child.stdout.close()
         record['policy_owner_retained'] = os.path.lexists(OWNED)
         record['dropin_retained'] = os.path.lexists(DROPIN)
         save_owned(record, directory/'result.json')
@@ -232,6 +248,7 @@ def main():
     mode.add_argument('--inspect', action='store_true')
     mode.add_argument('--smoke', action='store_true')
     mode.add_argument('--worker', action='store_true')
+    mode.add_argument('--input', action='store_true')
     parser.add_argument('--run-id')
     parser.add_argument('--boot-id')
     args = parser.parse_args()
@@ -247,7 +264,11 @@ def main():
         token = run_id(args.run_id)
         directory = RESULTS/token
         directory.mkdir(parents=True, exist_ok=False)
-        print(json.dumps(smoke(token, directory)))
+        if args.input:
+            from power_key_input import test_input
+            print(json.dumps(test_input(token, directory)))
+        else:
+            print(json.dumps(smoke(token, directory)))
 
 
 if __name__ == '__main__':

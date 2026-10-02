@@ -1731,6 +1731,29 @@ inspection and cold-restart recovery; do not remove its files or resubmit blindl
 and remaining physical-release/real-sleep gates. The normal diagnostic shutdown
 policy is restored after a successful run; this does not enable product gestures.
 
+For the attended **awake** power-key sequence, first confirm the operator is
+watching the screen, USB is connected and the headphone jack is empty:
+
+```sh
+task device:power-key-input
+```
+
+Follow the on-screen prompts: two quick POWER taps, a roughly one-second hold,
+then a final tap. During the hold, release at **RELEASE POWER NOW**, or after
+two seconds if the prompt does not appear. Tones confirm each completed
+press/release pair; their known startup delay remains. The screen stays on.
+The test kills a disposable policy worker during the hold and checks released
+input, unchanged PM counters, and policy/console/audio restoration. It neither
+enters sleep nor tests the product's two-/eight-second gestures. The four-pair
+sequence passed on diagnostic.16, with the owner confirming prompts, tones
+and the return of the dim console.
+
+If the sequence stops, release POWER and leave it untouched. Inspect the saved
+result and any retained owner before recovery; do not rerun or delete the
+policy files to bypass a failure. `device:power-policy-collect` retrieves the
+original printed run ID after a collection failure. [Report 114](docs/114-awake-power-key-input.md)
+describes the checks, evidence and remaining wake qualification.
+
 RTC and late/noirq preparation is repeatable:
 
 ```sh

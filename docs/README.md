@@ -224,6 +224,8 @@ new image build and the next hardware qualification sequence.
 
 - [113 — Diagnostic power-key policy](113-diagnostic-power-key-policy.md): owned boot-local logind suppression surviving worker SIGKILL, checked untouched awake restoration and saved tasks; physical-release/real-sleep gates remain open.
 
+- [114 — Awake power-key input](114-awake-power-key-input.md): four attended press/release pairs passed, including a short hold through disposable-worker death; checked awake handoff restored policy/console/audio without PM entry.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

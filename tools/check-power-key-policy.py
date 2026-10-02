@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect or qualify boot-local power-key suppression awake; no PM or key input."""
+"""Inspect or qualify boot-local power-key suppression awake; never enters PM."""
 import argparse
 import fcntl
 import hashlib
@@ -37,6 +37,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--smoke', action='store_true')
+    mode.add_argument('--input', action='store_true')
     mode.add_argument('--collect', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
@@ -61,7 +62,10 @@ def main():
                 raise ValueError('Unexpected helper directory')
             hashes = {}
             with client.open_sftp() as sftp:
-                for name in ('power_key_policy', 'power_key', 'keypad_pm'):
+                names = ['power_key_policy', 'power_key', 'keypad_pm']
+                if args.input:
+                    names += ['power_key_input', 'keypad_input', 'speaker_audio']
+                for name in names:
                     path = ROOT/'tools'/(name+'.py')
                     hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
                     upload(sftp, path, directory+'/'+name+'.py')
@@ -69,7 +73,7 @@ def main():
             script = directory+'/power_key_policy.py'
             before = json.loads(run(client, shlex.join(['sudo', '-n', 'python3', '-B', script, '--inspect']), display=False))
             (capture/'before.json').write_text(json.dumps(before, indent=2)+'\n')
-            if not args.smoke:
+            if not (args.smoke or args.input):
                 print('Read-only effective logind policy and ownership saved.')
                 return
             lock = json.loads((ROOT/'build/sources.lock.json').read_text())
@@ -78,17 +82,22 @@ def main():
             token = uuid.uuid4().hex
             (capture/'run.json').write_text(json.dumps(dict(run_id=token, helper=directory))+'\n')
             print('Power-policy run:', token, flush=True)
+            unit = 'gameshellneo-power-key-input' if args.input else 'gameshellneo-power-policy-smoke'
             command = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe', '--collect',
-                '--unit=gameshellneo-power-policy-smoke', '--property=RuntimeMaxSec=75',
-                '--property=TimeoutStopSec=10', '--property=UMask=0077',
+                '--unit='+unit, '--property=RuntimeMaxSec='+('180' if args.input else '75'),
+                '--property=TimeoutStopSec=10', '--property=UMask=0077']
+            if args.input:
+                command += ['--property=ExecStopPost=/usr/bin/python3 -B '+directory+
+                            '/power_key_input.py --restore-ui --run-id '+token]
+            command += [
                 '/usr/bin/systemd-inhibit', '--what=handle-power-key:sleep:idle', '--mode=block',
                 '--who=GameShellNeo PM diagnostic', '--why=Awake policy ownership qualification',
-                '/usr/bin/python3', '-B', script, '--smoke', '--run-id', token]
+                '/usr/bin/python3', '-B', script, '--input' if args.input else '--smoke', '--run-id', token]
             # No ExecStopPost restores poweroff after uncertain ownership. The
             # boot-local ignore policy intentionally survives cgroup destruction.
             try:
                 with (capture/'transcript.log').open('wb') as output:
-                    run(client, shlex.join(command), output=output, display=False, timeout=90)
+                    run(client, shlex.join(command), output=output, display=False, timeout=200 if args.input else 90)
             except BaseException as error:
                 (capture/'submission-error.txt').write_text(type(error).__name__+': '+str(error)+'\n')
                 raise
@@ -96,8 +105,18 @@ def main():
                 data = run(client, shlex.join(['sudo', '-n', 'cat',
                     '/var/lib/gameshellneo/power-policy-tests/'+token+'/result.json']), display=False)
                 (capture/'result.json').write_bytes(data)
-            validate_result(json.loads(data), token, before['boot_id'])
-            print('Awake policy survived worker SIGKILL; untouched key and original policy restored.')
+            value = json.loads(data)
+            if args.input:
+                from power_key_input import validate_result as validate_input
+                if (value.get('run_id') != token or value.get('passed') is not True or
+                        value['before']['boot_id'] != before['boot_id'] or
+                        value.get('policy_owner_retained') is not False or value.get('dropin_retained') is not False):
+                    raise ValueError('Attended awake key test incomplete or ownership retained')
+                validate_input(value)
+                print('Four awake power-key pairs passed; policy, input, console and audio restored.')
+            else:
+                validate_result(value, token, before['boot_id'])
+                print('Awake policy survived worker SIGKILL; untouched key and original policy restored.')
 
 
 if __name__ == '__main__':

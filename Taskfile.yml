@@ -436,6 +436,10 @@ tasks:
     desc: Awake untouched-key policy/worker-death/restoration check; no sleep
     cmds: [python3 tools/check-power-key-policy.py --smoke]
 
+  device:power-key-input:
+    desc: Attended awake power-key taps/short hold with speaker cues; explicit owner readiness required
+    cmds: [python3 tools/check-power-key-policy.py --input]
+
   device:power-policy-collect:
     desc: Retrieve the original power-policy result after uncertain SSH; RUN required
     env:

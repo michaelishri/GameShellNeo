@@ -6,7 +6,14 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.15 is installed with the
+Diagnostic.16 has been written to the DEV card and passed full 4 GiB readback;
+first boot and hardware qualification are pending. Its
+[preparation report](docs/111-diagnostic16-preparation.md) records the transmit
+suspend and band-query changes, recovery and offline checks;
+[hardware report](docs/112-diagnostic16-hardware-qualification.md) records the
+card installation and remaining attended sequence.
+
+The previous diagnostic.15 baseline includes the
 [country-request suspend fix](docs/106-brcmfmac-regulatory-suspend.md).
 Full card readback, owner-confirmed boot, both SSH routes, all six integration
 groups, journal rotation and awake power-key/RTC checks passed.
@@ -18,11 +25,7 @@ Country/control timeouts did not recur. A
 [transmit-admission fix](docs/109-wifi-transmit-suspend-ownership.md) is ready for
 hardware comparison against the remaining suspended-transmit warning.
 Actual sleep remains disabled.
-Diagnostic.16 is built, offline-verified and staged on the Mac, with transmit
-suspend ownership and checked band-capability queries. Its
-[preparation report](docs/111-diagnostic16-preparation.md) records recovery,
-artifact hashes, matching configuration/packages and the next attended test
-sequence. Diagnostic.15 remains installed and is retained for recovery.
+Diagnostic.15 is retained for recovery and comparison.
 Diagnostic.14 is retained for recovery and comparison:
 its [five observed late/noirq cycles](docs/105-diagnostic14-late-noirq-repeats.md)
 passed the restoration checks but exposed the recurring radio control errors

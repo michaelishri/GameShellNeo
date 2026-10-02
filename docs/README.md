@@ -24,8 +24,12 @@ groups and read-only PM/keypad/audio baselines.
 passing awake Wi-Fi, storage/load, battery-policy and final health checks.
 [96 — Attended validation](96-diagnostic13-attended-validation.md) records
 one passing freezer check, six driver debug cycles including speaker-assisted
-physical input, four USB reconnects and verified final restoration. Earlier-boot
-journal loss remains a follow-up; normal sleep remains disabled.
+physical input, four USB reconnects and verified final restoration.
+[97 — Journal ownership](97-journal-loss-investigation.md) identifies and fixes
+the scheduled RAM-log invocation that displaced early logs; this policy fix is
+on the running device and in future runtime sources, not the retained image.
+[98 — Sleep readiness](98-shallow-sleep-readiness.md) records the wake-error,
+key ownership, RTC and late/noirq gates; normal sleep remains disabled.
 
 Previous diagnostic.12:
 [85 — Preparation](85-diagnostic12-preparation.md) integrates four Wi-Fi
@@ -95,6 +99,8 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [98 — First shallow-sleep readiness](98-shallow-sleep-readiness.md) | S2idle boundaries, wake-error defects, RTC deadline and power-key ownership, late/noirq and recovery gates |
+| [97 — Journal displacement investigation](97-journal-loss-investigation.md) | Recovered early logs, confirmed RAM-log/rotation cause, runtime policy fix and repeatable continuity verification |
 | [96 — Diagnostic.13 attended qualification](96-diagnostic13-attended-validation.md) | Observed driver stages, speaker-assisted physical input, four USB reconnects, final restoration and earlier journal-loss follow-up |
 | [95 — Saved unattended awake qualification](95-awake-qualification-workflow.md) | One bounded awake sequence, persistent evidence/progress, fail-stop behavior and verified final state |
 | [94 — Unattended diagnostic.13 validation](94-unattended-diagnostic13-validation.md) | Awake Wi-Fi recovery/scanning, verified storage and CPU/memory load, battery-policy tests and restored final health |

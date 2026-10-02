@@ -12,6 +12,12 @@ manual-page, trim and scrub jobs are masked to keep measurements repeatable.
 Package sources are fixed snapshots; updates are deliberate rebuilds/reflashes
 in this milestone. A production update/maintenance policy remains later work.
 
+RAM logging is disabled in its own default configuration as well as masked
+as a service. Log rotation has a drop-in clearing Armbian's direct RAM-log
+pre/post hooks; its ordinary text-log command and timer remain enabled. This
+prevents scheduled rotation from moving persistent journals or switching
+journald to volatile storage. See [report 97](../docs/97-journal-loss-investigation.md).
+
 `gameshellneo-ready` records local **userspace** readiness in
 `/run/gameshellneo/ready.json`. Device names are observations, not a claim that
 display/input work. Network acquisition is independent. `sudo gameshellneo-collect`

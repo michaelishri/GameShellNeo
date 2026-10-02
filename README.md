@@ -161,8 +161,13 @@ passing unattended Wi-Fi recovery/scanning, storage/load, battery-policy and
 final health checks. [Report 96](docs/96-diagnostic13-attended-validation.md)
 records passing attended qualification: one freezer check, six driver debug
 cycles including speaker-assisted physical input, and four USB reconnects.
-Both SSH routes and final restoration passed. Earlier-boot journal loss remains
-under investigation; actual low-power sleep is still unqualified and disabled.
+Both SSH routes and final restoration passed. The earlier journal loss was
+traced to inherited RAM-log hooks in scheduled log rotation; the running device
+and runtime sources now have the verified policy correction in
+[report 97](docs/97-journal-loss-investigation.md). The retained diagnostic.13
+image artifact predates that correction. [Report 98](docs/98-shallow-sleep-readiness.md)
+defines the wake-error, power-key ownership, RTC and late/noirq preparation
+needed before actual low-power sleep, which remains unqualified and disabled.
 Fatal checked radio errors still require a cold restart. The saved
 `task device:qualify-awake` now combines the awake sequence into one command
 with persistent progress and a final report; its full live run passed in about
@@ -1515,6 +1520,25 @@ and a localhost allow exception. Those filters apply only to the test services;
 the task does not reconfigure Wi-Fi, restart production services or reboot.
 The uploaded helper is removed afterwards. Results remain in a private
 `integration.json`; any failed assertion returns a nonzero task status.
+
+For journal storage and the inherited Armbian log-rotation interaction:
+
+```sh
+task device:journal-inspect   # read-only storage/configuration/history capture over USB
+task device:journal-policy    # apply the saved two-file policy; save original contents
+task device:journal-rotation  # run ordinary text-log rotation and verify journal continuity
+```
+
+The inspector's exit status describes collection, not persistence health.
+The policy disables direct RAM-log calls and removes their rotation hooks;
+ordinary text-log rotation and journald's existing size limits remain active.
+It briefly pauses the rotation timer and restores its previous active state.
+The rotation check requires that policy first and uses no `--force`. Both
+actions verify the same boot, unchanged journald process, retained kernel
+history and unchanged displaced-journal inventory. They do not restart
+journald or merge/remove old evidence. Inspect an interrupted task's private
+capture and timer state before retrying. [Report 97](docs/97-journal-loss-investigation.md)
+records the recovered journals and hardware verification.
 
 The active country normally must match `GAMESHELL_WIFI_COUNTRY` in `.env`.
 For the owner's explicitly accepted AU access-point announcement while the

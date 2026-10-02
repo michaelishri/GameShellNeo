@@ -70,6 +70,10 @@ def main():
             require((root / 'etc/systemd/system' / unit).readlink() == Path('/dev/null'),
                     'Unowned ALSA state service is not masked: ' + unit)
     project = Path(__file__).resolve().parents[1]
+    for relative in ('etc/default/armbian-ramlog',
+                     'etc/systemd/system/logrotate.service.d/50-gameshellneo.conf'):
+        require((root / relative).read_bytes() == (project / 'runtime' / relative).read_bytes(),
+                'Persistent-journal ownership policy differs: ' + relative)
     built = json.loads((project / '.local/build/kernel-completed.json').read_text())
     require(identity['kernel'] == identity['sources']['linux']['tag'][1:] + identity['sources']['linux']['localversion'],
             'Kernel release differs from the image source lock')

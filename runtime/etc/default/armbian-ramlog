@@ -1,0 +1,3 @@
+# Journald owns bounded persistent storage. Direct Armbian helper calls must
+# remain inert too; masking armbian-ramlog.service alone does not disable them.
+ENABLED=false

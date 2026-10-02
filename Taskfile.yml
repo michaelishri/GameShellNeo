@@ -392,6 +392,18 @@ tasks:
     desc: Collect and download a private diagnostic archive (ROUTE=wifi or usb)
     cmds: [python3 tools/remote.py device logs]
 
+  device:journal-inspect:
+    desc: Capture journal storage, service ownership and bounded kernel history over USB (read-only)
+    cmds: [python3 tools/check-journal.py]
+
+  device:journal-policy:
+    desc: Install the saved persistent-journal policy over USB, preserving prior files as private evidence
+    cmds: [python3 tools/check-journal.py --apply]
+
+  device:journal-rotation:
+    desc: Run ordinary text-log rotation and verify journald/history stay intact; requires the saved policy
+    cmds: [python3 tools/check-journal.py --verify-rotation]
+
   device:check:
     desc: Check running image, services, journal ACLs, country and temporary BPF loopback policies
     cmds: [python3 tools/remote.py device check]

@@ -6,10 +6,13 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.14 is built, offline-verified and staged on the Mac for the next
-attended tests. [Preparation and artifact details](docs/103-diagnostic14-preparation.md)
-record its wake-IRQ and journal fixes. Diagnostic.13 remains installed until
-the next card transfer and flash.
+Diagnostic.14 is installed with passing full card readback, startup, both SSH
+routes, integration, journal rotation, awake power-key/RTC checks and the first
+observed late/noirq debug cycle.
+[Preparation and artifact details](docs/103-diagnostic14-preparation.md) record
+its wake-IRQ and journal fixes; [hardware qualification](docs/104-diagnostic14-hardware-qualification.md)
+records the attended gates and unresolved Wi-Fi control timeouts. Actual sleep
+remains disabled.
 
 Start with the [first-build specification](docs/23-first-build-spec.md),
 [build workflow](docs/24-building-and-testing.md),
@@ -156,7 +159,7 @@ input and four USB reconnects also passed in
 [report 90](docs/90-diagnostic12-input-usb-validation.md). The intermittent
 recovery failure and actual sleep remain open.
 
-The installed `0.1.0-diagnostic.13` adds packet-worker error isolation and
+The preceding `0.1.0-diagnostic.13` added packet-worker error isolation and
 checked interrupt rearm ownership. [Report 91](docs/91-diagnostic13-preparation.md)
 records the verified build and diagnostic.12 recovery;
 [report 93](docs/93-diagnostic13-installation.md) records full card readback,

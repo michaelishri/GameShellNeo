@@ -204,6 +204,8 @@ new image build and the next hardware qualification sequence.
 
 - [103 — Diagnostic.14 preparation](103-diagnostic14-preparation.md): verified recovery, complete build, offline checks and Mac staging.
 
+- [104 — Diagnostic.14 hardware qualification](104-diagnostic14-hardware-qualification.md): card readback, startup/journal/awake gates, first observed late/noirq pass and unresolved radio control timeouts.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

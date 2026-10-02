@@ -203,7 +203,8 @@ def main():
     def persist():
         print(json.dumps(record), flush=True)
     try:
-        with own(record, persist) as guard:
+        from keypad_pm import exclusive_pm
+        with exclusive_pm(OWNED.parent), own(record, persist) as guard:
             guard.before_entry()
             time.sleep(1)
             guard.after_entry()

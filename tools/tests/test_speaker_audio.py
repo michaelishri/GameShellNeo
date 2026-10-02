@@ -109,6 +109,7 @@ class Restoration(unittest.TestCase):
                 audio.restore()
         self.assertTrue(audio.OWNED.exists())
         with patch.object(sys, 'argv', ['pm', '--restore']), patch('keypad_pm.restore_trace'), \
+                patch.object(pm, 'STATE', self.root/'pm-owned.json'), \
                 patch('keypad_pm.restore_persistence'), patch('keypad_input.restore_console') as console, \
                 patch.object(audio, 'restore', side_effect=OSError('audio cleanup failed')), \
                 patch.object(pm, 'restore') as power, self.assertRaises(OSError):

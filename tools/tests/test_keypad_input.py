@@ -208,6 +208,7 @@ class Cleanup(unittest.TestCase):
 
     def test_console_restore_failure_cannot_prevent_pm_restore(self):
         with patch.object(sys, 'argv', ['test', '--restore']), \
+                patch.object(pm, 'STATE', keys.CONSOLE_OWNED.parent/'pm-owned.json'), \
                 patch('keypad_pm.restore_trace'), patch('keypad_pm.restore_persistence'), \
                 patch.object(keys, 'restore_console', side_effect=OSError('console error')), \
                 patch.object(pm, 'restore') as restore:
@@ -242,6 +243,7 @@ class EntryGuards(unittest.TestCase):
             yield Input()
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.object(pm, 'result_dir', return_value=Path(temporary)/'run'), \
+                patch.object(pm, 'STATE', Path(temporary)/'pm-owned.json'), \
                 patch.object(pm, 'snapshot', return_value={}), patch.object(pm, 'validate'), \
                 patch.object(pm, 'command', return_value=''), patch('keypad_pm.observe', observe), \
                 patch('keypad_pm.keypad_identity'), patch.object(keys, 'capture', capture), \

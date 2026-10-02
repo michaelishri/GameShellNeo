@@ -26,8 +26,8 @@ def module(name, filename):
 def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
                     keypad_quirk=None, wifi_trace=False, power_key=False):
     if (not re.fullmatch(r'/tmp/gameshellneo-pm\.[A-Za-z0-9]+', directory) or
-            stage not in ('freezer', 'devices') or not re.fullmatch(r'[0-9a-f]{32}', run_id) or
-            type(keypad_trace) is not bool or (keypad_trace and stage != 'devices') or
+            stage not in ('freezer', 'devices', 'platform') or not re.fullmatch(r'[0-9a-f]{32}', run_id) or
+            type(keypad_trace) is not bool or (keypad_trace and stage not in ('devices', 'platform')) or
             (keypad_persist is not None and (keypad_persist not in ('0', '1') or
                                             stage != 'devices' or not keypad_trace)) or
             type(keypad_input) is not bool or (keypad_input and
@@ -35,9 +35,11 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
             type(keypad_audio) is not bool or (keypad_audio and not keypad_input) or
             (keypad_quirk is not None and (keypad_quirk not in ('baseline', 'old-scheme', 'fast-recovery') or
                 stage != 'devices' or not keypad_trace or keypad_persist is not None)) or
-            type(wifi_trace) is not bool or (wifi_trace and (stage != 'devices' or keypad_input or
+            type(wifi_trace) is not bool or (wifi_trace and (stage not in ('devices', 'platform') or keypad_input or
                 keypad_persist is not None or keypad_quirk is not None))):
         raise ValueError('Invalid PM stage, path or run ID')
+    if stage == 'platform' and (power_key is not True or keypad_trace is not True):
+        raise ValueError('Platform debug requires key ownership and trace')
     if type(power_key) is not bool:
         raise ValueError('Invalid power-key ownership option')
     script = directory + '/test-pm-stages.py'
@@ -46,7 +48,7 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
             '--property=RuntimeMaxSec=' + ('420' if keypad_input else '120'), '--property=TimeoutStopSec=15',
             '--property=UMask=0077', '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
             '/usr/bin/systemd-inhibit', '--what=handle-power-key:sleep:idle', '--mode=block',
-            '--who=GameShellNeo PM diagnostic', '--why=Bounded freezer/devices debug test',
+            '--who=GameShellNeo PM diagnostic', '--why=Bounded PM debug test',
             '/usr/bin/python3', '-B', script, '--lock', directory + '/sources.lock.json',
             '--stage', stage, '--run-id', run_id] + (['--keypad-trace'] if keypad_trace else []) + (
                 ['--keypad-persist', keypad_persist] if keypad_persist is not None else []) + (
@@ -58,7 +60,7 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
 def inline(client, *args):
     # Inline inspection/recovery also needs the same saved keypad helper.
     program = 'import sys, types\n'
-    for name in ('keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace', 'power_key'):
+    for name in ('keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace', 'power_key', 'rtc_alarm', 'pm_platform'):
         program += ('keypad_helper = types.ModuleType(' + repr(name) + ')\n'
                     'exec(' + repr((ROOT / 'tools' / (name + '.py')).read_text()) + ', keypad_helper.__dict__)\n'
                     'sys.modules[' + repr(name) + '] = keypad_helper\n')
@@ -101,6 +103,8 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
             upload(sftp, ROOT / 'tools/speaker_audio.py', directory + '/speaker_audio.py')
             upload(sftp, ROOT / 'tools/wifi_trace.py', directory + '/wifi_trace.py')
             upload(sftp, ROOT / 'tools/power_key.py', directory + '/power_key.py')
+            upload(sftp, ROOT / 'tools/rtc_alarm.py', directory + '/rtc_alarm.py')
+            upload(sftp, ROOT / 'tools/pm_platform.py', directory + '/pm_platform.py')
             upload(sftp, ROOT / 'build/sources.lock.json', directory + '/sources.lock.json')
         (capture / 'run.json').write_text(json.dumps(dict(run_id=run_id, stage=stage, helper=directory)) + '\n')
         print('PM run:', run_id, 'helper:', directory, flush=True)
@@ -408,6 +412,7 @@ def main():
     mode.add_argument('--keypad-input', action='store_true')
     mode.add_argument('--keypad-quirks', action='store_true')
     mode.add_argument('--wifi-smoke', action='store_true')
+    mode.add_argument('--platform', action='store_true')
     parser.add_argument('--power-key', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
@@ -440,11 +445,16 @@ def main():
     stage = os.environ.get('NEO_PM_STAGE', '')
     cycles = int(os.environ.get('NEO_PM_CYCLES', '1'))
     trace_option = os.environ.get('NEO_KEYPAD_TRACE', '0')
+    if args.platform:
+        stage, trace_option, cycles = 'platform', '1', 1
+        args.power_key = True
     if args.keypad_retention or args.keypad_input or args.keypad_quirks:
         stage, trace_option = 'devices', '1'
-    if trace_option not in ('0', '1') or (trace_option == '1' and stage != 'devices'):
+    if stage == 'platform' and not args.platform:
+        raise ValueError('Use device:pm-platform for one guarded late/noirq cycle')
+    if trace_option not in ('0', '1') or (trace_option == '1' and stage not in ('devices', 'platform')):
         raise ValueError('KEYPAD_TRACE=0/1; tracing requires STAGE=devices')
-    if not (args.keypad_compare or args.wifi_smoke) and (stage not in ('freezer', 'devices') or not 1 <= cycles <= 4):
+    if not (args.keypad_compare or args.wifi_smoke) and (stage not in ('freezer', 'devices', 'platform') or not 1 <= cycles <= 4):
         raise ValueError('Explicit STAGE=freezer/devices and CYCLES=1..4 required')
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
     if (args.keypad_retention or args.keypad_input or args.keypad_quirks) and lock.get('experiments', {}).get('keypad_supply_retention') is not True:
@@ -459,9 +469,9 @@ def main():
     if quirk and (quirk not in ('baseline', 'old-scheme', 'fast-recovery') or
                   not (args.keypad_input or args.keypad_quirks)):
         raise ValueError('QUIRK requires the port comparison or physical keypad task')
-    wifi_option = os.environ.get('NEO_WIFI_TRACE', '0')
+    wifi_option = '1' if args.platform else os.environ.get('NEO_WIFI_TRACE', '0')
     if wifi_option not in ('0', '1') or (wifi_option == '1' and
-            (not args.test or stage != 'devices' or quirk)):
+            (not (args.test or args.platform) or stage not in ('devices', 'platform') or quirk)):
         raise ValueError('WIFI_TRACE=1 requires the ordinary devices test task')
     (capture / 'sources.lock.json').write_text(json.dumps(lock, indent=2) + '\n')
     with (LOCAL / 'pm-stages.lock').open('a') as guard:

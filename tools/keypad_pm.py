@@ -34,6 +34,15 @@ EVENTS = ('regulator/regulator_disable', 'regulator/regulator_disable_complete',
           'power/device_pm_callback_end')
 
 
+
+@contextmanager
+def exclusive_pm(directory):
+    """Serialize RTC, standalone key ownership and PM mutations on the device."""
+    with (directory / 'gameshellneo-pm-experiment.lock').open('a') as guard:
+        os.fchmod(guard.fileno(), 0o600)
+        fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        yield
+
 def optional(path):
     try:
         return Path(path).read_text().strip()

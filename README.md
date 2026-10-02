@@ -6,6 +6,11 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Sleep, a launcher, OTA and other board revisions are later work.
 
+Diagnostic.14 is built, offline-verified and staged on the Mac for the next
+attended tests. [Preparation and artifact details](docs/103-diagnostic14-preparation.md)
+record its wake-IRQ and journal fixes. Diagnostic.13 remains installed until
+the next card transfer and flash.
+
 Start with the [first-build specification](docs/23-first-build-spec.md),
 [build workflow](docs/24-building-and-testing.md),
 [first-build results](docs/25-first-build-validation.md), [research index](docs/README.md)
@@ -1647,3 +1652,17 @@ task device:pm-power-key STAGE=devices CYCLES=1 # Explicitly attended PM debug t
 bounded cleanup and abnormal-termination limits. The final short/2-second/
 8-second gestures remain the agreed product policy; these commands do not
 implement normal sleep or a power menu.
+
+RTC and late/noirq preparation is repeatable:
+
+```sh
+task device:rtc-inspect  # RTC time and logical alarm; no change
+task device:rtc-smoke    # Ten-second alarm while awake, then restore
+task device:rtc-restore  # Explicit recovery of an interrupted owned alarm
+task device:pm-platform # One attended late/noirq debug cycle; never real sleep
+```
+
+The platform task requires the wake-fixed image, same-boot RTC qualification,
+power-key ownership and complete PM traces. Run it only after explicit observer
+readiness. [Report 102](docs/102-rtc-and-platform-diagnostic-preparation.md)
+records the awake evidence, guards and prepared hardware sequence.

@@ -63,7 +63,10 @@ scratch with the pinned builder. The resolved configuration hash remained
 `d370205bf2e4eed5e35483f15372a6785e7d96252d40c343dfee0b2dde37a017`.
 Private evidence, including source/patch hashes and object hashes, is in
 `.local/build/wake-irq-tests/compile-evidence.json`; the build log is
-`.local/build/wake-drivers.log`. Shared checks passed: 13 runtime tests and
+`.local/build/wake-drivers.log`. Immutable run copies were retained as
+`.local/neo78-wake-irq-compile-evidence.json` and
+`.local/neo78-wake-drivers-full.log` before a later run can replace the generic
+task outputs. Shared checks passed: 13 runtime tests and
 322 tooling tests (one existing optional skip), C checks and shell lint.
 
 ## Remaining gates

@@ -200,6 +200,10 @@ new image build and the next hardware qualification sequence.
 
 - [101 — Diagnostic power-key ownership](101-diagnostic-power-key-ownership.md): exclusive event handling, awake qualification and real-sleep limits.
 
+- [102 — RTC and platform preparation](102-rtc-and-platform-diagnostic-preparation.md): awake alarm qualification and guarded late/noirq protocol.
+
+- [103 — Diagnostic.14 preparation](103-diagnostic14-preparation.md): verified recovery, complete build, offline checks and Mac staging.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

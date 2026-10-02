@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Inspect PM or exercise only the freezer/devices debug stages; never real sleep."""
+"""Inspect PM or exercise only the freezer/devices/platform debug stages; never real sleep."""
 import argparse
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager, nullcontext, ExitStack
 import gzip
 import hashlib
 import json
@@ -16,7 +16,7 @@ POWER = Path('/sys/power')
 BOOT = Path('/proc/sys/kernel/random/boot_id')
 STATE = Path('/run/gameshellneo-pm-test.json')
 RESULTS = Path('/var/lib/gameshellneo/pm-tests')
-STAGES = ('freezer', 'devices')
+STAGES = ('freezer', 'devices', 'platform')
 MASKS = ('sleep.target', 'suspend.target', 'hibernate.target',
          'hybrid-sleep.target', 'suspend-then-hibernate.target')
 SERVICES = ('gameshellneo-usb', 'gameshellneo-battery', 'gameshellneo-ready',
@@ -82,9 +82,9 @@ def restore():
 
 
 @contextmanager
-def stage_controls(stage):
-    if stage not in STAGES:
-        raise ValueError('Only freezer and devices are permitted')
+def stage_controls(stage, late_ready=False):
+    if stage not in STAGES or (stage == 'platform' and late_ready is not True):
+        raise ValueError('Only guarded freezer/devices/platform debug stages are permitted')
     original = dict(boot_id=read(BOOT), pm_test=selected(read(POWER / 'pm_test')),
                     pm_async=read(POWER / 'pm_async'))
     if original['pm_test'] != 'none' or original['pm_async'] not in ('0', '1'):
@@ -102,8 +102,8 @@ def stage_controls(stage):
         restore()
 
 
-def enter_stage(stage):
-    if (stage not in STAGES or selected(read(POWER / 'pm_test')) != stage or
+def enter_stage(stage, late_ready=False):
+    if (stage not in STAGES or (stage == 'platform' and late_ready is not True) or selected(read(POWER / 'pm_test')) != stage or
             read(POWER / 'pm_async') != '0' or
             read('/sys/module/suspend/parameters/pm_test_delay') != '5'):
         raise ValueError('Refusing entry: debug stage/readback/delay guard failed')
@@ -254,12 +254,14 @@ def check_result(before, after, stage, memory_ok):
 def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
                keypad_quirk=None, wifi_trace=False, power_key=False):
     if stage not in STAGES:
-        raise ValueError('Only freezer and devices are permitted')
+        raise ValueError('Only guarded freezer/devices/platform debug stages are permitted')
     if type(power_key) is not bool:
         raise ValueError('Invalid power-key ownership option')
-    if keypad_trace and stage != 'devices':
+    if stage == 'platform' and (power_key is not True or keypad_trace is not True):
+        raise ValueError('Platform requires power-key ownership and trace')
+    if keypad_trace and stage not in ('devices', 'platform'):
         raise ValueError('Keypad tracing is restricted to the devices debug stage')
-    if wifi_trace and (stage != 'devices' or keypad_input or keypad_persist is not None or keypad_quirk is not None):
+    if wifi_trace and (stage not in ('devices', 'platform') or keypad_input or keypad_persist is not None or keypad_quirk is not None):
         raise ValueError('Wi-Fi tracing requires ordinary devices without other experimental changes')
     if keypad_persist is not None and (keypad_persist not in ('0', '1') or
                                       stage != 'devices' or not keypad_trace):
@@ -275,13 +277,19 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
         raise ValueError('Port quirks require traced devices with retained supply and unchanged persistence')
     directory = result_dir(run_id)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
+    resources = ExitStack()
     record = dict(run_id=run_id, stage=stage, passed=False, event='started',
                   limits='PM debug stage only; no actual sleep, energy, wake or DRAM-retention proof.')
     try:
         before = snapshot()
         record['before'] = before
         validate(before, lock)
-        observers = ('rsb-comparison', 'idle-sample', 'power-profile', 'governor-profile',
+        from keypad_pm import exclusive_pm
+        resources.enter_context(exclusive_pm(STATE.parent))
+        if stage == 'platform':
+            from pm_platform import admission
+            record['rtc_qualification'] = admission(before, power_key, keypad_trace)
+        observers = ('power-key-smoke', 'rtc-alarm-smoke', 'rsb-comparison', 'idle-sample', 'power-profile', 'governor-profile',
                      'governor-comparison', 'usb-detection', 'usb-reconnects', 'usb-diagnostics',
                      'scan-test', 'firmware-trial', 'stability-test', 'backlight-test', 'keypad-capture', 'audio-test',
                      'wifi-trace-smoke')
@@ -324,7 +332,7 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
                             raise ValueError('Boot changed while waiting for physical input')
                         save(directory / 'started.json', record)
                     started = time.monotonic()
-                    with stage_controls(stage):
+                    with stage_controls(stage, late_ready=stage == 'platform'):
                         os.sync()
                         if inputs:
                             inputs.verify_hold('immediately-before-entry')
@@ -332,7 +340,7 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
                             record['speaker_audio']['idle_before_pm'] = speaker_idle()
                         if power_owner:
                             power_owner.before_entry()
-                        enter_stage(stage)
+                        enter_stage(stage, late_ready=stage == 'platform')
                         if power_owner:
                             power_owner.after_entry()
                     resumed = time.monotonic()
@@ -351,6 +359,9 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
                         # and restoration; diagnostic overhead must not extend the
                         # Wi-Fi qualification window.
                         record['after'] = snapshot()
+        if stage == 'platform':
+            from pm_platform import validate_trace
+            record['platform_trace'] = validate_trace(record['keypad'])
         after = record['after'] if wifi_trace else snapshot()
         record['after'] = after
         validate(after, lock)
@@ -360,7 +371,10 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
         record.update(event='failed', error=type(error).__name__ + ': ' + str(error))
         raise
     finally:
-        save(directory / 'result.json', record)
+        try:
+            resources.close()
+        finally:
+            save(directory / 'result.json', record)
 
 
 def main():
@@ -386,15 +400,17 @@ def main():
         from keypad_input import restore_console
         from speaker_audio import restore as restore_audio
         from wifi_trace import restore as restore_wifi_trace
-        failure = None
-        for operation in (restore_wifi_trace, restore_trace, restore_persistence, restore_port_quirks,
-                          restore_audio, restore_console, restore):
-            try:
-                operation()
-            except BaseException as error:
-                failure = failure or error
-        if failure:
-            raise failure
+        from keypad_pm import exclusive_pm
+        with exclusive_pm(STATE.parent):
+            failure = None
+            for operation in (restore_wifi_trace, restore_trace, restore_persistence, restore_port_quirks,
+                              restore_audio, restore_console, restore):
+                try:
+                    operation()
+                except BaseException as error:
+                    failure = failure or error
+            if failure:
+                raise failure
     elif args.inspect:
         print(json.dumps(snapshot()))
     elif args.collect:

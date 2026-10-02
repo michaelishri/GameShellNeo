@@ -6,12 +6,14 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.16 has been written to the DEV card and passed full 4 GiB readback;
-first boot and hardware qualification are pending. Its
+Diagnostic.16 is installed after full 4 GiB readback and owner-confirmed boot.
+Startup, both SSH routes, integration, journal and awake prerequisites passed,
+along with the automated checks for one freezer and one driver PM cycle.
+Driver-cycle visual confirmation and late/noirq qualification remain pending. Its
 [preparation report](docs/111-diagnostic16-preparation.md) records the transmit
 suspend and band-query changes, recovery and offline checks;
 [hardware report](docs/112-diagnostic16-hardware-qualification.md) records the
-card installation and remaining attended sequence.
+installation, initial results and remaining attended sequence.
 
 The previous diagnostic.15 baseline includes the
 [country-request suspend fix](docs/106-brcmfmac-regulatory-suspend.md).

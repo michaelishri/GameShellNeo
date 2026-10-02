@@ -16,6 +16,10 @@ remains disabled.
 Four additional observed late/noirq cycles passed, for five on this boot;
 [report 105](docs/105-diagnostic14-late-noirq-repeats.md) records their traces,
 restoration and the radio control errors still being investigated.
+The [country-request suspend fix](docs/106-brcmfmac-regulatory-suspend.md)
+now passes native/ARM32 regression tests and complete ARM driver compilation.
+Patch 0020 is awaiting a new image and hardware qualification; diagnostic.14
+does not contain it.
 
 Start with the [first-build specification](docs/23-first-build-spec.md),
 [build workflow](docs/24-building-and-testing.md),
@@ -599,6 +603,19 @@ Diagnostic.13 is installed; [report 91](docs/91-diagnostic13-preparation.md)
 records preparation and [report 93](docs/93-diagnostic13-installation.md) records
 the running baseline. Source-test evidence is under
 `.local/build/brcmfmac-{irq,lifecycle}-worker-tests/`.
+
+Country-request ordering across suspend has saved checks:
+
+```sh
+task test:brcmfmac-regulatory         # Actual callbacks, deferred requests and error paths
+task check:brcmfmac-regulatory-driver # Also compile the complete patched ARM cfg80211 object
+```
+
+`task build` includes the regression. Evidence is saved under
+`.local/build/brcmfmac-regulatory-tests/`.
+[Report 106](docs/106-brcmfmac-regulatory-suspend.md) describes patch 0020,
+RTNL ownership, deferred-update failures and the pending hardware checks.
+These tasks do not access the GameShell or replace its running modules.
 
 Wake-reference ownership and parent-error propagation have saved checks:
 

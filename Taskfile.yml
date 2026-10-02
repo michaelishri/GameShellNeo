@@ -89,6 +89,7 @@ tasks:
       - task: test:brcmfmac-lifecycle
       - task: test:brcmfmac-irq
       - task: test:brcmfmac-worker
+      - task: test:brcmfmac-regulatory
       - task: test:wake-irqs
       - task: test:musb-context
       - task: test:usb-policy
@@ -226,6 +227,14 @@ tasks:
   test:brcmfmac-freezer:
     desc: Check actual Wi-Fi freezer, workers and PM callbacks with controlled concurrency, native and ARM32
     cmds: [bash tools/run-logged.sh brcmfmac-freezer python3 tools/check-brcmfmac-freezer.py]
+
+  test:brcmfmac-regulatory:
+    desc: Check actual regulatory/PM callbacks, deferred country requests and replay errors on native/ARM32
+    cmds: [bash tools/run-logged.sh brcmfmac-regulatory python3 tools/check-brcmfmac-regulatory.py]
+
+  check:brcmfmac-regulatory-driver:
+    desc: Run regulatory regressions and compile the complete patched ARM cfg80211 object in scratch
+    cmds: [bash tools/run-logged.sh brcmfmac-regulatory-driver python3 tools/check-brcmfmac-regulatory.py --compile-driver]
 
   check:brcmfmac-freezer-drivers:
     desc: Run Wi-Fi freezer regressions and compile both complete ARM SDIO objects in isolated scratch

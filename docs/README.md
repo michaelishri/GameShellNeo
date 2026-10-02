@@ -208,6 +208,8 @@ new image build and the next hardware qualification sequence.
 
 - [105 — Late/noirq repeats](105-diagnostic14-late-noirq-repeats.md): four further observed passes, retained keypad, callback ordering, final health and radio error evidence.
 
+- [106 — Wi-Fi country requests across suspend](106-brcmfmac-regulatory-suspend.md): regulatory worker exclusion, deferred country updates, error policy and native/ARM32 source validation; hardware qualification remains ahead.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

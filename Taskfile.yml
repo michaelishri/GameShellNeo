@@ -90,6 +90,7 @@ tasks:
       - task: test:brcmfmac-irq
       - task: test:brcmfmac-worker
       - task: test:brcmfmac-regulatory
+      - task: test:brcmfmac-tx-suspend
       - task: test:wake-irqs
       - task: test:musb-context
       - task: test:usb-policy
@@ -235,6 +236,14 @@ tasks:
   check:brcmfmac-regulatory-driver:
     desc: Run regulatory regressions and compile the complete patched ARM cfg80211 object in scratch
     cmds: [bash tools/run-logged.sh brcmfmac-regulatory-driver python3 tools/check-brcmfmac-regulatory.py --compile-driver]
+
+  test:brcmfmac-tx-suspend:
+    desc: Check actual Wi-Fi queue/PM ownership and concurrent transmit drain natively and on ARM32
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-suspend python3 tools/check-brcmfmac-tx-suspend.py]
+
+  check:brcmfmac-tx-suspend-driver:
+    desc: Run transmit admission regressions and compile complete ARM core/cfg80211 objects
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-suspend-driver python3 tools/check-brcmfmac-tx-suspend.py --compile-driver]
 
   check:brcmfmac-freezer-drivers:
     desc: Run Wi-Fi freezer regressions and compile both complete ARM SDIO objects in isolated scratch

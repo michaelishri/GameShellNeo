@@ -214,6 +214,8 @@ new image build and the next hardware qualification sequence.
 
 - [108 — Diagnostic.15 hardware qualification](108-diagnostic15-hardware-qualification.md): startup/awake checks, one freezer, one devices and five observed late/noirq passes; no recurring country/control timeouts, full restoration and a separate suspended-transmit investigation.
 
+- [109 — Wi-Fi transmit suspend ownership](109-wifi-transmit-suspend-ownership.md): queue admission/drain, independent stop reasons, checked resume release and native/ARM32 validation; hardware comparison remains ahead.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

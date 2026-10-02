@@ -617,6 +617,18 @@ task check:brcmfmac-regulatory-driver # Also compile the complete patched ARM cf
 RTNL ownership, deferred-update failures and the pending hardware checks.
 These tasks do not access the GameShell or replace its running modules.
 
+Transmit admission across suspend also has saved checks:
+
+```sh
+task test:brcmfmac-tx-suspend         # Queue ownership and concurrent transmit drain
+task check:brcmfmac-tx-suspend-driver # Also compile complete ARM core/cfg80211 objects
+```
+
+`task build` includes this regression. [Report 109](docs/109-wifi-transmit-suspend-ownership.md)
+records patch 0021, its lock ordering, failed-resume behavior and source-test
+limits. Evidence is under `.local/build/brcmfmac-tx-suspend-tests/`.
+The source candidate is not installed in diagnostic.15.
+
 Wake-reference ownership and parent-error propagation have saved checks:
 
 ```sh

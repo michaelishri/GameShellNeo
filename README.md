@@ -158,8 +158,12 @@ records the verified build and diagnostic.12 recovery;
 owner-confirmed startup, both SSH routes, integration and read-only peripheral
 baselines. [Report 94](docs/94-unattended-diagnostic13-validation.md) records
 passing unattended Wi-Fi recovery/scanning, storage/load, battery-policy and
-final health checks. Observed PM/input/cable qualification remains ahead. Fatal checked
-radio errors still require a cold restart. The saved
+final health checks. [Report 96](docs/96-diagnostic13-attended-validation.md)
+records passing attended qualification: one freezer check, six driver debug
+cycles including speaker-assisted physical input, and four USB reconnects.
+Both SSH routes and final restoration passed. Earlier-boot journal loss remains
+under investigation; actual low-power sleep is still unqualified and disabled.
+Fatal checked radio errors still require a cold restart. The saved
 `task device:qualify-awake` now combines the awake sequence into one command
 with persistent progress and a final report; its full live run passed in about
 eleven minutes ([report 95](docs/95-awake-qualification-workflow.md)).

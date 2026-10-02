@@ -21,8 +21,11 @@ Current installed image: diagnostic.13.
 owner-confirmed startup, independent USB/Wi-Fi access, six passing integration
 groups and read-only PM/keypad/audio baselines.
 [94 — Unattended validation](94-unattended-diagnostic13-validation.md) records
-passing awake Wi-Fi, storage/load, battery-policy and final health checks. Observed PM/input/cable
-qualification remains ahead; normal sleep remains disabled.
+passing awake Wi-Fi, storage/load, battery-policy and final health checks.
+[96 — Attended validation](96-diagnostic13-attended-validation.md) records
+one passing freezer check, six driver debug cycles including speaker-assisted
+physical input, four USB reconnects and verified final restoration. Earlier-boot
+journal loss remains a follow-up; normal sleep remains disabled.
 
 Previous diagnostic.12:
 [85 — Preparation](85-diagnostic12-preparation.md) integrates four Wi-Fi
@@ -46,8 +49,8 @@ next source candidate with fault isolation, command completion and checked
 clock/status operations. It is not installed in diagnostic.12.
 [91 — Diagnostic.13 preparation](91-diagnostic13-preparation.md) records the
 complete candidate build, offline verification, recovery and prepared hardware
-sequence. Installation is recorded in report 93; physical PM/input/cable
-qualification remains separate.
+sequence. Installation is recorded in report 93; attended PM/input/cable
+qualification is recorded in report 96.
 
 Previous diagnostic.11 hardware: [74 — PM validation](74-diagnostic11-pm-validation.md)
 records driver/input/cable results and an intermittent Wi-Fi recovery failure;
@@ -92,6 +95,7 @@ new image build and the next hardware qualification sequence.
 
 | Report | Contents |
 | --- | --- |
+| [96 — Diagnostic.13 attended qualification](96-diagnostic13-attended-validation.md) | Observed driver stages, speaker-assisted physical input, four USB reconnects, final restoration and earlier journal-loss follow-up |
 | [95 — Saved unattended awake qualification](95-awake-qualification-workflow.md) | One bounded awake sequence, persistent evidence/progress, fail-stop behavior and verified final state |
 | [94 — Unattended diagnostic.13 validation](94-unattended-diagnostic13-validation.md) | Awake Wi-Fi recovery/scanning, verified storage and CPU/memory load, battery-policy tests and restored final health |
 | [93 — Diagnostic.13 installation](93-diagnostic13-installation.md) | Verified flash/boot, USB and Wi-Fi access, integration and read-only PM/keypad/audio baseline |

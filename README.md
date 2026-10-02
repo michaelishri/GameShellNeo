@@ -14,8 +14,15 @@ groups, journal rotation and awake power-key/RTC checks passed.
 verification; [hardware qualification](docs/108-diagnostic15-hardware-qualification.md)
 records the running baseline, one freezer, one devices and five attended
 late/noirq passes, with normal display return confirmed by the owner.
-Country/control timeouts did not recur; a separate suspended-transmit warning
-remains under investigation (NEO-85). Actual sleep remains disabled.
+Country/control timeouts did not recur. A
+[transmit-admission fix](docs/109-wifi-transmit-suspend-ownership.md) is ready for
+hardware comparison against the remaining suspended-transmit warning.
+Actual sleep remains disabled.
+Diagnostic.16 is built, offline-verified and staged on the Mac, with transmit
+suspend ownership and checked band-capability queries. Its
+[preparation report](docs/111-diagnostic16-preparation.md) records recovery,
+artifact hashes, matching configuration/packages and the next attended test
+sequence. Diagnostic.15 remains installed and is retained for recovery.
 Diagnostic.14 is retained for recovery and comparison:
 its [five observed late/noirq cycles](docs/105-diagnostic14-late-noirq-repeats.md)
 passed the restoration checks but exposed the recurring radio control errors

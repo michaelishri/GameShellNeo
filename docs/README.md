@@ -218,6 +218,8 @@ new image build and the next hardware qualification sequence.
 
 - [110 — Wi-Fi band query errors](110-wifi-band-query-errors.md): checked required/optional capability reads, legacy defaults, chain bounds and source validation; channel transactions and hardware comparison remain open.
 
+- [111 — Diagnostic.16 preparation](111-diagnostic16-preparation.md): preserved diagnostic.15 recovery, complete kernel/image build, matching configuration/packages, offline verification, Mac staging and the prepared transmit/capability comparison.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

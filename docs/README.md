@@ -193,6 +193,11 @@ new image build and the next hardware qualification sequence.
 
 **Hardware revision identification matters.** Published schematics, the product page and firmware artifacts contain differences, including the keypad microcontroller identification. The reports preserve those disagreements. The owner's mainboard is now identified as CPI v3.1; keypad and memory-package markings remain outstanding. Code enabling a device is not proof that a new image supports it reliably. [Hardware analysis](02-hardware.md); [installed baseline](21-installed-hardware-baseline.md).
 
+## Wake preparation
+
+- [99 — Wake IRQ locking research](99-wake-irq-locking-research.md): parent callback context and safe propagation constraints.
+- [100 — Checked wake-interrupt ownership](100-wake-irq-error-ownership.md): source fixes, failure regressions and remaining hardware gates.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

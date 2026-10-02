@@ -89,6 +89,7 @@ tasks:
       - task: test:brcmfmac-lifecycle
       - task: test:brcmfmac-irq
       - task: test:brcmfmac-worker
+      - task: test:wake-irqs
       - task: test:musb-context
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -209,6 +210,14 @@ tasks:
   test:brcmfmac-sleep:
     desc: Check actual Wi-Fi sleep/clock helpers with SDIO failures, native and ARM32
     cmds: [bash tools/run-logged.sh brcmfmac-sleep python3 tools/check-brcmfmac-sleep.py]
+
+  test:wake-irqs:
+    desc: Check actual IRQ-core/regmap/PEK/RTC/AC wake ownership and failures, native and ARM32
+    cmds: [bash tools/run-logged.sh wake-irqs python3 tools/check-wake-irqs.py]
+
+  check:wake-drivers:
+    desc: Run wake ownership regressions and compile all four complete ARM drivers in isolated scratch
+    cmds: [bash tools/run-logged.sh wake-drivers python3 tools/check-wake-irqs.py --compile-drivers]
 
   check:brcmfmac-driver:
     desc: Run Wi-Fi sleep/clock regressions and compile the complete ARM SDIO driver in isolated scratch

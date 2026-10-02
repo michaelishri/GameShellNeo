@@ -1,0 +1,327 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] irq: propagate atomic parent wake errors and retain client ownership
+
+Only regmap parents without slow bus callbacks and without separate wake
+registers use synchronous wake propagation. Other controllers retain their
+existing deferred path. Balance PEK, RTC and AC wake transitions, including
+rollback and failed disarms, without rereading policy on resume.
+
+diff --git a/drivers/base/regmap/regmap-irq.c b/drivers/base/regmap/regmap-irq.c
+--- a/drivers/base/regmap/regmap-irq.c
++++ b/drivers/base/regmap/regmap-irq.c
+@@ -32,6 +32,7 @@
+ 
+ 	int irq;
+ 	int wake_count;
++	bool wake_parent_atomic;
+ 
+ 	void *status_reg_buf;
+ 	unsigned int *main_status_buf;
+@@ -275,11 +276,31 @@
+ 	return 0;
+ }
+ 
++/* A nested regmap parent may take a sleeping bus lock. Only propagate
++ * synchronously when no wake-register transaction or slow parent bus is
++ * involved. Parent chips must retain their bus-lock contract while active.
++ */
++static bool regmap_irq_wake_parent_atomic(struct regmap_irq_chip_data *d)
++{
++	struct irq_chip *parent = irq_get_chip(d->irq);
++
++	return !d->wake_buf && parent && !parent->irq_bus_lock &&
++	       !parent->irq_bus_sync_unlock;
++}
++
+ static int regmap_irq_set_wake(struct irq_data *data, unsigned int on)
+ {
+ 	struct regmap_irq_chip_data *d = irq_data_get_irq_chip_data(data);
+ 	struct regmap *map = d->map;
+ 	const struct regmap_irq *irq_data = irq_to_regmap_irq(d, data->hwirq);
++
++	/* Keep parent and child wake_depth/IRQD_WAKEUP_STATE transactional.
++	 * The child bus mutex serializes siblings; the parent core retains its
++	 * own reference accounting and lock. Do not enqueue this transition
++	 * again in the void bus-sync callback.
++	 */
++	if (d->wake_parent_atomic)
++		return irq_set_irq_wake(d->irq, on);
+ 
+ 	if (on) {
+ 		if (d->wake_buf)
+@@ -936,6 +957,8 @@
+ 		goto err_domain;
+ 	}
+ 
++	/* request_threaded_irq() may select a parent chip via irq_set_type(). */
++	d->wake_parent_atomic = regmap_irq_wake_parent_atomic(d);
+ 	*data = d;
+ 
+ 	return 0;
+diff --git a/drivers/input/misc/axp20x-pek.c b/drivers/input/misc/axp20x-pek.c
+--- a/drivers/input/misc/axp20x-pek.c
++++ b/drivers/input/misc/axp20x-pek.c
+@@ -43,6 +43,9 @@
+ 	struct axp20x_info *info;
+ 	int irq_dbr;
+ 	int irq_dbf;
++	bool wake_dbf;
++	bool wake_dbr;
++	bool irqs_disabled;
+ };
+ 
+ struct axp20x_time {
+@@ -327,38 +330,70 @@
+ 	return 0;
+ }
+ 
++/* Keep failed disarms owned so a later attempt cannot stack references. */
++static int axp20x_pek_disarm_wake(struct axp20x_pek *pek)
++{
++	int ret = 0, err;
++
++	if (pek->wake_dbr) {
++		ret = disable_irq_wake(pek->irq_dbr);
++		if (!ret)
++			pek->wake_dbr = false;
++	}
++	if (pek->wake_dbf) {
++		err = disable_irq_wake(pek->irq_dbf);
++		if (!err)
++			pek->wake_dbf = false;
++		if (!ret)
++			ret = err;
++	}
++	return ret;
++}
++
+ static int axp20x_pek_suspend(struct device *dev)
+ {
+-	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
+-
+-	/*
+-	 * As nested threaded IRQs are not automatically disabled during
+-	 * suspend, we must explicitly disable non-wakeup IRQs.
+-	 */
++	struct axp20x_pek *pek = dev_get_drvdata(dev);
++	int ret, err;
++
++	if (!pek->input)
++		return 0;
++
++	ret = axp20x_pek_disarm_wake(pek);
++	if (ret)
++		return ret;
++
+ 	if (device_may_wakeup(dev)) {
+-		enable_irq_wake(axp20x_pek->irq_dbf);
+-		enable_irq_wake(axp20x_pek->irq_dbr);
++		ret = enable_irq_wake(pek->irq_dbf);
++		if (ret)
++			return ret;
++		pek->wake_dbf = true;
++		ret = enable_irq_wake(pek->irq_dbr);
++		if (ret) {
++			err = axp20x_pek_disarm_wake(pek);
++			if (err)
++				dev_err(dev, "Failed to unwind wake IRQ: %d\n", err);
++			return ret;
++		}
++		pek->wake_dbr = true;
+ 	} else {
+-		disable_irq(axp20x_pek->irq_dbf);
+-		disable_irq(axp20x_pek->irq_dbr);
+-	}
+-
++		/* Nested threaded IRQs are not disabled by the IRQ core. */
++		disable_irq(pek->irq_dbf);
++		disable_irq(pek->irq_dbr);
++		pek->irqs_disabled = true;
++	}
+ 	return 0;
+ }
+ 
+ static int axp20x_pek_resume(struct device *dev)
+ {
+-	struct axp20x_pek *axp20x_pek = dev_get_drvdata(dev);
+-
+-	if (device_may_wakeup(dev)) {
+-		disable_irq_wake(axp20x_pek->irq_dbf);
+-		disable_irq_wake(axp20x_pek->irq_dbr);
+-	} else {
+-		enable_irq(axp20x_pek->irq_dbf);
+-		enable_irq(axp20x_pek->irq_dbr);
+-	}
+-
+-	return 0;
++	struct axp20x_pek *pek = dev_get_drvdata(dev);
++
++	if (pek->irqs_disabled) {
++		enable_irq(pek->irq_dbf);
++		enable_irq(pek->irq_dbr);
++		pek->irqs_disabled = false;
++	}
++	return axp20x_pek_disarm_wake(pek);
+ }
+ 
+ static int __maybe_unused axp20x_pek_resume_noirq(struct device *dev)
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -146,6 +146,7 @@
+ 	const struct sun6i_rtc_clk_data *data;
+ 	void __iomem *base;
+ 	int irq;
++	bool wake_armed;
+ 	time64_t alarm;
+ 	unsigned long flags;
+ 
+@@ -710,27 +711,40 @@
+ };
+ 
+ #ifdef CONFIG_PM_SLEEP
+-/* Enable IRQ wake on suspend, to wake up from RTC. */
++static int sun6i_rtc_disarm_wake(struct sun6i_rtc_dev *chip)
++{
++	int ret;
++
++	if (!chip->wake_armed)
++		return 0;
++	ret = disable_irq_wake(chip->irq);
++	if (!ret)
++		chip->wake_armed = false;
++	return ret;
++}
++
++/* Arm only after any owned failed disarm has been resolved. */
+ static int sun6i_rtc_suspend(struct device *dev)
+ {
+ 	struct sun6i_rtc_dev *chip = dev_get_drvdata(dev);
+-
+-	if (device_may_wakeup(dev))
+-		enable_irq_wake(chip->irq);
+-
+-	return 0;
+-}
+-
+-/* Disable IRQ wake on resume. */
++	int ret;
++
++	ret = sun6i_rtc_disarm_wake(chip);
++	if (ret)
++		return ret;
++	if (!device_may_wakeup(dev))
++		return 0;
++	ret = enable_irq_wake(chip->irq);
++	if (!ret)
++		chip->wake_armed = true;
++	return ret;
++}
++
+ static int sun6i_rtc_resume(struct device *dev)
+ {
+-	struct sun6i_rtc_dev *chip = dev_get_drvdata(dev);
+-
+-	if (device_may_wakeup(dev))
+-		disable_irq_wake(chip->irq);
+-
+-	return 0;
+-}
++	return sun6i_rtc_disarm_wake(dev_get_drvdata(dev));
++}
++
+ #endif
+ 
+ static SIMPLE_DEV_PM_OPS(sun6i_rtc_pm_ops,
+diff --git a/drivers/power/supply/axp20x_ac_power.c b/drivers/power/supply/axp20x_ac_power.c
+--- a/drivers/power/supply/axp20x_ac_power.c
++++ b/drivers/power/supply/axp20x_ac_power.c
+@@ -44,6 +44,9 @@
+ 	struct iio_channel *acin_v;
+ 	struct iio_channel *acin_i;
+ 	bool has_acin_path_sel;
++	bool wake_armed;
++	bool irqs_disabled;
++	unsigned int disabled_from;
+ 	unsigned int num_irqs;
+ 	unsigned int irqs[] __counted_by(num_irqs);
+ };
+@@ -282,37 +285,58 @@
+ };
+ 
+ #ifdef CONFIG_PM_SLEEP
++static int axp20x_ac_power_disarm_wake(struct axp20x_ac_power *power)
++{
++	int ret;
++
++	if (!power->wake_armed)
++		return 0;
++	ret = disable_irq_wake(power->irqs[0]);
++	if (!ret)
++		power->wake_armed = false;
++	return ret;
++}
++
+ static int axp20x_ac_power_suspend(struct device *dev)
+ {
+ 	struct axp20x_ac_power *power = dev_get_drvdata(dev);
+-	int i = 0;
+-
+-	/*
+-	 * Allow wake via ACIN_PLUGIN only.
+-	 *
+-	 * As nested threaded IRQs are not automatically disabled during
+-	 * suspend, we must explicitly disable the remainder of the IRQs.
+-	 */
+-	if (device_may_wakeup(&power->supply->dev))
+-		enable_irq_wake(power->irqs[i++]);
++	int ret;
++	unsigned int i = 0;
++
++	ret = axp20x_ac_power_disarm_wake(power);
++	if (ret)
++		return ret;
++
++	/* Only AC insertion wakes; own the actual choice until resume. */
++	if (device_may_wakeup(&power->supply->dev)) {
++		ret = enable_irq_wake(power->irqs[0]);
++		if (ret)
++			return ret;
++		power->wake_armed = true;
++		i = 1;
++	}
++	power->disabled_from = i;
+ 	while (i < power->num_irqs)
+ 		disable_irq(power->irqs[i++]);
+-
++	power->irqs_disabled = true;
+ 	return 0;
+ }
+ 
+ static int axp20x_ac_power_resume(struct device *dev)
+ {
+ 	struct axp20x_ac_power *power = dev_get_drvdata(dev);
+-	int i = 0;
+-
+-	if (device_may_wakeup(&power->supply->dev))
+-		disable_irq_wake(power->irqs[i++]);
+-	while (i < power->num_irqs)
+-		enable_irq(power->irqs[i++]);
+-
+-	return 0;
+-}
++	unsigned int i;
++	int ret;
++
++	ret = axp20x_ac_power_disarm_wake(power);
++	if (power->irqs_disabled) {
++		for (i = power->disabled_from; i < power->num_irqs; i++)
++			enable_irq(power->irqs[i]);
++		power->irqs_disabled = false;
++	}
++	return ret;
++}
++
+ #endif
+ 
+ static SIMPLE_DEV_PM_OPS(axp20x_ac_power_pm_ops, axp20x_ac_power_suspend,

@@ -589,6 +589,16 @@ records preparation and [report 93](docs/93-diagnostic13-installation.md) record
 the running baseline. Source-test evidence is under
 `.local/build/brcmfmac-{irq,lifecycle}-worker-tests/`.
 
+Wake-reference ownership and parent-error propagation have saved checks:
+
+```sh
+task test:wake-irqs       # Actual IRQ-core/client functions, native + ARM32 failures
+task check:wake-drivers   # Also compile all four complete ARM drivers
+```
+
+[Report 100](docs/100-wake-irq-error-ownership.md) records patch 0019's scope,
+locking constraints and offline evidence. Hardware wake remains unqualified.
+
 For the Sunxi MUSB context capability fix, use:
 
 ```sh

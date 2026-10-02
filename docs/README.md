@@ -220,7 +220,7 @@ new image build and the next hardware qualification sequence.
 
 - [111 — Diagnostic.16 preparation](111-diagnostic16-preparation.md): preserved diagnostic.15 recovery, complete kernel/image build, matching configuration/packages, offline verification, Mac staging and the prepared transmit/capability comparison.
 
-- [112 — Diagnostic.16 hardware qualification](112-diagnostic16-hardware-qualification.md): guarded flash/readback, confirmed boot, startup/awake checks and initial freezer/driver passes; visual confirmation and late/noirq comparison pending.
+- [112 — Diagnostic.16 hardware qualification](112-diagnostic16-hardware-qualification.md): guarded flash/readback, startup/awake checks, one freezer/driver and five observed late/noirq passes; no recurring transmit warning, restored settings/idle audio and bounded qualification limits.
 
 ## Questions left open for the next phase
 

@@ -3,8 +3,11 @@
 3 October 2026, Pacific/Auckland. Diagnostic.16 has been written to the owner's
 Samsung DEV card, verified by full readback and safely ejected. The owner
 confirmed first boot; integration, journal and awake prerequisites passed.
-One freezer and one driver cycle passed the automated checks. Visual
-confirmation after the driver cycle and late/noirq qualification remain pending.
+One freezer, one driver and five late/noirq cycles passed the automated checks.
+The owner confirmed normal display after the driver, first late/noirq and
+four-repeat batch. Final health, settings and idle audio matched the baseline.
+The earlier suspended-transmit warning did not recur in this bounded comparison;
+actual sleep remains untested and disabled for normal use.
 
 [Report 111](111-diagnostic16-preparation.md) records the complete build,
 offline checks, retained diagnostic.15 recovery and staged archive. The source
@@ -146,11 +149,109 @@ route/channel failure and an SSH session/banner failure during recovery, then
 retrieved this same run successfully. Both failed connection attempts remain
 in the capture; no PM submission was retried. Access latency is unqualified.
 
-The owner has been asked to confirm normal dim-console return and readiness
-for one late/noirq cycle. No further PM test is running while that response is
-pending. No actual sleep has been entered.
+The owner confirmed normal dim-console return and readiness for one late/noirq
+cycle. The saved `task device:pm-platform` then passed, run ID
+`6c7055a5751849e2b15a4e7e11ee5cfc`. Evidence is
+`.local/diagnostics/20261002T185305.665142Z/cycle-1/`,
+`.local/neo88-platform-first.log` and
+`.local/neo88-kernel-after-platform-first.log`.
 
-The prior diagnostic.15 warning occurred in one of five late/noirq cycles.
-Repeated reviewed runs and complete logs are required for comparison; successful
-flashing does not resolve that warning. Actual sleep, product power-key gestures,
-firmware-country readback, NEO-55 and energy savings remain unqualified.
+The stage took **7.966 seconds**, including the five-second debug wait. Both SSH
+routes recovered on the same boot, and PM successes advanced from two to three
+with every failure counter still zero. Process memory, settings and power-key
+ownership restoration passed. The original keypad handle, USB device number
+and input path survived, with no disconnect or supply-disable event. Wi-Fi
+tracing was restored without loss and recorded two EAPOL transmissions and two
+receptions. A temporary SSH channel-open timeout recovered while collecting
+this same run; there was no repeated PM submission.
+
+Trace validation found all four ordered late/noirq phase pairs and **1,903
+device callback returns with zero errors**. RSB noirq resume finished at ftrace
+time `1676.189547`, before PEK noirq resume began at `1676.189607`. The trace
+contains no actual-sleep entry. The raw kernel log shows the expected RSB
+restore and keypad reset-resume, without a new country/control timeout,
+band-query failure, unsupported-register warning or suspended-transmit
+rejection. These observations establish this debug cycle's recovery, not actual
+sleep/wake reliability or resume latency.
+
+The owner confirmed normal dim-console return and gave fresh readiness for
+four further late/noirq cycles, reviewed individually.
+
+## Four-repeat comparison and final state
+
+Each repeat used one invocation of `task device:pm-platform`. The completed
+result, callback trace, keypad retention, both independent SSH proofs and raw
+kernel delta were reviewed before starting the next. The owner subsequently
+confirmed that all four display returns and final brightness looked normal.
+
+| Repeat | Run ID | Private capture | Stage including 5 s debug hold |
+| --- | --- | --- | --- |
+| 1 | `a49b1e28cb14466886178487637e095a` | `20261002T190057.578761Z` | 8.047 s |
+| 2 | `f24898a5b5834de295df4078f7e4b1b8` | `20261002T190253.625880Z` | 7.867 s |
+| 3 | `135c6d74d0d84d028f22acad8a697875` | `20261002T190445.281634Z` | 7.893 s |
+| 4 | `6fb0f67235f2420fab8d266e257c36b4` | `20261002T190648.133179Z` | 7.907 s |
+
+Captures are under `.local/diagnostics/<capture>/cycle-1/`. Host transcripts
+are `.local/neo88-platform-repeat{1,2,3,4}.log`; corresponding raw kernel logs
+are `.local/neo88-kernel-after-platform-repeat{1,2,3,4}.log`. Each capture
+includes the original result and a local review summary produced using the
+existing retention and platform validators.
+
+Every repeat preserved process memory, the original keypad handle, USB number
+and input path, with no disconnect or keypad-supply-disable event. Power-key
+ownership returned normally. All four late/noirq phase pairs were present in
+each trace, with 1,903 callback returns per cycle and no callback errors, trace
+loss or actual-sleep entry. RSB noirq completion preceded PEK noirq entry in
+each. Wi-Fi tracing was restored and recorded two EAPOL transmissions and two
+receptions per repeat. Both SSH routes recovered on the original boot.
+
+All five late/noirq raw-log intervals were free of the earlier suspended-transmit
+rejection and tracked country/control, band-query and unsupported-register
+errors. The complete raw kernel history was preserved across collection. The
+first three repeats recorded transient no-route/channel collection errors;
+repeat four recorded a channel-open timeout. Each original run was recovered
+without repeating its PM submission. These access interruptions remain recorded;
+the checks do not qualify network recovery latency.
+
+Final saved checks were:
+
+```sh
+task device:pm-inspect
+task device:audio-inspect
+task device:check ROUTE=usb ACTIVE_COUNTRY=AU
+task device:exec ROUTE=usb -- sudo -n dmesg --time-format=raw
+```
+
+PM successes reached **7** with every failure counter zero. The final snapshot
+passed the existing PM admission validator and matched the initial identity,
+kernel/configuration, normal sleep masks and PM controls, USB experiments,
+retained supplies, services, taint, Wi-Fi configuration/power save, charging
+and CPU policy, input/backlight and radio hashes. Battery monitoring remained
+valid; no charging setting changed. The entire final idle audio inspection
+matched its initial capture, including closed PCM devices and both amplifiers
+off. All six integration groups passed, with the accepted NZ provisioning / AU
+AP announcement / phy 99 policy unchanged.
+
+Final captures: PM `20261002T190857.680765Z`, audio
+`20261002T190915.512072Z`, integration `20261002T190953.454185Z`.
+Host transcripts are `.local/neo88-{pm,audio,integration}-final.log`; the final
+raw kernel log is `.local/neo88-kernel-final.log`. Comparison evidence is
+`.local/neo88-final-baseline-comparison.json`. No new kernel entry appeared
+between the last repeat's raw capture and the final check.
+
+## Conclusion and remaining limits
+
+Diagnostic.15 logged one `xmit rejected state=0` warning in five late/noirq
+cycles. Diagnostic.16 completed the same one-driver/five-late-noirq comparison
+without that warning, country/control timeouts or band-query errors. This
+supports the new driver's behavior on this board and boot. It does not prove
+that every possible transmit/control producer is excluded during suspension,
+identify the earlier packet, exercise every capability-query failure branch,
+or establish long-term radio reliability. The source failure-path tests remain
+separate evidence from these successful hardware runs.
+
+NEO-88's installation and attended debug comparison are complete. Actual sleep,
+product power-key gestures, firmware-country readback, NEO-55 and energy savings
+remain unqualified. Physical keypad taps, speaker playback and cable cycles were
+not repeated in this slice. Normal sleep stays masked and the diagnostic short
+power press still requests shutdown. Diagnostic.15 recovery remains available.

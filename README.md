@@ -8,12 +8,14 @@ board. Sleep, a launcher, OTA and other board revisions are later work.
 
 Diagnostic.16 is installed after full 4 GiB readback and owner-confirmed boot.
 Startup, both SSH routes, integration, journal and awake prerequisites passed,
-along with the automated checks for one freezer and one driver PM cycle.
-Driver-cycle visual confirmation and late/noirq qualification remain pending. Its
+along with one freezer, one driver and five attended late/noirq cycles. The owner
+confirmed normal display return; final settings, health and idle audio matched
+the baseline. The earlier rejected-transmit warning did not recur in this
+bounded comparison. The
 [preparation report](docs/111-diagnostic16-preparation.md) records the transmit
 suspend and band-query changes, recovery and offline checks;
 [hardware report](docs/112-diagnostic16-hardware-qualification.md) records the
-installation, initial results and remaining attended sequence.
+installation, completed comparison and remaining limits.
 
 The previous diagnostic.15 baseline includes the
 [country-request suspend fix](docs/106-brcmfmac-regulatory-suspend.md).
@@ -24,8 +26,8 @@ verification; [hardware qualification](docs/108-diagnostic15-hardware-qualificat
 records the running baseline, one freezer, one devices and five attended
 late/noirq passes, with normal display return confirmed by the owner.
 Country/control timeouts did not recur. A
-[transmit-admission fix](docs/109-wifi-transmit-suspend-ownership.md) is ready for
-hardware comparison against the remaining suspended-transmit warning.
+[transmit-admission fix](docs/109-wifi-transmit-suspend-ownership.md) is included
+in diagnostic.16's hardware comparison above.
 Actual sleep remains disabled.
 Diagnostic.15 is retained for recovery and comparison.
 Diagnostic.14 is retained for recovery and comparison:

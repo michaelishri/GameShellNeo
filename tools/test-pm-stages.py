@@ -252,9 +252,11 @@ def check_result(before, after, stage, memory_ok):
 
 
 def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
-               keypad_quirk=None, wifi_trace=False):
+               keypad_quirk=None, wifi_trace=False, power_key=False):
     if stage not in STAGES:
         raise ValueError('Only freezer and devices are permitted')
+    if type(power_key) is not bool:
+        raise ValueError('Invalid power-key ownership option')
     if keypad_trace and stage != 'devices':
         raise ValueError('Keypad tracing is restricted to the devices debug stage')
     if wifi_trace and (stage != 'devices' or keypad_input or keypad_persist is not None or keypad_quirk is not None):
@@ -296,11 +298,15 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
         record['port_quirks'] = {}
         record['wifi_trace'] = {}
         from wifi_trace import capture as capture_wifi
+        from power_key import own as own_power_key
+        record['power_key'] = {}
         with (persistence(record['persistence'], keypad_persist)
               if keypad_persist is not None else nullcontext()), \
              (port_quirks(record['port_quirks'], keypad_quirk)
               if keypad_quirk is not None else nullcontext()), \
-             (capture_wifi(record['wifi_trace']) if wifi_trace else nullcontext()):
+             (capture_wifi(record['wifi_trace']) if wifi_trace else nullcontext()), \
+             (own_power_key(record['power_key'], lambda: save(directory / 'started.json', record))
+              if power_key else nullcontext()) as power_owner:
             with observe(record['keypad'], tracing=keypad_trace) as original_fd:
                 from keypad_input import capture
                 from speaker_audio import session as speaker_session, idle as speaker_idle
@@ -324,7 +330,11 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
                             inputs.verify_hold('immediately-before-entry')
                         if cue:
                             record['speaker_audio']['idle_before_pm'] = speaker_idle()
+                        if power_owner:
+                            power_owner.before_entry()
                         enter_stage(stage)
+                        if power_owner:
+                            power_owner.after_entry()
                     resumed = time.monotonic()
                     record['stage_seconds'] = resumed - started
                     record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == digest
@@ -368,6 +378,7 @@ def main():
     parser.add_argument('--keypad-audio', action='store_true')
     parser.add_argument('--keypad-quirk', choices=('baseline', 'old-scheme', 'fast-recovery'))
     parser.add_argument('--wifi-trace', action='store_true')
+    parser.add_argument('--power-key', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
@@ -401,7 +412,7 @@ def main():
             signal.signal(sig, interrupted)
         test_stage(json.loads(read(args.lock)), args.stage, args.run_id,
                    args.keypad_trace, args.keypad_persist, args.keypad_input, args.keypad_audio, args.keypad_quirk,
-                   args.wifi_trace)
+                   args.wifi_trace, args.power_key)
 
 
 if __name__ == '__main__':

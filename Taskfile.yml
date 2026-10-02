@@ -381,6 +381,18 @@ tasks:
     desc: One awake Wi-Fi reconnect with bounded metadata capture; USB required, logging restored
     cmds: [python3 tools/check-pm-stages.py --wifi-smoke]
 
+  device:power-key-inspect:
+    desc: Read the AXP power-key identity and unresolved ownership marker; no PM or key grab
+    cmds: [python3 tools/check-power-key.py]
+
+  device:power-key-smoke:
+    desc: Verify inhibitor and exclusive power-key ownership while awake; leave power key untouched
+    cmds: [python3 tools/check-power-key.py --smoke]
+
+  device:pm-power-key:
+    desc: Attended debug stage with exclusive power-key ownership; explicit STAGE and owner readiness required
+    cmds: [python3 tools/check-pm-stages.py --test --power-key]
+
   device:pm-collect:
     desc: Retrieve a PM stage's persistent device evidence after reconnection; RUN required
     cmds: [python3 tools/check-pm-stages.py --collect]

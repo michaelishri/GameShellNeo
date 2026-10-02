@@ -24,7 +24,7 @@ def module(name, filename):
 
 
 def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
-                    keypad_quirk=None, wifi_trace=False):
+                    keypad_quirk=None, wifi_trace=False, power_key=False):
     if (not re.fullmatch(r'/tmp/gameshellneo-pm\.[A-Za-z0-9]+', directory) or
             stage not in ('freezer', 'devices') or not re.fullmatch(r'[0-9a-f]{32}', run_id) or
             type(keypad_trace) is not bool or (keypad_trace and stage != 'devices') or
@@ -38,6 +38,8 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
             type(wifi_trace) is not bool or (wifi_trace and (stage != 'devices' or keypad_input or
                 keypad_persist is not None or keypad_quirk is not None))):
         raise ValueError('Invalid PM stage, path or run ID')
+    if type(power_key) is not bool:
+        raise ValueError('Invalid power-key ownership option')
     script = directory + '/test-pm-stages.py'
     # No SSH-owned pipe: USB may disconnect during the devices test.
     return ['sudo', '-n', 'systemd-run', '--quiet', '--collect', '--unit=gameshellneo-pm-test',
@@ -50,13 +52,13 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
                 ['--keypad-persist', keypad_persist] if keypad_persist is not None else []) + (
                 ['--keypad-input'] if keypad_input else []) + (['--keypad-audio'] if keypad_audio else []) + (
                 ['--keypad-quirk', keypad_quirk] if keypad_quirk is not None else []) + (
-                ['--wifi-trace'] if wifi_trace else [])
+                ['--wifi-trace'] if wifi_trace else []) + (['--power-key'] if power_key else [])
 
 
 def inline(client, *args):
     # Inline inspection/recovery also needs the same saved keypad helper.
     program = 'import sys, types\n'
-    for name in ('keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace'):
+    for name in ('keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace', 'power_key'):
         program += ('keypad_helper = types.ModuleType(' + repr(name) + ')\n'
                     'exec(' + repr((ROOT / 'tools' / (name + '.py')).read_text()) + ', keypad_helper.__dict__)\n'
                     'sys.modules[' + repr(name) + '] = keypad_helper\n')
@@ -78,7 +80,7 @@ def collect(config, run_id):
 
 
 def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
-          keypad_quirk=None, wifi_trace=False):
+          keypad_quirk=None, wifi_trace=False, power_key=False):
     with device(config, 'usb') as client:
         before = json.loads(inline(client, '--inspect'))
         (capture / 'before.json').write_text(json.dumps(before, indent=2) + '\n')
@@ -91,13 +93,14 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
                         display=False).decode().strip()
         run_id = uuid.uuid4().hex
         command = service_command(directory, stage, run_id, keypad_trace, keypad_persist, keypad_input, keypad_audio,
-                                  keypad_quirk, wifi_trace)
+                                  keypad_quirk, wifi_trace, power_key)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/test-pm-stages.py', directory + '/test-pm-stages.py')
             upload(sftp, ROOT / 'tools/keypad_pm.py', directory + '/keypad_pm.py')
             upload(sftp, ROOT / 'tools/keypad_input.py', directory + '/keypad_input.py')
             upload(sftp, ROOT / 'tools/speaker_audio.py', directory + '/speaker_audio.py')
             upload(sftp, ROOT / 'tools/wifi_trace.py', directory + '/wifi_trace.py')
+            upload(sftp, ROOT / 'tools/power_key.py', directory + '/power_key.py')
             upload(sftp, ROOT / 'build/sources.lock.json', directory + '/sources.lock.json')
         (capture / 'run.json').write_text(json.dumps(dict(run_id=run_id, stage=stage, helper=directory)) + '\n')
         print('PM run:', run_id, 'helper:', directory, flush=True)
@@ -134,6 +137,8 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
             trace = result.get('wifi_trace', {})
             if trace.get('restored') is not True or trace.get('trace_lost') is not False:
                 raise ValueError('Wi-Fi trace completeness/restoration failed')
+        if power_key and result.get('power_key', {}).get('handed_back') is not True:
+            raise ValueError('Power-key ownership was not handed back cleanly')
         wifi_proof(config, result['after'])
         # A fresh USB SSH collection above and independent Wi-Fi proof below
         # are required; kernel return alone is insufficient.
@@ -403,6 +408,7 @@ def main():
     mode.add_argument('--keypad-input', action='store_true')
     mode.add_argument('--keypad-quirks', action='store_true')
     mode.add_argument('--wifi-smoke', action='store_true')
+    parser.add_argument('--power-key', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
     config = load_env()
@@ -473,7 +479,7 @@ def main():
             directory = capture / ('cycle-' + str(index + 1))
             directory.mkdir(mode=0o700)
             result = cycle(config, directory, lock, stage, trace_option == '1', keypad_input=args.keypad_input,
-                           keypad_audio=audio_option == '1', keypad_quirk=quirk or None, wifi_trace=wifi_option == '1')
+                           keypad_audio=audio_option == '1', keypad_quirk=quirk or None, wifi_trace=wifi_option == '1', power_key=args.power_key)
             if args.keypad_retention or args.keypad_input:
                 summary = retention_result(result)
                 (directory / 'retention.json').write_text(json.dumps(summary, indent=2) + '\n')

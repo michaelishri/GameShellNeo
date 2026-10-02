@@ -198,6 +198,8 @@ new image build and the next hardware qualification sequence.
 - [99 — Wake IRQ locking research](99-wake-irq-locking-research.md): parent callback context and safe propagation constraints.
 - [100 — Checked wake-interrupt ownership](100-wake-irq-error-ownership.md): source fixes, failure regressions and remaining hardware gates.
 
+- [101 — Diagnostic power-key ownership](101-diagnostic-power-key-ownership.md): exclusive event handling, awake qualification and real-sleep limits.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

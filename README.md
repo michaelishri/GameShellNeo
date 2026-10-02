@@ -1634,3 +1634,16 @@ sector ranges and the volume's mount state before/after. It never prints image
 bytes, unmounts, writes or ejects the card. A mismatch returns failure and
 preserves `.local/diagnostics/<capture>/card-compare.json` and its log.
 This diagnoses differences; it does not turn a failed flash into a passed one.
+
+Power-key ownership preparation has repeatable commands:
+
+```sh
+task device:power-key-inspect  # Read-only identity/recovery-marker check
+task device:power-key-smoke    # Untouched power key, awake acquisition/handoff only
+task device:pm-power-key STAGE=devices CYCLES=1 # Explicitly attended PM debug test
+```
+
+[Report 101](docs/101-diagnostic-power-key-ownership.md) explains ownership,
+bounded cleanup and abnormal-termination limits. The final short/2-second/
+8-second gestures remain the agreed product policy; these commands do not
+implement normal sleep or a power menu.

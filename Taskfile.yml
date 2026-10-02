@@ -93,6 +93,7 @@ tasks:
       - task: test:brcmfmac-tx-suspend
       - task: test:brcmfmac-band-queries
       - task: test:wake-irqs
+      - task: test:sunxi-sdio-refs
       - task: test:musb-context
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -221,6 +222,18 @@ tasks:
   test:power-key-events:
     desc: Reproduce PEK/input-core synthetic release and duplicate filtering, native and ARM32; no hardware
     cmds: [bash tools/run-logged.sh power-key-events python3 tools/check-power-key-events.py]
+
+  test:sunxi-sdio-refs:
+    desc: Check actual Sunxi/MMC SDIO reference ownership and resume rearm, native and ARM32
+    cmds: [bash tools/run-logged.sh sunxi-sdio-refs python3 tools/check-sunxi-sdio-refs.py]
+
+  check:sunxi-sdio-driver:
+    desc: Run SDIO ownership regressions and compile complete host/core ARM objects in isolated scratch
+    cmds: [bash tools/run-logged.sh sunxi-sdio-driver python3 tools/check-sunxi-sdio-refs.py --compile-driver]
+
+  check:sdio-ref-history:
+    desc: Compare explicit saved PM result.json files from one boot; optional --require-stable; no device access
+    cmds: [python3 tools/check-sdio-ref-history.py]
 
   check:wake-drivers:
     desc: Run wake ownership regressions and compile all four complete ARM drivers in isolated scratch

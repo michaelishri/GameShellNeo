@@ -1,0 +1,54 @@
+From: GameShellNeo contributors
+Subject: [PATCH] mmc: sunxi: balance SDIO IRQ runtime references on state changes
+
+The threaded SDIO core wakes its interrupt thread on retained-power resume.
+That thread rearms the IRQ even when it was already enabled. Taking a new
+runtime reference on every enable leaks one per such resume. Repeated disable
+calls can also consume a reference owned by another runtime-PM user.
+
+Use the existing cached SDIO mask to change reference ownership only on an
+actual enable/disable transition. Serialize the reference accounting and
+cached mask with the existing IRQ lock. The non-sleeping get precedes register
+access, and the non-sleeping put follows masking. Continue to program IMASK on
+repeated requests, including after controller reset, preserving unrelated bits.
+
+No autosuspend, card-power or brcmfmac policy is changed.
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -975,12 +975,15 @@
+ {
+ 	struct sunxi_mmc_host *host = mmc_priv(mmc);
+ 	unsigned long flags;
++	bool was_enabled;
+ 	u32 imask;
+ 
+-	if (enable)
++	spin_lock_irqsave(&host->lock, flags);
++
++	/* Resume can rearm an already enabled IRQ; own one reference per state. */
++	was_enabled = !!host->sdio_imask;
++	if (enable && !was_enabled)
+ 		pm_runtime_get_noresume(host->dev);
+-
+-	spin_lock_irqsave(&host->lock, flags);
+ 
+ 	imask = mmc_readl(host, REG_IMASK);
+ 	if (enable) {
+@@ -991,10 +994,12 @@
+ 		imask &= ~SDXC_SDIO_INTERRUPT;
+ 	}
+ 	mmc_writel(host, REG_IMASK, imask);
++
++	/* The non-sleeping put follows the hardware mask, under the same lock. */
++	if (!enable && was_enabled)
++		pm_runtime_put_noidle(host->dev);
++
+ 	spin_unlock_irqrestore(&host->lock, flags);
+-
+-	if (!enable)
+-		pm_runtime_put_noidle(host->mmc->parent);
+ }
+ 
+ static void sunxi_mmc_hw_reset(struct mmc_host *mmc)

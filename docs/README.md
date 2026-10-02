@@ -230,6 +230,8 @@ new image build and the next hardware qualification sequence.
 
 - [116 — Bounded power-key PM release](116-bounded-power-key-pm-release.md): attended logical-clear and fresh awake handoff passed with approximate physical-release timing; saved tasks/source tests and separate repeated SDIO reference growth tracked in NEO-92.
 
+- [117 — SDIO runtime-reference ownership](117-sdio-runtime-reference-ownership.md): source reproduction of resume reference growth, transition-based Sunxi driver fix, native/ARM32 checks and offline-verified diagnostic.17; hardware comparison pending.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

@@ -1774,7 +1774,21 @@ before restoring shutdown handling. It does not enter real sleep. See
 The attended logical-clear and fresh awake handoff passed on diagnostic.16;
 the owner's approximate release does not prove physical hold through the
 callback. Report 116 also records a separate SDIO runtime-reference increase
-across seven saved PM cycles, queued for driver investigation in NEO-92.
+across seven saved PM cycles, tracked in NEO-92.
+
+NEO-92's driver candidate makes SDIO interrupt reference accounting depend on
+enable/disable transitions, preserving repeated hardware rearming. Its saved
+source checks run without a device:
+
+```sh
+task test:sunxi-sdio-refs       # Actual host/core functions, native and ARM32
+task check:sunxi-sdio-driver    # Also compile the complete ARM host/core files
+task check:sdio-ref-history -- --require-stable path/to/cycle-1/result.json path/to/another/result.json
+```
+
+[Report 117](docs/117-sdio-runtime-reference-ownership.md) records the cause,
+source tests, diagnostic.17 preparation and required hardware comparison.
+Reference stability and battery savings remain separate acceptance questions.
 
 RTC and late/noirq preparation is repeatable:
 

@@ -34,6 +34,16 @@ changes require a fresh source extraction; do not silently reuse a patched tree.
 | 0021 | Drain network transmitters at wiphy suspend and retain an independent queue stop through bus/configuration restoration | 109 actual-function scenarios pass natively/ARM32, twelve negative controls reject and complete ARM core/cfg80211 objects compile (report 109). Includes concurrent modeled transmit/flow lock ordering and failed-resume carrier policy. Diagnostic.15 remains unchanged; hardware qualification is pending. Generic DOWN/error lifetime is unchanged. Remove when equivalent upstream queue ownership and restoration is verified |
 | 0022 | Return failed required capability reads and transport errors, preserve optional legacy rejection defaults, and finish scalar queries before channel mutation | 85 actual-function scenarios pass natively/ARM32, ten negative controls reject and full ARM cfg80211 compiles (report 110). Bounds RX-chain count to the HT/VHT representation. Internal channel transaction, raw firmware rejection attribution and hardware qualification remain open. Not installed in diagnostic.15. Remove when equivalent upstream failure and bounds handling is verified |
 
+Patch 0023 balances the Sunxi SDIO interrupt's runtime reference only on
+enabled-state transitions under the existing IRQ lock, preserving every IMASK
+write and independent users' references. The actual host/core source passes
+2,058 native/ARM32 cases and rejects eight negative controls; complete ARM
+host/core objects compile. `task test:sunxi-sdio-refs` and
+`task check:sunxi-sdio-driver` reproduce these checks. Diagnostic.17 will
+qualify the candidate against the recorded per-cycle count growth; hardware
+and energy claims remain pending. Remove the patch when equivalent upstream
+ownership is verified. See [report 117](../docs/117-sdio-runtime-reference-ownership.md).
+
 Patches 0014–0017 are integrated for image qualification in
 [diagnostic.12 preparation](../docs/85-diagnostic12-preparation.md). The ledger's
 source-test results do not establish hardware recovery or energy savings.

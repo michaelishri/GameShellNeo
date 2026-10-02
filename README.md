@@ -6,21 +6,20 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.14 is installed with passing full card readback, startup, both SSH
-routes, integration, journal rotation, awake power-key/RTC checks and the first
-observed late/noirq debug cycle.
-[Preparation and artifact details](docs/103-diagnostic14-preparation.md) record
-its wake-IRQ and journal fixes; [hardware qualification](docs/104-diagnostic14-hardware-qualification.md)
-records the attended gates and unresolved Wi-Fi control timeouts. Actual sleep
-remains disabled.
-Four additional observed late/noirq cycles passed, for five on this boot;
-[report 105](docs/105-diagnostic14-late-noirq-repeats.md) records their traces,
-restoration and the radio control errors still being investigated.
-Diagnostic.15 is built, offline-verified and staged on the Mac with the
+Diagnostic.15 is installed with the
 [country-request suspend fix](docs/106-brcmfmac-regulatory-suspend.md).
-[Preparation and the hardware comparison sequence](docs/107-diagnostic15-preparation.md)
-record recovery, checksums and passing source/image checks. Diagnostic.14
-remains installed; card flashing and diagnostic.15 hardware qualification are next.
+Full card readback, owner-confirmed boot, both SSH routes, all six integration
+groups, journal rotation and awake power-key/RTC checks passed.
+[Preparation](docs/107-diagnostic15-preparation.md) records recovery and build
+verification; [hardware qualification](docs/108-diagnostic15-hardware-qualification.md)
+records the running baseline, one freezer, one devices and five attended
+late/noirq passes, with normal display return confirmed by the owner.
+Country/control timeouts did not recur; a separate suspended-transmit warning
+remains under investigation (NEO-85). Actual sleep remains disabled.
+Diagnostic.14 is retained for recovery and comparison:
+its [five observed late/noirq cycles](docs/105-diagnostic14-late-noirq-repeats.md)
+passed the restoration checks but exposed the recurring radio control errors
+addressed by this candidate.
 
 Start with the [first-build specification](docs/23-first-build-spec.md),
 [build workflow](docs/24-building-and-testing.md),

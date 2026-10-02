@@ -212,6 +212,8 @@ new image build and the next hardware qualification sequence.
 
 - [107 — Diagnostic.15 preparation](107-diagnostic15-preparation.md): preserved diagnostic.14 recovery, complete kernel/image build, offline verification, Mac staging and the prepared country-request hardware comparison.
 
+- [108 — Diagnostic.15 hardware qualification](108-diagnostic15-hardware-qualification.md): startup/awake checks, one freezer, one devices and five observed late/noirq passes; no recurring country/control timeouts, full restoration and a separate suspended-transmit investigation.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

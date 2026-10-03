@@ -5,8 +5,10 @@
 DEV card, passed full 4 GiB readback and been safely ejected. An earlier attempt
 was interrupted when the dongle's charging cable was disconnected. The owner
 confirmed the login screen; both SSH routes, startup integration, journal
-rotation and awake key/RTC checks pass on the new boot. Attended debug stages
-and USB/sleep recovery remain unqualified.
+rotation and awake key/RTC checks pass on the new boot. The attended freezer,
+driver and all five late/noirq debug stages also pass. The owner confirmed the
+normal dim console after the driver and initial late/noirq checks, then that
+all four repeats looked normal. Actual USB/sleep recovery remains unqualified.
 
 ## Source image and shutdown
 
@@ -139,6 +141,116 @@ systemd startup completion at **22.040 seconds**. These are this boot's software
 milestones, not measured power-button-to-UI latency or the under-five-second
 product target. No boot-performance improvement is claimed here.
 
+## Attended debug checks
+
+After the owner's explicit readiness, the saved workflows ran a freezer check
+and then one driver debug cycle. After the owner's normal-console confirmation
+and fresh readiness, one late/noirq cycle followed. A second normal-console
+confirmation and readiness preceded four more late/noirq cycles. The original
+result was reviewed before each next submission. All completed on the same
+diagnostic.18 boot:
+
+| Stage | Run ID | PM successes | SDIO references | Duration |
+| --- | --- | --- | --- | --- |
+| Freezer | `99bf31d656c844e6a7b33048e2c07833` | 0 → 1 | 2 → 2 | 5.512 s |
+| Drivers | `7d55850ba8024a5ca1c195a046376d37` | 1 → 2 | 2 → 2 | 7.880 s |
+| Initial late/noirq | `f7f1c4b2122a4adc8073aec7c9fca1b8` | 2 → 3 | 2 → 2 | 7.881 s |
+| Late/noirq repeat 1 | `0eafac20d05442cdb39f1167dc337dec` | 3 → 4 | 2 → 2 | 8.050 s |
+| Late/noirq repeat 2 | `573ef599660e4cc99c5e27524ccd92f6` | 4 → 5 | 2 → 2 | 8.051 s |
+| Late/noirq repeat 3 | `eec0d0e4716049bab5773ee593c9e178` | 5 → 6 | 2 → 2 | 7.921 s |
+| Late/noirq repeat 4 | `fe5f91404cf745d592eedf5e3cf8b6d5` | 6 → 7 | 2 → 2 | 7.920 s |
+
+Both independent SSH routes recovered after each, with zero PM failures,
+kernel taint or failed units. The USB gadget returned configured and its system-wake policy
+remained disabled. PM controls returned to none/async 1/delay 5; display
+settings returned to brightness 1 and power 0. The memory canary survived.
+Power-key ownership was handed back with verified logical release and closed
+descriptor; no power-key event was recorded.
+
+The original keypad descriptor stayed connected, with no hangup, poll/ioctl
+error or held key. The driver and late/noirq keypad and Wi-Fi traces had no
+loss/overrun and restored their settings. The kernel delta contains the
+expected keypad reset-resume, without a new enumeration or unsupported
+USB-register warning. Every late/noirq trace confirms all four phases and both
+RSB noirq callbacks.
+Transient host collection failures occurred during the driver cycle, initial
+late/noirq and repeats 1 and 4 (repeat 1 additionally recorded an SSH banner
+error). Each collector subsequently retrieved the same complete run and both
+SSH proofs passed. No PM resubmission or cable reconnect was used.
+
+The owner confirmed the normal console after the driver and initial late/noirq
+cycles, then “Yes—all four looked normal” after the repeat batch. The stage
+durations include the five-second debug delay and overhead; none of these tests
+entered real sleep or measured resume latency or energy.
+
+Private results are saved under `.local/diagnostics/`:
+
+- `20261003T163711.389559Z/cycle-1/result.json` — freezer.
+- `20261003T164303.709233Z/cycle-1/result.json` — drivers, with the original
+  `collection-errors.txt` retained alongside it.
+- `20261003T164453.776351Z/cycle-1/result.json` — initial late/noirq, also with
+  its original collection error retained.
+- `20261003T164736.793468Z/cycle-1/result.json` — late/noirq repeat 1.
+- `20261003T164914.978630Z/cycle-1/result.json` — late/noirq repeat 2.
+- `20261003T165101.284251Z/cycle-1/result.json` — late/noirq repeat 3.
+- `20261003T165230.493074Z/cycle-1/result.json` — late/noirq repeat 4.
+
+```sh
+task device:pm-power-key STAGE=freezer CYCLES=1
+task device:pm-power-key STAGE=devices CYCLES=1 KEYPAD_TRACE=1 WIFI_TRACE=1
+# After review and fresh readiness:
+task device:pm-platform
+# After review and fresh readiness, run the same platform task four more times,
+# reviewing each original result before submitting the next.
+task check:sdio-ref-history -- --require-stable \
+  .local/diagnostics/20261003T163711.389559Z/cycle-1/result.json \
+  .local/diagnostics/20261003T164303.709233Z/cycle-1/result.json \
+  .local/diagnostics/20261003T164453.776351Z/cycle-1/result.json \
+  .local/diagnostics/20261003T164736.793468Z/cycle-1/result.json \
+  .local/diagnostics/20261003T164914.978630Z/cycle-1/result.json \
+  .local/diagnostics/20261003T165101.284251Z/cycle-1/result.json \
+  .local/diagnostics/20261003T165230.493074Z/cycle-1/result.json \
+  > .local/neo95-diag18-reference-history.json
+```
+
+This seven-result history passes the stability check with consecutive PM
+successes 0 → 7 and zero failures. It supplies the debug prerequisites for an
+awake rehearsal; it does not itself authorize a real-sleep submission.
+
+## Same-source awake rehearsal
+
+After the final screen confirmation, the saved same-source rehearsal passed:
+
+```sh
+task device:sleep-rehearse QUALIFICATION=.local/neo95-diag18-reference-history.json
+task mac:usb-inspect
+```
+
+Rehearsal run `0120c40f292b4e1b96a89a051ae47986` is saved at
+`.local/diagnostics/20261003T165527.352971Z/result.json`. The 30-second alarm
+delivered after 30.525 seconds, with count 1, flags `0xa0` and RTC IRQ count
+1 → 2. Alarm restoration passed. No sleep state was written; PM counts stayed
+7/0 and SDIO usage stayed 2. Both SSH routes, the original keypad descriptor,
+memory canary, audio and display checks passed. USB, keypad and Wi-Fi traces
+recorded no loss and restored their settings. Power-key policy returned to its
+original state with clean descriptor handback and no retained diagnostic
+policy, drop-in, PM controls or RTC ownership.
+
+The live USB endpoint formats now pass the recorder's stored-return-field
+check (`endpoint_return_text_trusted=true`). This verifies patch 0024's live
+format identity; operation events across suspend/resume remain a separate
+qualification. CPU-idle driver remains `none`, governor `menu`, clocksource
+`arch_sys_counter`. The awake run provides no CPU retention or energy proof.
+
+The separate Mac capture at `.local/diagnostics/20261003T165608.941679Z`
+completed all six reads. GameShellNeo appears in the USB tree; the USB route
+uses active interface `en8` with its existing IPv4 address. No DHCP lease,
+interface, route or host power setting was changed.
+
+All prerequisites are saved. A fresh readiness question for one actual
+RTC-wake test was sent; no real sleep had been submitted at this report's
+prerequisite checkpoint.
+
 ## Reproduction and remaining work
 
 The routine commands remain the documented Taskfile workflows:
@@ -158,8 +270,9 @@ card each time. Keep the reader's USB and charging connections intact through
 write, full readback and ejection; changing dongle power can interrupt storage.
 
 The installed image, both SSH routes, USB wake policy, services, journal
-rotation, idle audio, awake key ownership and RTC delivery are now checked.
-Requalify the debug stages with fresh observation before a separately attended
-real-sleep attempt. The old boot's consumed prerequisites cannot authorize a
-new sleep test. The separate source candidates from reports 132–139 are not
+rotation, idle audio, awake key ownership, RTC delivery and seven attended
+debug stages, final screen observation and same-source awake rehearsal are now
+checked. A separately attended real-sleep attempt is the next boundary. The old
+boot's consumed prerequisites cannot authorize a new sleep test. The separate
+source candidates from reports 132–139 and 141 are not
 part of this image; diagnostic.18 contains patches 0001–0025 only.

@@ -208,6 +208,20 @@ class Evidence(unittest.TestCase):
                                     'axp22x-ac': {'type': 'Mains', 'present': '1', 'online': '1'}},
                     services={n: {'ActiveState': 'active', 'NRestarts': '0'} for n in pm.SERVICES})
         pm.validate(good, lock)
+        wake_lock = deepcopy(lock)
+        wake_lock['features'] = {'usb_system_wakeup': False}
+        wake_good = deepcopy(good)
+        wake_good['image']['sources'] = wake_lock
+        wake_good['usb_system_wakeup'] = ['disabled']
+        pm.validate(wake_good, wake_lock)
+        for policy in ([], ['enabled'], [None], ['disabled', 'disabled']):
+            with self.assertRaisesRegex(ValueError, 'USB system wake policy'):
+                pm.validate(wake_good | {'usb_system_wakeup': policy}, wake_lock)
+        for policy in (True, 0, None):
+            invalid_lock = deepcopy(wake_lock)
+            invalid_lock['features']['usb_system_wakeup'] = policy
+            with self.assertRaisesRegex(ValueError, 'USB system wake policy'):
+                pm.validate(wake_good, invalid_lock)
         # Battery current direction is independent of external input availability.
         for status in ('Charging', 'Discharging', 'Full', 'Not charging'):
             with self.subTest(status=status):

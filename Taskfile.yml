@@ -100,6 +100,7 @@ tasks:
       - task: test:wake-irqs
       - task: test:sunxi-sdio-refs
       - task: test:musb-context
+      - task: test:musb-sleep
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -200,6 +201,14 @@ tasks:
   test:udc-trace:
     desc: Execute actual USB endpoint trace formatting natively and on ARM32, with negative controls
     cmds: [bash tools/run-logged.sh udc-trace python3 tools/check-udc-trace.py]
+
+  test:musb-sleep:
+    desc: Test actual MUSB system-sleep connection ownership on native and ARM32
+    cmds: [bash tools/run-logged.sh musb-sleep python3 tools/check-musb-sleep.py]
+
+  check:musb-sleep-drivers:
+    desc: Test MUSB sleep ownership and compile the complete ARM controller/gadget/glue
+    cmds: [bash tools/run-logged.sh musb-sleep-drivers python3 tools/check-musb-sleep.py --compile-drivers]
 
   check:udc-driver:
     desc: Run trace-format regressions and compile the complete ARM USB device-controller core

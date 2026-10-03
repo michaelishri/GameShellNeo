@@ -99,6 +99,7 @@ def state():
         raise ValueError('Unexpected gadget device/driver logging identity')
     read = lambda p: p.read_text().strip()
     return dict(boot_id=read(BOOT), udc=udc.name, state=read(udc/'state'),
+                system_wakeup=read(udc/'device/power/wakeup'),
                 ecm_log_prefix=driver+' '+gadget_device.name+': ',
                 carrier=read(Path('/sys/class/net/usb0/carrier')),
                 flags=read(Path('/sys/class/net/usb0/flags')),

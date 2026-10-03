@@ -28,6 +28,11 @@ CPU-idle support. Overall sleep remains unqualified and disabled for normal use.
 [121 — USB recovery](121-usb-reconnect-and-clean-boot.md) records one working
 cable reconnect, the separate Mac sleep timeline, and an observed clean reboot
 restoring both routes and ordinary diagnostic power-key handling.
+The later [traced reproduction](125-traced-rtc-wake-usb-failure.md) failed USB
+recovery again without a new recorded Mac sleep; its boot-local diagnostic
+power-key suppression remains retained. [Diagnostic.18 preparation](128-musb-system-sleep-candidate.md)
+adds a controller-owned disconnect/reconnect candidate and corrected endpoint
+trace output. It has not yet been installed or hardware-qualified.
 
 Previous diagnostic.13:
 [93 — Installation](93-diagnostic13-installation.md) records full card readback,
@@ -269,3 +274,6 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [125 — Traced RTC-wake USB failure](125-traced-rtc-wake-usb-failure.md): RTC, display, keypad and Wi-Fi return, but USB fails again; combined MUSB resume status and lost enumeration narrow the driver investigation, with no new Mac sleep event in the saved history.
 
 - [127 — USB endpoint trace formatting](127-usb-endpoint-trace-format.md): corrects the shadowed trace return value, adds 252 native/ARM32 formatting cases and an explicit recorder trust flag; image/live qualification remains pending.
+
+- [126 — MUSB system-sleep design](126-musb-system-sleep-design.md): primary-source lifecycle audit, temporary pull-up ownership and wake-policy boundaries.
+- [128 — MUSB sleep candidate](128-musb-system-sleep-candidate.md): patch 0025, source regressions, explicit USB wake policy and diagnostic.18 preparation; hardware recovery remains unqualified.

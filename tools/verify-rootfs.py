@@ -138,6 +138,11 @@ def main():
     for name in ('gameshellneo-usb', 'gameshellneo-battery', 'gameshellneo-ready'):
         require((root / 'etc/systemd/system/multi-user.target.wants' / (name + '.service')).is_symlink(),
                 f'Service not enabled: {name}')
+    require(identity['sources'].get('features', {}).get('usb_system_wakeup') is False,
+            'Image must explicitly disable USB system wake policy')
+    usb_script = Path('usr/local/sbin/gameshellneo-usb')
+    require((root / usb_script).read_bytes() == (project / 'runtime' / usb_script).read_bytes(),
+            'USB connection/wake policy script differs from the source')
     for name in ('sleep.target', 'suspend.target', 'hibernate.target',
                  'hybrid-sleep.target', 'suspend-then-hibernate.target',
                  'wpa_supplicant.service', 'dbus-fi.w1.wpa_supplicant1.service'):

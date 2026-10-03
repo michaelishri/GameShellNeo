@@ -689,6 +689,21 @@ records the formatter correction and pending image qualification. USB captures
 now label whether endpoint return text is trustworthy; diagnostic.17's trailing
 endpoint arrow values must not be treated as operation results.
 
+For the USB connection lifecycle across system sleep, use:
+
+```sh
+task test:musb-sleep          # Actual PM/pull-up functions, native + ARM32, failure controls
+task check:musb-sleep-drivers # Also compile the complete ARM MUSB core/gadget/Sunxi glue
+```
+
+`task build` includes the source regression. The diagnostic.18 candidate removes
+the peripheral pull-up before system sleep and restores the latest connection
+request after the controller is ready. Startup explicitly disables USB system
+wake; PM admission verifies that policy. This does not alter charging or resolve
+the driver's separate probe-time IRQ-wake ownership. Normal user sleep remains
+disabled pending hardware qualification. See [design](docs/126-musb-system-sleep-design.md)
+and [implementation](docs/128-musb-system-sleep-candidate.md).
+
 For the opt-in USB polling experiment, use:
 
 ```sh

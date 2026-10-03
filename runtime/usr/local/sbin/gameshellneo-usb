@@ -19,12 +19,22 @@ case ${1:-} in
 esac
 modprobe libcomposite
 if ! mountpoint -q /sys/kernel/config; then mount -t configfs none /sys/kernel/config; fi
-if [[ -d $gadget ]]; then
-    [[ -n $(cat "$gadget/UDC") ]] && exit 0
-    stop_gadget
-fi
 mapfile -t controllers < <(find /sys/class/udc -mindepth 1 -maxdepth 1 -printf '%f\n')
 [[ ${#controllers[@]} == 1 ]] || { echo 'Expected one USB device controller' >&2; exit 1; }
+# Product wake sources are POWER/RTC. USB may detach during system sleep.
+# This selects device policy; it does not undo MUSB's probe-time IRQ wake ref.
+wakeup=/sys/class/udc/${controllers[0]}/device/power/wakeup
+[[ -f $wakeup && -w $wakeup ]] || { echo 'Missing USB wake policy control' >&2; exit 1; }
+case $(cat "$wakeup") in
+    enabled|disabled) ;;
+    *) echo 'Unexpected USB wake policy' >&2; exit 1 ;;
+esac
+printf 'disabled\n' > "$wakeup"
+[[ $(cat "$wakeup") == disabled ]] || { echo 'USB wake policy readback failed' >&2; exit 1; }
+if [[ -d $gadget ]]; then
+    [[ $(cat "$gadget/UDC") == "${controllers[0]}" ]] && exit 0
+    stop_gadget
+fi
 identity=$(cat /etc/machine-id)
 [[ $identity =~ ^[0-9a-f]{32}$ ]] || exit 1
 printf -v mac_tail ':%s:%s:%s:%s:%s' "${identity:0:2}" "${identity:2:2}" \

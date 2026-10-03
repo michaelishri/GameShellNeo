@@ -27,7 +27,7 @@ def snapshot(token):
         cpuidle_driver=read(cpu/'cpuidle/current_driver'),
         cpuidle_governor=read(cpu/'cpuidle/current_governor_ro'),
         idle_states={str(p): read(p) for p in sorted(cpu.glob('cpu[0-9]*/cpuidle/state*/name'))},
-        udc={p.name: {k: read(p/k) for k in ('state', 'current_speed', 'maximum_speed')}
+        udc={p.name: {k: read(p/k) for k in ('state', 'current_speed', 'maximum_speed', 'device/power/wakeup')}
              for p in sorted(udc.glob('*'))},
         gadget_bindings={str(p): read(p) for p in Path('/sys/kernel/config/usb_gadget').glob('*/UDC')},
         extcon={str(p.resolve()): read(p) for p in Path('/sys/class/extcon').glob('*/state')},

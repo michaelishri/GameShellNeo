@@ -1,0 +1,205 @@
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2215,16 +2215,18 @@
+ {
+ 	struct musb_pending_work *w, *_w;
+ 	unsigned long flags;
+-	int error = 0;
++	int error = 0, ret;
+ 
+ 	spin_lock_irqsave(&musb->list_lock, flags);
+ 	list_for_each_entry_safe(w, _w, &musb->pending_list, node) {
+ 		if (w->callback) {
+-			error = w->callback(musb, w->data);
+-			if (error < 0) {
++			ret = w->callback(musb, w->data);
++			if (ret < 0) {
++				if (!error)
++					error = ret;
+ 				dev_err(musb->controller,
+ 					"resume callback %p failed: %i\n",
+-					w->callback, error);
++					w->callback, ret);
+ 			}
+ 		}
+ 		list_del(&w->node);
+@@ -2744,6 +2746,8 @@
+ 	power &= MUSB_POWER_SUSPENDM | MUSB_POWER_RESUME;
+ 	musb->context.power &= ~(MUSB_POWER_SUSPENDM | MUSB_POWER_RESUME);
+ 	power |= musb->context.power;
++	if (musb->gadget_suspended)
++		power &= ~MUSB_POWER_SOFTCONN;
+ 	musb_writeb(musb_base, MUSB_POWER, power);
+ 
+ 	musb_writew(musb_base, MUSB_INTRTXE, musb->intrtxe);
+@@ -2816,6 +2820,7 @@
+ 		return ret;
+ 	}
+ 
++	musb_gadget_suspend(musb);
+ 	musb_platform_disable(musb);
+ 	musb_disable_interrupts(musb);
+ 
+@@ -2831,11 +2836,7 @@
+ 
+ 	spin_lock_irqsave(&musb->lock, flags);
+ 
+-	if (is_peripheral_active(musb)) {
+-		/* FIXME force disconnect unless we know USB will wake
+-		 * the system up quickly enough to respond ...
+-		 */
+-	} else if (is_host_active(musb)) {
++	if (is_host_active(musb)) {
+ 		/* we know all the children are suspended; sometimes
+ 		 * they will even be wakeup-enabled.
+ 		 */
+@@ -2887,12 +2888,16 @@
+ 	if (error)
+ 		dev_err(musb->controller, "resume work failed with %i\n",
+ 			error);
++	if (musb->gadget_suspended && !error)
++		musb_gadget_resume(musb);
++	else if (!musb->gadget_suspended)
++		error = 0; /* Preserve the existing policy outside the gated path. */
+ 	spin_unlock_irqrestore(&musb->lock, flags);
+ 
+ 	pm_runtime_mark_last_busy(dev);
+ 	pm_runtime_put_autosuspend(dev);
+ 
+-	return 0;
++	return error;
+ }
+ 
+ static int musb_runtime_suspend(struct device *dev)
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -359,6 +359,8 @@
+ 	bool			session;
+ 	unsigned long		quirk_retries;
+ 	bool			is_host;
++	/* Own storage: adjacent bitfields are not all lock-protected. */
++	bool			gadget_suspended;
+ 
+ 	int			a_wait_bcon;	/* VBUS timeout in msecs */
+ 	unsigned long		idle_timeout;	/* Next timeout in jiffies */
+diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -1632,15 +1632,49 @@
+ 	return usb_phy_set_power(musb->xceiv, mA);
+ }
+ 
++/* System PM holds a runtime reference; never drain work under musb->lock. */
++void musb_gadget_suspend(struct musb *musb)
++{
++	unsigned long flags;
++
++	if (musb->port_mode != MUSB_PERIPHERAL ||
++	    device_may_wakeup(musb->controller) ||
++	    (musb->ops->quirks & MUSB_PRESERVE_SESSION))
++		return;
++
++	spin_lock_irqsave(&musb->lock, flags);
++	musb->gadget_suspended = 1;
++	spin_unlock_irqrestore(&musb->lock, flags);
++	cancel_delayed_work_sync(&musb->gadget_work);
++
++	spin_lock_irqsave(&musb->lock, flags);
++	/* Preserve softconnect intent; only remove the physical pull-up. */
++	musb_pullup(musb, 0);
++	spin_unlock_irqrestore(&musb->lock, flags);
++}
++
++/* Called under musb->lock, after context, interrupts and resume work. */
++void musb_gadget_resume(struct musb *musb)
++{
++	musb->gadget_suspended = 0;
++	musb_pullup(musb, musb->softconnect && musb->gadget_driver);
++}
++
+ static void musb_gadget_work(struct work_struct *work)
+ {
+ 	struct musb *musb;
+ 	unsigned long flags;
++	int ret;
+ 
+ 	musb = container_of(work, struct musb, gadget_work.work);
+-	pm_runtime_get_sync(musb->controller);
++	ret = pm_runtime_resume_and_get(musb->controller);
++	if (ret < 0) {
++		dev_err(musb->controller, "gadget work resume failed: %d\n", ret);
++		return;
++	}
+ 	spin_lock_irqsave(&musb->lock, flags);
+-	musb_pullup(musb, musb->softconnect);
++	if (!musb->gadget_suspended)
++		musb_pullup(musb, musb->softconnect && musb->gadget_driver);
+ 	spin_unlock_irqrestore(&musb->lock, flags);
+ 	pm_runtime_mark_last_busy(musb->controller);
+ 	pm_runtime_put_autosuspend(musb->controller);
+@@ -1659,7 +1693,8 @@
+ 	spin_lock_irqsave(&musb->lock, flags);
+ 	if (is_on != musb->softconnect) {
+ 		musb->softconnect = is_on;
+-		schedule_delayed_work(&musb->gadget_work, 0);
++		if (!musb->gadget_suspended)
++			schedule_delayed_work(&musb->gadget_work, 0);
+ 	}
+ 	spin_unlock_irqrestore(&musb->lock, flags);
+ 
+@@ -1810,8 +1845,9 @@
+ 	if (musb->port_mode == MUSB_HOST)
+ 		return;
+ 
++	usb_del_gadget_udc(&musb->g);
++	/* Unregister can itself queue a pull-up update. */
+ 	cancel_delayed_work_sync(&musb->gadget_work);
+-	usb_del_gadget_udc(&musb->g);
+ }
+ 
+ /*
+@@ -1839,10 +1875,9 @@
+ 
+ 	pm_runtime_get_sync(musb->controller);
+ 
++	spin_lock_irqsave(&musb->lock, flags);
+ 	musb->softconnect = 0;
+ 	musb->gadget_driver = driver;
+-
+-	spin_lock_irqsave(&musb->lock, flags);
+ 	musb->is_active = 1;
+ 
+ 	if (musb->xceiv)
+@@ -1904,7 +1939,9 @@
+ 		phy_set_mode(musb->phy, PHY_MODE_INVALID);
+ 
+ 	musb->is_active = 0;
++	musb->softconnect = 0;
+ 	musb->gadget_driver = NULL;
++	musb_pullup(musb, 0);
+ 	musb_platform_try_idle(musb, 0);
+ 	spin_unlock_irqrestore(&musb->lock, flags);
+ 
+diff --git a/drivers/usb/musb/musb_gadget.h b/drivers/usb/musb/musb_gadget.h
+--- a/drivers/usb/musb/musb_gadget.h
++++ b/drivers/usb/musb/musb_gadget.h
+@@ -21,6 +21,8 @@
+ extern void musb_g_resume(struct musb *);
+ extern void musb_g_wakeup(struct musb *);
+ extern void musb_g_disconnect(struct musb *);
++extern void musb_gadget_suspend(struct musb *musb);
++extern void musb_gadget_resume(struct musb *musb);
+ extern void musb_gadget_cleanup(struct musb *);
+ extern int musb_gadget_setup(struct musb *);
+ 
+@@ -37,6 +39,8 @@
+ static inline void musb_g_resume(struct musb *musb)		{}
+ static inline void musb_g_wakeup(struct musb *musb)		{}
+ static inline void musb_g_disconnect(struct musb *musb)		{}
++static inline void musb_gadget_suspend(struct musb *musb)	{}
++static inline void musb_gadget_resume(struct musb *musb)	{}
+ static inline void musb_gadget_cleanup(struct musb *musb)	{}
+ static inline int musb_gadget_setup(struct musb *musb)
+ {

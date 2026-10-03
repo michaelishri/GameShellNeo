@@ -53,6 +53,18 @@ compiles. Use `task test:udc-trace` or `task check:udc-driver`.
 pending image/live qualification. Remove when equivalent upstream formatting
 is verified.
 
+Patch 0025 owns a temporary system-sleep pull-up gate for fixed peripherals
+with USB system wake disabled and without `MUSB_PRESERVE_SESSION`. It preserves
+connection intent, drains pending work outside the spinlock, masks saved
+SOFTCONN during restoration and reconnects after successful resume work.
+Worker PM failures skip MMIO; unregister-generated work is drained; the first
+pending callback error remains observable. `task test:musb-sleep` executes
+actual functions natively/ARM32; `task check:musb-sleep-drivers` also compiles
+the complete controller/gadget/Sunxi objects. Hardware reconnection remains
+unqualified. Remove when equivalent upstream lifecycle ownership is verified.
+See [design](../docs/126-musb-system-sleep-design.md) and
+[candidate](../docs/128-musb-system-sleep-candidate.md).
+
 Patches 0014–0017 are integrated for image qualification in
 [diagnostic.12 preparation](../docs/85-diagnostic12-preparation.md). The ledger's
 source-test results do not establish hardware recovery or energy savings.

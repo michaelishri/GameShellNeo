@@ -209,3 +209,12 @@ Sunxi child ownership and full MUSB teardown are separate gates. Use
 [report 144](../docs/144-extcon-notifier-drain-candidate.md). The change is absent
 from diagnostic.18. Remove when equivalent upstream lifetime guarantees are
 verified; assign a new image identity before integration.
+
+Patch 0032 adds a KUnit configuration/Kbuild entry for the extcon notifier
+lifetime suite exported by the existing overlay. `task test:extcon-kunit` builds
+and runs isolated Linux UML kernels with TREE/TINY SRCU and lock/RCU debugging.
+It uses synthetic providers and real threads/completions/timers; its softirq
+case suppresses userspace uevents explicitly. See
+[report 145](../docs/145-extcon-kernel-lifetime-validation.md). KUnit remains
+optional and disabled in normal board configurations. These checks do not
+qualify full MUSB removal, SMP/ARM/hard-IRQ behavior or the installed image.

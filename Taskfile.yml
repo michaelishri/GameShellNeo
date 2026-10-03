@@ -216,6 +216,12 @@ tasks:
     desc: Run notifier regressions and compile ARM extcon core/devres with TREE and TINY SRCU
     cmds: [bash tools/run-logged.sh extcon-drivers python3 tools/check-extcon-notifier.py --compile-drivers]
 
+  test:extcon-kunit:
+    desc: Build and run real Linux UML notifier lifetime tests with TREE and TINY SRCU; no device access
+    env:
+      NEO_EXTCON_KUNIT_VARIANT: '{{.VARIANT | default "all"}}'
+    cmds: [bash tools/run-logged.sh extcon-kunit python3 tools/check-extcon-kunit.py]
+
   check:musb-drivers:
     desc: Run context regressions and compile the full ARM MUSB core and Sunxi drivers
     cmds: [bash tools/run-logged.sh musb-drivers python3 tools/check-musb-context.py --compile-drivers]

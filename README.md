@@ -800,6 +800,7 @@ prerequisite in patch 0031. It does not yet change Sunxi removal ownership:
 ```sh
 task test:extcon-notifier # Actual dispatch/unlink source with modeled SRCU, native and ARM32
 task check:extcon-drivers # Also compile/link extcon core/devres: board, module, TINY_SRCU
+task test:extcon-kunit   # Real Linux UML tests with lock/RCU debugging, TREE and TINY SRCU
 ```
 
 The tests preserve raw callback contexts, cover a block selected before its
@@ -807,7 +808,8 @@ callback enters, and check the unlink-then-drain boundary. Evidence is saved in
 `.local/build/extcon-notifier-tests/`; the task log is
 `.local/build/extcon-drivers.log`. On this branch, `task build` includes the
 source regression. [Report 144](docs/144-extcon-notifier-drain-candidate.md)
-records the scope and remaining integration/concurrency gates. This candidate
+records the source-test scope. [Report 145](docs/145-extcon-kernel-lifetime-validation.md)
+adds real-kernel thread/SRCU/softirq evidence and records the remaining integration gates. This candidate
 is absent from diagnostic.18 and requires a new image identity before image
 assembly.
 

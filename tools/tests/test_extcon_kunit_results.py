@@ -1,0 +1,77 @@
+"""Prevent incomplete, duplicated or warning-bearing kernel runs passing admission."""
+from copy import deepcopy
+from pathlib import Path
+import sys
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from extcon_kunit_results import CASES, COUNTS, checked_cases
+
+
+class KUnitEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        self.suite = dict(name='extcon-notifier-lifetime', arch='um', misc=dict(COUNTS),
+                          sub_groups=[], test_cases=[dict(name=name, status='PASS') for name in CASES])
+        self.report = dict(name='KUnit Test Group', arch='um', misc=dict(COUNTS),
+                           test_cases=[], sub_groups=[self.suite])
+        self.log = '\n'.join(['extcon-notifier-lifetime', *CASES])
+
+    def test_complete_evidence_is_accepted_without_mutation(self):
+        original = deepcopy(self.report)
+        self.assertEqual(checked_cases(self.report, self.log), self.suite['test_cases'])
+        self.assertEqual(self.report, original)
+
+    def test_missing_duplicate_extra_and_nonpassing_cases(self):
+        for mode in ('missing', 'duplicate', 'extra', 'SKIP', 'FAIL', 'ERROR'):
+            with self.subTest(mode=mode):
+                report = deepcopy(self.report)
+                cases = report['sub_groups'][0]['test_cases']
+                if mode == 'missing':
+                    cases.pop()
+                elif mode == 'duplicate':
+                    cases[-1] = dict(cases[0])
+                elif mode == 'extra':
+                    cases.append(dict(name='foreign', status='PASS'))
+                else:
+                    cases[0]['status'] = mode
+                with self.assertRaises(ValueError):
+                    checked_cases(report, self.log)
+
+    def test_other_architecture_suite_counts_or_nested_structure(self):
+        for level in ('root', 'suite'):
+            for field, value in (('arch', 'arm'), ('name', 'foreign'),
+                                 ('misc', dict(COUNTS, errors=1)),
+                                 ('sub_groups', [] if level == 'root' else [{}])):
+                with self.subTest(level=level, field=field):
+                    report = deepcopy(self.report)
+                    target = report if level == 'root' else report['sub_groups'][0]
+                    target[field] = value
+                    with self.assertRaises(ValueError):
+                        checked_cases(report, self.log)
+
+    def test_warning_and_incomplete_log_are_rejected(self):
+        for error in ('WARNING:', 'BUG:', 'possible circular locking', 'suspicious RCU',
+                      'sleeping function called', 'Kernel panic', 'not ok ',
+                      'rcu: INFO: rcu_preempt detected expedited stalls',
+                      'INFO: task extcon-remove blocked for more than 120 seconds'):
+            with self.subTest(error=error), self.assertRaises(ValueError):
+                checked_cases(self.report, self.log + '\n' + error)
+        with self.assertRaises(ValueError):
+            checked_cases(self.report, self.log.replace(CASES[-1], ''))
+
+    def test_malformed_groups_are_rejected(self):
+        for value in (None, [], {}, dict(self.report, sub_groups=None),
+                      dict(self.report, sub_groups=[None]),
+                      dict(self.report, sub_groups=[self.suite, self.suite])):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                checked_cases(value, self.log)
+        for value in (None, [], {}, {'name': [], 'status': 'PASS'}):
+            with self.subTest(case=value):
+                report = deepcopy(self.report)
+                report['sub_groups'][0]['test_cases'][0] = value
+                with self.assertRaises(ValueError):
+                    checked_cases(report, self.log)
+
+
+if __name__ == '__main__':
+    unittest.main()

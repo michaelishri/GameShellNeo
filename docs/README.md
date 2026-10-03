@@ -232,6 +232,8 @@ new image build and the next hardware qualification sequence.
 
 - [117 — SDIO runtime-reference ownership](117-sdio-runtime-reference-ownership.md): source reproduction of resume reference growth, transition-based Sunxi driver fix, native/ARM32 checks and offline-verified diagnostic.17; hardware comparison pending.
 
+- [118 — Diagnostic.17 hardware qualification](118-diagnostic17-hardware-qualification.md): guarded installation and full 4 GiB card readback passed; boot and attended SDIO reference comparison pending.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

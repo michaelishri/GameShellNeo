@@ -90,6 +90,18 @@ This is absent from diagnostic.18. Remove when equivalent upstream error
 handling is verified; assign a new image identity before integration. Numbers
 0027–0028 are reserved by the separate WFI candidate and are not prerequisites.
 
+Patch 0030 is the separate NEO-103 callback-lifetime candidate, based on the
+wake/startup candidates. UDC's asynchronous-callback operation controls
+admission under the MUSB lock; a count protects the selected driver across
+each callback's unlocked interval. `wait_event_lock_irq()` drains that count
+before unbind without polling or masking shared IRQs. Endpoint completions
+remain ungated, and soft-stop/start preserves UDC's current admission policy.
+Source, wait-macro, concurrent and ARM checks use `task test:musb-sleep` and
+`task check:musb-wake-configs`; see [report 137](../docs/137-musb-gadget-callback-lifetime.md).
+Failed-power stop/removal and complete controller IRQ/timer/work lifetime
+remain separate work. Remove when equivalent upstream behavior is verified;
+a new image/kernel identity and hardware qualification are required.
+
 Patches 0014–0017 are integrated for image qualification in
 [diagnostic.12 preparation](../docs/85-diagnostic12-preparation.md). The ledger's
 source-test results do not establish hardware recovery or energy savings.

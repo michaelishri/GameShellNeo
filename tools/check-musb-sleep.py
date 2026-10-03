@@ -11,14 +11,15 @@ import subprocess
 import tarfile
 
 from kernel_checks import ROOT, archive_for, compile_objects, run, sha256
+from musb_callback_checks import callback_checks
 
 WORK = ROOT / '.local/build/musb-sleep-tests'
 PREFIX = 'drivers/usb/musb/'
-FILES = ('musb_core.c', 'musb_core.h', 'musb_regs.h', 'musb_gadget.c', 'musb_gadget.h', 'sunxi.c')
+FILES = ('musb_core.c', 'musb_core.h', 'musb_regs.h', 'musb_gadget.c', 'musb_gadget.h', 'musb_gadget_ep0.c', 'sunxi.c')
 
 
 def function(text, name):
-    match = re.search(r'^(?:static\s+)?(?:inline\s+)?(?:void|int|bool)\s+' + name + r'\([^;{]*\)\n\{', text, re.M)
+    match = re.search(r'^(?:static\s+)?(?:inline\s+)?(?:void|int|bool|struct\s+usb_gadget_driver\s*\*)\s*' + name + r'\([^;{]*\)\n\{', text, re.M)
     if not match:
         raise ValueError('Missing function: ' + name)
     return text[match.start():text.index('\n}', match.end()) + 3] + '\n'
@@ -189,7 +190,7 @@ def main():
         irq_source = irq_sources['manage.c']
         dependencies = {}
         version_prefix = 'linux-' + lock['linux']['tag'][1:] + '/'
-        needed = ('include/linux/pm_runtime.h', 'drivers/usb/gadget/udc/core.c')
+        needed = ('include/linux/pm_runtime.h', 'drivers/usb/gadget/udc/core.c', 'include/linux/wait.h')
         with tarfile.open(archive, mode='r|xz') as source:
             for entry in source:
                 if entry.name in [version_prefix + name for name in needed]:
@@ -200,7 +201,8 @@ def main():
             raise ValueError('Missing locked PM/UDC source')
         patches = [ROOT / 'kernel/patches' / name for name in (
             '0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
-            '0026-musb-wake-irq-policy.patch', '0029-musb-startup-runtime-pm.patch')]
+            '0026-musb-wake-irq-policy.patch', '0029-musb-startup-runtime-pm.patch',
+            '0030-musb-gadget-callback-lifetime.patch')]
         for patch in patches:
             run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=WORK / 'patched')
         core = (target / 'musb_core.c').read_text()
@@ -296,16 +298,20 @@ def main():
         print(arm, end='', flush=True)
         evidence = dict(linux=lock['linux']['tag'], archive_sha256=sha256(archive),
                         inputs={str(p.relative_to(ROOT)): sha256(p) for p in
-                                (*patches, harness, Path(__file__), ROOT / 'tools/kernel_checks.py')},
+                                (*patches, harness, Path(__file__), ROOT / 'tools/kernel_checks.py',
+                                 ROOT / 'tools/musb_callback_checks.py')},
                         native=results, arm32=arm.strip(), builder=builder,
                         limits='Actual source functions, deterministic boundary interleavings. '
                                'No electrical USB timing, host enumeration or scheduler concurrency qualification.')
         pm_source = dependencies['include/linux/pm_runtime.h']
         evidence['probe_remove'] = probe_checks(core, irq_source, pm_source, builder)
         evidence['startup'] = startup_checks(gadget, pm_source, dependencies['drivers/usb/gadget/udc/core.c'], builder)
+        evidence['callbacks'] = callback_checks(
+            WORK, target, dependencies['drivers/usb/gadget/udc/core.c'],
+            dependencies['include/linux/wait.h'], builder, function)
         if args.compile_drivers or args.compile_matrix:
             evidence['arm_build'] = compile_objects(archive, lock, WORK, [
-                PREFIX + 'musb_core.o', PREFIX + 'musb_gadget.o', PREFIX + 'sunxi.o'])
+                PREFIX + 'musb_core.o', PREFIX + 'musb_gadget.o', PREFIX + 'musb_gadget_ep0.o', PREFIX + 'sunxi.o'])
         if args.compile_matrix:
             # These are compile-only alternatives, never board image configurations.
             matrices = {
@@ -313,15 +319,15 @@ def main():
                           'CONFIG_USB_MUSB_HOST=y'), ('musb_core.o', 'musb_host.o', 'sunxi.o')),
                 'dual-role': (('CONFIG_USB_MUSB_GADGET=n', 'CONFIG_USB_MUSB_HOST=n',
                                'CONFIG_USB_MUSB_DUAL_ROLE=y'),
-                              ('musb_core.o', 'musb_host.o', 'musb_gadget.o', 'sunxi.o')),
+                              ('musb_core.o', 'musb_host.o', 'musb_gadget.o', 'musb_gadget_ep0.o', 'sunxi.o')),
                 'module': (('CONFIG_USB_MUSB_HDRC=m', 'CONFIG_USB_MUSB_SUNXI=m'),
-                           ('musb_core.o', 'musb_gadget.o', 'sunxi.o')),
+                           ('musb_core.o', 'musb_gadget.o', 'musb_gadget_ep0.o', 'musb_hdrc.o', 'sunxi.o')),
                 'no-system-sleep': (('CONFIG_SUSPEND=n', 'CONFIG_HIBERNATION=n',
                                      'CONFIG_PM_SLEEP=n', 'CONFIG_PM=y'),
-                                    ('musb_core.o', 'musb_gadget.o', 'sunxi.o')),
+                                    ('musb_core.o', 'musb_gadget.o', 'musb_gadget_ep0.o', 'sunxi.o')),
                 'no-pm': (('CONFIG_SUSPEND=n', 'CONFIG_HIBERNATION=n',
                           'CONFIG_PM_SLEEP=n', 'CONFIG_PM=n'),
-                         ('musb_core.o', 'musb_gadget.o', 'sunxi.o')),
+                         ('musb_core.o', 'musb_gadget.o', 'musb_gadget_ep0.o', 'sunxi.o')),
             }
             evidence['arm_configurations'] = {}
             for name, (config, objects) in matrices.items():
@@ -329,6 +335,25 @@ def main():
                 evidence['arm_configurations'][name] = compile_objects(
                     archive, lock, WORK, [PREFIX + obj for obj in objects],
                     extra_config=config, project_config=False)
+                if name == 'module':
+                    record = evidence['arm_configurations'][name]
+                    linked = record['scratch'] + '/output/' + PREFIX + 'musb_hdrc.o'
+                    symbols = subprocess.check_output([
+                        'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
+                        '--platform', builder['platform'],
+                        '--entrypoint', builder['cross_compile'] + 'readelf',
+                        '-v', f'{ROOT}:/project', builder['image'],
+                        '--wide', '--symbols', '/project/' + linked], text=True)
+                    symbol_file = WORK / 'module-symbols.txt'
+                    symbol_file.write_text(symbols)
+                    required = ('musb_gadget_get_driver', 'musb_gadget_put_driver')
+                    for symbol in required:
+                        rows = [line.split() for line in symbols.splitlines()
+                                if line.split() and line.split()[-1] == symbol]
+                        if len(rows) != 1 or rows[0][3:5] != ['FUNC', 'GLOBAL'] or rows[0][6] == 'UND':
+                            raise RuntimeError('Callback helper is unresolved in combined module: ' + symbol)
+                    record['callback_helpers'] = dict(defined=list(required),
+                                                      symbols_sha256=sha256(symbol_file))
                 (WORK / 'matrix-progress.json').write_text(json.dumps(evidence, indent=2) + '\n')
         output.write_text(json.dumps(evidence, indent=2) + '\n')
         print('Evidence:', output.relative_to(ROOT), flush=True)

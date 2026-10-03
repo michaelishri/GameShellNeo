@@ -727,6 +727,14 @@ reference accounting and retry. Stop/remove error recovery and asynchronous
 callback ownership remain separate work. See [report 136](docs/136-musb-startup-runtime-pm.md).
 This candidate also requires a new image identity and hardware qualification.
 
+The `work/musb-callback-lifetime` candidate adds patch 0030. Its UDC callback
+gate prevents new setup/reset/suspend/resume/disconnect notifications during
+unbind and waits for admitted callbacks using the existing controller lock.
+The same tasks execute actual callbacks, UDC bind/unbind and Linux wait macros
+with controlled concurrent tests; endpoint request completion remains available.
+The compile matrix includes endpoint zero and the combined module object.
+See [report 137](docs/137-musb-gadget-callback-lifetime.md) for coverage and limits.
+
 For the opt-in USB polling experiment, use:
 
 ```sh

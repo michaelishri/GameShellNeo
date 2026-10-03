@@ -710,6 +710,20 @@ the driver's separate probe-time IRQ-wake ownership. Normal user sleep remains
 disabled pending hardware qualification. See [design](docs/126-musb-system-sleep-design.md)
 and [implementation](docs/128-musb-system-sleep-candidate.md).
 
+For the separate CPI WFI source candidate, use:
+
+```sh
+task test:cpuidle-s2idle  # Actual entry/scheduler/registration/tick source, native + ARM32
+task check:cpuidle-kernel # Also compile four ARM configurations and inspect WFI assembly
+```
+
+These tasks run locally and save evidence in `.local/build/cpuidle-s2idle-tests/`.
+The board driver is disabled by default; the state-0 core correction is global.
+This branch requires a new image identity and the battery clock prerequisite
+before enabling it for hardware qualification. Diagnostic.18 stays the separate
+USB test image. [Report 134](docs/134-cpi-wfi-s2idle-candidate.md) records scope,
+results and remaining gates. `task build` includes the source regression.
+
 For the opt-in USB polling experiment, use:
 
 ```sh

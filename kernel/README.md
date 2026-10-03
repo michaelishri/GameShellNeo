@@ -3,6 +3,18 @@
 Base: Linux **6.18.54**, source and upstream configuration hashes in
 [the lock](../build/sources.lock.json). Only CPI v3.1 is targeted.
 
+This candidate branch adds patches **0027/0028** and the default-off CPI WFI
+overlay driver. Patch 0027 enables valid state-0 s2idle entry and updates its
+scheduler return contract; it changes global core behavior even with the new
+driver disabled. Patch 0028 supplies Kbuild/Kconfig integration. 618 native/ARM32
+source scenarios, eleven native negative controls, four ARM compilation
+configurations and saved WFI disassembly checks pass. No full candidate image or
+hardware qualification is claimed. Remove these patches when equivalent upstream
+state-0 support and suitable board registration are verified. See
+[report 134](../docs/134-cpi-wfi-s2idle-candidate.md). Number 0026 is reserved for
+the separate MUSB IRQ-wake branch. Assign a new image identity and integrate the
+battery clock prerequisite before enabling this experiment.
+
 `tools/kernel-inputs.py --export DIRECTORY` creates the complete patch queue
 and content manifest. Existing-source changes live in `patches/`; new source
 files and bindings live in `overlay/` and become the third generated patch.

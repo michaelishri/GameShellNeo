@@ -104,6 +104,7 @@ tasks:
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
+      - task: test:cpuidle-s2idle
       - task: build:kernel
       - task: test:usb-policy-board
       - task: check:dt
@@ -205,6 +206,14 @@ tasks:
   test:musb-sleep:
     desc: Test actual MUSB system-sleep connection ownership on native and ARM32
     cmds: [bash tools/run-logged.sh musb-sleep python3 tools/check-musb-sleep.py]
+
+  test:cpuidle-s2idle:
+    desc: Test actual CPU-idle entry, scheduler, registration and tick-freeze functions on native and ARM32
+    cmds: [bash tools/run-logged.sh cpuidle-s2idle python3 tools/check-cpuidle-s2idle.py]
+
+  check:cpuidle-kernel:
+    desc: Run CPU-idle regressions and compile ARM entry, scheduler and timer objects in four configurations
+    cmds: [bash tools/run-logged.sh cpuidle-kernel python3 tools/check-cpuidle-s2idle.py --compile-kernel]
 
   check:musb-sleep-drivers:
     desc: Test MUSB sleep ownership and compile the complete ARM controller/gadget/glue

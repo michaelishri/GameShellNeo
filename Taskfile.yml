@@ -231,6 +231,13 @@ tasks:
       NEO_EXTCON_KUNIT_VARIANT: '{{.VARIANT | default "all"}}'
     cmds: [bash tools/run-logged.sh extcon-kunit python3 tools/check-extcon-kunit.py]
 
+  test:extcon-provider-kunit:
+    desc: Run real Linux linked-provider probe/unbind tests with inferred firmware links disabled
+    env:
+      NEO_EXTCON_KUNIT_SUITE: provider
+      NEO_EXTCON_KUNIT_VARIANT: '{{.VARIANT | default "all"}}'
+    cmds: [bash tools/run-logged.sh extcon-provider-kunit python3 tools/check-extcon-kunit.py]
+
   check:musb-drivers:
     desc: Run context regressions and compile the full ARM MUSB core and Sunxi drivers
     cmds: [bash tools/run-logged.sh musb-drivers python3 tools/check-musb-context.py --compile-drivers]

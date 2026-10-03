@@ -801,6 +801,7 @@ prerequisite in patch 0031 and Sunxi child notifier/work ownership in patch 0033
 task test:extcon-notifier # Actual dispatch/unlink source with modeled SRCU, native and ARM32
 task check:extcon-drivers # Also compile/link extcon core/devres: board, module, TINY_SRCU
 task test:extcon-kunit   # Real Linux UML tests with lock/RCU debugging, TREE and TINY SRCU
+task test:extcon-provider-kunit # Linked provider admission/unbind against real driver core, fw_devlink=off
 task test:sunxi-owner    # Actual child/worker hooks with modeled lifetime boundaries, native + ARM32
 task check:sunxi-owner-drivers # Also compile full Sunxi/extcon objects in gadget, host and dual-role modes
 ```
@@ -822,8 +823,26 @@ compiler evidence are under `.local/build/sunxi-owner-tests/`; task logs are
 `.local/build/sunxi-owner.log` and `.local/build/sunxi-owner-drivers.log`.
 `task build` includes the source regression on this branch. These use controlled
 workqueue/notifier/resource boundaries, not real Linux concurrency or hardware.
-[Report 146](docs/146-sunxi-child-notifier-work.md) records the scope; provider
-lifetime, core IRQ/PM retirement and complete removal/rebind remain open.
+[Report 146](docs/146-sunxi-child-notifier-work.md) records that scope; the
+provider integration below continues it. Core IRQ/PM retirement and complete
+removal/rebind remain open.
+
+Patch 0034 adds a linked provider lookup and uses it in Sunxi's parent probe.
+`task test:extcon-provider-kunit` runs both SRCU configurations by default;
+`VARIANT=tree` or `VARIANT=tiny` selects one. It exercises fully bound,
+still-probing, failed and unbinding suppliers, existing device links, consumer
+probe failure/rebind, and supplier removal waiting for probes and callbacks.
+The suite uses synthetic platform devices and software firmware nodes, with
+inferred firmware links disabled. It does not exercise a physical PHY or the
+entire Sunxi remove path. [Report 147](docs/147-extcon-provider-lifetime.md)
+records the contract and qualification.
+
+The provider task shares the notifier suite's builder and strict evidence
+validation, but uses `.local/build/extcon-provider-kunit/` for isolated outputs.
+Each accepted run retains independent copies of its kernel, configuration,
+full log and result JSON under `accepted-runs/`, with a hashed receipt.
+Latest summaries are `evidence-all.json`, `evidence-tree.json` or
+`evidence-tiny.json`; task output is `.local/build/extcon-provider-kunit.log`.
 
 For the opt-in USB polling experiment, use:
 

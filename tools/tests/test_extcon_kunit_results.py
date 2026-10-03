@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from extcon_kunit_results import CASES, COUNTS, checked_cases
+from extcon_kunit_results import CASES, COUNTS, PROVIDER_CASES, checked_cases
 
 spec = importlib.util.spec_from_file_location('extcon_kunit_runner',
                                              Path(__file__).resolve().parents[1] / 'check-extcon-kunit.py')
@@ -79,6 +79,32 @@ class KUnitEvidenceTests(unittest.TestCase):
                 report['sub_groups'][0]['test_cases'][0] = value
                 with self.assertRaises(ValueError):
                     checked_cases(report, self.log)
+
+    def test_provider_requires_its_own_exact_suite_and_cases(self):
+        report = deepcopy(self.report)
+        suite = report['sub_groups'][0]
+        suite['name'] = 'extcon-provider-lifetime'
+        suite['test_cases'] = [dict(name=name, status='PASS') for name in PROVIDER_CASES]
+        suite['misc'] = dict(COUNTS, tests=len(PROVIDER_CASES), passed=len(PROVIDER_CASES))
+        report['misc'] = dict(suite['misc'])
+        log = '\n'.join(['Kernel command line: fw_devlink=off', suite['name'], *PROVIDER_CASES])
+        self.assertEqual(checked_cases(report, log, 'provider'), suite['test_cases'])
+        for wrong_report, wrong_log, kind in (
+            (report, log, 'notifier'), (self.report, self.log, 'provider'),
+            (report, log, 'foreign'), (report, self.log, 'provider'),
+        ):
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                checked_cases(wrong_report, wrong_log, kind)
+        for error in ('WARNING:', 'BUG:', 'not ok '):
+            with self.subTest(error=error), self.assertRaises(ValueError):
+                checked_cases(report, log + error, 'provider')
+        for replacement in ('', 'fw_devlink=on', 'fw_devlink=off fw_devlink=on',
+                            'fw_devlink=off fw_devlink=off'):
+            with self.subTest(bootargs=replacement), self.assertRaises(ValueError):
+                checked_cases(report, log.replace('fw_devlink=off', replacement), 'provider')
+        suite['test_cases'][-1] = dict(suite['test_cases'][0])
+        with self.assertRaises(ValueError):
+            checked_cases(report, log, 'provider')
 
 
 class ArtifactTests(unittest.TestCase):

@@ -304,3 +304,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [145 — Real-kernel extcon lifetime checks](145-extcon-kernel-lifetime-validation.md): nine KUnit cases pass under TREE and TINY SRCU with lock/RCU debugging, saved UML workflow and strict evidence checks; IRQ uevent, provider lifetime and MUSB integration boundaries remain explicit.
 
 - [146 — Sunxi child notifier and work ownership](146-sunxi-child-notifier-work.md): explicit callback ownership, failed-init draining, terminal work shutdown and fresh rebind state; 240 native/ARM32 scenarios and three ARM builds, with provider/core retirement still open.
+
+- [147 — Extcon provider lifetime](147-extcon-provider-lifetime.md): linked lookup and Sunxi integration, explicit failed-probe cleanup contract, and real-kernel supplier/consumer ordering tests with inferred firmware links disabled; complete controller retirement and board qualification remain open.

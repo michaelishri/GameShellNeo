@@ -777,6 +777,23 @@ with controlled concurrent tests; endpoint request completion remains available.
 The compile matrix includes endpoint zero and the combined module object.
 See [report 137](docs/137-musb-gadget-callback-lifetime.md) for coverage and limits.
 
+The `work/musb-teardown-audit` branch provides a separate removal-order audit:
+
+```sh
+task test:musb-teardown-audit # Reproduce source-order defects, native + ARM32; no device access
+```
+
+It extracts the pinned stop/remove, endpoint-disable, UDC-stop and Sunxi
+exit/interrupt functions, then checks 20 stop and 24 removal scenarios under
+four diagnostic variants. Passing means the expected defects and control
+effects were reproduced; it does not mean removal is safe. Two deliberately
+broken native controls must fail the specific ownership assertions. Evidence
+is in `.local/build/musb-teardown-tests/evidence.json`, with progress in
+`.local/build/musb-teardown-audit.log`. See
+[report 139](docs/139-musb-teardown-power-audit.md) for modeled boundaries,
+source findings and the remaining implementation requirements. This task is
+not an image-build gate and introduces no driver patch.
+
 For the opt-in USB polling experiment, use:
 
 ```sh

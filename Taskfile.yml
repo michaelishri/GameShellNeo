@@ -203,6 +203,10 @@ tasks:
     desc: Check actual MUSB context register behavior with and without the Sunxi quirk
     cmds: [bash tools/run-logged.sh musb-context python3 tools/check-musb-context.py]
 
+  test:musb-teardown-audit:
+    desc: Reproduce actual-source teardown ordering with modeled boundaries; not safe-removal qualification
+    cmds: [bash tools/run-logged.sh musb-teardown-audit python3 tools/check-musb-teardown.py]
+
   check:musb-drivers:
     desc: Run context regressions and compile the full ARM MUSB core and Sunxi drivers
     cmds: [bash tools/run-logged.sh musb-drivers python3 tools/check-musb-context.py --compile-drivers]

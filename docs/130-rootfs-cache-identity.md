@@ -1,7 +1,7 @@
 # Base-rootfs cache identity (NEO-99)
 
-4 October 2026, Pacific/Auckland. Source/tooling validation completed; the
-diagnostic.18 build will establish the first cache record with this key.
+4 October 2026, Pacific/Auckland. Source/tooling validation and diagnostic.18
+image integration passed, establishing the first cache record with this key.
 No build-duration saving has yet been measured.
 
 The previous cache key hashed the whole source lock. A change from
@@ -66,6 +66,23 @@ source fixtures. They demonstrate:
 
 The repository checks pass with 13 runtime tests and 462 tooling tests, one
 existing optional skip, compiled selector/mount-guard checks and shell lint.
-Logs: `.local/neo99-check.log`. Actual cache recording/checking after the image
-build remains the integration check; a second complete image build solely to
-time the cache would not establish a device performance or energy improvement.
+Logs: `.local/neo99-check.log`.
+
+## Image integration
+
+The shared `task build:image` workflow completed a fresh bootstrap with
+`ARTIFACT_IGNORE_CACHE=yes`, recorded the v2 inputs and produced the verified
+diagnostic.18 image. A subsequent read-only `python3 tools/rootfs-cache.py check`
+accepted the real archive and recomputed its SHA-256:
+
+- Archive: `rootfs-armhf-trixie-minimal_202610-21ea887c26ba-Ha7bbf3-B5532e2.tar.zst`.
+- SHA-256: `698ccc704a0af47abcd417770bfbcdb75ab1ff8f0e3950d376410f143d639b64`.
+- Ledger: `.local/build/rootfs-cache.json`, including `base_rootfs_lock_v2` and
+  the build wrapper fingerprint.
+- Build and verification logs: `.local/build/image.log` and
+  `.local/build/image-verify.log`.
+
+This completes NEO-99's implementation and integration check. Version-only
+reuse is exercised by the isolated tests; this build establishes the actual
+new cache baseline. It is not a paired timing experiment, and no device
+performance or energy improvement is claimed.

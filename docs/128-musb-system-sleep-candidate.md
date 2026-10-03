@@ -1,8 +1,9 @@
 # MUSB system-sleep connection candidate (NEO-95)
 
-3 October 2026, Pacific/Auckland. Diagnostic.18 is being prepared to test an
-underlying USB controller lifecycle correction. The installed diagnostic.17
-remains unchanged after the [failed actual-sleep attempt](125-traced-rtc-wake-usb-failure.md).
+3–4 October 2026, Pacific/Auckland. Diagnostic.18 is built, verified and staged
+on the Mac to test an underlying USB controller lifecycle correction. The
+installed diagnostic.17 remains unchanged after the
+[failed actual-sleep attempt](125-traced-rtc-wake-usb-failure.md).
 Its RTC wake, keypad, Wi-Fi and owner-confirmed dim console returned, while USB
 did not enumerate again. The failure remains authoritative; source tests do not
 requalify it.
@@ -106,11 +107,16 @@ tests. Host-only and dual-role kernel configurations are not hardware-qualified.
 Four startup-script tests run the real script against isolated sysfs/configfs
 fixtures, including repeated startup, missing/ambiguous controllers, bad policy
 and failed readback. PM admission tests cover wrong or missing wake policy.
-Repository checks pass: 13 runtime tests, 457 tooling tests with one existing
+Repository checks pass: 13 runtime tests, 462 tooling tests with one existing
 optional skip, compiled selector/mount-guard checks, Bash syntax and ShellCheck.
 
 Local evidence is retained under `.local/build/musb-sleep-tests/`,
-`.local/build/musb-sleep-drivers.log` and `.local/neo95-check.log`.
+`.local/build/musb-sleep-drivers.log` and `.local/neo99-check.log`. The final
+separate-`bool` source passed the isolated ARM compilation again in
+`kernel-3c02a5aaa1cd79b8`; its compile evidence identifies all three objects.
+The complete image kernel also built successfully, with all 25 patches and
+15 checked kernel/module artifacts. The compiled-board USB policy and
+device-tree/schema checks passed, including their negative controls.
 
 ## Image and next hardware boundary
 
@@ -120,13 +126,33 @@ plus the explicit USB wake policy. CPU-idle configuration is unchanged to keep
 the USB comparison focused. Normal sleep stays masked; no production sleep,
 latency or battery-life claim is made.
 
-The shared build task is running after a verified diagnostic.17 checkpoint at
+The shared build tasks completed after a verified diagnostic.17 checkpoint at
 `.local/recovery/diagnostic17-before-musb-sleep-fix/` and archived kernel state at
 `.local/previous-kernels/20261003T103010Z-1155126/`. The interrupted first
 candidate's partial build is separately archived at
 `.local/previous-kernels/20261003T104418Z-1181147/` and is not a recovery image.
-Artifact verification and
-transfer details will be recorded when complete. No new image is installed yet.
+The resulting 4 GiB image passed offline verification: partition boundaries,
+bootloader readback, FAT16/ext4 filesystem checks, U-Boot CRCs/addresses,
+kernel/DTB/modules/radio hashes, private identity permissions and service policy.
+The new base-rootfs cache record passed its independent read-only check
+([report 130](130-rootfs-cache-identity.md)).
+
+| Artifact | Value |
+| --- | --- |
+| Image | `GameShellNeo-0.1.0-diagnostic.18-cpi31-21f78ee232de.img` |
+| Raw bytes | 4,294,967,296 |
+| Raw SHA-256 | `21f78ee232de9692ac429f06994586fff77aa49d52011fd0350c8e5c85320f87` |
+| Compressed bytes | 269,743,893 |
+| Compressed SHA-256 | `7a304c154280a3c4f908823528325117796d7e9b0d9e7fbba63511820884abac` |
+
+`task mac:stage` uploaded the private archive after the owner confirmed regular
+Wi-Fi. Both compressed and decompressed checksums passed on the Mac. No card
+was written and no new image is installed yet. Logs are saved in
+`.local/diagnostic18-kernel-restart.log`, `.local/diagnostic18-image.log`,
+`.local/build/image-verify.log` and `.local/diagnostic18-mac-stage.log`;
+`.local/artifacts/verification.json` and `.local/flash/transfer.json` record
+the artifact identities. These artifacts contain private provisioning and
+remain excluded from version control.
 
 After card installation, collect a fresh boot baseline and verify the new wake
 policy and trace format. Requalify freezer, driver and late/noirq stages with

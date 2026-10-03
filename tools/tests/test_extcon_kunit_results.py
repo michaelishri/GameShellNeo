@@ -1,11 +1,19 @@
 """Prevent incomplete, duplicated or warning-bearing kernel runs passing admission."""
 from copy import deepcopy
+import importlib.util
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from extcon_kunit_results import CASES, COUNTS, checked_cases
+
+spec = importlib.util.spec_from_file_location('extcon_kunit_runner',
+                                             Path(__file__).resolve().parents[1] / 'check-extcon-kunit.py')
+runner = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runner)
 
 
 class KUnitEvidenceTests(unittest.TestCase):
@@ -71,6 +79,39 @@ class KUnitEvidenceTests(unittest.TestCase):
                 report['sub_groups'][0]['test_cases'][0] = value
                 with self.assertRaises(ValueError):
                     checked_cases(report, self.log)
+
+
+class ArtifactTests(unittest.TestCase):
+    def test_later_runs_cannot_overwrite_retained_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scratch = root / 'kernel'
+            (scratch / 'output').mkdir(parents=True)
+            names = {'output/linux': 'linux', 'output/.config': 'config',
+                     'output/test.log': 'test.log', 'results.json': 'results.json'}
+            for source in names:
+                (scratch / source).write_bytes(b'first ' + source.encode())
+            with patch.object(runner, 'ROOT', root):
+                first = runner.retain_run(scratch)
+                for source in names:
+                    (scratch / source).write_bytes(b'second ' + source.encode())
+                second = runner.retain_run(scratch)
+            self.assertNotEqual(first['artifact_dir'], second['artifact_dir'])
+            for source, name in names.items():
+                self.assertEqual((root / first['artifact_dir'] / name).read_bytes(),
+                                 b'first ' + source.encode())
+                self.assertEqual((root / second['artifact_dir'] / name).read_bytes(),
+                                 b'second ' + source.encode())
+
+    def test_partial_copy_cannot_publish_an_acceptance_record(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            scratch = root / 'kernel'
+            (scratch / 'output').mkdir(parents=True)
+            (scratch / 'output/linux').write_bytes(b'kernel')
+            with patch.object(runner, 'ROOT', root), self.assertRaises(FileNotFoundError):
+                runner.retain_run(scratch)
+            self.assertFalse(list(scratch.rglob('evidence.json')))
 
 
 if __name__ == '__main__':

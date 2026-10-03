@@ -8,12 +8,33 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import uuid
 
 from kernel_checks import ROOT, archive_for, check_overrides, run, sha256
 from kernel_sources import atomic_json, ensure_source, locked
 from extcon_kunit_results import checked_cases
 
 WORK = ROOT / '.local/build/extcon-kunit'
+
+
+def retain_run(scratch):
+    """Detach accepted artifacts from paths that subsequent Kbuild/KUnit runs reuse."""
+    accepted = scratch / 'accepted-runs' / uuid.uuid4().hex
+    accepted.mkdir(parents=True, mode=0o700)
+    record = dict(scratch=str(scratch.relative_to(ROOT)),
+                  artifact_dir=str(accepted.relative_to(ROOT)))
+    for field, path, name in (
+        ('kernel_sha256', scratch / 'output/linux', 'linux'),
+        ('config_sha256', scratch / 'output/.config', 'config'),
+        ('log_sha256', scratch / 'output/test.log', 'test.log'),
+        ('report_sha256', scratch / 'results.json', 'results.json'),
+    ):
+        digest = sha256(path)
+        shutil.copyfile(path, accepted / name)
+        if sha256(accepted / name) != digest:
+            raise RuntimeError('Accepted artifact changed during retention: ' + name)
+        record[field] = digest
+    return record
 
 
 def main():
@@ -90,9 +111,12 @@ def main():
             report = json.loads((scratch / 'results.json').read_text())
             log = (output / 'test.log').read_text(errors='replace')
             cases = checked_cases(report, log)
-            results[name] = dict(scratch=relative, cases=cases,
-                config_sha256=sha256(output / '.config'), log_sha256=sha256(output / 'test.log'),
-                kernel_sha256=sha256(output / 'linux'), report_sha256=sha256(scratch / 'results.json'))
+            record = retain_run(scratch)
+            record['cases'] = cases
+            atomic_json(ROOT / record['artifact_dir'] / 'evidence.json', dict(
+                schema_version=1, variant=name, source=metadata, builder=builder,
+                inputs=inputs, result=record))
+            results[name] = record
             atomic_json(WORK / 'progress.json', results)
         atomic_json(evidence, dict(schema_version=1, linux=lock['linux']['tag'],
             source=dict(path=str(source.relative_to(ROOT)), **metadata), inputs=inputs,

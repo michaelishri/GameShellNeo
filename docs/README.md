@@ -298,4 +298,4 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 
 - [139 — MUSB teardown audit](139-musb-teardown-power-audit.md): endpoint/work/IRQ cleanup ordering, PM and PHY/notifier ownership, reproducible native/ARM32 evidence and the limits on a safe recovery implementation.
 
-- [140 — Diagnostic.18 card installation](140-diagnostic18-card-installation.md): interrupted dongle-powered reader, read-only comparison, successful guarded flash/full readback and pending new-boot qualification.
+- [140 — Diagnostic.18 installation and startup](140-diagnostic18-card-installation.md): interrupted dongle-powered reader, successful guarded flash/full readback, owner-confirmed boot, both routes and awake prerequisite checks; observed PM qualification remains pending.

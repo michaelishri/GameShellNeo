@@ -1,10 +1,12 @@
-# Diagnostic.18 card installation (NEO-95)
+# Diagnostic.18 installation and startup (NEO-95)
 
 4 October 2026, Pacific/Auckland. The exact diagnostic.18 artifact from
 [report 128](128-musb-system-sleep-candidate.md) has been written to the Samsung
 DEV card, passed full 4 GiB readback and been safely ejected. An earlier attempt
-was interrupted when the dongle's charging cable was disconnected. New-boot
-integration and attended USB/sleep qualification remain separate steps.
+was interrupted when the dongle's charging cable was disconnected. The owner
+confirmed the login screen; both SSH routes, startup integration, journal
+rotation and awake key/RTC checks pass on the new boot. Attended debug stages
+and USB/sleep recovery remain unqualified.
 
 ## Source image and shutdown
 
@@ -75,6 +77,68 @@ Evidence is `.local/diagnostics/20261003T161548.495987Z/flash.log` and
 The original interrupted attempt remains recorded as failed. No boot or
 USB/sleep qualification is claimed by the successful card readback.
 
+## New-boot startup and awake checks
+
+The owner confirmed the login console. USB and independent Wi-Fi SSH both
+reach `6.18.54-gameshellneo18`, boot
+`e419f334-0a16-4b04-96d2-d97a2e4d5d0b`. The installed image manifest exactly
+matches `.local/artifacts/image-manifest.json`, including the kernel and all
+25 patches. The USB gadget reports configured/high-speed, and its system-wake
+policy reads `disabled` as required by diagnostic.18.
+
+All six integration groups pass: image identity, services, database/policy,
+journal ACL, BPF enforcement and country policy. The six inspected services
+are active with zero restarts; no unit is failed and kernel taint is zero.
+Provisioning remains NZ, with the previously accepted AP-announced AU global
+country and phy label 99. Firmware-country readback remains unqualified.
+
+The initial SDIO runtime count is **2**, active and forbidden. PM success and
+failure counts are both zero. Normal sleep targets remain masked, `pm_test`
+is none, async is 1 and the debug delay is five seconds. The RSB supplier is
+active with usage 1, control auto and a 1000 ms autosuspend delay. The CPU-idle
+driver is still `none`; this image does not contain the later WFI candidate.
+Backlight is at level 1 with power 0. Both audio amplifiers are off; no tone
+was requested during startup. Battery telemetry reports 100%, Charging and
+4.1635 V; no charging policy was changed.
+
+The saved kernel startup log contains the established BCM43430/0 firmware
+7.13.53.9 fallback messages, without a firmware crash or runtime-reference
+underflow. Ordinary text-log rotation passes continuity checks without a
+journald restart, kernel-history loss or changes to displaced journal files.
+
+Awake power-key acquisition, released-state verification and descriptor
+handback pass, with no key events. The ten-second RTC check delivers one
+notification with flags `0xa0` after **10.034 seconds** and restores the
+disabled alarm. Its run ID is `c0736c186b9f4a2186da2f7bd47ef7d7`. These checks
+establish awake ownership/delivery only, not waking from sleep.
+
+| Evidence | Capture under `.local/diagnostics/` |
+| --- | --- |
+| Startup status | `20261003T162033.435268Z` |
+| Initial PM snapshot | `20261003T162102.467593Z` |
+| Journal inspection | `20261003T162137.257597Z` |
+| Idle audio inspection | `20261003T162151.167002Z` |
+| Integration | `20261003T162205.425506Z` |
+| Ordinary journal rotation | `20261003T162256.129445Z` |
+| Awake power-key ownership | `20261003T162322.966647Z` |
+| Awake RTC delivery/restoration | `20261003T162341.649579Z` |
+
+The commands are `device:status ROUTE=usb`, `device:pm-inspect`,
+`device:journal-inspect`, `device:audio-inspect`,
+`device:check ROUTE=usb ACTIVE_COUNTRY=AU`, `device:journal-rotation`,
+`device:power-key-smoke` and `device:rtc-smoke`. Explicit read-only
+`device:exec` calls captured both route identities, the installed manifest,
+USB wake policy, regulatory state, initial SDIO ownership and kernel journal.
+Host transcripts are `.local/neo95-diag18-*.log` and
+`.local/neo95-diag18-installed-image.json`. An initial concurrent audio read
+was refused by the host's shared diagnostic lock before device access; its
+later serialized run is the successful capture above.
+
+Startup reports local userspace ready at monotonic **16.949 seconds** and
+systemd startup completion at **22.040 seconds**. These are this boot's software
+milestones, not measured power-button-to-UI latency or the under-five-second
+product target. No boot-performance improvement is claimed here.
+
 ## Reproduction and remaining work
 
 The routine commands remain the documented Taskfile workflows:
@@ -93,9 +157,9 @@ task mac:compare DISK=diskN
 card each time. Keep the reader's USB and charging connections intact through
 write, full readback and ejection; changing dongle power can interrupt storage.
 
-After owner-confirmed boot, verify the exact installed image, both SSH routes,
-USB wake policy, services, journal rotation, idle audio, awake key ownership
-and RTC delivery. Requalify the debug stages before a separately attended
+The installed image, both SSH routes, USB wake policy, services, journal
+rotation, idle audio, awake key ownership and RTC delivery are now checked.
+Requalify the debug stages with fresh observation before a separately attended
 real-sleep attempt. The old boot's consumed prerequisites cannot authorize a
 new sleep test. The separate source candidates from reports 132–139 are not
 part of this image; diagnostic.18 contains patches 0001–0025 only.

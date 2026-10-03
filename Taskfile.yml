@@ -102,6 +102,7 @@ tasks:
       - task: test:sunxi-sdio-refs
       - task: test:musb-context
       - task: test:musb-sleep
+      - task: test:extcon-notifier
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -206,6 +207,14 @@ tasks:
   test:musb-teardown-audit:
     desc: Reproduce actual-source teardown ordering with modeled boundaries; not safe-removal qualification
     cmds: [bash tools/run-logged.sh musb-teardown-audit python3 tools/check-musb-teardown.py]
+
+  test:extcon-notifier:
+    desc: Exercise actual extcon/raw notifier functions with modeled SRCU and concurrent unlink
+    cmds: [bash tools/run-logged.sh extcon-notifier python3 tools/check-extcon-notifier.py]
+
+  check:extcon-drivers:
+    desc: Run notifier regressions and compile ARM extcon core/devres with TREE and TINY SRCU
+    cmds: [bash tools/run-logged.sh extcon-drivers python3 tools/check-extcon-notifier.py --compile-drivers]
 
   check:musb-drivers:
     desc: Run context regressions and compile the full ARM MUSB core and Sunxi drivers

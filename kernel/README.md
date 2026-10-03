@@ -199,3 +199,13 @@ comparator and parent-adjusting search retain their previous behavior.
 `task check:clock-drivers` additionally builds complete affected clock objects
 in isolated scratch. These are computation and integration checks, not physical
 PLL, power or timing measurements. See [report 39](../docs/39-clock-rate-constraint-optimization.md).
+
+Patch 0031 adds an opt-in process-context extcon notifier unlink/drain API.
+A per-device SRCU envelope covers both existing raw chains from selection
+through callback return. Allocation initializes the domain; free cleans it up.
+Ordinary unregister and callback contexts remain unchanged. Provider lifetime,
+Sunxi child ownership and full MUSB teardown are separate gates. Use
+`task test:extcon-notifier` and `task check:extcon-drivers`; see
+[report 144](../docs/144-extcon-notifier-drain-candidate.md). The change is absent
+from diagnostic.18. Remove when equivalent upstream lifetime guarantees are
+verified; assign a new image identity before integration.

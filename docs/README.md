@@ -294,3 +294,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [136 — MUSB startup power failures](136-musb-startup-runtime-pm.md): checked probe/gadget start, reference/error regressions and the unresolved stop/remove and asynchronous-callback lifetime boundaries; separate from diagnostic.18.
 
 - [137 — MUSB gadget callback lifetime](137-musb-gadget-callback-lifetime.md): admission and drain before unbind, stable callback pointers, request-completion preservation and actual-source concurrent tests; separate candidate.
+
+- [138 — Shared kernel sources](138-kernel-source-reuse.md): verified source reuse, isolated ARM outputs and resumable compaction; 18 MUSB copies reduced to three with unchanged historical evidence and about 24.89 GiB reclaimed.

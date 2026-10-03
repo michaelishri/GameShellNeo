@@ -49,8 +49,19 @@ def plan(root, suite):
         if {p.name for p in path.iterdir()} - {
                 'source', 'output', 'extra.config', 'compiler.txt', 'elf-info.txt'}:
             raise ValueError('Unexpected files in compiler tree: ' + path.name)
-        for child in ('source', 'output'):
-            real_directory(path / child)
+        real_directory(path / 'output')
+        source = path / 'source'
+        if source.is_symlink():
+            # A superseded output may point at a shared source. Remove only
+            # this link with the scratch tree; never remove the source cache.
+            target = os.readlink(source)
+            if not re.fullmatch(r'[.][.]/[.]sources/source-[0-9a-f]{64}/source', target):
+                raise ValueError('Unexpected shared source link')
+            entry = work / '.sources' / Path(target).parts[2]
+            for parent in (work / '.sources', entry, entry / 'source'):
+                real_directory(parent)
+        else:
+            real_directory(source)
         if not (path / 'source/Makefile').is_file() or not (path / 'output/.config').is_file():
             raise ValueError('Incomplete compiler tree: ' + path.name)
         candidates.append(path)

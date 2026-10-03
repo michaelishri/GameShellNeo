@@ -117,3 +117,5 @@ it has not been submitted. Preserve the cable and controls during that attempt
 so the new USB trace and separate Mac snapshot can distinguish device recovery
 from a physical reconnect. No automatic retry of the original failed sleep run
 is authorized by this sequence.
+
+The subsequent separately attended attempt is recorded in [report 125](125-traced-rtc-wake-usb-failure.md). It reproduced USB failure and consumed this baseline; the rehearsal and seven debug records must not be reused to submit another sleep attempt.

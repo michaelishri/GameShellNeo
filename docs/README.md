@@ -251,7 +251,7 @@ new image build and the next hardware qualification sequence.
 - [121 — USB reconnect and clean boot](121-usb-reconnect-and-clean-boot.md): saved Mac-side network/sleep inspection, one successful cable-reconnect recovery, separated host-sleep timing and observed reboot restoring the ordinary diagnostic policy; original resume issue remains open.
 - [122 — USB resume metadata recorder](122-usb-resume-metadata-recorder.md): bounded MUSB/gadget tracing and audited ECM notification logging, owned cleanup, passive awake qualification and integration for the next attended sleep experiment; no driver fix or resume pass claimed.
 - [123 — Sleep measurement criteria](123-sleep-measurement-criteria.md): separates functional RTC wake from timekeeping/CPU-idle/energy, bounds clock sampling and in-loop waiting, preserves the original USB failure, and records the remaining WFI/timer integration work.
-- [124 — USB reproduction prerequisites](124-usb-reproduction-prerequisites.md): all seven current-boot debug checks pass with both routes, retained keypad, restored traces and SDIO usage 2; owner screen confirmation and the new-source awake RTC/USB-recorder rehearsal pass; separately observed actual sleep remains pending.
+- [124 — USB reproduction prerequisites](124-usb-reproduction-prerequisites.md): all seven current-boot debug checks pass with both routes, retained keypad, restored traces and SDIO usage 2; owner screen confirmation and the new-source awake RTC/USB-recorder rehearsal pass before the separately recorded actual-sleep attempt in report 125.
 - [119 — Guarded RTC sleep preparation](119-guarded-rtc-sleep-preparation.md): separate one-shot s2idle admission, RTC deadline and wake attribution, persistent key protection, failure tests and two successful awake rehearsals; the subsequent attempt is in report 120.
 
 ## Questions left open for the next phase
@@ -265,3 +265,5 @@ These are research gaps, not requests to choose an implementation now:
 - Which parts of the existing interface and game-launch conventions should GameShellNeo retain?
 
 The follow-up Python assessment includes the newly supplied local clone; the original historical analysis remains explicitly dated. Subsequent device inspection is recorded separately in report 21. During that inspection, no device was flashed, no original source checkout was changed, and no full multi-gigabyte OS image was downloaded or mounted. The device's boot region and boot partition were copied read-only for local reference. The later GameShellNeo build and offline image inspection are recorded in report 25; the original physical card remains untouched.
+
+- [125 — Traced RTC-wake USB failure](125-traced-rtc-wake-usb-failure.md): RTC, display, keypad and Wi-Fi return, but USB fails again; combined MUSB resume status and lost enumeration narrow the driver investigation, with no new Mac sleep event in the saved history.

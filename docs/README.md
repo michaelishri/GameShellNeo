@@ -291,3 +291,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [135 — Awake measurement clock guards](135-awake-measurement-clock-guards.md): sleep/PM rejection, preserved cleanup, historical-evidence labeling and read-only board clock observations; separate candidate tools.
 
 - [136 — MUSB startup power failures](136-musb-startup-runtime-pm.md): checked probe/gadget start, reference/error regressions and the unresolved stop/remove and asynchronous-callback lifetime boundaries; separate from diagnostic.18.
+
+- [137 — MUSB gadget callback lifetime](137-musb-gadget-callback-lifetime.md): admission and drain before unbind, stable callback pointers, request-completion preservation and actual-source concurrent tests; separate candidate.

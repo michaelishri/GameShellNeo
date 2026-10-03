@@ -28,6 +28,9 @@ env:
   NEO_PM_STAGE: '{{.STAGE | default ""}}'
   NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
   NEO_PM_RUN: '{{.RUN | default ""}}'
+  NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
+  NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
+  NEO_SLEEP_ATTENDED: '{{.ATTENDED | default "0"}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
   NEO_WIFI_TRACE: '{{.WIFI_TRACE | default "0"}}'
   NEO_KEYPAD_AUDIO: '{{.AUDIO | default "0"}}'
@@ -466,6 +469,18 @@ tasks:
   device:pm-platform:
     desc: One attended late/noirq debug cycle; checked image, same-boot RTC smoke, power-key ownership and traces required
     cmds: [python3 tools/check-pm-stages.py --platform]
+
+  device:sleep-rehearse:
+    desc: Awake RTC deadline/key-policy/trace rehearsal; QUALIFICATION required, no sleep submission
+    cmds: [python3 tools/check-sleep-rtc.py --rehearse]
+
+  device:sleep-rtc:
+    desc: One attended real s2idle attempt; QUALIFICATION, REHEARSAL and fresh ATTENDED=1 required
+    cmds: [python3 tools/check-sleep-rtc.py --rtc-wake]
+
+  device:sleep-collect:
+    desc: Collect the original sleep/rehearsal RUN after uncertain SSH; never resubmit
+    cmds: [python3 tools/check-sleep-rtc.py --collect]
 
   device:pm-power-key:
     desc: Attended debug stage with exclusive power-key ownership; explicit STAGE and owner readiness required

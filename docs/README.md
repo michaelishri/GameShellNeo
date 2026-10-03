@@ -243,6 +243,8 @@ new image build and the next hardware qualification sequence.
 
 - [118 — Diagnostic.17 hardware qualification](118-diagnostic17-hardware-qualification.md): verified installation/startup, seven observed debug-stage passes with stable SDIO usage, retained keypad/network access, owner-confirmed display and final restoration.
 
+- [119 — Guarded RTC sleep preparation](119-guarded-rtc-sleep-preparation.md): separate one-shot s2idle admission, RTC deadline and wake attribution, persistent key protection, failure tests and two successful awake rehearsals; first real-sleep attempt pending.
+
 ## Questions left open for the next phase
 
 These are research gaps, not requests to choose an implementation now:

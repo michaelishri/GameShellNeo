@@ -1807,3 +1807,28 @@ The platform task requires the wake-fixed image, same-boot RTC qualification,
 power-key ownership and complete PM traces. Run it only after explicit observer
 readiness. [Report 102](docs/102-rtc-and-platform-diagnostic-preparation.md)
 records the awake evidence, guards and prepared hardware sequence.
+
+The first actual-s2idle experiment has its own commands:
+
+```sh
+# Requires the seven accepted same-boot PM records; keeps the screen awake.
+task device:sleep-rehearse QUALIFICATION=.local/neo92-final-reference-history.json
+# After fresh observer readiness, use the successful rehearsal's printed run ID.
+task device:sleep-rtc QUALIFICATION=.local/neo92-final-reference-history.json REHEARSAL=<run-id> ATTENDED=1
+# On uncertain SSH, collect the original attempt instead of resubmitting it.
+task device:sleep-collect RUN=<original-run-id>
+```
+
+The rehearsal never writes the sleep state. Actual sleep requires matching
+helper sources, boot/image, RTC and late/noirq qualification, unchanged SDIO
+references, healthy USB/Wi-Fi and independent power-key protection. It arms a
+30-second RTC deadline, checks the wakeup counter, and submits at most once.
+Keep USB connected and all controls untouched. An early wake or incomplete
+result fails qualification; do not automatically repeat the command.
+
+[Report 119](docs/119-guarded-rtc-sleep-preparation.md) records admission,
+recovery limits and the two successful awake rehearsals. Ordinary sleep remains
+masked. Interrupted ownership can deliberately leave power-key actions ignored;
+preserve the evidence and review recovery before further tests. The device-side
+cleanup restores only its owned alarm/PM/trace resources, never an uncertain
+poweroff policy. First real sleep and physical key wake remain unqualified.

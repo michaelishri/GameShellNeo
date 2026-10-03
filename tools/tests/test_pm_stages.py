@@ -279,6 +279,8 @@ class Evidence(unittest.TestCase):
                      dict(journal=after['journal'] + 'brcmfmac: error while changing bus sleep state -5\n'),
                      dict(journal=after['journal'] + 'brcmfmac: HT Avail timeout\n'),
                      dict(journal=after['journal'] + 'sunxi-musb does not have ULPI bus control register\n'),
+                     dict(journal=after['journal'] + 'musb-hdrc: gadget work resume failed: -5\n'),
+                     dict(journal=after['journal'] + 'musb-hdrc: resume work failed with -19\n'),
                      dict(stats=after['stats'] | {'success': '4'}),
                      dict(stats=after['stats'] | {'failed_suspend': '1'}),
                      dict(backlight={}), dict(inputs=[]), dict(pm={'pm_async': '0'}),

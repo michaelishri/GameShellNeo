@@ -4,10 +4,16 @@
 reference leak matching [report 116's](116-bounded-power-key-pm-release.md)
 seven-cycle hardware trend. Patch 0023 and its source/ARM checks are complete.
 Diagnostic.17 builds, passes offline verification and is staged on the Mac
-with compressed/decompressed checksums verified. Installation and hardware
-comparison remain pending. No new board
+with compressed/decompressed checksums verified. At the end of this preparation,
+installation and hardware comparison remained pending. No new board
 PM cycle, runtime-PM setting or power-key policy
 change was performed during this work.
+
+Subsequent installation and attended comparison are complete in
+[report 118](118-diagnostic17-hardware-qualification.md): one freezer, one
+driver and five late/noirq cycles pass with SDIO usage stable at 2, alongside
+restoration, both network routes and owner-confirmed display. The source/build
+record below preserves its preparation-time evidence and acceptance protocol.
 
 ## Cause and ownership
 

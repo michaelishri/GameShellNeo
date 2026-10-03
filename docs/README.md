@@ -16,7 +16,16 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current installed image: diagnostic.13.
+Current installed image: diagnostic.17.
+[118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)
+records verified card installation, startup/awake checks and observed freezer,
+driver and five late/noirq passes. The SDIO count stays at 2 throughout, with
+both routes, keypad identity, display and final restoration passing.
+[117 — Reference ownership](117-sdio-runtime-reference-ownership.md) explains
+the driver fix and source validation. Actual sleep remains unqualified and
+disabled for normal use.
+
+Previous diagnostic.13:
 [93 — Installation](93-diagnostic13-installation.md) records full card readback,
 owner-confirmed startup, independent USB/Wi-Fi access, six passing integration
 groups and read-only PM/keypad/audio baselines.
@@ -230,9 +239,9 @@ new image build and the next hardware qualification sequence.
 
 - [116 — Bounded power-key PM release](116-bounded-power-key-pm-release.md): attended logical-clear and fresh awake handoff passed with approximate physical-release timing; saved tasks/source tests and separate repeated SDIO reference growth tracked in NEO-92.
 
-- [117 — SDIO runtime-reference ownership](117-sdio-runtime-reference-ownership.md): source reproduction of resume reference growth, transition-based Sunxi driver fix, native/ARM32 checks and offline-verified diagnostic.17; hardware comparison pending.
+- [117 — SDIO runtime-reference ownership](117-sdio-runtime-reference-ownership.md): source reproduction of resume reference growth, transition-based Sunxi driver fix, native/ARM32 checks and offline-verified diagnostic.17; subsequent hardware comparison in report 118.
 
-- [118 — Diagnostic.17 hardware qualification](118-diagnostic17-hardware-qualification.md): guarded installation and full 4 GiB card readback passed; boot and attended SDIO reference comparison pending.
+- [118 — Diagnostic.17 hardware qualification](118-diagnostic17-hardware-qualification.md): verified installation/startup, seven observed debug-stage passes with stable SDIO usage, retained keypad/network access, owner-confirmed display and final restoration.
 
 ## Questions left open for the next phase
 

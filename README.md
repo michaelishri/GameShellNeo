@@ -1788,7 +1788,11 @@ task check:sdio-ref-history -- --require-stable path/to/cycle-1/result.json path
 
 [Report 117](docs/117-sdio-runtime-reference-ownership.md) records the cause,
 source tests, diagnostic.17 preparation and required hardware comparison.
-Reference stability and battery savings remain separate acceptance questions.
+[Report 118](docs/118-diagnostic17-hardware-qualification.md) records the
+completed installation and attended comparison: SDIO usage stays at 2 through
+one freezer, one driver and five late/noirq cycles, with display, input-handle,
+network and restoration checks passing. Battery savings and actual sleep
+remain separate acceptance questions.
 
 RTC and late/noirq preparation is repeatable:
 

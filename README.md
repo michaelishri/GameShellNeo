@@ -795,12 +795,14 @@ source findings and the remaining implementation requirements. This task is
 not an image-build gate and introduces no driver patch.
 
 The `work/musb-removal-lifetime` branch adds the extcon consumer-drain
-prerequisite in patch 0031. It does not yet change Sunxi removal ownership:
+prerequisite in patch 0031 and Sunxi child notifier/work ownership in patch 0033:
 
 ```sh
 task test:extcon-notifier # Actual dispatch/unlink source with modeled SRCU, native and ARM32
 task check:extcon-drivers # Also compile/link extcon core/devres: board, module, TINY_SRCU
 task test:extcon-kunit   # Real Linux UML tests with lock/RCU debugging, TREE and TINY SRCU
+task test:sunxi-owner    # Actual child/worker hooks with modeled lifetime boundaries, native + ARM32
+task check:sunxi-owner-drivers # Also compile full Sunxi/extcon objects in gadget, host and dual-role modes
 ```
 
 The tests preserve raw callback contexts, cover a block selected before its
@@ -812,6 +814,16 @@ records the source-test scope. [Report 145](docs/145-extcon-kernel-lifetime-vali
 adds real-kernel thread/SRCU/softirq evidence and records the remaining integration gates. This candidate
 is absent from diagnostic.18 and requires a new image identity before image
 assembly.
+
+The Sunxi checks cover failed initialization, a previously selected notifier,
+terminal queue rejection, restartable ordinary disable/enable, cable-state
+changes during work, and a fresh child using the same parent glue. Source and
+compiler evidence are under `.local/build/sunxi-owner-tests/`; task logs are
+`.local/build/sunxi-owner.log` and `.local/build/sunxi-owner-drivers.log`.
+`task build` includes the source regression on this branch. These use controlled
+workqueue/notifier/resource boundaries, not real Linux concurrency or hardware.
+[Report 146](docs/146-sunxi-child-notifier-work.md) records the scope; provider
+lifetime, core IRQ/PM retirement and complete removal/rebind remain open.
 
 For the opt-in USB polling experiment, use:
 

@@ -103,6 +103,7 @@ tasks:
       - task: test:musb-context
       - task: test:musb-sleep
       - task: test:extcon-notifier
+      - task: test:sunxi-owner
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -215,6 +216,14 @@ tasks:
   check:extcon-drivers:
     desc: Run notifier regressions and compile ARM extcon core/devres with TREE and TINY SRCU
     cmds: [bash tools/run-logged.sh extcon-drivers python3 tools/check-extcon-notifier.py --compile-drivers]
+
+  test:sunxi-owner:
+    desc: Exercise actual Sunxi child ownership and rebind hooks with controlled resource boundaries
+    cmds: [bash tools/run-logged.sh sunxi-owner python3 tools/check-sunxi-owner.py]
+
+  check:sunxi-owner-drivers:
+    desc: Run Sunxi ownership regressions and compile ARM gadget, host and dual-role glue/extcon
+    cmds: [bash tools/run-logged.sh sunxi-owner-drivers python3 tools/check-sunxi-owner.py --compile-drivers]
 
   test:extcon-kunit:
     desc: Build and run real Linux UML notifier lifetime tests with TREE and TINY SRCU; no device access

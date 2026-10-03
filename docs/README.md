@@ -302,3 +302,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [144 — Extcon consumer notifier drain](144-extcon-notifier-drain-candidate.md): per-device SRCU around raw dispatch, explicit synchronous unlink/drain, native/ARM32 source tests and three ARM configurations; framework prerequisite with Sunxi ownership and kernel concurrency qualification still open.
 
 - [145 — Real-kernel extcon lifetime checks](145-extcon-kernel-lifetime-validation.md): nine KUnit cases pass under TREE and TINY SRCU with lock/RCU debugging, saved UML workflow and strict evidence checks; IRQ uevent, provider lifetime and MUSB integration boundaries remain explicit.
+
+- [146 — Sunxi child notifier and work ownership](146-sunxi-child-notifier-work.md): explicit callback ownership, failed-init draining, terminal work shutdown and fresh rebind state; 240 native/ARM32 scenarios and three ARM builds, with provider/core retirement still open.

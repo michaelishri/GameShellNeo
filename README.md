@@ -1852,3 +1852,21 @@ records a cable reconnect that restored USB and an observed normal reboot that
 cleared the failed attempt's boot-local power-key suppression. Both routes and
 the normal dim console now pass; ordinary diagnostic short-press shutdown is
 restored. Do not reuse the earlier boot's consumed sleep qualification.
+
+Focused USB resume tracing is available on diagnostic.17 without rebuilding:
+
+```sh
+task device:usb-trace-sample                       # Ten passive awake seconds
+task device:usb-trace-collect RUN=<run-id> ROUTE=wifi # Read the original result
+```
+
+The sample captures controller/gadget events and audited ECM notification
+messages in bounded buffers, restores tracing/logging, checks unchanged USB/PM
+state and verifies both SSH routes. It never changes network interfaces or
+submits sleep. If interrupted, collect the original run before deciding whether
+to repeat it. Results and source hashes are saved privately on both machines.
+An idle trace validates recorder operation, not notification delivery or resume.
+
+The separate sleep diagnostic now includes this recorder and requires a fresh
+same-source rehearsal. [Report 122](docs/122-usb-resume-metadata-recorder.md)
+records ownership, failure tests, awake evidence and the remaining qualification.

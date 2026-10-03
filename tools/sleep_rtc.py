@@ -22,6 +22,7 @@ import power_key_policy as policy
 import rtc_alarm as rtc
 import pm_platform
 import wifi_trace
+import usb_trace
 import speaker_audio
 
 RESULTS = Path('/var/lib/gameshellneo/sleep-tests')
@@ -32,7 +33,7 @@ SDIO_PATCH = 'kernel/patches/0023-sunxi-mmc-sdio-reference-ownership.patch'
 SDIO_SHA = '52f4e3d8b966f8f69718340697606e30d174033d998be84f98b42bc2c97e92ee'
 SOURCES = ('sleep_rtc', 'test-pm-stages', 'keypad_pm', 'power_key', 'power_key_policy',
            'power_key_pm', 'power_key_input', 'keypad_input', 'speaker_audio',
-           'rtc_alarm', 'pm_platform', 'wifi_trace')
+           'rtc_alarm', 'pm_platform', 'wifi_trace', 'usb_trace')
 
 
 def pm_module():
@@ -346,7 +347,8 @@ def health(pm, record, lock):
             k['old_handle_after']['disconnected'] or k['old_handle_after']['ioctl_errno'] is not None or
             k['before']['usb']['attributes'] != k['after']['usb']['attributes'] or
             k['before']['inputs'] != k['after']['inputs'] or
-            record['wifi_trace'].get('restored') is not True or record['wifi_trace'].get('trace_lost') is not False):
+            record['wifi_trace'].get('restored') is not True or record['wifi_trace'].get('trace_lost') is not False or
+            record['usb_trace'].get('restored') is not True or record['usb_trace'].get('trace_lost') is not False):
         raise ValueError('Input retention or trace restoration failed')
     if record.get('process_memory_ok') is not True:
         raise ValueError('Process memory changed')
@@ -380,7 +382,7 @@ def run(pm, token, mode, lock, receipt, rehearsal=None):
     finally:
         os.close(parent)
     record = dict(run_id=token, mode=mode, event='started', passed=False,
-                  sources=sources(), rtc={}, power_key={}, keypad={}, wifi_trace={})
+                  sources=sources(), rtc={}, power_key={}, keypad={}, wifi_trace={}, usb_trace={})
     persist = lambda: pm.save(directory/'started.json', record)
     try:
         with keypad_pm.exclusive_pm(OWNED.parent):
@@ -401,7 +403,8 @@ def run(pm, token, mode, lock, receipt, rehearsal=None):
                 guard.before_entry()
                 record['pek_before'] = power_key_pm.irq_counts()
                 policy.acquire(token, before['boot_id'])
-                with wifi_trace.capture(record['wifi_trace']), keypad_pm.observe(record['keypad'], tracing=True):
+                with usb_trace.capture(record['usb_trace'], token), wifi_trace.capture(record['wifi_trace']), \
+                        keypad_pm.observe(record['keypad'], tracing=True):
                     # Tag newly acquired trace ownership for this controller's
                     # recovery; untagged or foreign traces are never removed.
                     for owned in (wifi_trace.OWNED, keypad_pm.OWNED):
@@ -453,6 +456,7 @@ def recover(pm, token):
         failures = []
         operations = ((rtc.OWNED, 'run_id', rtc.restore),
                       (OWNED, 'run_id', lambda: restore_controls(pm, token)),
+                      (usb_trace.OWNED, 'run_id', lambda: usb_trace.restore(token)),
                       (wifi_trace.OWNED, 'sleep_run', wifi_trace.restore),
                       (keypad_pm.OWNED, 'sleep_run', keypad_pm.restore_trace))
         for path, field, operation in operations:

@@ -429,6 +429,14 @@ tasks:
     desc: One awake Wi-Fi reconnect with bounded metadata capture; USB required, logging restored
     cmds: [python3 tools/check-pm-stages.py --wifi-smoke]
 
+  device:usb-trace-sample:
+    desc: Passive ten-second USB/ECM metadata capture; no link or PM changes, restores logging
+    cmds: [python3 tools/check-usb-trace.py]
+
+  device:usb-trace-collect:
+    desc: Read original USB metadata RUN over ROUTE=usb (default) or wifi; never resubmit
+    cmds: [python3 tools/check-usb-trace.py --collect]
+
   device:rtc-inspect:
     desc: Read RTC time, logical alarm and controller identity; no clock or alarm change
     cmds: [python3 tools/check-rtc-alarm.py]

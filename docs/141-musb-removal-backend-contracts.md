@@ -368,9 +368,13 @@ context, with an opt-in process-context synchronous unregister operation:
 
 This construction uses `srcu_read_lock()` rather than converting the chains to
 `srcu_notifier_head`. The latter's documented call-chain context is process
-context; extcon explicitly accommodates interrupt callers. In contrast, the
-pinned SRCU read-lock API permits matching read lock/unlock in the same IRQ
-context. The proposed envelope adds no sleeping reader-side operation and
+context; extcon's raw dispatch and state handling include IRQ-oriented code.
+The pinned SRCU read-lock API permits matching read lock/unlock in the same IRQ
+context. This does **not** establish that the full `extcon_sync()` path is IRQ
+safe: its subsequent userspace-event path can allocate with `GFP_KERNEL`.
+[Report 145](145-extcon-kernel-lifetime-validation.md) records that boundary and
+isolates callback dispatch for its softirq test. The proposed envelope adds no
+sleeping reader-side operation and
 does not relax a callback's original context constraints. Source:
 [notifier header][notifier-header], chain-context contracts;
 [SRCU header][srcu-header], `srcu_read_lock()`;

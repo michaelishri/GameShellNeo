@@ -307,3 +307,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [143 — Repeat RTC-wake runner](143-repeat-rtc-wake-runner.md): bounded attended batches, original-result lineage, durable one-successor claims and stop-on-failure collection; source checks pass, hardware qualification pending.
 
 - [144 — Extcon consumer notifier drain](144-extcon-notifier-drain-candidate.md): per-device SRCU around raw dispatch, explicit synchronous unlink/drain, native/ARM32 source tests and three ARM configurations; framework prerequisite with Sunxi ownership and kernel concurrency qualification still open.
+
+- [145 — Real-kernel extcon lifetime checks](145-extcon-kernel-lifetime-validation.md): nine KUnit cases pass under TREE and TINY SRCU with lock/RCU debugging, saved UML workflow and strict evidence checks; IRQ uevent, provider lifetime and MUSB integration boundaries remain explicit.

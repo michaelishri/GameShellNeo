@@ -138,9 +138,10 @@ not part of patch 0031 or accepted evidence. Core IRQ/work/timer, role setters,
 parent runtime PM, DMA and backend resource retirement remain the larger
 NEO-106 work described in reports 139 and 141.
 
-Before integration, exercise the new boundary in a real kernel with relevant
-SRCU/lock debugging and review subsystem-wide callback/lifetime compatibility.
-Then integrate the consumer ownership change and test probe failure/rebind
+[Report 145](145-extcon-kernel-lifetime-validation.md) subsequently adds real
+Linux UML thread/SRCU/softirq checks under TREE and TINY SRCU with lock debugging.
+SMP/hard-IRQ and subsystem-wide lifetime compatibility still need review.
+Next, integrate the consumer ownership change and test probe failure/rebind
 and producer retirement together. A new image and observed device checks follow
 those source gates. No latency, battery-life or standby improvement is claimed
 by this prerequisite.

@@ -700,6 +700,7 @@ For the USB connection lifecycle across system sleep, use:
 ```sh
 task test:musb-sleep          # Actual PM/pull-up functions, native + ARM32, failure controls
 task check:musb-sleep-drivers # Also compile the complete ARM MUSB core/gadget/Sunxi glue
+task check:musb-wake-configs  # Also compile isolated host/dual-role/module and PM-disabled variants
 ```
 
 `task build` includes the source regression. The diagnostic.18 candidate removes
@@ -709,6 +710,15 @@ wake; PM admission verifies that policy. This does not alter charging or resolve
 the driver's separate probe-time IRQ-wake ownership. Normal user sleep remains
 disabled pending hardware qualification. See [design](docs/126-musb-system-sleep-design.md)
 and [implementation](docs/128-musb-system-sleep-candidate.md).
+
+The separate `work/musb-wake-irq-policy` branch adds checked IRQ-wake ownership
+in patch 0026. Its source regression also executes the pinned IRQ core's wake
+reference helpers. The six-configuration task records results under
+`.local/build/musb-sleep-tests/matrix-evidence.json`; alternate configurations
+are for driver compilation only and never replace the board configuration or
+kernel artifacts. [Report 132](docs/132-musb-wake-irq-candidate.md) records its
+coverage and remaining gates. This candidate is absent from staged
+diagnostic.18; assign a new image/kernel identity before building its image.
 
 For the opt-in USB polling experiment, use:
 

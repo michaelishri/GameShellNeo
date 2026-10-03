@@ -27,11 +27,14 @@ def function(text, name):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--compile-drivers', action='store_true')
+    parser.add_argument('--compile-matrix', action='store_true',
+                        help='Also compile isolated host/dual-role/module and PM stub configurations')
     args = parser.parse_args()
     WORK.mkdir(parents=True, exist_ok=True)
     with (WORK / '.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        output = WORK / ('compile-evidence.json' if args.compile_drivers else 'evidence.json')
+        output = WORK / ('matrix-evidence.json' if args.compile_matrix else
+                         'compile-evidence.json' if args.compile_drivers else 'evidence.json')
         output.unlink(missing_ok=True)
         lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
         archive = archive_for(lock)
@@ -49,17 +52,29 @@ def main():
                         break
         if found != set(FILES):
             raise ValueError('Incomplete locked source')
+        with tarfile.open(archive, mode='r|xz') as source:
+            irq_name = 'linux-' + lock['linux']['tag'][1:] + '/kernel/irq/manage.c'
+            for entry in source:
+                if entry.name == irq_name:
+                    irq_source = source.extractfile(entry).read().decode()
+                    break
+            else:
+                raise ValueError('Missing locked IRQ-core source')
         patches = [ROOT / 'kernel/patches' / name for name in (
-            '0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch')]
+            '0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
+            '0026-musb-wake-irq-policy.patch')]
         for patch in patches:
             run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=WORK / 'patched')
         core = (target / 'musb_core.c').read_text()
         gadget = (target / 'musb_gadget.c').read_text()
-        functions = ''.join(function(gadget, name) for name in (
+        functions = ''.join(function(irq_source, name) for name in (
+            'set_irq_wake_real', 'irq_set_irq_wake'))
+        functions += ''.join(function(gadget, name) for name in (
             'musb_pullup', 'musb_gadget_suspend', 'musb_gadget_resume',
             'musb_gadget_work', 'musb_gadget_pullup', 'musb_gadget_cleanup',
             'musb_gadget_stop'))
         functions += ''.join(function(core, name) for name in (
+            'musb_disarm_wake', 'musb_init_wakeup', 'musb_cleanup_wakeup', 'musb_free',
             'musb_save_context', 'musb_restore_context', 'musb_run_resume_work',
             'musb_suspend', 'musb_resume'))
         definitions = (target / 'musb_core.h').read_text() + (target / 'musb_regs.h').read_text()
@@ -88,6 +103,19 @@ def main():
             enqueue_during_sleep=functions.replace('\t\tif (!musb->gadget_suspended)\n\t\t\tschedule', '\t\tschedule'),
             stop_keeps_pullup=functions.rsplit('\tmusb_pullup(musb, 0);', 1)[0] +
                 functions.rsplit('\tmusb_pullup(musb, 0);', 1)[1],
+            keeps_probe_wake=functions.replace(
+                '\tmusb->irq_wake = true;\n\tret = musb_disarm_wake(musb);',
+                '\tmusb->irq_wake = true;\n\tret = 0;', 1),
+            loses_failed_disarm=functions.replace(
+                '\tif (!ret)\n\t\tmusb->irq_wake = false;', '\tmusb->irq_wake = false;', 1),
+            disarm_rereads_policy=functions.replace(
+                '\tif (!musb->irq_wake)', '\tif (!device_may_wakeup(musb->controller) || !musb->irq_wake)', 1),
+            ignores_arm_error=functions.replace(
+                '\t\tif (ret)\n\t\t\tgoto err_pm_put;', '\t\t/* lost arm error */', 1),
+            loses_disarm_error=functions.replace(
+                '\t\tif (!error)\n\t\t\terror = ret;', '\t\t/* lost disarm error */', 1),
+            clears_foreign_source=functions.replace(
+                '\tif (musb->wakeup_initialized) {', '\tif (true) {', 1),
         )
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         results = {}
@@ -125,9 +153,33 @@ def main():
                         native=results, arm32=arm.strip(), builder=builder,
                         limits='Actual source functions, deterministic boundary interleavings. '
                                'No electrical USB timing, host enumeration or scheduler concurrency qualification.')
-        if args.compile_drivers:
+        if args.compile_drivers or args.compile_matrix:
             evidence['arm_build'] = compile_objects(archive, lock, WORK, [
                 PREFIX + 'musb_core.o', PREFIX + 'musb_gadget.o', PREFIX + 'sunxi.o'])
+        if args.compile_matrix:
+            # These are compile-only alternatives, never board image configurations.
+            matrices = {
+                'host': (('CONFIG_USB_MUSB_GADGET=n', 'CONFIG_USB_MUSB_DUAL_ROLE=n',
+                          'CONFIG_USB_MUSB_HOST=y'), ('musb_core.o', 'musb_host.o', 'sunxi.o')),
+                'dual-role': (('CONFIG_USB_MUSB_GADGET=n', 'CONFIG_USB_MUSB_HOST=n',
+                               'CONFIG_USB_MUSB_DUAL_ROLE=y'),
+                              ('musb_core.o', 'musb_host.o', 'musb_gadget.o', 'sunxi.o')),
+                'module': (('CONFIG_USB_MUSB_HDRC=m', 'CONFIG_USB_MUSB_SUNXI=m'),
+                           ('musb_core.o', 'musb_gadget.o', 'sunxi.o')),
+                'no-system-sleep': (('CONFIG_SUSPEND=n', 'CONFIG_HIBERNATION=n',
+                                     'CONFIG_PM_SLEEP=n', 'CONFIG_PM=y'),
+                                    ('musb_core.o', 'musb_gadget.o', 'sunxi.o')),
+                'no-pm': (('CONFIG_SUSPEND=n', 'CONFIG_HIBERNATION=n',
+                          'CONFIG_PM_SLEEP=n', 'CONFIG_PM=n'),
+                         ('musb_core.o', 'musb_gadget.o', 'sunxi.o')),
+            }
+            evidence['arm_configurations'] = {}
+            for name, (config, objects) in matrices.items():
+                print('Compile-only MUSB configuration:', name, flush=True)
+                evidence['arm_configurations'][name] = compile_objects(
+                    archive, lock, WORK, [PREFIX + obj for obj in objects],
+                    extra_config=config, project_config=False)
+                (WORK / 'matrix-progress.json').write_text(json.dumps(evidence, indent=2) + '\n')
         output.write_text(json.dumps(evidence, indent=2) + '\n')
         print('Evidence:', output.relative_to(ROOT), flush=True)
 

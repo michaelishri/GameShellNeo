@@ -65,6 +65,19 @@ unqualified. Remove when equivalent upstream lifecycle ownership is verified.
 See [design](../docs/126-musb-system-sleep-design.md) and
 [candidate](../docs/128-musb-system-sleep-candidate.md).
 
+Patch 0026 is a separate NEO-98 source candidate, absent from diagnostic.18.
+It balances the probe-time IRQ-wake reference, preserves the enabled default
+for supported fresh controllers, and checks owned system-sleep arm/disarm and
+cleanup before backend teardown. Failed disarm remains owned and reported;
+foreign capability/source/wakeirq arrangements are rejected unchanged.
+89 native/ARM32 source scenarios, 14 negative controls and six ARM driver
+configuration builds pass. Full probe failure injection, IRQ suspend traversal,
+other-backend runtime wake and hardware qualification remain open. Permanent
+teardown disarm failure remains an explicit limitation. Use
+`task check:musb-wake-configs`; [report 132](../docs/132-musb-wake-irq-candidate.md)
+defines the tested scope. Remove when equivalent upstream ownership and error
+handling are verified. Assign a new image/kernel identity before image assembly.
+
 Patches 0014–0017 are integrated for image qualification in
 [diagnostic.12 preparation](../docs/85-diagnostic12-preparation.md). The ledger's
 source-test results do not establish hardware recovery or energy savings.

@@ -42,6 +42,20 @@ def qualified():
 
 
 class Admission(unittest.TestCase):
+    def test_wake_ownership_errors_reject_sleep_health_after_recovery(self):
+        pm = sleep.pm_module()
+        state = dict.fromkeys(('boot_id', 'kernel', 'image', 'pm', 'pm_test_delay',
+            'masks', 'inputs', 'backlight', 'wifi_config_sha256', 'wifi_power_save',
+            'charger', 'cpu_policy'))
+        before = state | {'journal': 'baseline\n'}
+        for stage in ('suspend', 'resume', 'cleanup'):
+            record = {'before': before, 'after': state | {'journal':
+                'baseline\nmusb-hdrc: wake IRQ 164 ' + stage + ' failed: -5\n'}}
+            with self.subTest(stage=stage), patch.object(pm, 'validate'), \
+                    patch.object(sleep, 'validate_delivery', return_value={'rtc': True}), \
+                    self.assertRaisesRegex(ValueError, 'Kernel fault'):
+                sleep.health(pm, record, {})
+
     def test_exact_baseline_and_rejected_evidence(self):
         records,current=qualified()
         self.assertEqual(len(sleep.prerequisite(records,current)),7)

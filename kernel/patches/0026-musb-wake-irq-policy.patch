@@ -1,0 +1,214 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: own wake IRQ references across system sleep
+
+Test capability without retaining a probe-time wake reference. Preserve
+non-wake-capable controllers, check system-PM arm/disarm errors, and keep
+failed-disarm ownership so later transitions cannot stack references.
+Clean up before platform/PHY teardown; retain existing policy defaults.
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2184,6 +2184,66 @@
+ 	return NULL;
+ }
+ 
++/* Retain a failed disarm so the next transition cannot stack wake references. */
++static int musb_disarm_wake(struct musb *musb)
++{
++	int ret;
++
++	if (!musb->irq_wake)
++		return 0;
++	ret = disable_irq_wake(musb->nIrq);
++	if (!ret)
++		musb->irq_wake = false;
++	return ret;
++}
++
++static int musb_init_wakeup(struct musb *musb)
++{
++	struct device *dev = musb->controller;
++	int ret;
++
++	/* The core owns wake capability only on a fresh controller device. */
++	if (device_can_wakeup(dev))
++		return -EEXIST;
++#ifdef CONFIG_PM_SLEEP
++	if (dev->power.wakeup)
++		return -EEXIST;
++#endif
++#ifdef CONFIG_PM
++	if (dev->power.wakeirq)
++		return -EEXIST;
++#endif
++
++	/* Preserve support for controllers whose IRQ cannot wake the system.
++	 * Unlike the old probe, do not retain this capability-test reference.
++	 */
++	ret = enable_irq_wake(musb->nIrq);
++	if (ret)
++		return 0;
++	musb->irq_wake = true;
++	ret = musb_disarm_wake(musb);
++	if (ret)
++		return ret;
++
++	/* init_wakeup may set capability before failing to allocate its source. */
++	musb->wakeup_initialized = true;
++	return device_init_wakeup(dev, true);
++}
++
++/* Called before PHY/platform teardown, with no controller spinlock held. */
++static void musb_cleanup_wakeup(struct musb *musb)
++{
++	int ret = musb_disarm_wake(musb);
++
++	if (ret)
++		dev_err(musb->controller, "wake IRQ %d cleanup failed: %d\n",
++			musb->nIrq, ret);
++	if (musb->wakeup_initialized) {
++		device_init_wakeup(musb->controller, false);
++		musb->wakeup_initialized = false;
++	}
++}
++
+ static void musb_free(struct musb *musb)
+ {
+ 	/* this has multiple entry modes. it handles fault cleanup after
+@@ -2191,11 +2251,8 @@
+ 	 * cleanup after everything's been de-activated.
+ 	 */
+ 
+-	if (musb->nIrq >= 0) {
+-		if (musb->irq_wake)
+-			disable_irq_wake(musb->nIrq);
++	if (musb->nIrq >= 0)
+ 		free_irq(musb->nIrq, musb);
+-	}
+ 
+ 	musb_host_free(musb);
+ }
+@@ -2513,13 +2570,9 @@
+ 		goto fail3;
+ 	}
+ 	musb->nIrq = nIrq;
+-	/* FIXME this handles wakeup irqs wrong */
+-	if (enable_irq_wake(nIrq) == 0) {
+-		musb->irq_wake = 1;
+-		device_init_wakeup(dev, 1);
+-	} else {
+-		musb->irq_wake = 0;
+-	}
++	status = musb_init_wakeup(musb);
++	if (status)
++		goto fail3;
+ 
+ 	/* program PHY to use external vBus if required */
+ 	if (plat->extvbus) {
+@@ -2572,6 +2625,7 @@
+ 	return 0;
+ 
+ fail3:
++	musb_cleanup_wakeup(musb);
+ 	cancel_delayed_work_sync(&musb->irq_work);
+ 	cancel_delayed_work_sync(&musb->finish_resume_work);
+ 	cancel_delayed_work_sync(&musb->deassert_reset_work);
+@@ -2587,8 +2641,6 @@
+ 	pm_runtime_disable(musb->controller);
+ 
+ fail2:
+-	if (musb->irq_wake)
+-		device_init_wakeup(dev, 0);
+ 	musb_platform_exit(musb);
+ 
+ fail1:
+@@ -2648,6 +2700,7 @@
+ 	musb_disable_interrupts(musb);
+ 	musb_writeb(musb->mregs, MUSB_DEVCTL, 0);
+ 	spin_unlock_irqrestore(&musb->lock, flags);
++	musb_cleanup_wakeup(musb);
+ 	musb_platform_exit(musb);
+ 
+ 	pm_runtime_dont_use_autosuspend(musb->controller);
+@@ -2658,7 +2711,6 @@
+ 		musb_dma_controller_destroy(musb->dma_controller);
+ 	usb_phy_shutdown(musb->xceiv);
+ 	musb_free(musb);
+-	device_init_wakeup(dev, 0);
+ }
+ 
+ #ifdef	CONFIG_PM
+@@ -2820,6 +2872,16 @@
+ 		return ret;
+ 	}
+ 
++	ret = musb_disarm_wake(musb);
++	if (ret)
++		goto err_pm_put;
++	if (device_may_wakeup(dev)) {
++		ret = enable_irq_wake(musb->nIrq);
++		if (ret)
++			goto err_pm_put;
++		musb->irq_wake = true;
++	}
++
+ 	musb_gadget_suspend(musb);
+ 	musb_platform_disable(musb);
+ 	musb_disable_interrupts(musb);
+@@ -2846,13 +2908,19 @@
+ 
+ 	spin_unlock_irqrestore(&musb->lock, flags);
+ 	return 0;
++
++err_pm_put:
++	dev_err(dev, "wake IRQ %d suspend failed: %d\n", musb->nIrq, ret);
++	pm_runtime_mark_last_busy(dev);
++	pm_runtime_put_autosuspend(dev);
++	return ret;
+ }
+ 
+ static int musb_resume(struct device *dev)
+ {
+ 	struct musb *musb = dev_to_musb(dev);
+ 	unsigned long flags;
+-	int error;
++	int error, ret;
+ 	u8 devctl;
+ 	u8 mask;
+ 
+@@ -2893,6 +2961,13 @@
+ 	else if (!musb->gadget_suspended)
+ 		error = 0; /* Preserve the existing policy outside the gated path. */
+ 	spin_unlock_irqrestore(&musb->lock, flags);
++
++	ret = musb_disarm_wake(musb);
++	if (ret) {
++		dev_err(dev, "wake IRQ %d resume failed: %d\n", musb->nIrq, ret);
++		if (!error)
++			error = ret;
++	}
+ 
+ 	pm_runtime_mark_last_busy(dev);
+ 	pm_runtime_put_autosuspend(dev);
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -343,7 +343,6 @@
+ 	enum usb_otg_state	otg_state;
+ 
+ 	int nIrq;
+-	unsigned		irq_wake:1;
+ 
+ 	struct musb_hw_ep	 endpoints[MUSB_C_NUM_EPS];
+ #define control_ep		endpoints
+@@ -361,6 +360,9 @@
+ 	bool			is_host;
+ 	/* Own storage: adjacent bitfields are not all lock-protected. */
+ 	bool			gadget_suspended;
++	/* Successful IRQ arm and capability initialization owned by this core. */
++	bool			irq_wake;
++	bool			wakeup_initialized;
+ 
+ 	int			a_wait_bcon;	/* VBUS timeout in msecs */
+ 	unsigned long		idle_timeout;	/* Next timeout in jiffies */

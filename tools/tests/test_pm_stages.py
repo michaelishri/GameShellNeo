@@ -281,6 +281,9 @@ class Evidence(unittest.TestCase):
                      dict(journal=after['journal'] + 'sunxi-musb does not have ULPI bus control register\n'),
                      dict(journal=after['journal'] + 'musb-hdrc: gadget work resume failed: -5\n'),
                      dict(journal=after['journal'] + 'musb-hdrc: resume work failed with -19\n'),
+                     dict(journal=after['journal'] + 'musb-hdrc: wake IRQ 164 suspend failed: -5\n'),
+                     dict(journal=after['journal'] + 'musb-hdrc: wake IRQ 164 resume failed: -19\n'),
+                     dict(journal=after['journal'] + 'musb-hdrc: wake IRQ 164 cleanup failed: -5\n'),
                      dict(stats=after['stats'] | {'success': '4'}),
                      dict(stats=after['stats'] | {'failed_suspend': '1'}),
                      dict(backlight={}), dict(inputs=[]), dict(pm={'pm_async': '0'}),
@@ -291,6 +294,11 @@ class Evidence(unittest.TestCase):
                 pm.check_result(before, after | change, 'devices', True)
         with self.assertRaises(ValueError):
             pm.check_result(before, after, 'freezer', False)
+
+    def test_wake_irq_metadata_is_not_itself_a_fault(self):
+        before, after = self.snapshots()
+        pm.check_result(before, after | {
+            'journal': after['journal'] + 'musb-hdrc: wake IRQ 164 configured\n'}, 'devices', True)
 
     def test_normal_lock_cannot_enable_tests(self):
         for experiments in ({}, {'usb_absent_poll': True},

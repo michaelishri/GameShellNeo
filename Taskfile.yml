@@ -210,6 +210,10 @@ tasks:
     desc: Test MUSB sleep ownership and compile the complete ARM controller/gadget/glue
     cmds: [bash tools/run-logged.sh musb-sleep-drivers python3 tools/check-musb-sleep.py --compile-drivers]
 
+  check:musb-wake-configs:
+    desc: Test MUSB sleep/wake ownership and compile board, host, dual-role, module and PM stub configurations
+    cmds: [bash tools/run-logged.sh musb-wake-configs python3 tools/check-musb-sleep.py --compile-matrix]
+
   check:udc-driver:
     desc: Run trace-format regressions and compile the complete ARM USB device-controller core
     cmds: [bash tools/run-logged.sh udc-driver python3 tools/check-udc-trace.py --compile-driver]

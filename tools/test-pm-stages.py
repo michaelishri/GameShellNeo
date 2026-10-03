@@ -32,6 +32,11 @@ FAULTS = ('WARNING:', 'Oops:', 'Kernel panic', 'Firmware has halted or crashed',
           'gadget work resume failed:', 'resume work failed with')
 
 
+def kernel_fault(text):
+    return any(x in text for x in FAULTS) or bool(re.search(
+        r'\bwake IRQ \d+ (?:suspend|resume|cleanup) failed: -?\d+\b', text))
+
+
 def read(path):
     return Path(path).read_text().strip()
 
@@ -198,7 +203,7 @@ def validate(snapshot, lock):
             raise ValueError('Unexpected deep/automatic/test-boot power support')
     identities = re.findall(r'brcmf_c_preinit_dcmds: (Firmware: .+)', s['journal'])
     if (not identities or any(v != lock['radio']['firmware']['runtime_identity'] for v in identities) or
-            any(x in s['journal'] for x in FAULTS)):
+            kernel_fault(s['journal'])):
         raise ValueError('Unexpected firmware identity or kernel fault evidence')
     if (selected(s['pm']['pm_test'] or '') != 'none' or selected(s['pm']['mem_sleep'] or '') != 's2idle' or
             'freeze' not in (s['pm']['state'] or '').split() or s['pm_test_delay'] != '5' or
@@ -238,7 +243,7 @@ def check_result(before, after, stage, memory_ok):
     if not after['journal'].startswith(before['journal']):
         raise ValueError('Kernel evidence lost or rotated during stage')
     delta = after['journal'][len(before['journal']):]
-    if delta.count('suspend debug: Waiting for 5 second(s).') != 1 or any(x in delta for x in FAULTS):
+    if delta.count('suspend debug: Waiting for 5 second(s).') != 1 or kernel_fault(delta):
         raise ValueError('Expected bounded debug wait missing or new kernel fault')
     if int(after['stats']['success']) - int(before['stats']['success']) != 1:
         raise ValueError('Expected exactly one completed PM debug cycle')

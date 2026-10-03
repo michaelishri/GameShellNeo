@@ -32,6 +32,16 @@ percentage and threshold remain provisional until pack calibration; this is an
 awake guard, not hardware protection or a wake-from-sleep mechanism. Python is
 used for this diagnostic policy; measure its cost during the efficiency phase.
 
+The `work/battery-boottime` candidate publishes schema 2 with an explicit
+`CLOCK_BOOTTIME` timestamp and boot ID. Consecutive readings use elapsed time
+including sleep; a detected suspend breaks the sequence. A read taking more
+than two seconds, or spanning a detected suspend, publishes degraded monitoring.
+MONOTONIC is retained only as `sample_monotonic_seconds` for correlation, so
+older consumers cannot silently use it as an age. The shared diagnostic parser
+rejects legacy, wrong-clock and wrong-boot observations. This source candidate
+is absent from staged diagnostic.18; see [report 133](../docs/133-battery-boottime.md)
+for integration and hardware limits.
+
 USB ECM serves DHCP on `usb0` only, without a default route or DNS offer. Device
 and host MAC addresses derive from the private per-device machine ID. The Linux
 Foundation gadget identity is for this development image; a production USB

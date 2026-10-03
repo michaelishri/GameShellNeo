@@ -13,6 +13,8 @@ import subprocess
 import sys
 import time
 
+from battery_sample import sample_age
+
 POWER = Path('/sys/power')
 BOOT = Path('/proc/sys/kernel/random/boot_id')
 STATE = Path('/run/gameshellneo-pm-test.json')
@@ -133,7 +135,7 @@ def snapshot():
     battery = json.loads(read('/run/gameshellneo/battery.json'))
     journal = command('journalctl', '-b', '-k', '--no-pager', '-o', 'short-monotonic')
     config = gzip.decompress(Path('/proc/config.gz').read_bytes()).decode()
-    return dict(boot_id=read(BOOT), image=image, kernel=os.uname().release,
+    result = dict(boot_id=read(BOOT), image=image, kernel=os.uname().release,
                 monotonic_seconds=time.monotonic(), taint=read('/proc/sys/kernel/tainted'),
                 pm={name: optional(POWER / name) for name in ('state', 'mem_sleep', 'pm_test', 'pm_async')},
                 pm_test_delay=optional('/sys/module/suspend/parameters/pm_test_delay'),
@@ -152,7 +154,6 @@ def snapshot():
                 masks={name: os.path.realpath('/etc/systemd/system/' + name) for name in MASKS},
                 sleep_config=read('/etc/systemd/sleep.conf.d/50-gameshellneo.conf'),
                 services=services, battery=battery,
-                battery_age_seconds=time.monotonic() - battery['monotonic_seconds'],
                 external_power={name: {field: read('/sys/class/power_supply/' + name + '/' + field)
                                        for field in ('type', 'present', 'online')}
                                 for name in ('axp20x-usb', 'axp22x-ac')},
@@ -172,6 +173,9 @@ def snapshot():
                 firmware_sha256=hashlib.sha256(Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.bin').read_bytes()).hexdigest(),
                 nvram_sha256=hashlib.sha256(Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt').read_bytes()).hexdigest(),
                 journal=journal)
+    result['boottime_seconds'] = time.clock_gettime(time.CLOCK_BOOTTIME)
+    result['battery_age_seconds'] = sample_age(battery, now=result['boottime_seconds'], boot_id=result['boot_id'])
+    return result
 
 
 def validate(snapshot, lock):
@@ -209,6 +213,14 @@ def validate(snapshot, lock):
         raise ValueError('PM stage isolation or ordinary sleep policy failed')
     b = s['battery']
     features = lock.get('features', {})
+    if 'battery_sample_clock' in features:
+        if (features['battery_sample_clock'] != 'CLOCK_BOOTTIME' or
+                s['image']['sources'].get('features') != features or
+                s.get('boottime_seconds') is None or not s.get('boot_id')):
+            raise ValueError('Battery sample clock differs from image inputs')
+        age = sample_age(b, now=s.get('boottime_seconds'), boot_id=s.get('boot_id'))
+        if age != s['battery_age_seconds']:
+            raise ValueError('Battery age differs from captured BOOTTIME evidence')
     if 'usb_system_wakeup' in features:
         if (features['usb_system_wakeup'] is not False or
                 s['image']['sources'].get('features') != features or

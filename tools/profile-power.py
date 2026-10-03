@@ -11,6 +11,8 @@ import subprocess
 import sys
 import time
 
+from battery_sample import sample_age
+
 
 def read(path):
     return Path(path).read_text().strip()
@@ -79,7 +81,7 @@ def processes():
 
 def health():
     guard = json.loads(read('/run/gameshellneo/battery.json'))
-    age = time.monotonic() - guard['monotonic_seconds']
+    age = sample_age(guard)
     inputs = {p.parent.name: int(read(p)) for p in Path('/sys/class/power_supply').glob('*/online')
               if read(p.parent / 'type') != 'Battery'}
     state = dict(boot_id=read('/proc/sys/kernel/random/boot_id'),

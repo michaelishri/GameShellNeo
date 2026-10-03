@@ -133,6 +133,7 @@ class Controls(unittest.TestCase):
         program = '''
 import runpy, sys, time
 from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]).parent))
 scope = runpy.run_path(sys.argv[1], run_name='pm_worker')
 fn = scope['stage_controls'] if sys.argv[3] == 'start' else scope['restore']
 g = scope['restore'].__globals__
@@ -208,6 +209,20 @@ class Evidence(unittest.TestCase):
                                     'axp22x-ac': {'type': 'Mains', 'present': '1', 'online': '1'}},
                     services={n: {'ActiveState': 'active', 'NRestarts': '0'} for n in pm.SERVICES})
         pm.validate(good, lock)
+        clock_lock = deepcopy(lock)
+        clock_lock['features'] = {'battery_sample_clock': 'CLOCK_BOOTTIME'}
+        clock_good = deepcopy(good)
+        clock_good['image']['sources'] = clock_lock
+        clock_good.update(boot_id='boot', boottime_seconds=102)
+        clock_good['battery'].update(schema_version=2, sample_clock='CLOCK_BOOTTIME',
+                                    boot_id='boot', boottime_seconds=100)
+        pm.validate(clock_good, clock_lock)
+        for change in ({'boottime_seconds': 3700}, {'boottime_seconds': None}, {'boot_id': None},
+                       {'battery_age_seconds': 0}, {'battery': good['battery']}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                pm.validate(clock_good | change, clock_lock)
+        with self.assertRaisesRegex(ValueError, 'battery_freshness'):
+            pm.validate(clock_good | dict(boottime_seconds=3700, battery_age_seconds=3600), clock_lock)
         wake_lock = deepcopy(lock)
         wake_lock['features'] = {'usb_system_wakeup': False}
         wake_good = deepcopy(good)

@@ -69,11 +69,16 @@ class SimulationComplete(Exception):
 class BatteryLoopTests(unittest.TestCase):
     """Run the actual main loop with fake sysfs, time and shutdown delivery."""
 
-    def simulate(self, samples, times=None, returns=(0,)):
+    def simulate(self, samples, times=None, returns=(0,), monotonic_times=None,
+                 read_seconds=None, read_sleep=None):
         times = times if times is not None else [10 * i for i in range(len(samples))]
+        monotonic_times = monotonic_times if monotonic_times is not None else times
+        read_seconds = read_seconds if read_seconds is not None else [0] * len(samples)
+        read_sleep = read_sleep if read_sleep is not None else [0] * len(samples)
         self.assertEqual(len(samples), len(times))
         states, requests = [], []
         tick = 0
+        read_finished = False
         reader = battery.read_sample
         with tempfile.TemporaryDirectory(prefix='gameshellneo-battery-test.') as directory:
             root = Path(directory)
@@ -81,8 +86,11 @@ class BatteryLoopTests(unittest.TestCase):
             supply = supplies / 'battery'
             supply.mkdir(parents=True)
             output = root / 'state'
+            boot_file = root / 'boot-id'
+            boot_file.write_text('test-boot\n')
 
             def sample():
+                nonlocal read_finished
                 values = dict(type='Battery', present='1', capacity='10',
                               status='Discharging', voltage_now='3600000')
                 values.update(samples[tick])
@@ -92,16 +100,29 @@ class BatteryLoopTests(unittest.TestCase):
                         path.unlink(missing_ok=True)
                     else:
                         path.write_text(str(value) + '\n')
-                return reader(supplies)
+                try:
+                    return reader(supplies)
+                finally:
+                    read_finished = True
+
+            def monotonic_ns():
+                return round((monotonic_times[tick] + (read_seconds[tick] if read_finished else 0)) * 1e9)
+
+            def boottime_ns(clock):
+                self.assertEqual(clock, 7)
+                return round((times[tick] + (read_seconds[tick] + read_sleep[tick] if read_finished else 0)) * 1e9)
 
             def sleep(seconds):
-                nonlocal tick
+                nonlocal tick, read_finished
                 self.assertEqual(seconds, 10)
                 tick += 1
+                read_finished = False
                 if tick == len(samples):
                     raise SimulationComplete()
 
             def state_directory(path):
+                if path == '/proc/sys/kernel/random/boot_id':
+                    return boot_file
                 self.assertEqual(path, '/run/gameshellneo')
                 return output
 
@@ -124,7 +145,8 @@ class BatteryLoopTests(unittest.TestCase):
             with patch.object(battery, 'Path', state_directory), \
                     patch.object(battery, 'read_sample', sample), \
                     patch.object(battery, 'time', SimpleNamespace(
-                        monotonic=lambda: times[tick], sleep=sleep)), \
+                        monotonic_ns=monotonic_ns, clock_gettime_ns=boottime_ns,
+                        CLOCK_BOOTTIME=7, sleep=sleep)), \
                     patch.object(battery, 'os', SimpleNamespace(replace=publish)), \
                     patch.object(battery, 'subprocess', SimpleNamespace(run=poweroff)), \
                     patch.object(battery, 'logging', Mock(INFO=20)):
@@ -141,6 +163,41 @@ class BatteryLoopTests(unittest.TestCase):
         self.assertEqual([s['consecutive_low_samples'] for s in states], [1, 2, 3])
         self.assertEqual(requests, [{'time': 20, 'returncode': 0}])
         self.assertTrue(all(s['monitoring'] == 'valid' for s in states))
+        self.assertTrue(all(s['schema_version'] == 2 and s['sample_clock'] == 'CLOCK_BOOTTIME'
+                            and s['boot_id'] == 'test-boot' for s in states))
+        self.assertEqual([s['boottime_seconds'] for s in states], [0, 10, 20])
+        self.assertTrue(all('monotonic_seconds' not in s for s in states))
+
+    def test_sleep_breaks_consecutive_window_with_monotonic_frozen(self):
+        for boot, mono in (([0, 10, 3610, 3620, 3630], [0, 10, 20, 30, 40]),
+                           ([0, 10, 20, 30, 40], [0, 10, 19, 29, 39])):
+            with self.subTest(boottime=boot):
+                states, requests = self.simulate([{}] * 5, times=boot, monotonic_times=mono)
+                self.assertEqual([s['consecutive_low_samples'] for s in states], [1, 2, 1, 2, 3])
+                self.assertEqual(requests, [{'time': boot[-1], 'returncode': 0}])
+                self.assertEqual([s['sample_monotonic_seconds'] for s in states], mono)
+
+    def test_slow_or_suspended_sysfs_read_is_degraded_and_cannot_power_off(self):
+        for duration, sleep_gap in ((3, 0), (0, 0.1), (0, 10)):
+            boot = [0, 10, 20, 30 + sleep_gap, 40 + sleep_gap, 50 + sleep_gap]
+            with self.subTest(duration=duration, sleep=sleep_gap):
+                states, requests = self.simulate([{}] * 6, times=boot,
+                    monotonic_times=[0, 10, 20, 30, 40, 50],
+                    read_seconds=[0, 0, duration, 0, 0, 0], read_sleep=[0, 0, sleep_gap, 0, 0, 0])
+                self.assertEqual([s['consecutive_low_samples'] for s in states], [1, 2, 0, 1, 2, 3])
+                self.assertEqual(states[2]['monitoring'], 'degraded')
+                self.assertNotIn('capacity_percent', states[2])
+                self.assertEqual(states[2]['boottime_seconds'], 20)
+                self.assertEqual(requests, [{'time': boot[-1], 'returncode': 0}])
+
+    def test_clock_bracketing_does_not_confuse_syscall_latency_with_sleep(self):
+        with patch.object(battery.time, 'monotonic_ns', side_effect=[10, 14]), \
+                patch.object(battery.time, 'clock_gettime_ns', return_value=20):
+            value = battery.clocks()
+        self.assertEqual(value['gap_low'], 6)
+        self.assertEqual(value['gap_high'], 10)
+        self.assertFalse(battery.crossed_suspend(value, dict(gap_low=9, gap_high=12)))
+        self.assertTrue(battery.crossed_suspend(value, dict(gap_low=11, gap_high=12)))
 
     def test_above_threshold_and_external_power_do_not_request_shutdown(self):
         for reading in ({'capacity': '11'}, {'status': 'Charging', 'capacity': '0'},

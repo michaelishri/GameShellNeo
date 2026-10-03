@@ -169,6 +169,7 @@ def observe(config, cycles, seconds, directory, emit):
         emit('device_capture', directory=remote_dir)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/record-usb-detection.py', script)
+            upload(sftp, ROOT / 'tools/battery_sample.py', remote_dir + '/battery_sample.py')
             # Preserve SSH-account ownership when systemd opens the existing
             # file, allowing bounded incremental SFTP reads without sudo cat.
             with sftp.open(capture, 'wx'):
@@ -254,7 +255,8 @@ def observe(config, cycles, seconds, directory, emit):
                     except (OSError, RuntimeError, paramiko.SSHException):
                         pass
             if stopped:
-                run(observer.client, shlex.join(['sudo', '-n', 'rm', '--', capture, script]), display=False)
+                run(observer.client, shlex.join(['sudo', '-n', 'rm', '--', capture, script,
+                                                remote_dir + '/battery_sample.py']), display=False)
                 run(observer.client, shlex.join(['rmdir', '--', remote_dir]), display=False)
         if not stopped or not ready or (cycles and len(tracker.completed) != cycles):
             raise ValueError('Incomplete capture, cycles or cleanup')

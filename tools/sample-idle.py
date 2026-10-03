@@ -11,6 +11,8 @@ import subprocess
 import sys
 import time
 
+from battery_sample import sample_age
+
 
 def read(path):
     return Path(path).read_text().strip()
@@ -75,7 +77,7 @@ def sample(battery, inputs):
         'temperature_millic': int(read('/sys/class/thermal/thermal_zone0/temp')),
         'kernel_taint': int(read('/proc/sys/kernel/tainted')),
         'guard_monitoring': guard.get('monitoring'),
-        'guard_age_seconds': now - guard['monotonic_seconds'],
+        'guard_age_seconds': sample_age(guard),
     }
     if (state['present'] != 1 or state['status'] != 'Discharging' or
             not 20 < state['capacity_percent'] <= 100 or state['voltage_uv'] <= 0 or

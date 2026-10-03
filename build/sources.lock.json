@@ -4,7 +4,8 @@
   "image_version": "0.1.0-diagnostic.18",
   "features": {
     "speaker_audio": true,
-    "usb_system_wakeup": false
+    "usb_system_wakeup": false,
+    "battery_sample_clock": "CLOCK_BOOTTIME"
   },
   "experiments": {
     "suspend_diagnostics": true,

@@ -19,6 +19,14 @@ def require(condition, message):
         raise SystemExit(message)
 
 
+def verify_battery(root, project, sources):
+    require(sources.get('features', {}).get('battery_sample_clock') == 'CLOCK_BOOTTIME',
+            'Image must identify the BOOTTIME battery contract')
+    script = Path('usr/local/lib/gameshellneo/battery_guard.py')
+    require((root / script).read_bytes() == (project / 'runtime' / script).read_bytes(),
+            'Battery observation/clock policy differs from the source')
+
+
 def uboot_payload(path, image_type):
     data = path.read_bytes()
     header = bytearray(data[:64])
@@ -138,6 +146,7 @@ def main():
     for name in ('gameshellneo-usb', 'gameshellneo-battery', 'gameshellneo-ready'):
         require((root / 'etc/systemd/system/multi-user.target.wants' / (name + '.service')).is_symlink(),
                 f'Service not enabled: {name}')
+    verify_battery(root, project, identity['sources'])
     require(identity['sources'].get('features', {}).get('usb_system_wakeup') is False,
             'Image must explicitly disable USB system wake policy')
     usb_script = Path('usr/local/sbin/gameshellneo-usb')

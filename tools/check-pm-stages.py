@@ -67,7 +67,7 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
 def inline(client, *args):
     # Inline inspection/recovery also needs the same saved keypad helper.
     program = 'import sys, types\n'
-    for name in ('keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace', 'power_key', 'rtc_alarm', 'pm_platform'):
+    for name in ('battery_sample', 'keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace', 'power_key', 'rtc_alarm', 'pm_platform'):
         program += ('keypad_helper = types.ModuleType(' + repr(name) + ')\n'
                     'exec(' + repr((ROOT / 'tools' / (name + '.py')).read_text()) + ', keypad_helper.__dict__)\n'
                     'sys.modules[' + repr(name) + '] = keypad_helper\n')
@@ -105,6 +105,7 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
                                   keypad_quirk, wifi_trace, power_key, power_key_input)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/test-pm-stages.py', directory + '/test-pm-stages.py')
+            upload(sftp, ROOT / 'tools/battery_sample.py', directory + '/battery_sample.py')
             upload(sftp, ROOT / 'tools/keypad_pm.py', directory + '/keypad_pm.py')
             upload(sftp, ROOT / 'tools/keypad_input.py', directory + '/keypad_input.py')
             upload(sftp, ROOT / 'tools/speaker_audio.py', directory + '/speaker_audio.py')
@@ -115,7 +116,7 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
             if power_key_input:
                 for name in ('power_key_policy', 'power_key_input', 'power_key_pm'):
                     upload(sftp, ROOT/'tools'/(name+'.py'), directory+'/'+name+'.py')
-                names = ('test-pm-stages', 'keypad_pm', 'keypad_input', 'speaker_audio',
+                names = ('test-pm-stages', 'battery_sample', 'keypad_pm', 'keypad_input', 'speaker_audio',
                          'power_key', 'power_key_policy', 'power_key_input', 'power_key_pm')
                 (capture/'source.json').write_text(json.dumps({name: hashlib.sha256(
                     (ROOT/'tools'/(name+'.py')).read_bytes()).hexdigest() for name in names}, indent=2)+'\n')

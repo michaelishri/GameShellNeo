@@ -33,6 +33,16 @@ systemd-analyze
 '''
 
 
+def device_source(filename):
+    """Bundle the shared battery parser for standalone python -c diagnostics."""
+    helper = (ROOT / 'tools/battery_sample.py').read_text()
+    return ('import sys, types\n'
+            '_battery_sample = types.ModuleType("battery_sample")\n'
+            'exec(' + repr(helper) + ', _battery_sample.__dict__)\n'
+            'sys.modules["battery_sample"] = _battery_sample\n' +
+            (ROOT / 'tools' / filename).read_text())
+
+
 def private_path(value, default):
     return Path(value or default).expanduser().resolve()
 
@@ -219,7 +229,7 @@ def device_action(config, action, route):
                          '--property=RuntimeMaxSec=' + str(seconds + 120),
                          '--property=TimeoutStopSec=10', '--property=Nice=10',
                          '/usr/bin/python3', '-B', '-u', '-c',
-                         (ROOT / 'tools/sample-idle.py').read_text(), '--seconds', str(seconds),
+                         device_source('sample-idle.py'), '--seconds', str(seconds),
                          '--backlight', backlight]
             with (directory / 'idle-sample.jsonl').open('wb') as output:
                 run(client, shlex.join(arguments), output=output, timeout=90)
@@ -233,7 +243,7 @@ def device_action(config, action, route):
                          '--property=RuntimeMaxSec=' + str(seconds + 90),
                          '--property=TimeoutStopSec=10', '--property=Nice=10',
                          '/usr/bin/python3', '-B', '-u', '-c',
-                         (ROOT / 'tools/profile-power.py').read_text(), '--seconds', str(seconds)]
+                         device_source('profile-power.py'), '--seconds', str(seconds)]
             path = directory / 'power-profile.jsonl'
             print('Capturing private profile:', path, flush=True)
             with path.open('wb') as output:
@@ -297,7 +307,7 @@ def device_action(config, action, route):
             remote_dir = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-governor.XXXXXXXX',
                              display=False).decode().strip()
             arguments = governor_command(remote_dir, seconds, rate)
-            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py')
+            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py', 'battery_sample.py')
             with client.open_sftp() as sftp:
                 for name in names:
                     upload(sftp, ROOT / 'tools' / name, remote_dir + '/' + name)
@@ -332,7 +342,7 @@ def device_action(config, action, route):
                              display=False).decode().strip()
             if not re.fullmatch(r'/tmp/gameshellneo-sugov\.[A-Za-z0-9]+', remote_dir):
                 raise ValueError('Unexpected temporary governor profile directory')
-            names = ('profile-governor.py', 'profile-power.py')
+            names = ('profile-governor.py', 'profile-power.py', 'battery_sample.py')
             artifacts = ('perf.data', 'perf-record.txt', 'perf-report.txt', 'kallsyms.txt')
             with client.open_sftp() as sftp:
                 for name in names:

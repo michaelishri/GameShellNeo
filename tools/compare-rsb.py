@@ -11,6 +11,8 @@ import signal
 import subprocess
 import time
 
+from battery_sample import sample_age
+
 BUS = Path('/sys/bus/platform/devices/1f03400.rsb')
 DELAY = BUS / 'power/autosuspend_delay_ms'
 BOOT = Path('/proc/sys/kernel/random/boot_id')
@@ -103,7 +105,7 @@ def summarize(before, after):
 
 def cached_health():
     guard = json.loads(read('/run/gameshellneo/battery.json'))
-    age = time.monotonic() - guard['monotonic_seconds']
+    age = sample_age(guard)
     usb = [read(p) for p in Path('/sys/class/udc').glob('*/state')]
     if (guard.get('monitoring') != 'valid' or not 0 <= age <= 25 or
             guard.get('status') not in ('Charging', 'Full', 'Not charging') or

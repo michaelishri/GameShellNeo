@@ -94,7 +94,8 @@ class RsbTests(unittest.TestCase):
                 self.assertEqual(self.delay.read_text().strip(), '1000')
 
     def test_fresh_process_recovers_after_killed_worker(self):
-        setup = ('import importlib.util, pathlib, time\n'
+        setup = ('import importlib.util, pathlib, sys, time\n'
+                 f'sys.path.insert(0, {str(TOOLS)!r})\n'
                  f's = importlib.util.spec_from_file_location("rsb", {str(TOOLS / "compare-rsb.py")!r})\n'
                  'm = importlib.util.module_from_spec(s); s.loader.exec_module(m)\n'
                  f'm.DELAY = pathlib.Path({str(self.delay)!r})\n'

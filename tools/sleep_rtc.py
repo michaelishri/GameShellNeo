@@ -33,7 +33,7 @@ MAX_CLOCK_SAMPLE_SECONDS = 0.05
 SDIO = 'consumer:platform:1c10000.mmc'
 SDIO_PATCH = 'kernel/patches/0023-sunxi-mmc-sdio-reference-ownership.patch'
 SDIO_SHA = '52f4e3d8b966f8f69718340697606e30d174033d998be84f98b42bc2c97e92ee'
-SOURCES = ('sleep_rtc', 'test-pm-stages', 'keypad_pm', 'power_key', 'power_key_policy',
+SOURCES = ('sleep_rtc', 'test-pm-stages', 'battery_sample', 'keypad_pm', 'power_key', 'power_key_policy',
            'power_key_pm', 'power_key_input', 'keypad_input', 'speaker_audio',
            'rtc_alarm', 'pm_platform', 'wifi_trace', 'usb_trace')
 

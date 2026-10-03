@@ -1448,6 +1448,13 @@ three low readings, invalid/missing telemetry, charging or capacity recovery,
 sampling gaps and retry after a rejected shutdown request. Output is retained
 privately as `battery-policy.txt`.
 
+The separate `work/battery-boottime` candidate extends these regressions to
+sleep-inclusive reading age, interrupted reads and low-reading sequences across
+resume. `task test` runs the local simulations and consumer checks. Its schema-2
+producer and matching diagnostic tools must be deployed together in a later,
+separately identified image; the installed-source hash check deliberately rejects
+diagnostic.18's older guard. See [report 133](docs/133-battery-boottime.md).
+
 The checks run as the SSH user with a 60-second bound. Temporary state replaces
 the real `/run/gameshellneo` path inside that process, and a test function
 records every would-be shutdown command. The live battery service continues

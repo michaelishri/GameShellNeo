@@ -13,7 +13,7 @@ import time
 
 import paramiko
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run
+from remote import LOCAL, ROOT, device, device_source, evidence_directory, run
 
 
 def state(config):
@@ -21,7 +21,7 @@ def state(config):
     code = ('import json, hashlib\n'
             'from pathlib import Path\n'
             'scope = {"__name__": "power_state"}\n'
-            'exec(' + repr((ROOT / 'tools/profile-power.py').read_text()) + ', scope)\n'
+            'exec(' + repr(device_source('profile-power.py')) + ', scope)\n'
             'log = scope["subprocess"].run(["journalctl", "-b", "-k", "--no-pager", "-o", "cat"], '
             'check=True, capture_output=True, text=True, timeout=30).stdout\n'
             'print(json.dumps(dict(health=scope["health"](), radio=scope["radio"](), '

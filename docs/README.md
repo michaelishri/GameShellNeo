@@ -281,3 +281,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [129 — CPI v3.1 WFI-only s2idle design](129-cpi31-wfi-s2idle-design.md): board opt-in, global state-0 entry contract, timer/IRQ obligations and measurement limits for the later CPU-idle slice.
 
 - [130 — Base-rootfs cache identity](130-rootfs-cache-identity.md): version-only reuse with dependency/archive verification, conservative legacy rejection and regression fixtures.
+
+- [131 — MUSB IRQ-wake ownership](131-musb-wake-irq-ownership.md): probe-time reference, checked system-sleep ownership, shared-IRQ failure semantics and the separate candidate's qualification requirements.

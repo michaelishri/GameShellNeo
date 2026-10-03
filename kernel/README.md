@@ -70,8 +70,9 @@ It balances the probe-time IRQ-wake reference, preserves the enabled default
 for supported fresh controllers, and checks owned system-sleep arm/disarm and
 cleanup before backend teardown. Failed disarm remains owned and reported;
 foreign capability/source/wakeirq arrangements are rejected unchanged.
-89 native/ARM32 source scenarios, 14 negative controls and six ARM driver
-configuration builds pass. Full probe failure injection, IRQ suspend traversal,
+205 native/ARM32 source scenarios and 22 negative controls pass, including
+actual probe/remove functions and per-IRQ PM/dispatch helpers. Six ARM driver
+configuration builds pass for the unchanged patch. Whole-kernel PM/IRQ traversal,
 other-backend runtime wake and hardware qualification remain open. Permanent
 teardown disarm failure remains an explicit limitation. Use
 `task check:musb-wake-configs`; [report 132](../docs/132-musb-wake-irq-candidate.md)

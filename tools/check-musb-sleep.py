@@ -18,10 +18,65 @@ FILES = ('musb_core.c', 'musb_core.h', 'musb_regs.h', 'musb_gadget.c', 'musb_gad
 
 
 def function(text, name):
-    match = re.search(r'^(?:static )?(?:void|int)\s+' + name + r'\([^;{]*\)\n\{', text, re.M)
+    match = re.search(r'^(?:static\s+)?(?:inline\s+)?(?:void|int|bool)\s+' + name + r'\([^;{]*\)\n\{', text, re.M)
     if not match:
         raise ValueError('Missing function: ' + name)
     return text[match.start():text.index('\n}', match.end()) + 3] + '\n'
+
+
+def probe_checks(core, irq_source, builder):
+    functions = ''.join(function(irq_source, name) for name in (
+        'set_irq_wake_real', 'irq_set_irq_wake'))
+    functions += ''.join(function(core, name) for name in (
+        'musb_disarm_wake', 'musb_init_wakeup', 'musb_cleanup_wakeup', 'musb_free',
+        'musb_init_controller', 'musb_remove'))
+    variants = {
+        'candidate': functions,
+        'missing_probe_unwind': functions.replace('fail3:\n\tmusb_cleanup_wakeup(musb);', 'fail3:'),
+        'cleanup_after_platform_exit': functions.replace(
+            '\tmusb_cleanup_wakeup(musb);\n\tmusb_platform_exit(musb);',
+            '\tmusb_platform_exit(musb);\n\tmusb_cleanup_wakeup(musb);'),
+        'ignored_source_allocation': functions.replace(
+            '\treturn device_init_wakeup(dev, true);', '\tdevice_init_wakeup(dev, true);\n\treturn 0;'),
+        'missing_partial_capability_owner': functions.replace(
+            '\tmusb->wakeup_initialized = true;', '\t/* omitted ownership */'),
+        'free_before_wake_cleanup': functions.replace(
+            'fail3:\n\tmusb_cleanup_wakeup(musb);', 'fail3:\n\tmusb_free(musb);\n\tmusb_cleanup_wakeup(musb);'),
+        'probe_drops_foreign_state': functions.replace(
+            '\tif (musb->wakeup_initialized) {', '\tif (true) {'),
+    }
+    header = WORK / 'musb_wake_probe_functions.h'
+    harness = ROOT / 'kernel/tests/musb_wake_probe_test.c'
+    results = {}
+    try:
+        for name, value in variants.items():
+            if name != 'candidate' and value == functions:
+                raise ValueError('Probe negative control did not mutate: ' + name)
+            header.write_text(value)
+            binary = WORK / ('probe-' + name)
+            run(['cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+                 '-I', str(WORK), str(harness), '-o', str(binary)])
+            result = subprocess.run([str(binary)], capture_output=True, text=True)
+            (WORK / ('probe-' + name + '.txt')).write_text(result.stdout + result.stderr)
+            if name == 'candidate':
+                result.check_returncode()
+            elif result.returncode == 0 or 'Assertion' not in result.stderr:
+                raise RuntimeError('Probe negative control did not fail: ' + name)
+            results[name] = dict(returncode=result.returncode, output=result.stdout.strip(), error=result.stderr.strip())
+            print('probe-' + name + ': ' + (result.stdout.strip() or 'expected assertion failure'), flush=True)
+    finally:
+        header.write_text(functions)
+    arm = subprocess.check_output([
+        'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
+        '--platform', builder['platform'], '--entrypoint', 'bash',
+        '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
+        'set -euo pipefail\n'
+        'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror -static '
+        '-I.local/build/musb-sleep-tests kernel/tests/musb_wake_probe_test.c '
+        '-o .local/build/musb-sleep-tests/probe-arm\n'
+        'qemu-arm .local/build/musb-sleep-tests/probe-arm'], text=True)
+    print(arm, end='', flush=True)
+    return dict(native=results, arm32=arm.strip(), harness_sha256=sha256(harness))
 
 
 def main():
@@ -36,6 +91,8 @@ def main():
         output = WORK / ('matrix-evidence.json' if args.compile_matrix else
                          'compile-evidence.json' if args.compile_drivers else 'evidence.json')
         output.unlink(missing_ok=True)
+        if args.compile_matrix:
+            (WORK / 'matrix-progress.json').unlink(missing_ok=True)
         lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
         archive = archive_for(lock)
         target = WORK / 'patched' / PREFIX
@@ -52,14 +109,17 @@ def main():
                         break
         if found != set(FILES):
             raise ValueError('Incomplete locked source')
+        irq_sources = {}
+        irq_prefix = 'linux-' + lock['linux']['tag'][1:] + '/kernel/irq/'
         with tarfile.open(archive, mode='r|xz') as source:
-            irq_name = 'linux-' + lock['linux']['tag'][1:] + '/kernel/irq/manage.c'
             for entry in source:
-                if entry.name == irq_name:
-                    irq_source = source.extractfile(entry).read().decode()
-                    break
-            else:
-                raise ValueError('Missing locked IRQ-core source')
+                if entry.name in [irq_prefix + name for name in ('manage.c', 'pm.c', 'chip.c')]:
+                    irq_sources[entry.name.removeprefix(irq_prefix)] = source.extractfile(entry).read().decode()
+                    if len(irq_sources) == 3:
+                        break
+        if len(irq_sources) != 3:
+            raise ValueError('Missing locked IRQ-core source')
+        irq_source = irq_sources['manage.c']
         patches = [ROOT / 'kernel/patches' / name for name in (
             '0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
             '0026-musb-wake-irq-policy.patch')]
@@ -68,7 +128,11 @@ def main():
         core = (target / 'musb_core.c').read_text()
         gadget = (target / 'musb_gadget.c').read_text()
         functions = ''.join(function(irq_source, name) for name in (
-            'set_irq_wake_real', 'irq_set_irq_wake'))
+            'set_irq_wake_real', 'irq_set_irq_wake', '__disable_irq', '__enable_irq'))
+        functions += ''.join(function(irq_sources['pm.c'], name) for name in (
+            'irq_pm_handle_wakeup', 'suspend_device_irq', 'resume_irq'))
+        functions += ''.join(function(irq_sources['chip.c'], name) for name in (
+            'irq_can_handle_pm', 'irq_can_handle_actions', 'irq_can_handle'))
         functions += ''.join(function(gadget, name) for name in (
             'musb_pullup', 'musb_gadget_suspend', 'musb_gadget_resume',
             'musb_gadget_work', 'musb_gadget_pullup', 'musb_gadget_cleanup',
@@ -116,6 +180,11 @@ def main():
                 '\t\tif (!error)\n\t\t\terror = ret;', '\t\t/* lost disarm error */', 1),
             clears_foreign_source=functions.replace(
                 '\tif (musb->wakeup_initialized) {', '\tif (true) {', 1),
+            no_wake_arm=functions.replace(
+                '\t\tirqd_set(irqd, IRQD_WAKEUP_ARMED);', '\t\t/* no wake arm */', 1),
+            wake_handler_runs_early=functions.replace(
+                '\tif (!irq_can_handle_pm(desc))\n\t\treturn false;',
+                '\tif (!irq_can_handle_pm(desc))\n\t\treturn true;', 1),
         )
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         results = {}
@@ -153,6 +222,7 @@ def main():
                         native=results, arm32=arm.strip(), builder=builder,
                         limits='Actual source functions, deterministic boundary interleavings. '
                                'No electrical USB timing, host enumeration or scheduler concurrency qualification.')
+        evidence['probe_remove'] = probe_checks(core, irq_source, builder)
         if args.compile_drivers or args.compile_matrix:
             evidence['arm_build'] = compile_objects(archive, lock, WORK, [
                 PREFIX + 'musb_core.o', PREFIX + 'musb_gadget.o', PREFIX + 'sunxi.o'])

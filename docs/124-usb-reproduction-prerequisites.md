@@ -3,8 +3,8 @@
 3 October 2026, Pacific/Auckland. All seven current-boot debug prerequisites
 passed: freezer, driver and five late/noirq cycles. The owner confirmed the
 normal dim console after the driver and first late/noirq checks, then readiness
-for four late/noirq repeats. Final visible-console confirmation after those
-repeats is pending. No actual sleep request was submitted.
+for four late/noirq repeats. Afterward the owner confirmed: “Screen looks normal.”
+No actual sleep request was submitted.
 
 This continues [report 122](122-usb-resume-metadata-recorder.md)'s USB tracing
 preparation and [report 123](123-sleep-measurement-criteria.md)'s corrected
@@ -50,8 +50,8 @@ Recorded stage durations were approximately 5.565 seconds for freezer, 7.892
 seconds for drivers and 7.843–8.115 seconds for late/noirq. These include the
 five-second PM debug delay and test overhead; they are not sleep
 residency, user-visible resume latency or energy measurements. Automated display
-setting restoration is supported by the owner's driver and initial late/noirq
-screen confirmations; the final four-cycle visual report remains pending.
+setting restoration is supported by the owner's driver, initial late/noirq and
+final four-cycle screen confirmations.
 
 ## Saved commands and evidence
 
@@ -79,7 +79,41 @@ with consecutive PM success counts and no intervening PM. It provides the
 current-boot prerequisite input for the new-source awake rehearsal; it does not
 by itself admit a new actual sleep test.
 
-Next, record the final visible-console confirmation and run the new-source
-awake rehearsal. Any actual RTC-wake reproduction requires a successful matching
-rehearsal and separate fresh observation; no automatic retry of the original
-failed sleep run is authorized by this debug sequence.
+## Updated-source awake rehearsal
+
+After the final screen confirmation, the saved rehearsal passed:
+
+```sh
+task device:sleep-rehearse QUALIFICATION=.local/neo95-current-reference-history.json
+task mac:usb-inspect
+```
+
+- Rehearsal run: `9e2bcd2564154716b2ff141c8cdb8634`.
+- Private result: `.local/diagnostics/20261003T094447.146415Z/result.json`.
+- Sources matched the uploaded manifest and current committed helpers.
+- The 30-second alarm delivered after 30.290 seconds while awake. RTC IRQ 31
+  increased 1 → 2; its event reported count 1 / flags `0xa0`. Alarm restoration
+  passed.
+- No sleep state was written. PM counts stayed 7/0, SDIO usage stayed 2, and
+  the original keypad, memory canary, audio and display settings survived.
+- USB, Wi-Fi and keypad traces were complete and restored. The USB trace
+  contained 1,162 MUSB interrupt entries and two markers, with no ECM notification
+  events; this rehearses capture/cleanup, not notification delivery or resume.
+- The original power-key policy was restored with a clean logical release and
+  descriptor handback. No policy, RTC or PM-control ownership was left retained.
+- Independent USB and Wi-Fi SSH checks passed on the same boot.
+- CPU-idle inventory remained driver `none`, CPUs 0–3, governor `menu`,
+  clocksource `arch_sys_counter`, with no registered state directories. This
+  awake run establishes neither CPU retention nor energy savings.
+
+The separate read-only Mac capture at
+`.local/diagnostics/20261003T094557.564528Z` completed all six reads. The USB route
+used `en8`, active with an IPv4 address, and the GameShell appeared in the USB
+tree. No DHCP, interface or route settings were changed.
+
+The prerequisites and updated-source rehearsal are now complete. A fresh
+observer-readiness request for **one** actual RTC-wake reproduction is pending;
+it has not been submitted. Preserve the cable and controls during that attempt
+so the new USB trace and separate Mac snapshot can distinguish device recovery
+from a physical reconnect. No automatic retry of the original failed sleep run
+is authorized by this sequence.

@@ -41,6 +41,7 @@ env:
   NEO_CHECKPOINT_NAME: '{{.NAME | default ""}}'
   NEO_SCRATCH_SUITE: '{{.SUITE | default ""}}'
   NEO_SCRATCH_APPLY: '{{.APPLY | default "0"}}'
+  NEO_SCRATCH_TARGET: '{{.TARGET | default ""}}'
   NEO_RETENTION_KEEP: '{{.KEEP | default "3"}}'
   NEO_RETENTION_APPLY: '{{.APPLY | default "0"}}'
   NEO_RECOVERY_UPLOAD: '{{.UPLOAD | default "0"}}'
@@ -136,6 +137,14 @@ tasks:
   build:prune-driver-scratch:
     desc: Preview superseded brcmfmac compiler trees for SUITE; APPLY=1 removes them under the suite lock
     cmds: [python3 tools/prune-driver-scratch.py]
+
+  build:compact-driver-sources:
+    desc: Verify and share duplicate driver sources for SUITE; optional TARGET worktree, APPLY=1 replaces copies
+    cmds: [python3 tools/compact-driver-sources.py]
+
+  check:kernel-source-reuse:
+    desc: Cross-build two isolated ARM configurations using one read-only kernel source
+    cmds: [bash tools/run-logged.sh kernel-source-reuse python3 tools/check-kernel-source-reuse.py]
 
   build:prune-retained:
     desc: Preview old raw images/kernel snapshots; KEEP=3, APPLY=1 verifies recovery and removes old copies

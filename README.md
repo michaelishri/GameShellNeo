@@ -378,6 +378,8 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task kernel:reset` | After changing the patch queue; archives old kernel source/output and artifact metadata/logs under `.local/previous-kernels/`, then run `task build`. Recovery images stay in `.local/artifacts/` |
 | `task build:rootfs` | Exercise Debian bootstrap/cache preparation independently |
 | `task build:prune-driver-scratch SUITE=brcmfmac-pm-tests` | Preview superseded compiler trees; add `APPLY=1` to remove them while retaining current normal/debug build evidence |
+| `task build:compact-driver-sources SUITE=musb-sleep-tests` | Verify duplicate sources against the locked archive and patch queue; add `APPLY=1` to replace them with shared-source links, keeping compiled outputs and evidence |
+| `task check:kernel-source-reuse` | Build two real ARM configurations and regenerate an object, checking isolated outputs and shared read-only source; no device access |
 | `task build:prune-retained KEEP=3` | Preview older raw images and full kernel snapshots; `APPLY=1` verifies compressed recovery and preserves compact provenance before removal |
 | `task check` | Python and C regressions, Bash syntax and ShellCheck |
 | `task test:nkmp` | Compare original/patched clock searches natively and under ARM32 emulation; also runs before the kernel in `task build` |
@@ -446,6 +448,46 @@ active tests, symlinks or unexpected scratch contents stop cleanup. Only older
 removed; recovery images, archived full kernels, downloads, provisioning and
 diagnostic captures remain outside its scope. Each application saves an
 incremental `prune-*.json` record alongside the retained suite evidence.
+
+Driver object checks now share one verified kernel source per patch queue within
+each suite. Each configuration retains its own `kernel-<16 hex digits>/output`;
+the source identity excludes the compiler, image version and configuration.
+Docker mounts the shared source read-only and writes configuration merge
+temporaries into the output directory. Source contents, owner executable bits and
+symlink targets are checked on reuse. A changed archive or patch queue selects a
+new source. This does not change full image/kernel builds.
+
+To compact existing copies without losing their compiled objects or evidence:
+
+```sh
+task build:compact-driver-sources SUITE=musb-sleep-tests
+task build:compact-driver-sources SUITE=musb-sleep-tests APPLY=1
+```
+
+Optional `TARGET=/absolute/path/to/worktree` selects another worktree of this
+same repository. Supported suites are the five Wi-Fi suites above,
+`musb-sleep-tests` and `cpuidle-s2idle-tests`. Preview may extract one verified
+source into the selected suite's `.sources` cache (about 1.7 GiB of temporary
+extra disk use for this kernel), but does not replace or delete legacy sources.
+Leave that headroom available. The task requires the downloaded locked archive,
+an idle suite, completed compiler evidence and matching object/configuration
+hashes. Every selected source must match the freshly patched source, including
+files left by `patch`; all selected trees are checked before any replacement.
+The worktree's current archive and patch queue must still reproduce those
+sources. Unreferenced compiler trees are left alone.
+
+`APPLY=1` replaces each matching source directory with a relative cache link.
+It preserves outputs, configurations, logs and original evidence, and writes an
+incremental `compact-*.json` audit with before/after evidence hashes and disk
+space. If interrupted, rerun the same task with `APPLY=1`: its migration record
+allows it to finish deleting only verified remnants. A changed remnant stops
+cleanup for investigation. Object builds reject incomplete migrations. Suite
+and cache locks reject concurrent compaction/build operations; older Wi-Fi
+pruning removes superseded source links without deleting shared caches.
+There is deliberately no automatic shared-cache eviction.
+When extending an older candidate branch, bring forward `kernel_checks.py` and
+`kernel_sources.py` together before adding new compiler configurations; an older
+helper can still create full source copies for new scratch identities.
 
 To prune older diagnostic images and full kernel snapshots, wait until the
 entire build/pack/staging workflow finishes, then run:

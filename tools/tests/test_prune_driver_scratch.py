@@ -2,6 +2,7 @@
 import fcntl
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -61,6 +62,16 @@ class PruneTests(unittest.TestCase):
             with self.assertRaises(BlockingIOError):
                 prune.prune(self.root, self.suite, apply=True)
         self.assertTrue(self.trees[2].exists())
+
+    def test_pruning_shared_scratch_retains_cache(self):
+        source = self.work / '.sources' / ('source-' + 'a' * 64) / 'source'
+        source.mkdir(parents=True)
+        (source / 'Makefile').write_text('shared source')
+        shutil.rmtree(self.trees[2] / 'source')
+        (self.trees[2] / 'source').symlink_to('../.sources/source-' + 'a' * 64 + '/source')
+        result = prune.prune(self.root, self.suite, apply=True)
+        self.assertEqual(len(result['removed']), 1)
+        self.assertEqual((source / 'Makefile').read_text(), 'shared source')
 
     def test_missing_or_escaping_evidence_is_not_pruned(self):
         for value in ('../../recovery', '.local/build/other/kernel-' + 'a' * 16,

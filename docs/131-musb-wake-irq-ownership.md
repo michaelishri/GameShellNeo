@@ -318,10 +318,12 @@ capability is false. At this review point the draft had no new regression or
 hardware qualification, and was not applied to the main source or staged.18.
 
 Subsequent coordinating-task update: that freshness guard is now present in
-the separate [implementation branch][candidate]. Its source checks pass 89
-native/ARM32 scenarios and 14 negative controls, and six complete ARM driver
-object configurations compile. The branch's report 132 identifies the tested
-subset and remaining fault-injection gates below. No candidate image has been
+the separate [implementation branch][candidate]. Its expanded source checks pass
+205 native/ARM32 scenarios and 22 negative controls, including actual probe/remove
+functions and per-IRQ PM/dispatch helpers. Six complete ARM driver object
+configurations compile for the unchanged patch. The branch's report 132 identifies
+the tested API-boundary subset and remaining whole-kernel, concurrency and backend
+gates below. No candidate image has been
 built or installed; these results do not change diagnostic.18 or establish
 hardware wake behavior.
 

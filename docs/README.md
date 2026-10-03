@@ -277,3 +277,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 
 - [126 — MUSB system-sleep design](126-musb-system-sleep-design.md): primary-source lifecycle audit, temporary pull-up ownership and wake-policy boundaries.
 - [128 — MUSB sleep candidate](128-musb-system-sleep-candidate.md): patch 0025, source regressions, explicit USB wake policy and diagnostic.18 preparation; hardware recovery remains unqualified.
+
+- [129 — CPI v3.1 WFI-only s2idle design](129-cpi31-wfi-s2idle-design.md): board opt-in, global state-0 entry contract, timer/IRQ obligations and measurement limits for the later CPU-idle slice.

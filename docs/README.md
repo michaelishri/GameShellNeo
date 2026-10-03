@@ -289,3 +289,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [134 — CPI WFI s2idle candidate](134-cpi-wfi-s2idle-candidate.md): global state-0 entry contract, default-off board driver, native/ARM32 source tests, four ARM configurations and remaining image/hardware gates.
 
 - [135 — Awake measurement clock guards](135-awake-measurement-clock-guards.md): sleep/PM rejection, preserved cleanup, historical-evidence labeling and read-only board clock observations; separate candidate tools.
+
+- [136 — MUSB startup power failures](136-musb-startup-runtime-pm.md): checked probe/gadget start, reference/error regressions and the unresolved stop/remove and asynchronous-callback lifetime boundaries; separate from diagnostic.18.

@@ -303,3 +303,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [141 — MUSB backend removal contracts](141-musb-removal-backend-contracts.md): nine platform and four DMA backends, partial-probe/rebind ownership, parent PM/IRQ dependencies and an opt-in extcon callback-drain design; implementation and hardware qualification remain separate.
 
 - [142 — First RTC-wake USB recovery](142-diagnostic18-first-rtc-wake-success.md): diagnostic.18 returns automatically to configured USB/ECM and both SSH routes after actual s2idle; NEO-97 live formatting passes, while repeatability and energy remain open.
+
+- [143 — Repeat RTC-wake runner](143-repeat-rtc-wake-runner.md): bounded attended batches, original-result lineage, durable one-successor claims and stop-on-failure collection; source checks pass, hardware qualification pending.

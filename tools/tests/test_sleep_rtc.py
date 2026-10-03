@@ -510,10 +510,11 @@ class HostCommand(unittest.TestCase):
             with self.assertRaises(ValueError):host.service('/tmp/gameshellneo-sleep.test',TOKEN,mode,'')
 
     def test_actual_sleep_requires_explicit_attended_flag_before_network(self):
-        with patch.object(sys,'argv',['test','--rtc-wake']),patch.dict(os.environ,{'NEO_SLEEP_ATTENDED':'0'}), \
-                patch.object(host,'load_env') as load:
-            with self.assertRaises(SystemExit):host.main()
-            load.assert_not_called()
+        for mode in ('--rtc-wake', '--rtc-batch'):
+            with patch.object(sys,'argv',['test',mode]),patch.dict(os.environ,{'NEO_SLEEP_ATTENDED':'0'}), \
+                    patch.object(host,'load_env') as load:
+                with self.assertRaises(SystemExit):host.main()
+                load.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()

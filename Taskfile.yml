@@ -515,6 +515,12 @@ tasks:
     desc: One attended real s2idle attempt; QUALIFICATION, REHEARSAL and fresh ATTENDED=1 required
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake]
 
+  device:sleep-batch:
+    desc: One to four attended RTC-wake cycles; stop on incomplete recovery, retain original run
+    env:
+      NEO_PM_CYCLES: '{{.CYCLES | default "4"}}'
+    cmds: [python3 tools/check-sleep-rtc.py --rtc-batch]
+
   device:sleep-collect:
     desc: Read original sleep RUN and live recovery state; ROUTE=usb (default) or wifi, never resubmit
     cmds: [python3 tools/check-sleep-rtc.py --collect]

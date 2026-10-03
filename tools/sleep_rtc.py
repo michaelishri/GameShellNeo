@@ -1,6 +1,7 @@
-"""Separate, one-shot RTC s2idle diagnostic and awake rehearsal. No ordinary sleep policy."""
+"""RTC s2idle diagnostic with verified sequential attempts and awake rehearsal. No ordinary sleep policy."""
 import argparse
 from contextlib import contextmanager
+from copy import deepcopy
 import fcntl
 import hashlib
 import importlib.util
@@ -30,6 +31,7 @@ RESULTS = Path('/var/lib/gameshellneo/sleep-tests')
 OWNED = Path('/run/gameshellneo-sleep-controls.json')
 SECONDS, MIN_MARGIN = 30, 15
 MAX_CLOCK_SAMPLE_SECONDS = 0.05
+MAX_SLEEP_CHAIN = 16
 SDIO = 'consumer:platform:1c10000.mmc'
 SDIO_PATCH = 'kernel/patches/0023-sunxi-mmc-sdio-reference-ownership.patch'
 SDIO_SHA = '52f4e3d8b966f8f69718340697606e30d174033d998be84f98b42bc2c97e92ee'
@@ -97,6 +99,96 @@ def prerequisite(records, current):
     return [r['run_id'] for r in ordered]
 
 
+def completed_result(pm, record, lock, mode):
+    """Revalidate original evidence; a stored 'passed' flag is not sufficient."""
+    policy.run_id(record['run_id'])
+    if (record.get('event') != 'complete' or record.get('passed') is not True or
+            record.get('mode') != mode or record.get('sources') != sources() or
+            record.get('policy_restored') is not True or
+            any(record.get(k) is not False for k in
+                ('policy_owner_retained', 'dropin_retained', 'controls_retained', 'rtc_owner_retained'))):
+        raise ValueError('Incomplete, unrestored or different-source sleep evidence')
+    if (record['policy_before'] != record['policy_after'] or record['power_key'].get('events') or
+            not all(record['power_key'].get(k) is True for k in
+                    ('handed_back', 'logical_release_verified', 'descriptor_closed'))):
+        raise ValueError('Power-key policy or handback differs')
+    pm.validate(record['before'], lock)
+    evaluated = deepcopy(record)
+    health(pm, evaluated, lock)
+    for field in ('delivery', 'sleep_trace') if mode == 'rtc-wake' else ('delivery',):
+        if evaluated[field] != record.get(field):
+            raise ValueError('Recorded wake assessment differs from original evidence')
+    for side in ('before', 'after'):
+        usb = record['usb_trace'][side]
+        if usb['state'] != 'configured' or usb['carrier'] != '1':
+            raise ValueError('USB configuration/carrier recovery is incomplete')
+
+
+def history(pm, records, sleeps, current, lock):
+    """An unchanged debug anchor followed by contiguous, fully checked sleeps."""
+    if not isinstance(sleeps, list) or len(sleeps) > MAX_SLEEP_CHAIN:
+        raise ValueError('Sleep history exceeds the bounded qualification chain')
+    now = current['monotonic_seconds']
+    if type(now) not in (int, float) or not math.isfinite(now) or now < 0:
+        raise ValueError('Invalid current snapshot time')
+    anchor = sleeps[0]['before'] if sleeps else current
+    ids = prerequisite(records, anchor)
+    tokens, previous, alarm, rehearsal = [], None, None, None
+    for record in sleeps:
+        token = policy.run_id(record['run_id'])
+        if token in ids + tokens:
+            raise ValueError('Duplicate or replayed sleep record')
+        completed_result(pm, record, lock, 'rtc-wake')
+        qualification = record['qualification']
+        if qualification['runs'] != ids or qualification.get('sleep_runs') != tokens:
+            raise ValueError('Sleep ancestry differs from the supplied history')
+        parent = tokens[-1] if tokens else ids[-1]
+        if record.get('parent_claim') != dict(parent=parent, run_id=token, boot_id=current['boot_id']):
+            raise ValueError('Missing or mismatched single-successor claim')
+        if rehearsal is not None and record['rehearsal'] != rehearsal:
+            raise ValueError('Sleep chain changed its awake rehearsal')
+        rehearsal = policy.run_id(record['rehearsal'])
+        for side in ('before', 'after'):
+            snapshot = record[side]
+            if any(snapshot[k] != current[k] for k in ('boot_id', 'kernel', 'image')):
+                raise ValueError('Sleep history boot/image differs')
+            if snapshot['rsb_links'][SDIO]['consumer']['power'] != current['rsb_links'][SDIO]['consumer']['power']:
+                raise ValueError('Sleep history SDIO ownership differs')
+        before, after = record['before'], record['after']
+        times = (before['monotonic_seconds'], after['monotonic_seconds'])
+        if (any(type(t) not in (int, float) or not math.isfinite(t) for t in times) or
+                not 0 <= times[0] < times[1]):
+            raise ValueError('Invalid sleep history time ordering')
+        if previous is not None and (previous['stats'] != before['stats'] or
+                previous['monotonic_seconds'] >= times[0] or record['rtc']['irq_before'] != alarm):
+            raise ValueError('Unrecorded PM/RTC activity or overlapping sleeps')
+        previous, alarm = after, record['rtc']['irq_after']
+        tokens.append(token)
+    if previous is not None and (previous['stats'] != current['stats'] or
+            previous['monotonic_seconds'] >= current['monotonic_seconds']):
+        raise ValueError('PM occurred after the supplied sleep history')
+    return dict(runs=ids, sleep_runs=tokens)
+
+
+def successor_path(pm, qualification):
+    repeats = qualification['sleep_runs']
+    parent = repeats[-1] if repeats else qualification['runs'][-1]
+    return (RESULTS if repeats else pm.RESULTS)/policy.run_id(parent)/'sleep-successor.json'
+
+
+def claim_successor(pm, qualification, token, boot_id):
+    """Consume one parent before any alarm/PM mutation; never overwrite a claim."""
+    path = successor_path(pm, qualification)
+    claim = dict(parent=path.parent.name, run_id=policy.run_id(token), boot_id=boot_id)
+    keypad_pm.save_owned(claim, path)
+    fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    return claim
+
+
 def admission(pm, before, lock, receipt):
     pm.validate(before, lock)
     if before['image']['project_inputs_sha256'].get(SDIO_PATCH) != SDIO_SHA:
@@ -115,11 +207,28 @@ def admission(pm, before, lock, receipt):
     for entry in receipt['runs']:
         token = policy.run_id(entry['run_id'])
         record = json.loads((pm.RESULTS/token/'result.json').read_text())
-        if digest(record) != entry['sha256']:
+        if record.get('run_id') != token or digest(record) != entry['sha256']:
             raise ValueError('Device prerequisite differs from both-route host evidence')
         records.append(record)
-    ids = prerequisite(records, before)
-    return dict(runs=ids, rtc=pm_platform.admission(before, True, True))
+    entries = receipt.get('sleeps', [])
+    if not isinstance(entries, list) or len(entries) >= MAX_SLEEP_CHAIN:
+        raise ValueError('Sleep history is invalid or at its admission limit')
+    sleeps = []
+    for entry in entries:
+        token = policy.run_id(entry['run_id'])
+        record = json.loads((RESULTS/token/'result.json').read_text())
+        if record.get('run_id') != token or digest(record) != entry['sha256']:
+            raise ValueError('Device sleep differs from both-route host evidence')
+        claim = json.loads(successor_path(pm, record['qualification']).read_text())
+        if claim != record.get('parent_claim'):
+            raise ValueError('Device successor ledger differs from the sleep evidence')
+        sleeps.append(record)
+    qualified = history(pm, records, sleeps, before, lock)
+    if sleeps and rtc_irq() != sleeps[-1]['rtc']['irq_after']:
+        raise ValueError('RTC activity occurred after the supplied sleep history')
+    if successor_path(pm, qualified).exists():
+        raise ValueError('Qualification already claimed; collect its original successor')
+    return qualified | dict(rtc=pm_platform.admission(before, True, True))
 
 
 def rtc_irq(text=None):
@@ -492,6 +601,26 @@ def retain_failed_handoff(record, token):
             record['policy_rearm_error'] = type(error).__name__+': '+str(error)
 
 
+def rehearsal_for_chain(pm, before, lock, qualification, rehearsal):
+    preceding = qualification['sleep_runs']
+    prior = json.loads((RESULTS/policy.run_id(rehearsal)/'result.json').read_text())
+    completed_result(pm, prior, lock, 'rehearse')
+    first = json.loads((RESULTS/preceding[0]/'result.json').read_text()) if preceding else None
+    anchor = first['before'] if first else before
+    if (prior['run_id'] != rehearsal or prior['after']['boot_id'] != before['boot_id'] or
+            prior['after']['image'] != before['image'] or
+            prior['after']['rsb_links'][SDIO]['consumer']['power'] != anchor['rsb_links'][SDIO]['consumer']['power'] or
+            prior['after']['stats'] != anchor['stats'] or
+            prior['after']['monotonic_seconds'] >= anchor['monotonic_seconds'] or
+            prior['qualification']['runs'] != qualification['runs'] or
+            prior['qualification'].get('sleep_runs') != [] or
+            (first and (first['rehearsal'] != rehearsal or
+                        first['rtc']['irq_before'] != prior['rtc']['irq_after']))):
+        raise ValueError('Require a successful same-source/same-boot awake rehearsal')
+    last = json.loads((RESULTS/preceding[-1]/'result.json').read_text()) if preceding else prior
+    return last['rtc']['irq_after']
+
+
 def run(pm, token, mode, lock, receipt, rehearsal=None):
     policy.run_id(token)
     directory = RESULTS/token
@@ -512,14 +641,16 @@ def run(pm, token, mode, lock, receipt, rehearsal=None):
             record['qualification'] = admission(pm, before, lock, receipt)
             record['policy_before'] = policy.inspect()
             record['audio_before'] = speaker_audio.idle()
+            preceding = record['qualification']['sleep_runs']
+            if mode == 'rehearse' and preceding:
+                raise ValueError('A repeat chain retains its original awake rehearsal')
             if mode == 'rtc-wake':
-                prior = json.loads((RESULTS/policy.run_id(rehearsal)/'result.json').read_text())
-                if (prior.get('passed') is not True or prior.get('mode') != 'rehearse' or
-                        prior['sources'] != record['sources'] or prior['after']['boot_id'] != before['boot_id'] or
-                        prior['after']['stats'] != before['stats']):
-                    raise ValueError('Require a successful same-source/same-boot awake rehearsal')
+                expected_rtc = rehearsal_for_chain(pm, before, lock, record['qualification'], rehearsal)
                 record['rehearsal'] = rehearsal
             persist()
+            if mode == 'rtc-wake':
+                record['parent_claim'] = claim_successor(pm, record['qualification'], token, before['boot_id'])
+                persist()
             memory = os.urandom(4*1024*1024); checksum = hashlib.sha256(memory).hexdigest()
             with power_key.own(record['power_key'], persist) as guard:
                 guard.before_entry()
@@ -534,6 +665,8 @@ def run(pm, token, mode, lock, receipt, rehearsal=None):
                     with controls(pm, token):
                         os.sync()
                         record['rtc']['irq_before'] = rtc_irq()
+                        if mode == 'rtc-wake' and record['rtc']['irq_before'] != expected_rtc:
+                            raise ValueError('RTC activity changed before sleep admission')
                         with deadline(record['rtc'], persist, token) as (fd, target):
                             policy.verify(token)
                             power_key_pm.require_delta(record['pek_before'], power_key_pm.irq_counts(), 0, 0)

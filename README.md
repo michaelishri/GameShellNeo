@@ -1920,6 +1920,45 @@ references, healthy USB/Wi-Fi and independent power-key protection. It arms a
 Keep USB connected and all controls untouched. An early wake or incomplete
 result fails qualification; do not automatically repeat the command.
 
+Repeat testing has a bounded batch command. After a fresh same-source awake
+rehearsal and observer readiness, run up to four cycles together:
+
+```sh
+task device:sleep-batch QUALIFICATION=<current-history.json> REHEARSAL=<run-id> CYCLES=4 ATTENDED=1
+```
+
+Each cycle is an independent one-shot attempt with its own device result. The
+host rechecks RTC wake, original boot/image/helper identity, PM/reference
+continuity, restored controls and independent USB/Wi-Fi SSH before the next
+cycle. There is a 20-second awake observation interval between cycles. Keep
+USB connected and all controls untouched for the whole batch; allow roughly
+six to eight minutes for four cycles, including collection. Report anything
+unexpected immediately while leaving the cable and controls untouched.
+
+The batch saves `batch.json` and each accepted cycle's
+`qualification-next.json` under its private diagnostic directory. A later
+attended batch can use the final `qualification-next.json` with the **original**
+rehearsal ID. This retains the seven original debug records and every accepted
+sleep result rather than pretending the consumed baseline is unused. The
+chain is bounded to 16 actual sleeps; changed helper sources, image/boot,
+unrecorded PM/RTC activity or an incomplete result require investigation and
+a fresh baseline. A new alarm rehearsal is not inserted midway through a chain.
+
+Both host and device revalidate the saved evidence; the device additionally
+checks original result hashes and a persistent single-successor claim. That
+claim is written before the alarm or sleep request and is never automatically
+removed, including after interruption. Do not delete claims or replay a failed
+batch. Collect the original run and review its state. If host collection fails
+after the device succeeded, missing route proofs still prevent automatic
+continuation. Ordinary sleep policy is unchanged.
+
+The first successful diagnostic.18 result predates this repeat-runner source
+and remains valid historical evidence ([report 142](docs/142-diagnostic18-first-rtc-wake-success.md)).
+It cannot seed the new chain: establish one fresh seven-debug sequence and
+new-source awake rehearsal before the first batch. No card reflash is needed.
+[Report 143](docs/143-repeat-rtc-wake-runner.md) records the admission design,
+failure tests and remaining hardware qualification.
+
 [Report 119](docs/119-guarded-rtc-sleep-preparation.md) records admission,
 recovery limits and the two successful awake rehearsals. Ordinary sleep remains
 masked. Interrupted ownership can deliberately leave power-key actions ignored;

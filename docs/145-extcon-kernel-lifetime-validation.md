@@ -67,16 +67,19 @@ skipped, duplicated, extra or failed cases, malformed groups, incomplete logs
 and recognized kernel warnings/faults. Five host regression methods exercise
 these rejection paths. KUnit's own parser and exit status must also pass.
 
-Kernel, effective configuration, raw boot/test log and parsed report hashes are
-retained alongside the source inventory, patch manifest, pinned builder identity
-and runner/config input hashes. Prior boot logs and parsed reports are archived
+Each accepted run copies its kernel, effective configuration, raw boot/test log
+and parsed report into a unique `accepted-runs/<id>/` directory. Copies are
+verified against their source hashes before an individual acceptance receipt is
+published. Later Kbuild/KUnit executions reuse their working outputs, while the
+accepted copies and receipt remain separate. The receipt includes source
+inventory, patch manifest, pinned builder and runner/config input hashes. Prior boot logs and parsed reports are archived
 with their kernel/config/source identities before KUnit reuses its conventional
 output paths.
 
 The final default task passes all nine cases under both configurations, with no
 recognized kernel warnings, faults, RCU stalls or hung tasks. Its accepted
 `evidence-all.json` SHA-256 is
-`33d16946f043d8c0893adfd4668020320842f8192041ccc72ddec52b3fd6ac08`.
+`ff82aee8d2104cd3e788b68173f8733bc8b25f4067b2ab1c9bcb58cfd7160fb4`.
 The verified source-tree digest is
 `1bcb1808a60e0849c55bba021149c88c0cfe3f5f58d74c66db1f365970ff8781`.
 All accepted artifact hashes, runner/config inputs and the current patch queue
@@ -87,9 +90,19 @@ were checked again after completion.
 | TREE SRCU | `286cb5dda08bec0c8c89b57d37ea011219c77ae87ef2ebccb5d2f32832c5a6e7` | `kernel-tree-34040536586df373` |
 | TINY SRCU | `29f291114938940fc8aa95beaa1906f7b69eb1b6700bf27b4fd4459f589846e3` | `kernel-tiny-e504a0f36b42708b` |
 
-The final host check passes 13 runtime and 492 tooling tests (two existing
+Accepted TREE artifacts are under that kernel's
+`accepted-runs/453ec7df683a44059a1fe0e0c9b7ac23/`; its `evidence.json` SHA-256 is
+`2ffcf11822d68c2f23024df4d40723c8ae460819a0752d81dfb7d4579e54ffa8`.
+The TINY artifacts are under
+`accepted-runs/584168af3f2341d2a8818995c3332896/`; receipt SHA-256 is
+`df70b2683363c41f157b00fb3eb4354b1ef79e3f219b93f5fab11349b57f6185`.
+Both receipts and all retained files were reverified. Two additional host
+regressions ensure later runs cannot replace retained bytes and an incomplete
+copy cannot publish acceptance.
+
+The final host check passes 13 runtime and 494 tooling tests (two existing
 optional skips), compiled helper checks and shell lint. Its saved log is
-`.local/neo106-kunit-host-check-final.log`. The five result-validator methods
+`.local/neo106-kunit-retention-check.log`. The five result-validator methods
 also pass independently after adding malformed-case and stall/hung-task
 rejection. Individual TREE/TINY runs preceded the final default-task check;
 their reports remain as earlier evidence, not substitutes for the final runner.

@@ -12,6 +12,8 @@ import subprocess
 import sys
 import time
 
+from awake_clock import AwakeRun
+
 
 RATE_PATHS = tuple(Path('/sys/devices/system/cpu/cpufreq') / name for name in
                    ('schedutil/rate_limit_us', 'policy0/schedutil/rate_limit_us'))
@@ -78,6 +80,7 @@ def stable_configuration(capabilities):
 
 
 def compare(seconds, candidate):
+    awake = AwakeRun()
     profile, idle = helper('profile-power'), helper('sample-idle')
     initial = profile.health()
     if initial['governor'] != 'schedutil':
@@ -92,6 +95,7 @@ def compare(seconds, candidate):
         raise ValueError('Expected one battery and identifiable external-power inputs')
 
     def checked(expected):
+        awake.check()
         health = profile.health()
         capabilities = profile.capabilities()
         if (any(health[key] != initial[key] for key in fixed) or
@@ -139,7 +143,7 @@ def compare(seconds, candidate):
     if int(read(path)) != original:
         raise ValueError('Original update rate was not retained after cleanup')
     profile.emit('raw', clock_ticks_per_second=os.sysconf('SC_CLK_TCK'), phases=phases)
-    profile.emit('complete', passed=True, restored_us=original,
+    profile.emit('complete', passed=True, restored_us=original, awake_proof=awake.finish(),
                  phases=[{key: phase[key] for key in ('phase', 'rate_limit_us', 'counters', 'battery')}
                          for phase in phases])
 

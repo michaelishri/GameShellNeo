@@ -12,6 +12,7 @@ import subprocess
 import time
 
 from battery_sample import sample_age
+from awake_clock import AwakeRun, observe, validate, windows
 
 BUS = Path('/sys/bus/platform/devices/1f03400.rsb')
 DELAY = BUS / 'power/autosuspend_delay_ms'
@@ -73,6 +74,7 @@ def saved_delay(candidate):
 
 
 def residency():
+    clock_before = observe()
     started = time.monotonic_ns()
     values = {name: read(BUS / 'power' / name) for name in
               ('control', 'autosuspend_delay_ms', 'runtime_status',
@@ -81,10 +83,14 @@ def residency():
         values[name] = int(values[name])
     if values['control'] != 'auto' or values['runtime_status'] not in ('active', 'suspended', 'suspending', 'resuming'):
         raise ValueError('RSB runtime PM is unavailable or not automatic')
-    return dict(started_ns=started, finished_ns=time.monotonic_ns(), **values)
+    result = dict(started_ns=started, finished_ns=time.monotonic_ns(), **values)
+    result['awake_window'] = [clock_before, observe()]
+    validate(result['awake_window'])
+    return result
 
 
 def summarize(before, after):
+    awake = windows([before, after])
     if (before['control'] != after['control'] or
             before['autosuspend_delay_ms'] != after['autosuspend_delay_ms']):
         raise ValueError('RSB policy changed during a measurement')
@@ -97,7 +103,7 @@ def summarize(before, after):
     if seconds <= 0 or min(active, suspended) < 0 or active + suspended <= 0 or \
             abs(active + suspended - seconds * 1000) > uncertainty_ms:
         raise ValueError('RSB residency counters decreased or elapsed-time coverage failed')
-    return dict(seconds=seconds, active_ms=active, suspended_ms=suspended,
+    return dict(seconds=seconds, awake_validation=awake, active_ms=active, suspended_ms=suspended,
                 suspended_percent=100 * suspended / (active + suspended),
                 counter_coverage_percent=100 * (active + suspended) / (seconds * 1000),
                 resume_count=None, limits='Runtime accounting; not physical clock or energy measurement.')
@@ -175,6 +181,7 @@ def boundary_health(lock):
 
 
 def compare(lock, seconds, candidate):
+    awake = AwakeRun()
     spec = importlib.util.spec_from_file_location('profile_power', Path(__file__).with_name('profile-power.py'))
     profile = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(profile)
@@ -190,6 +197,7 @@ def compare(lock, seconds, candidate):
             set_delay(delay)
             emit('phase', phase=label, delay_ms=delay)
             time.sleep(15)
+            awake.check()
             start_health = cached_health()
             if fixed_health(start_health) != fixed:
                 raise ValueError('Initial device configuration changed')
@@ -203,6 +211,7 @@ def compare(lock, seconds, candidate):
             samples = []
             for index in range(seconds // 10 + 1):
                 time.sleep(max(0, started + index * 10 - time.monotonic()))
+                awake.check()
                 health = cached_health()
                 if fixed_health(health) != fixed or int(read(DELAY)) != delay or read(BUS / 'power/control') != 'auto':
                     raise ValueError('Device configuration changed during RSB measurement')
@@ -231,7 +240,7 @@ def compare(lock, seconds, candidate):
     final = boundary_health(lock)
     if int(read(DELAY)) != original or fixed_health(final['health']) != fixed:
         raise ValueError('Final restoration/health failed')
-    emit('complete', passed=True, restored_ms=original, final=final, phases=phases)
+    emit('complete', passed=True, restored_ms=original, final=final, phases=phases, awake_proof=awake.finish())
 
 
 def main():

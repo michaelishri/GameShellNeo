@@ -12,6 +12,7 @@ import sys
 import time
 
 from battery_sample import sample_age
+from awake_clock import AwakeRun, observe, validate, windows
 
 
 def read(path):
@@ -140,6 +141,7 @@ def peripheral_state():
 
 
 def snapshot():
+    clock_before = observe()
     started = time.monotonic()
     result = dict(health=health(), radio=radio(), capabilities=capabilities(),
                   peripherals=peripheral_state(),
@@ -156,6 +158,8 @@ def snapshot():
     result['interrupts'] = interrupts(read('/proc/interrupts'))
     result['softirqs'] = interrupts(read('/proc/softirqs'))
     result['capture_seconds'] = time.monotonic() - started
+    result['awake_window'] = [clock_before, observe()]
+    validate(result['awake_window'])
     return result
 
 
@@ -209,6 +213,7 @@ def stack_samples(ranked, identities):
 
 
 def summarize(before, after, ticks):
+    awake = windows([before, after])
     seconds = after['monotonic_seconds'] - before['monotonic_seconds']
     if seconds <= 0 or before['stat']['cpus'].keys() != after['stat']['cpus'].keys():
         raise ValueError('Invalid duration or changed CPU set')
@@ -226,7 +231,7 @@ def summarize(before, after, ticks):
                          accounted_cpu_seconds=total / ticks,
                          accounting_coverage_percent=100 * total / ticks / seconds / cpu_count
                          if cpu_count else None)
-    return dict(duration_seconds=seconds, cpu=cpus,
+    return dict(duration_seconds=seconds, awake_validation=awake, cpu=cpus,
                 counters={key: dict(count=delta(a, after['stat']['counters'][key]),
                                     per_second=delta(a, after['stat']['counters'][key]) / seconds)
                           for key, a in before['stat']['counters'].items()},
@@ -245,10 +250,12 @@ def main():
     args = parser.parse_args()
     if not 30 <= args.seconds <= 300 or args.seconds % 30:
         parser.error('seconds must be a multiple of 30 in 30..300')
+    awake = AwakeRun()
     initial = health()
     fixed = ('boot_id', 'online_cpus', 'brightness', 'bl_power', 'governor')
 
     def checked():
+        awake.check()
         value = health()
         if any(value[key] != initial[key] for key in fixed):
             raise ValueError('Boot, CPU set, brightness or governor changed')
@@ -286,7 +293,7 @@ def main():
              'clocks': '/sys/kernel/debug/clk/clk_summary',
              'regulators': '/sys/kernel/debug/regulator/regulator_summary',
              'timers': '/proc/timer_list'}.items()})
-    emit('complete', passed=True, **summary)
+    emit('complete', passed=True, awake_proof=awake.finish(), **summary)
 
 
 if __name__ == '__main__':

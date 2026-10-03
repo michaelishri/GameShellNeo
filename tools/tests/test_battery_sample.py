@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from awake_fixtures import clock
 
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
@@ -119,7 +120,8 @@ class BatteryAge(unittest.TestCase):
 
                 args = () if function != 'sample' else (fake_path('/sys/class/power_supply/battery'),
                     [fake_path('/sys/class/power_supply/axp20x-usb'), fake_path('/sys/class/power_supply/axp22x-ac')])
-                with patch.object(module, 'read', read), patch.object(module, 'Path', fake_path):
+                with patch.object(module, 'read', read), patch.object(module, 'Path', fake_path), \
+                        patch.object(module, 'observe', side_effect=clock(), create=True):
                     with patch.object(module, 'sample_age', lambda value: battery_sample.sample_age(
                             value, now=101, boot_id='boot')):
                         getattr(module, function)(*args)

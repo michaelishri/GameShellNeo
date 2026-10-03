@@ -34,13 +34,14 @@ systemd-analyze
 
 
 def device_source(filename):
-    """Bundle the shared battery parser for standalone python -c diagnostics."""
-    helper = (ROOT / 'tools/battery_sample.py').read_text()
-    return ('import sys, types\n'
-            '_battery_sample = types.ModuleType("battery_sample")\n'
-            'exec(' + repr(helper) + ', _battery_sample.__dict__)\n'
-            'sys.modules["battery_sample"] = _battery_sample\n' +
-            (ROOT / 'tools' / filename).read_text())
+    """Bundle shared observation helpers for standalone python -c diagnostics."""
+    source = 'import sys, types\n'
+    for name in ('battery_sample', 'awake_clock'):
+        helper = (ROOT / 'tools' / (name + '.py')).read_text()
+        source += (f'_helper = types.ModuleType({name!r})\n'
+                   'exec(' + repr(helper) + ', _helper.__dict__)\n'
+                   f'sys.modules[{name!r}] = _helper\n')
+    return source + (ROOT / 'tools' / filename).read_text()
 
 
 def private_path(value, default):
@@ -170,7 +171,22 @@ def device_action(config, action, route):
             run(client, shlex.join(arguments))
             return
         directory = evidence_directory()
-        if action == 'check':
+        if action == 'awake-clock-check':
+            arguments = ['python3', '-B', '-c', device_source('record-awake-clock.py')]
+            path = directory / 'awake-clock.json'
+            inputs = ('record-awake-clock.py', 'awake_clock.py', 'battery_sample.py', 'remote.py')
+            (directory / 'clock-sources.json').write_text(json.dumps({name:
+                hashlib.sha256((ROOT / 'tools' / name).read_bytes()).hexdigest()
+                for name in inputs}, indent=2) + '\n')
+            with path.open('wb') as output:
+                run(client, shlex.join(arguments), output=output, display=False, timeout=20)
+            result = json.loads(path.read_text())
+            from awake_clock import checked_proof
+            summary = checked_proof(result.get('awake_proof'))
+            if result.get('passed') is not True or summary['observation_count'] != 21:
+                raise ValueError('Incomplete read-only clock check')
+            print(json.dumps(dict(kernel=result['kernel'], python=result['python'], **summary), indent=2))
+        elif action == 'check':
             country = config.get('GAMESHELL_WIFI_COUNTRY', '')
             active_country = os.environ.get('NEO_ACTIVE_COUNTRY') or country
             if not all(re.fullmatch(r'[A-Z]{2}', value) for value in (country, active_country)):
@@ -307,7 +323,7 @@ def device_action(config, action, route):
             remote_dir = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-governor.XXXXXXXX',
                              display=False).decode().strip()
             arguments = governor_command(remote_dir, seconds, rate)
-            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py', 'battery_sample.py')
+            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py', 'battery_sample.py', 'awake_clock.py')
             with client.open_sftp() as sftp:
                 for name in names:
                     upload(sftp, ROOT / 'tools' / name, remote_dir + '/' + name)
@@ -342,7 +358,7 @@ def device_action(config, action, route):
                              display=False).decode().strip()
             if not re.fullmatch(r'/tmp/gameshellneo-sugov\.[A-Za-z0-9]+', remote_dir):
                 raise ValueError('Unexpected temporary governor profile directory')
-            names = ('profile-governor.py', 'profile-power.py', 'battery_sample.py')
+            names = ('profile-governor.py', 'profile-power.py', 'battery_sample.py', 'awake_clock.py')
             artifacts = ('perf.data', 'perf-record.txt', 'perf-report.txt', 'kallsyms.txt')
             with client.open_sftp() as sftp:
                 for name in names:
@@ -582,7 +598,7 @@ def main():
     sub = parser.add_subparsers(dest='host', required=True)
     target = sub.add_parser('device')
     target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
-                                          'stability', 'battery-check', 'idle-sample', 'power-profile',
+                                          'stability', 'battery-check', 'awake-clock-check', 'idle-sample', 'power-profile',
                                           'governor-compare', 'governor-profile', 'usb-policy',
                                           'wifi-scan-test', 'wifi-scan-restore'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))

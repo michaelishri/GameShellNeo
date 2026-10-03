@@ -56,6 +56,7 @@ def main():
             command = service_command(directory, seconds, delay)
             files = [(ROOT / 'tools/compare-rsb.py', 'compare-rsb.py'),
                      (ROOT / 'tools/battery_sample.py', 'battery_sample.py'),
+                     (ROOT / 'tools/awake_clock.py', 'awake_clock.py'),
                      (ROOT / 'tools/profile-power.py', 'profile-power.py'),
                      (ROOT / 'build/sources.lock.json', 'sources.lock.json')]
             with client.open_sftp() as sftp:

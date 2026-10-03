@@ -287,3 +287,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [133 — Battery observations across sleep](133-battery-boottime.md): explicit BOOTTIME sample contract, conservative read/sequence handling, shared consumer validation and reproducible simulations; separate from staged diagnostic.18.
 
 - [134 — CPI WFI s2idle candidate](134-cpi-wfi-s2idle-candidate.md): global state-0 entry contract, default-off board driver, native/ARM32 source tests, four ARM configurations and remaining image/hardware gates.
+
+- [135 — Awake measurement clock guards](135-awake-measurement-clock-guards.md): sleep/PM rejection, preserved cleanup, historical-evidence labeling and read-only board clock observations; separate candidate tools.

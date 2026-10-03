@@ -170,6 +170,10 @@ tasks:
     desc: Verify rollback through user-systemd with temporary files; no device access or sudo
     cmds: [NEO_SYSTEMD_TESTS=1 python3 -m unittest discover -s tools/tests -p test_governor_compare.py -v]
 
+  test:awake-clock:
+    desc: Simulate sleep during awake measurements and verify rejection/restoration; no device access
+    cmds: [bash tools/run-logged.sh awake-clock python3 -m unittest discover -s tools/tests -p test_awake_clock.py -v]
+
   test:nkmp:
     desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
     cmds: [bash tools/run-logged.sh nkmp python3 tools/check-nkmp.py]
@@ -365,6 +369,10 @@ tasks:
   device:status:
     desc: Capture kernel, service, power and access status (ROUTE=wifi or usb)
     cmds: [python3 tools/remote.py device status]
+
+  device:awake-clock-check:
+    desc: Read-only clock/PM-counter observations on the running board; no settings or sleep operations
+    cmds: [python3 tools/remote.py device awake-clock-check]
 
   device:wifi-config:
     desc: Apply Wi-Fi credentials from .env over USB, verify Wi-Fi SSH, then update GAMESHELL_IP

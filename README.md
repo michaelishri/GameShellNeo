@@ -1554,6 +1554,24 @@ external power, invalid/stale monitoring, reported capacity at or below 20%,
 excessive temperature or kernel taint fails the run. Failure ends profiling,
 not the running system.
 
+On the `work/awake-sample-clock` candidate branch, idle, counter, governor and RSB
+measurements also reject observed system sleep/PM activity using bounded clock
+observations and suspend counters. Existing recovery still restores temporary
+settings. New comparisons require the recorded proof; historical USB reports
+remain readable with a label showing that sleep observations were absent.
+This requires the matching BOOTTIME battery producer/tools from NEO-100 and is
+separate from the staged diagnostic.18 image. See
+[report 135](docs/135-awake-measurement-clock-guards.md) for detection limits.
+
+```sh
+task test:awake-clock                 # Local simulated interruptions and cleanup
+task device:awake-clock-check ROUTE=wifi # Short read-only clock/PM check; no sleep/settings changes
+```
+
+The device check saves observations and source hashes in its printed private
+capture directory. It can run independently of the battery-producer version;
+passing it does not qualify a complete power comparison or sleep recovery.
+
 The private `power-profile.jsonl` contains before/after CPU accounting,
 interrupts, softirqs, process CPU ticks, Wi-Fi packet counters/power-save state,
 available idle/frequency counters and peripheral runtime-PM state. Clock,

@@ -283,3 +283,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [130 — Base-rootfs cache identity](130-rootfs-cache-identity.md): version-only reuse with dependency/archive verification, conservative legacy rejection and regression fixtures.
 
 - [131 — MUSB IRQ-wake ownership](131-musb-wake-irq-ownership.md): probe-time reference, checked system-sleep ownership, shared-IRQ failure semantics and the separate candidate's qualification requirements.
+
+- [133 — Battery observations across sleep](133-battery-boottime.md): explicit BOOTTIME sample contract, conservative read/sequence handling, shared consumer validation and reproducible simulations; separate from staged diagnostic.18.

@@ -1,5 +1,11 @@
 # USB endpoint trace result correction (NEO-97)
 
+Completed 4 October: diagnostic.18's verified installation and
+[first successful RTC-wake capture](142-diagnostic18-first-rtc-wake-success.md)
+confirm the live stored-result formats and seven successful endpoint operations
+printing `--> 0`. NEO-97's source, image and live-format scope is complete;
+the original source-stage account below remains dated.
+
 3 October 2026, Pacific/Auckland. Patch 0024 corrects the USB gadget endpoint
 trace formatter to print the operation's recorded result. It has passed
 actual-source native/ARM32 formatting regressions and full ARM UDC-core

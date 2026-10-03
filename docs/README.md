@@ -273,7 +273,7 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 
 - [125 — Traced RTC-wake USB failure](125-traced-rtc-wake-usb-failure.md): RTC, display, keypad and Wi-Fi return, but USB fails again; combined MUSB resume status and lost enumeration narrow the driver investigation, with no new Mac sleep event in the saved history.
 
-- [127 — USB endpoint trace formatting](127-usb-endpoint-trace-format.md): corrects the shadowed trace return value, adds 252 native/ARM32 formatting cases and an explicit recorder trust flag; image/live qualification remains pending.
+- [127 — USB endpoint trace formatting](127-usb-endpoint-trace-format.md): corrects the shadowed trace return value, with 252 native/ARM32 formatting cases, an explicit trust flag and diagnostic.18 live operation qualification.
 
 - [126 — MUSB system-sleep design](126-musb-system-sleep-design.md): primary-source lifecycle audit, temporary pull-up ownership and wake-policy boundaries.
 - [128 — MUSB sleep candidate](128-musb-system-sleep-candidate.md): patch 0025, source regressions, explicit USB wake policy and diagnostic.18 preparation; hardware recovery remains unqualified.
@@ -301,3 +301,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [140 — Diagnostic.18 installation and startup](140-diagnostic18-card-installation.md): interrupted dongle-powered reader, successful guarded flash/full readback, owner-confirmed boot, both routes, seven attended debug cycles and same-source awake RTC rehearsal; actual USB/sleep recovery remains unqualified.
 
 - [141 — MUSB backend removal contracts](141-musb-removal-backend-contracts.md): nine platform and four DMA backends, partial-probe/rebind ownership, parent PM/IRQ dependencies and an opt-in extcon callback-drain design; implementation and hardware qualification remain separate.
+
+- [142 — First RTC-wake USB recovery](142-diagnostic18-first-rtc-wake-success.md): diagnostic.18 returns automatically to configured USB/ECM and both SSH routes after actual s2idle; NEO-97 live formatting passes, while repeatability and energy remain open.

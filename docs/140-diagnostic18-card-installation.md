@@ -1,5 +1,9 @@
 # Diagnostic.18 installation and startup (NEO-95)
 
+Subsequent result: [report 142](142-diagnostic18-first-rtc-wake-success.md)
+records one successful actual RTC-wake/USB-recovery attempt. It consumed the
+prerequisite sequence below; do not reuse it to submit another sleep test.
+
 4 October 2026, Pacific/Auckland. The exact diagnostic.18 artifact from
 [report 128](128-musb-system-sleep-candidate.md) has been written to the Samsung
 DEV card, passed full 4 GiB readback and been safely ejected. An earlier attempt

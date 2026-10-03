@@ -18,10 +18,18 @@ def sha(path):
 
 
 def inputs():
-    paths = [ROOT / 'build/sources.lock.json']
+    # These two fields are consumed only by final image/kernel assembly.
+    # Keep every other field, including unknown future fields, conservative.
+    lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
+    del lock['image_version']
+    del lock['linux']['localversion']
+    encoded = json.dumps(lock, sort_keys=True, separators=(',', ':')).encode()
+    paths = [ROOT / 'tools/build-image.sh']
     for folder in ('build/armbian', 'build/armbian-patches'):
         paths += [p for p in (ROOT / folder).rglob('*') if p.is_file() and p.name != 'gameshellneo.sh']
     result = {str(p.relative_to(ROOT)): sha(p) for p in sorted(paths)}
+    # Different key name deliberately rejects the old whole-lock ledger.
+    result['base_rootfs_lock_v2'] = hashlib.sha256(encoded).hexdigest()
     # Final image edits do not invalidate a base rootfs. Its APT source policy does.
     tree = ast.parse((ROOT / 'tools/image.py').read_text())
     policy = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == 'apt_sources')

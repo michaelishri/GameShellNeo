@@ -388,6 +388,12 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task image:checkpoint NAME=diagnostic7-before-usb-pm` | Verify the current raw/gzip image and retain its matching metadata before changing build identity; use a new name for each checkpoint |
 | `task mac:stage-recovery NAME=diagnostic8-before-keypad-retention` | Verify and select a checkpoint's matching recovery archive on the Mac; no card write |
 
+The base-rootfs cache ignores only image-version and kernel local-version
+suffix changes. Builder, snapshots, package/APT hooks, configuration, wrapper
+arguments and all other source-lock fields remain fingerprinted, and the
+archive is hash-verified. Older cache records are rebuilt once. See
+[the cache dependency contract](docs/130-rootfs-cache-identity.md).
+
 Image assembly automatically runs offline verification and collects its image,
 checksums, manifests, logs and package inventory in `.local/artifacts/`.
 `verification.json` identifies the current bundle. `IMAGE='/path/to/image.img'`

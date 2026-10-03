@@ -1819,6 +1819,8 @@ task device:sleep-rtc QUALIFICATION=.local/neo92-final-reference-history.json RE
 task device:sleep-collect RUN=<original-run-id>
 # If USB has not recovered but the configured Wi-Fi route works:
 task device:sleep-collect RUN=<original-run-id> ROUTE=wifi
+# Capture the Mac side before reconnecting or changing network settings:
+task mac:usb-inspect
 ```
 
 The rehearsal never writes the sleep state. Actual sleep requires matching
@@ -1836,10 +1838,17 @@ cleanup restores only its owned alarm/PM/trace resources, never an uncertain
 poweroff policy. Collection saves the unchanged original result plus a separate
 read-only snapshot of current CPU-idle/USB/ownership state and boot identity;
 collecting over Wi-Fi does not count as USB recovery.
+The Mac inspection saves its USB tree, interface addresses, hardware ports,
+service order, route to the configured USB address and its last 100 logged
+sleep/wake transitions in a private diagnostic folder. It does not renew DHCP
+or change network or power settings.
 
 [Report 120](docs/120-first-rtc-sleep-findings.md) records the first actual
 attempt: RTC wake, retained keypad and Wi-Fi return, but USB remains unattached.
 The CPU-idle driver is absent and stopped timekeeping is not demonstrated; the
 recorder's original residency assumption needs correction. Overall sleep
-qualification remains open, and the failed attempt retains diagnostic power-key
-suppression. Do not repeat that consumed qualification or delete its owners.
+qualification remains open. [Report 121](docs/121-usb-reconnect-and-clean-boot.md)
+records a cable reconnect that restored USB and an observed normal reboot that
+cleared the failed attempt's boot-local power-key suppression. Both routes and
+the normal dim console now pass; ordinary diagnostic short-press shutdown is
+restored. Do not reuse the earlier boot's consumed sleep qualification.

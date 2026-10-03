@@ -615,6 +615,10 @@ tasks:
     desc: Show Mac connectivity and physical external disks without changing them
     cmds: [python3 tools/remote.py mac status]
 
+  mac:usb-inspect:
+    desc: Save read-only Mac USB/network and sleep history; no lease renewal or settings change
+    cmds: [python3 tools/check-mac-usb.py]
+
   mac:stage:
     desc: Pack and upload the current verified image and flash helper; no disk write
     cmds:

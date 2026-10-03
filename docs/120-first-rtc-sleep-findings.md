@@ -1,5 +1,11 @@
 # First RTC-wake s2idle attempt (NEO-94)
 
+Later recovery: [report 121](121-usb-reconnect-and-clean-boot.md) records the
+owner's delayed same-boot console confirmation, an intervening Mac sleep/cable
+reconnect, one successful prompted USB reconnect and a clean reboot restoring
+ordinary diagnostic power-key handling. The original failed result below is
+unchanged.
+
 3 October 2026, Pacific/Auckland. Diagnostic.17 completed its first actual
 `freeze` request and the RTC woke the kernel. The attempt **failed overall
 qualification**: USB networking did not recover. Independent Wi-Fi SSH returned

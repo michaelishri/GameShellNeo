@@ -25,6 +25,9 @@ both routes, keypad identity, display and final restoration passing.
 the driver fix and source validation. [120 — First RTC sleep](120-first-rtc-sleep-findings.md)
 records a real RTC wake with retained keypad/Wi-Fi, failed USB recovery and absent
 CPU-idle support. Overall sleep remains unqualified and disabled for normal use.
+[121 — USB recovery](121-usb-reconnect-and-clean-boot.md) records one working
+cable reconnect, the separate Mac sleep timeline, and an observed clean reboot
+restoring both routes and ordinary diagnostic power-key handling.
 
 Previous diagnostic.13:
 [93 — Installation](93-diagnostic13-installation.md) records full card readback,
@@ -245,6 +248,7 @@ new image build and the next hardware qualification sequence.
 - [118 — Diagnostic.17 hardware qualification](118-diagnostic17-hardware-qualification.md): verified installation/startup, seven observed debug-stage passes with stable SDIO usage, retained keypad/network access, owner-confirmed display and final restoration.
 
 - [120 — First RTC sleep findings](120-first-rtc-sleep-findings.md): RTC wake and same-boot Wi-Fi recovery, failed USB attachment, CPU-idle/timekeeping evidence and corrected measurement interpretation; retained key suppression and repeatable read-only recovery collection.
+- [121 — USB reconnect and clean boot](121-usb-reconnect-and-clean-boot.md): saved Mac-side network/sleep inspection, one successful cable-reconnect recovery, separated host-sleep timing and observed reboot restoring the ordinary diagnostic policy; original resume issue remains open.
 - [119 — Guarded RTC sleep preparation](119-guarded-rtc-sleep-preparation.md): separate one-shot s2idle admission, RTC deadline and wake attribution, persistent key protection, failure tests and two successful awake rehearsals; the subsequent attempt is in report 120.
 
 ## Questions left open for the next phase

@@ -295,3 +295,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [137 — MUSB gadget callback lifetime](137-musb-gadget-callback-lifetime.md): admission and drain before unbind, stable callback pointers, request-completion preservation and actual-source concurrent tests; separate candidate.
 
 - [138 — Shared kernel sources](138-kernel-source-reuse.md): verified source reuse, isolated ARM outputs and resumable compaction; 18 MUSB copies reduced to three with unchanged historical evidence and about 24.89 GiB reclaimed.
+
+- [139 — MUSB teardown audit](139-musb-teardown-power-audit.md): endpoint/work/IRQ cleanup ordering, PM and PHY/notifier ownership, reproducible native/ARM32 evidence and the limits on a safe recovery implementation.

@@ -752,6 +752,16 @@ the driver's separate probe-time IRQ-wake ownership. Normal user sleep remains
 disabled pending hardware qualification. See [design](docs/126-musb-system-sleep-design.md)
 and [implementation](docs/128-musb-system-sleep-candidate.md).
 
+For the separate teardown audit, check out
+[work/musb-teardown-audit](https://github.com/michaelishri/GameShellNeo/tree/work/musb-teardown-audit)
+and run `task test:musb-teardown-audit`. The task executes extracted stop/remove,
+endpoint and Sunxi functions natively and under ARM32, recording hashes and
+results in `.local/build/musb-teardown-tests/evidence.json`. A pass reproduces
+the expected source-order defects and diagnostic control effects; it does not
+qualify safe removal. The task introduces no driver patch and is not an image
+build gate. [Report 139](docs/139-musb-teardown-power-audit.md) documents the
+coverage, modeled boundaries and follow-on implementation requirements.
+
 For the opt-in USB polling experiment, use:
 
 ```sh

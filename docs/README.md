@@ -305,3 +305,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [142 — First RTC-wake USB recovery](142-diagnostic18-first-rtc-wake-success.md): diagnostic.18 returns automatically to configured USB/ECM and both SSH routes after actual s2idle; NEO-97 live formatting passes, while repeatability and energy remain open.
 
 - [143 — Repeat RTC-wake runner](143-repeat-rtc-wake-runner.md): bounded attended batches, original-result lineage, durable one-successor claims and stop-on-failure collection; source checks pass, hardware qualification pending.
+
+- [144 — Extcon consumer notifier drain](144-extcon-notifier-drain-candidate.md): per-device SRCU around raw dispatch, explicit synchronous unlink/drain, native/ARM32 source tests and three ARM configurations; framework prerequisite with Sunxi ownership and kernel concurrency qualification still open.

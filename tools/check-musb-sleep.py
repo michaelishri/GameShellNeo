@@ -24,8 +24,10 @@ def function(text, name):
     return text[match.start():text.index('\n}', match.end()) + 3] + '\n'
 
 
-def probe_checks(core, irq_source, builder):
-    functions = ''.join(function(irq_source, name) for name in (
+def probe_checks(core, irq_source, pm_source, builder):
+    functions = ''.join(function(pm_source, name) for name in (
+        'pm_runtime_get_active', 'pm_runtime_resume_and_get'))
+    functions += ''.join(function(irq_source, name) for name in (
         'set_irq_wake_real', 'irq_set_irq_wake'))
     functions += ''.join(function(core, name) for name in (
         'musb_disarm_wake', 'musb_init_wakeup', 'musb_cleanup_wakeup', 'musb_free',
@@ -44,6 +46,19 @@ def probe_checks(core, irq_source, builder):
             'fail3:\n\tmusb_cleanup_wakeup(musb);', 'fail3:\n\tmusb_free(musb);\n\tmusb_cleanup_wakeup(musb);'),
         'probe_drops_foreign_state': functions.replace(
             '\tif (musb->wakeup_initialized) {', '\tif (true) {'),
+        'ignored_probe_power_failure': functions.replace(
+            '\tif (status < 0) {\n\t\tpm_runtime_disable',
+            '\tif (false) {\n\t\tpm_runtime_disable'),
+        'failed_get_keeps_reference': functions.replace(
+            '\t\tpm_runtime_put_noidle(dev);', '\t\t/* lost error balance */'),
+        'failed_probe_leaves_runtime_enabled': functions.replace(
+            '\t\tpm_runtime_disable(musb->controller);', '\t\t/* lost disable */'),
+        'failed_probe_idles_before_disable': functions.replace(
+            '\t\tpm_runtime_disable(musb->controller);\n\t\tpm_runtime_dont_use_autosuspend(musb->controller);',
+            '\t\tpm_runtime_dont_use_autosuspend(musb->controller);\n\t\tpm_runtime_disable(musb->controller);'),
+        'failed_probe_skips_platform_exit': functions.replace(
+            '\t\tgoto fail2;\n\t}\n\n\tstatus = usb_phy_init',
+            '\t\tgoto fail1;\n\t}\n\n\tstatus = usb_phy_init'),
     }
     header = WORK / 'musb_wake_probe_functions.h'
     harness = ROOT / 'kernel/tests/musb_wake_probe_test.c'
@@ -75,6 +90,58 @@ def probe_checks(core, irq_source, builder):
         '-I.local/build/musb-sleep-tests kernel/tests/musb_wake_probe_test.c '
         '-o .local/build/musb-sleep-tests/probe-arm\n'
         'qemu-arm .local/build/musb-sleep-tests/probe-arm'], text=True)
+    print(arm, end='', flush=True)
+    return dict(native=results, arm32=arm.strip(), harness_sha256=sha256(harness))
+
+
+def startup_checks(gadget, pm_source, udc_source, builder):
+    functions = ''.join(function(pm_source, name) for name in (
+        'pm_runtime_get_active', 'pm_runtime_resume_and_get'))
+    functions += function(gadget, 'musb_gadget_start')
+    functions += function(udc_source, 'usb_gadget_udc_start_locked')
+    variants = {
+        'candidate': functions,
+        'ignored_start_power_failure': functions.replace(
+            '\tif (retval < 0)\n\t\tgoto err;', '\t/* ignored startup error */'),
+        'failed_get_keeps_reference': functions.replace(
+            '\t\tpm_runtime_put_noidle(dev);', '\t\t/* lost error balance */'),
+        'udc_publishes_failed_start': functions.replace(
+            '\tif (!ret)\n\t\tudc->started = true;', '\tudc->started = true;'),
+        'lost_success_put': functions.replace(
+            '\tpm_runtime_put_autosuspend(musb->controller);', '\t/* lost success balance */'),
+        'positive_resume_is_error': functions.replace(
+            '\tif (ret < 0) {', '\tif (ret) {'),
+    }
+    header = WORK / 'musb_startup_functions.h'
+    harness = ROOT / 'kernel/tests/musb_startup_test.c'
+    results = {}
+    try:
+        for name, value in variants.items():
+            if name != 'candidate' and value == functions:
+                raise ValueError('Startup negative control did not mutate: ' + name)
+            header.write_text(value)
+            binary = WORK / ('startup-' + name)
+            run(['cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+                 '-I', str(WORK), str(harness), '-o', str(binary)])
+            result = subprocess.run([str(binary)], capture_output=True, text=True)
+            (WORK / ('startup-' + name + '.txt')).write_text(result.stdout + result.stderr)
+            if name == 'candidate':
+                result.check_returncode()
+            elif result.returncode == 0 or 'Assertion' not in result.stderr:
+                raise RuntimeError('Startup negative control did not fail: ' + name)
+            results[name] = dict(returncode=result.returncode, output=result.stdout.strip(), error=result.stderr.strip())
+            print('startup-' + name + ': ' + (result.stdout.strip() or 'expected assertion failure'), flush=True)
+    finally:
+        header.write_text(functions)
+    arm = subprocess.check_output([
+        'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
+        '--platform', builder['platform'], '--entrypoint', 'bash',
+        '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
+        'set -euo pipefail\n'
+        'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror -static '
+        '-I.local/build/musb-sleep-tests kernel/tests/musb_startup_test.c '
+        '-o .local/build/musb-sleep-tests/startup-arm\n'
+        'qemu-arm .local/build/musb-sleep-tests/startup-arm'], text=True)
     print(arm, end='', flush=True)
     return dict(native=results, arm32=arm.strip(), harness_sha256=sha256(harness))
 
@@ -120,9 +187,20 @@ def main():
         if len(irq_sources) != 3:
             raise ValueError('Missing locked IRQ-core source')
         irq_source = irq_sources['manage.c']
+        dependencies = {}
+        version_prefix = 'linux-' + lock['linux']['tag'][1:] + '/'
+        needed = ('include/linux/pm_runtime.h', 'drivers/usb/gadget/udc/core.c')
+        with tarfile.open(archive, mode='r|xz') as source:
+            for entry in source:
+                if entry.name in [version_prefix + name for name in needed]:
+                    dependencies[entry.name.removeprefix(version_prefix)] = source.extractfile(entry).read().decode()
+                    if len(dependencies) == len(needed):
+                        break
+        if len(dependencies) != len(needed):
+            raise ValueError('Missing locked PM/UDC source')
         patches = [ROOT / 'kernel/patches' / name for name in (
             '0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
-            '0026-musb-wake-irq-policy.patch')]
+            '0026-musb-wake-irq-policy.patch', '0029-musb-startup-runtime-pm.patch')]
         for patch in patches:
             run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=WORK / 'patched')
         core = (target / 'musb_core.c').read_text()
@@ -222,7 +300,9 @@ def main():
                         native=results, arm32=arm.strip(), builder=builder,
                         limits='Actual source functions, deterministic boundary interleavings. '
                                'No electrical USB timing, host enumeration or scheduler concurrency qualification.')
-        evidence['probe_remove'] = probe_checks(core, irq_source, builder)
+        pm_source = dependencies['include/linux/pm_runtime.h']
+        evidence['probe_remove'] = probe_checks(core, irq_source, pm_source, builder)
+        evidence['startup'] = startup_checks(gadget, pm_source, dependencies['drivers/usb/gadget/udc/core.c'], builder)
         if args.compile_drivers or args.compile_matrix:
             evidence['arm_build'] = compile_objects(archive, lock, WORK, [
                 PREFIX + 'musb_core.o', PREFIX + 'musb_gadget.o', PREFIX + 'sunxi.o'])

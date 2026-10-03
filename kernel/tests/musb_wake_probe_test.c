@@ -13,6 +13,8 @@ typedef uint16_t u16;
 #define CONFIG_PM 1
 #define CONFIG_PM_SLEEP 1
 #define CONFIG_USB_PHY 1
+#define EPROBE_DEFER 517
+#define RPM_GET_PUT 1
 #define IS_ENABLED(option) (option)
 #define IRQ_GET_DESC_CHECK_GLOBAL 0
 #define IRQCHIP_SKIP_SET_WAKE 1
@@ -92,6 +94,9 @@ static unsigned scenarios, request_calls, free_calls, wake_calls, source_calls;
 static unsigned chip_off_calls, cleanup_calls, errors, host_frees;
 static bool requested, platform_live, phy_live, chip_live, sources_masked;
 static bool dma_live, capability_owned;
+static bool hold_platform_ref, platform_ref, runtime_ready, autosuspend;
+static int resume_result;
+static unsigned get_calls, noidle_calls, put_calls, phy_calls, mmio_calls;
 static int fifo_mode, musb_ulpi_access;
 static bool use_dma;
 static io_fn musb_phy_callback;
@@ -123,8 +128,10 @@ static void noop(void) {}
 #define musb_deassert_reset noop
 #define musb_host_finish_resume noop
 #define musb_otg_timer_func noop
-static u8 musb_default_readb(void *p, unsigned off) { return ((u8 *)p)[off]; }
-static void musb_default_writeb(void *p, unsigned off, u8 v) { ((u8 *)p)[off] = v; }
+static void mmio_check(void)
+{ assert(runtime_ready && instance.controller->refs > (int)platform_ref); mmio_calls++; }
+static u8 musb_default_readb(void *p, unsigned off) { mmio_check(); return ((u8 *)p)[off]; }
+static void musb_default_writeb(void *p, unsigned off, u8 v) { mmio_check(); ((u8 *)p)[off] = v; }
 static u16 musb_default_readw(void *p, unsigned off) { return musb_default_readb(p, off); }
 static void musb_default_writew(void *p, unsigned off, u16 v) { musb_default_writeb(p, off, v); }
 static u8 (*musb_readb)(void *, unsigned), (*musb_clearb)(void *, unsigned);
@@ -197,25 +204,43 @@ static int musb_platform_init(struct musb *m)
 {
 	if (failure == PLATFORM) return -EIO;
 	platform_live = true; m->xceiv = &transceiver;
+	if (hold_platform_ref) { m->controller->refs++; platform_ref = true; }
 	m->isr = failure == NO_ISR ? NULL : noop; return 0;
 }
 static void musb_platform_exit(struct musb *m)
 {
 	assert(m == &instance && platform_live && !capability_owned);
 	assert(!m->irq_wake || (failure == DISARM && permanent_disarm));
+	if (platform_ref) { assert(m->controller->refs > 0); m->controller->refs--; platform_ref = false; }
 	platform_live = chip_live = false;
 }
-static void pm_runtime_use_autosuspend(struct device *d) { (void)d; }
+static void pm_runtime_use_autosuspend(struct device *d) { (void)d; assert(!autosuspend); autosuspend = true; }
 static void pm_runtime_set_autosuspend_delay(struct device *d, int n) { (void)d; assert(n == 500); }
 static void pm_runtime_enable(struct device *d) { assert(!d->runtime_enabled); d->runtime_enabled = true; }
-static int pm_runtime_get_sync(struct device *d) { assert(d->runtime_enabled); d->refs++; return 0; }
-static void pm_runtime_put_sync(struct device *d) { assert(d->refs > 0); d->refs--; }
+static int __pm_runtime_resume(struct device *d, int flags)
+{
+	assert(d->runtime_enabled && flags == RPM_GET_PUT); d->refs++; get_calls++;
+	runtime_ready = resume_result >= 0; return resume_result;
+}
+static int pm_runtime_get_sync(struct device *d) { return __pm_runtime_resume(d, RPM_GET_PUT); }
+static void __attribute__((unused)) pm_runtime_put_noidle(struct device *d)
+{ assert(d->refs > (int)platform_ref); d->refs--; noidle_calls++; }
+static void pm_runtime_put_sync(struct device *d) { assert(d->refs > (int)platform_ref); d->refs--; put_calls++; }
 static void pm_runtime_put_autosuspend(struct device *d) { pm_runtime_put_sync(d); }
 static void pm_runtime_mark_last_busy(struct device *d) { (void)d; }
-static void pm_runtime_dont_use_autosuspend(struct device *d) { (void)d; }
-static void pm_runtime_disable(struct device *d) { assert(!d->refs && d->runtime_enabled); d->runtime_enabled = false; }
+static void pm_runtime_dont_use_autosuspend(struct device *d)
+{
+	assert(autosuspend);
+	/* update_autosuspend can call rpm_idle: no unprotected idle on failure. */
+	assert(!d->runtime_enabled || d->refs > (int)platform_ref);
+	autosuspend = false;
+}
+static void pm_runtime_disable(struct device *d)
+{ assert(d->refs == (int)platform_ref && d->runtime_enabled); d->runtime_enabled = false; }
 static int usb_phy_init(struct transceiver *p)
-{ assert(p == &transceiver && platform_live); if (failure == PHY) return -EIO; phy_live = true; return 0; }
+{ assert(runtime_ready && p == &transceiver && platform_live); phy_calls++;
+  if (failure == PHY) return -EIO;
+  phy_live = true; return 0; }
 static void usb_phy_shutdown(struct transceiver *p)
 {
 	assert(p == &transceiver && phy_live && !capability_owned);
@@ -272,6 +297,8 @@ static void init(struct platform_device *pdev, int role, enum failure fault, uns
 	request_calls = free_calls = wake_calls = source_calls = chip_off_calls = 0;
 	cleanup_calls = errors = host_frees = 0;
 	requested = platform_live = phy_live = sources_masked = dma_live = capability_owned = false;
+	hold_platform_ref = platform_ref = runtime_ready = autosuspend = false;
+	resume_result = 0; get_calls = noidle_calls = put_calls = phy_calls = mmio_calls = 0;
 	chip_live = true; failure = fault; permanent_disarm = false;
 	ops = (struct musb_platform_ops){.dma_init = dma_create, .dma_exit = dma_destroy};
 	if (fault == NO_DMA_OP) ops.dma_exit = NULL;
@@ -339,6 +366,32 @@ int main(void)
 		musb_remove(&pdev);
 		assert(desc.wake_depth == 1 && !requested && !pdev.dev.refs && !pdev.dev.capable);
 		scenarios++;
+	}
+	/* Core reference accounting with and without a Sunxi-style backend hold.
+	 * The lower PM engine reports both successful return values and failures;
+	 * get_active/resume_and_get are extracted from the actual kernel header.
+	 */
+	const int results[] = {0, 1, -EIO, -EBUSY, -EACCES, -EPROBE_DEFER, -ETIMEDOUT};
+	for (int role = MUSB_HOST; role <= MUSB_OTG; role++)
+	for (unsigned hold = 0; hold < 2; hold++)
+	for (unsigned i = 0; i < sizeof(results) / sizeof(results[0]); i++) {
+		init(&pdev, role, OK, 0); hold_platform_ref = hold; resume_result = results[i];
+		int ret = musb_init_controller(&pdev.dev, 164, registers);
+		if (results[i] < 0) {
+			assert(ret == results[i] && get_calls == 1 && noidle_calls == 1 && !put_calls);
+			assert(!phy_calls && !mmio_calls && !request_calls && !cleanup_calls && !wake_calls);
+			assert(!platform_live && !platform_ref && !pdev.dev.refs && !pdev.dev.runtime_enabled);
+			assert(!instance.is_initialized && !autosuspend && !phy_live && !dma_live && host_frees == 1);
+			/* A later reprobe must work without inheriting failed-get debt. */
+			chip_live = true; resume_result = 0;
+			assert(!musb_init_controller(&pdev.dev, 164, registers));
+		} else {
+			assert(!ret && get_calls == 1 && !noidle_calls && put_calls == 1);
+		}
+		assert(instance.is_initialized && phy_calls == 1 && mmio_calls && pdev.dev.refs == (int)hold);
+		resume_result = 0; musb_remove(&pdev);
+		assert(!platform_live && !platform_ref && !phy_live && !dma_live && !requested);
+		assert(!pdev.dev.refs && !pdev.dev.runtime_enabled && !autosuspend); scenarios++;
 	}
 	printf("MUSB probe/remove wake: %u actual-source scenarios passed\n", scenarios);
 	return 0;

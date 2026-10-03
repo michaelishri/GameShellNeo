@@ -720,6 +720,13 @@ kernel artifacts. [Report 132](docs/132-musb-wake-irq-candidate.md) records its
 coverage and remaining gates. This candidate is absent from staged
 diagnostic.18; assign a new image/kernel identity before building its image.
 
+The `work/musb-startup-pm` candidate builds on that branch with checked probe
+and gadget-start power-up in patch 0029. The same tasks now exercise actual
+runtime-PM get helpers and the UDC start wrapper, including injected failures,
+reference accounting and retry. Stop/remove error recovery and asynchronous
+callback ownership remain separate work. See [report 136](docs/136-musb-startup-runtime-pm.md).
+This candidate also requires a new image identity and hardware qualification.
+
 For the opt-in USB polling experiment, use:
 
 ```sh

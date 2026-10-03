@@ -1,0 +1,53 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: stop startup when runtime resume fails
+
+Check the probe and UDC-start power-up results before publishing gadget
+ownership or touching the controller. Use resume_and_get so a failed get
+does not retain a usage reference. Probe must disable runtime PM and unwind
+platform initialization without shutting down an uninitialized USB PHY.
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2526,7 +2526,12 @@
+ 	pm_runtime_use_autosuspend(musb->controller);
+ 	pm_runtime_set_autosuspend_delay(musb->controller, 500);
+ 	pm_runtime_enable(musb->controller);
+-	pm_runtime_get_sync(musb->controller);
++	status = pm_runtime_resume_and_get(musb->controller);
++	if (status < 0) {
++		pm_runtime_disable(musb->controller);
++		pm_runtime_dont_use_autosuspend(musb->controller);
++		goto fail2;
++	}
+ 
+ 	status = usb_phy_init(musb->xceiv);
+ 	if (status < 0)
+@@ -2992,11 +2997,11 @@
+ 	int error;
+ 
+ 	/*
+-	 * When pm_runtime_get_sync called for the first time in driver
++	 * When pm_runtime_resume_and_get is first called in driver
+ 	 * init,  some of the structure is still not initialized which is
+ 	 * used in restore function. But clock needs to be
+ 	 * enabled before any register access, so
+-	 * pm_runtime_get_sync has to be called.
++	 * pm_runtime_resume_and_get has to be called.
+ 	 * Also context restore without save does not make
+ 	 * any sense
+ 	 */
+diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -1873,7 +1873,9 @@
+ 		goto err;
+ 	}
+ 
+-	pm_runtime_get_sync(musb->controller);
++	retval = pm_runtime_resume_and_get(musb->controller);
++	if (retval < 0)
++		goto err;
+ 
+ 	spin_lock_irqsave(&musb->lock, flags);
+ 	musb->softconnect = 0;

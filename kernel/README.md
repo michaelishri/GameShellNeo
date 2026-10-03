@@ -79,6 +79,17 @@ teardown disarm failure remains an explicit limitation. Use
 defines the tested scope. Remove when equivalent upstream ownership and error
 handling are verified. Assign a new image/kernel identity before image assembly.
 
+Patch 0029 is the separate NEO-102 startup candidate on top of patch 0026.
+Probe and gadget start check `pm_runtime_resume_and_get()` before core
+PHY/register operations or gadget ownership publication. Failed probe disables
+runtime PM and unwinds the initialized backend without releasing an
+uninitialized USB PHY. Existing source tasks cover PM helper semantics, UDC
+start propagation, failed-start retries and backend-held references. Stop/remove
+and asynchronous callback lifetime remain open; see [report 136](../docs/136-musb-startup-runtime-pm.md).
+This is absent from diagnostic.18. Remove when equivalent upstream error
+handling is verified; assign a new image identity before integration. Numbers
+0027–0028 are reserved by the separate WFI candidate and are not prerequisites.
+
 Patches 0014–0017 are integrated for image qualification in
 [diagnostic.12 preparation](../docs/85-diagnostic12-preparation.md). The ledger's
 source-test results do not establish hardware recovery or energy savings.

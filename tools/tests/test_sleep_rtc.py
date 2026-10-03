@@ -20,6 +20,8 @@ import test_power_key_policy as policy_tests
 
 spec = importlib.util.spec_from_file_location('sleep_host', TOOLS/'check-sleep-rtc.py')
 host = importlib.util.module_from_spec(spec); spec.loader.exec_module(host)
+spec = importlib.util.spec_from_file_location('sleep_report', TOOLS/'report-sleep-evidence.py')
+report = importlib.util.module_from_spec(spec); spec.loader.exec_module(report)
 TOKEN = 'a'*32
 
 
@@ -252,26 +254,135 @@ class Alarm(unittest.TestCase):
 
 
 class Evidence(unittest.TestCase):
+    @staticmethod
+    def clock(boot, mono):
+        return dict(boot=boot, mono=mono, mono_before=mono-1e-6, mono_after=mono+1e-6)
+
+    @staticmethod
+    def sleep_trace(end=130, freeze=''):
+        marker=(' python3-10 [003] ..... 103.000000: suspend_resume: machine_suspend[1] begin\n'+freeze+
+                f' python3-10 [003] ..... {end:.6f}: suspend_resume: machine_suspend[1] end\n')
+        text=existing.trace().replace('suspend_resume: dpm_resume_noirq',marker+'suspend_resume: dpm_resume_noirq',1)
+        return dict(trace=text,trace_restored=True,trace_overrun=False)
+
     def delivery_record(self):
-        return dict(mode='rtc-wake', entry_clock={'boot':102,'mono':102},returned={'boot':131,'mono':106},wake_irq='31',
-            rtc=dict(started={'boot':101,'mono':101}, irq_before={'irq':31,'count':1,'cpus':['CPU0']},
+        return dict(mode='rtc-wake', entry_clock=self.clock(102,102),returned=self.clock(131,131),wake_irq='31',
+            entry_intent=dict(mode='rtc-wake',state='freeze',pm_test='none',pm_async='0'),keypad=self.sleep_trace(),
+            rtc=dict(started=self.clock(101,101), margin_seconds=29, entry_margin_seconds=29,
+                irq_before={'irq':31,'count':1,'cpus':['CPU0']},
                 irq_after={'irq':31,'count':2,'cpus':['CPU0']},interrupt={'flags':0xa0,'count':1},restored=True,
                 after_delivery={'rtc_time':sleep.rtc.rtc_time(1031)}, requested=[1,0]+sleep.rtc.rtc_time(1030)))
 
-    def test_real_residency_and_rtc_attribution_not_just_successful_return(self):
-        good=self.delivery_record();self.assertEqual(sleep.validate_delivery(good)['suspended_seconds'],25)
-        bad=[lambda r:r.update(wake_irq='90'),lambda r:r['returned'].update(mono=131),
+    def test_functional_rtc_wake_accepts_running_timekeeping_without_claiming_energy(self):
+        result=sleep.validate_delivery(self.delivery_record())
+        self.assertTrue(result['functional_rtc_wake'])
+        self.assertEqual(result['interval']['clock_gap_seconds'],0)
+        self.assertEqual(result['s2idle_trace']['s2idle_monotonic_seconds'],27)
+        self.assertEqual(result['timekeeping']['observation'],'not_observed')
+        self.assertFalse(result['energy_qualified']);self.assertFalse(result['cpu_retention_qualified'])
+        self.assertNotIn('suspended_seconds',result)
+
+    def test_deadline_wake_identity_intent_and_restoration_stay_mandatory(self):
+        good=self.delivery_record()
+        bad=[lambda r:r.update(wake_irq='90'), lambda r:r['entry_intent'].update(pm_test='platform'),
              lambda r:r['returned'].update(boot=104),lambda r:r['rtc'].update(restored=False),
              lambda r:r['rtc']['irq_after'].update(count=1),lambda r:r['rtc']['interrupt'].update(count=2),
-             lambda r:r['rtc']['after_delivery'].update(rtc_time=sleep.rtc.rtc_time(1045))]
+             lambda r:r['rtc']['after_delivery'].update(rtc_time=sleep.rtc.rtc_time(1045)),
+             lambda r:r.update(mode='unknown'),lambda r:r['rtc'].update(entry_margin_seconds=14),
+             lambda r:r.update(entry_clock=self.clock(125,125)),
+             lambda r:r['keypad'].update(trace=existing.trace()),
+             lambda r:r['keypad'].update(trace_overrun=True),
+             lambda r:r['rtc']['irq_after'].update(irq=32),lambda r:r['rtc']['interrupt'].update(flags=0x80)]
         for change in bad:
             r=deepcopy(good);change(r)
+            with self.subTest(change=change),self.assertRaises(ValueError):sleep.validate_delivery(r)
+
+    def test_timer_freeze_is_separate_and_can_resume_on_another_cpu(self):
+        r=self.delivery_record();r['returned']=self.clock(131,106)
+        freezes=(' swapper-0 [003] ..... 103.100000: suspend_resume: timekeeping_freeze[3] begin\n'
+                 ' swapper-0 [000] ..... 103.100001: suspend_resume: timekeeping_freeze[0] end\n')
+        r['keypad']=self.sleep_trace(105,freezes)
+        result=sleep.validate_delivery(r)
+        self.assertEqual(result['timekeeping'],dict(freeze_pairs=1,observation='observed'))
+        self.assertEqual(result['interval']['clock_gap_seconds'],25)
+        self.assertTrue(result['functional_rtc_wake']);self.assertFalse(result['energy_qualified'])
+        r['keypad']=self.sleep_trace(105)
+        with self.assertRaisesRegex(ValueError,'discontinuity'):sleep.validate_delivery(r)
+
+    def test_small_clock_skew_and_legacy_unbracketed_records_are_not_sleep_residency(self):
+        r=self.delivery_record();r['returned']['boot']+=1e-6
+        result=sleep.validate_delivery(r)
+        self.assertEqual(result['timekeeping']['observation'],'not_observed')
+        for key in ('entry_clock','returned'):
+            r[key]={k:v for k,v in r[key].items() if k in ('mono','boot')}
+        r['rtc']['started']={k:v for k,v in r['rtc']['started'].items() if k in ('mono','boot')}
+        result=sleep.validate_delivery(r)
+        self.assertIsNone(result['interval']['sampling_uncertainty_seconds'])
+        self.assertFalse(result['energy_qualified'])
+
+    def test_clocks_reject_nan_infinity_backwards_or_unbounded_reads(self):
+        for value in (float('nan'),float('inf'),-1,True,'131'):
+            r=self.delivery_record();r['returned']['boot']=value
+            with self.assertRaises(ValueError):sleep.validate_delivery(r)
+        for change in (lambda r:r['returned'].update(mono_before=120),
+                       lambda r:r['returned'].pop('mono_after'),
+                       lambda r:r.update(returned=self.clock(131,132)),
+                       lambda r:r.update(returned=self.clock(100,100))):
+            r=self.delivery_record();change(r)
             with self.assertRaises(ValueError):sleep.validate_delivery(r)
 
+    def test_awake_rehearsal_never_claims_functional_sleep(self):
+        r=self.delivery_record();r['mode']='rehearse';r['keypad']['trace']=''
+        result=sleep.validate_delivery(r)
+        self.assertFalse(result['functional_rtc_wake']);self.assertFalse(result['energy_qualified'])
+        r['keypad']=self.sleep_trace()
+        with self.assertRaisesRegex(ValueError,'awake rehearsal'):sleep.validate_delivery(r)
+
+    def test_late_rtc_after_an_early_loop_exit_cannot_be_counted_as_sleep(self):
+        r=self.delivery_record();r['keypad']=self.sleep_trace(108)
+        with self.assertRaisesRegex(ValueError,'wait inside s2idle'):sleep.validate_delivery(r)
+
+    def test_bracketed_clock_capture(self):
+        with patch.object(sleep.time,'monotonic',side_effect=[12,12.002]), \
+                patch.object(sleep.time,'clock_gettime',return_value=20):
+            value=sleep.clock_pair()
+            self.assertAlmostEqual(value.pop('mono'),12.001)
+            self.assertEqual(value,dict(boot=20,mono_before=12,mono_after=12.002))
+
+    def test_timer_freeze_incomplete_nested_or_outside_boundary_rejected(self):
+        a=' idle-0 [003] ..... 103.100000: suspend_resume: timekeeping_freeze[3] begin\n'
+        b=' idle-0 [002] ..... 103.100001: suspend_resume: timekeeping_freeze[2] end\n'
+        for freeze in (a,b,b+a,a+a+b+b,a+b.replace('103.100001','102.000000'),a+b.replace('[2]','[x]')):
+            with self.assertRaises(ValueError):sleep.validate_trace(self.sleep_trace(130,freeze))
+        record=self.sleep_trace();record['trace']+=a+b
+        with self.assertRaises(ValueError):sleep.validate_trace(record)
+
+    def test_usb_failure_still_rejects_after_wake_assessment_is_saved(self):
+        r=self.delivery_record();r.update(before={},after={})
+        pm=Mock();pm.validate.side_effect=ValueError('usb_configured')
+        with self.assertRaisesRegex(ValueError,'usb_configured'):sleep.health(pm,r,{})
+        self.assertTrue(r['delivery']['functional_rtc_wake'])
+        self.assertFalse(r['delivery']['energy_qualified'])
+
+    def test_offline_assessment_keeps_original_usb_failure_and_bytes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'result.json'
+            value=self.delivery_record()|dict(event='failed',passed=False,error='usb_configured',run_id=TOKEN)
+            path.write_text(json.dumps(value));original=path.read_bytes()
+            result=report.assess(path)
+            self.assertTrue(result['measurement_checks_passed'])
+            self.assertFalse(result['original_passed']);self.assertFalse(result['overall_requalified'])
+            self.assertEqual(result['original_error'],'usb_configured')
+            self.assertEqual(path.read_bytes(),original)
+            value['wake_irq']='99';path.write_text(json.dumps(value))
+            result=report.assess(path)
+            self.assertFalse(result['measurement_checks_passed'])
+            value['event']='started';path.write_text(json.dumps(value))
+            with self.assertRaises(ValueError):report.assess(path)
+
     def test_sleep_trace_boundaries_errors_and_debug_trace_rejected(self):
+        record=self.sleep_trace();good=record['trace']
         marker='suspend_resume: machine_suspend[1] begin\nsuspend_resume: machine_suspend[1] end\n'
-        good=existing.trace().replace('suspend_resume: dpm_resume_noirq',marker+'suspend_resume: dpm_resume_noirq',1)
-        record=dict(trace=good,trace_restored=True,trace_overrun=False)
         self.assertTrue(sleep.validate_trace(record)['s2idle_boundary'])
         for bad in (existing.trace(),good+marker,good.replace('err=0','err=-5'),
                     good.replace('machine_suspend[1]','machine_suspend[3]'),marker+existing.trace()):
@@ -379,6 +490,14 @@ class Recovery(unittest.TestCase):
 
 
 class HostCommand(unittest.TestCase):
+    def test_device_clock_inspection_never_enters_or_recovers_pm(self):
+        with patch.object(sys,'argv',['sleep_rtc.py','--clock-inspect']), \
+                patch.object(sleep,'inspect_clocks',return_value={}) as inspect, \
+                patch.object(sleep,'run') as run,patch.object(sleep,'recover') as recover, \
+                patch.object(sleep,'pm_module') as pm:
+            sleep.main()
+            inspect.assert_called_once();run.assert_not_called();recover.assert_not_called();pm.assert_not_called()
+
     def test_awake_and_real_entry_are_distinct_no_pipe_or_retries(self):
         awake=host.service('/tmp/gameshellneo-sleep.test',TOKEN,'rehearse','')
         real=host.service('/tmp/gameshellneo-sleep.test',TOKEN,'rtc-wake','b'*32)

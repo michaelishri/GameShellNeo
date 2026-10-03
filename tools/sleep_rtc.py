@@ -5,6 +5,7 @@ import fcntl
 import hashlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -28,6 +29,7 @@ import speaker_audio
 RESULTS = Path('/var/lib/gameshellneo/sleep-tests')
 OWNED = Path('/run/gameshellneo-sleep-controls.json')
 SECONDS, MIN_MARGIN = 30, 15
+MAX_CLOCK_SAMPLE_SECONDS = 0.05
 SDIO = 'consumer:platform:1c10000.mmc'
 SDIO_PATCH = 'kernel/patches/0023-sunxi-mmc-sdio-reference-ownership.patch'
 SDIO_SHA = '52f4e3d8b966f8f69718340697606e30d174033d998be84f98b42bc2c97e92ee'
@@ -134,7 +136,65 @@ def rtc_irq(text=None):
 
 
 def clock_pair():
-    return dict(boot=time.clock_gettime(time.CLOCK_BOOTTIME), mono=time.monotonic())
+    # Bracket BOOTTIME rather than interpreting sequential-read skew as sleep.
+    left = time.monotonic()
+    boot = time.clock_gettime(time.CLOCK_BOOTTIME)
+    right = time.monotonic()
+    return dict(boot=boot, mono=(left+right)/2, mono_before=left, mono_after=right)
+
+
+def clock_interval(before, after):
+    errors = []
+    for sample in (before, after):
+        if any(type(sample.get(k)) not in (int, float) or not math.isfinite(sample[k]) or sample[k] < 0
+               for k in ('boot', 'mono')):
+            raise ValueError('Invalid sleep clock sample')
+        if 'mono_before' not in sample and 'mono_after' not in sample:
+            errors.append(None)  # Historical records have no measured sampling bound.
+            continue
+        a, b = sample.get('mono_before'), sample.get('mono_after')
+        if (any(type(x) not in (int, float) or not math.isfinite(x) for x in (a, b)) or
+                not 0 <= a <= sample['mono'] <= b or b-a > MAX_CLOCK_SAMPLE_SECONDS):
+            raise ValueError('Invalid or excessively delayed bracketed clock sample')
+        errors.append(max(sample['mono']-a, b-sample['mono']))
+    wall = after['boot']-before['boot']
+    mono = after['mono']-before['mono']
+    if wall < 0 or mono < 0:
+        raise ValueError('Sleep clocks moved backwards')
+    uncertainty = None if None in errors else sum(errors)
+    gap = wall-mono
+    if uncertainty is not None and gap < -uncertainty-1e-6:
+        raise ValueError('MONOTONIC advanced beyond BOOTTIME sampling uncertainty')
+    return dict(boottime_seconds=wall, monotonic_seconds=mono, clock_gap_seconds=gap,
+                sampling_uncertainty_seconds=uncertainty)
+
+
+def idle_snapshot():
+    """CPU-idle/timer inventory, not evidence of entering a hardware idle state."""
+    cpu = Path('/sys/devices/system/cpu')
+    return dict(online=keypad_pm.optional(cpu/'online'),
+                driver=keypad_pm.optional(cpu/'cpuidle/current_driver'),
+                governor=keypad_pm.optional(cpu/'cpuidle/current_governor_ro'),
+                clocksource=keypad_pm.optional('/sys/devices/system/clocksource/clocksource0/current_clocksource'),
+                states={str(p.relative_to(cpu)): {name: keypad_pm.optional(p/name) for name in
+                        ('name', 'desc', 'latency', 'residency', 'disable', 'usage', 'time', 's2idle_usage', 's2idle_time')}
+                        for p in sorted(cpu.glob('cpu[0-9]*/cpuidle/state*'))})
+
+
+def inspect_clocks():
+    def state():
+        return dict(boot_id=keypad_pm.optional('/proc/sys/kernel/random/boot_id'),
+                    pm={name: keypad_pm.optional('/sys/power/'+name) for name in ('pm_test', 'pm_async')},
+                    stats={p.name: p.read_text().strip() for p in Path('/sys/power/suspend_stats').iterdir() if p.is_file()})
+    before = state()
+    idle = idle_snapshot()
+    samples = [clock_pair() for _ in range(8)]
+    intervals = [clock_interval(a, b) for a, b in zip(samples, samples[1:])]
+    after = state()
+    if before != after:
+        raise ValueError('PM/boot changed during clock inspection')
+    return dict(before=before, after=after, cpu_idle=idle, samples=samples, intervals=intervals,
+                sources=sources(), limits='Awake read-only clock sampling; no RTC programming or PM entry.')
 
 
 def wakeup_count():
@@ -250,7 +310,7 @@ def enter(pm, record, guard, fd, target, persist, mode):
                                 pm_test=pm.selected(pm.read(pm.POWER/'pm_test')), pm_async=pm.read(pm.POWER/'pm_async'))
     persist()
     guard.before_entry()
-    margin(fd, target)  # Includes all durable-write/guard overhead in admission.
+    record['rtc']['entry_margin_seconds'] = margin(fd, target)  # Includes durable-write/guard overhead.
     if (record['entry_intent']['pm_test'] != 'none' or record['entry_intent']['pm_async'] != '0' or
             pm.selected(pm.read(pm.POWER/'pm_test')) != 'none' or pm.read(pm.POWER/'pm_async') != '0'):
         raise ValueError('Sleep controls failed readback')
@@ -272,23 +332,59 @@ def enter(pm, record, guard, fd, target, persist, mode):
 
 
 def validate_delivery(record):
+    if record.get('mode') not in ('rehearse', 'rtc-wake'):
+        raise ValueError('Unknown sleep evidence mode')
     rtc_data = record['rtc']
     a, b = rtc_data['irq_before'], rtc_data['irq_after']
     if a['irq'] != b['irq'] or a['cpus'] != b['cpus'] or b['count'] != a['count']+1:
         raise ValueError('RTC interrupt delivery identity/count mismatch')
     if rtc_data['interrupt'] != dict(count=1, flags=0xa0) or rtc_data.get('restored') is not True:
         raise ValueError('RTC delivery or restoration incomplete')
-    elapsed = record['returned']['boot']-rtc_data['started']['boot']
+    elapsed = clock_interval(rtc_data['started'], record['returned'])['boottime_seconds']
     lag = rtc.instant(rtc_data['after_delivery']['rtc_time'])-rtc.instant(rtc_data['requested'][2:])
     if not SECONDS-2 <= elapsed <= SECONDS+10 or not 0 <= lag <= 10:
         raise ValueError('RTC delivery outside the bounded deadline')
     if record['mode'] == 'rtc-wake':
-        a, b = record['entry_clock'], record['returned']
-        suspended = (b['boot']-a['boot'])-(b['mono']-a['mono'])
-        if record['wake_irq'] != str(rtc_data['irq_before']['irq']) or not 5 <= suspended <= SECONDS+5:
-            raise ValueError('No qualified RTC wake with a genuine suspended interval')
-        return dict(suspended_seconds=suspended, alarm_elapsed_seconds=elapsed)
-    return dict(alarm_elapsed_seconds=elapsed)
+        if record.get('entry_intent') != dict(mode='rtc-wake', state='freeze', pm_test='none', pm_async='0'):
+            raise ValueError('No explicit actual-sleep intent with debug mode disabled')
+        clock_interval(rtc_data['started'], record['entry_clock'])
+        interval = clock_interval(record['entry_clock'], record['returned'])
+        margin_seconds = rtc_data.get('entry_margin_seconds', rtc_data.get('margin_seconds'))
+        if (type(margin_seconds) is not int or not MIN_MARGIN <= margin_seconds <= SECONDS or
+                record['wake_irq'] != str(rtc_data['irq_before']['irq']) or
+                not margin_seconds-2 <= interval['boottime_seconds'] <= SECONDS+5):
+            raise ValueError('Wrong wake IRQ or RTC-wait interval outside the admitted deadline')
+        trace = validate_trace(record['keypad'])
+        # Mono trace timestamps exclude timekeeping suspension. Never require a
+        # minimum duration in this clock, or call the clock gap CPU residency.
+        if (trace['s2idle_start_mono'] < record['entry_clock']['mono']-MAX_CLOCK_SAMPLE_SECONDS or
+                trace['s2idle_end_mono'] > record['returned']['mono']+MAX_CLOCK_SAMPLE_SECONDS):
+            raise ValueError('Actual-sleep trace lies outside the submitted interval')
+        pairs = trace['timekeeping_freeze_pairs']
+        uncertainty = interval['sampling_uncertainty_seconds']
+        gap = interval['clock_gap_seconds']
+        if uncertainty is not None and pairs == 0 and gap > uncertainty+1e-6:
+            raise ValueError('Clock discontinuity without a matching timekeeping-freeze trace')
+        observed = pairs > 0 and uncertainty is not None and gap > uncertainty+1e-6
+        # Exclude entry/resume delays from the required RTC wait. A clock gap
+        # contributes only when bounded sampling and paired in-loop freeze
+        # events support it. Historical unbracketed samples add no duration.
+        supported = trace['s2idle_monotonic_seconds']
+        if observed:
+            supported += max(0, gap-uncertainty)
+        entry_overhead = max(0, trace['s2idle_start_mono']-record['entry_clock']['mono'])
+        if supported < max(5, margin_seconds-entry_overhead-2):
+            raise ValueError('Trace does not establish the admitted RTC wait inside s2idle')
+        return dict(functional_rtc_wake=True, alarm_elapsed_seconds=elapsed, interval=interval,
+                    s2idle_trace=trace,
+                    s2idle_supported_seconds=supported,
+                    timekeeping=dict(freeze_pairs=pairs, observation='observed' if observed else
+                                     'inconclusive' if pairs else 'not_observed'),
+                    cpu_retention_qualified=False, energy_qualified=False)
+    if re.search(r'suspend_resume: (?:suspend_enter|machine_suspend|timekeeping_freeze)\[', record['keypad']['trace']):
+        raise ValueError('Unexpected sleep/timekeeping transition during awake rehearsal')
+    return dict(alarm_elapsed_seconds=elapsed, functional_rtc_wake=False,
+                cpu_retention_qualified=False, energy_qualified=False)
 
 
 def validate_trace(record):
@@ -304,7 +400,30 @@ def validate_trace(record):
     # Reuse the established exact late/noirq + RSB checker after checking the
     # real-sleep boundary separately; never broaden the debug checker's contract.
     sanitized = re.sub(r'^.*suspend_resume: machine_suspend\[1\].*\n?', '', text, flags=re.M)
-    return pm_platform.validate_trace(record | {'trace': sanitized}) | {'s2idle_boundary': True}
+    result = pm_platform.validate_trace(record | {'trace': sanitized})
+    def stamp(marker):
+        prefix = text[text.rfind('\n', 0, marker.start())+1:marker.start()]
+        value = re.search(r'\s([0-9]+\.[0-9]+): $', prefix)
+        if not value:
+            raise ValueError('Missing monotonic timestamp on sleep trace boundary')
+        return float(value[1])
+    start, end = [stamp(m) for m in markers]
+    if end < start:
+        raise ValueError('Sleep trace timestamps moved backwards')
+    freezes = list(re.finditer(r'suspend_resume: timekeeping_freeze\[\d+\] (begin|end)', text))
+    if text.count('suspend_resume: timekeeping_freeze') != len(freezes) or len(freezes) % 2:
+        raise ValueError('Incomplete timekeeping-freeze trace')
+    last = start
+    for index, marker in enumerate(freezes):
+        timestamp = stamp(marker)
+        if (marker[1] != ('begin' if index % 2 == 0 else 'end') or
+                not markers[0].end() < marker.start() < markers[1].start() or
+                not last <= timestamp <= end):
+            raise ValueError('Timekeeping-freeze trace outside the sleep boundary or out of order')
+        last = timestamp
+    return result | dict(s2idle_boundary=True, s2idle_start_mono=start, s2idle_end_mono=end,
+                         s2idle_monotonic_seconds=end-start, timekeeping_freeze_pairs=len(freezes)//2,
+                         limits='Actual s2idle path; trace duration is MONOTONIC, not CPU residency or energy.')
 
 
 class UntouchedHandoff:
@@ -323,6 +442,8 @@ class UntouchedHandoff:
 
 
 def health(pm, record, lock):
+    # Preserve the wake/clock result even if a later device recovery check fails.
+    record['delivery'] = validate_delivery(record)
     before, after = record['before'], record['after']
     pm.validate(after, lock)
     keys = ('boot_id', 'kernel', 'image', 'pm', 'pm_test_delay', 'masks', 'inputs', 'backlight',
@@ -354,7 +475,6 @@ def health(pm, record, lock):
         raise ValueError('Process memory changed')
     if record['audio_before'] != record['audio_after']:
         raise ValueError('Idle audio state changed')
-    record['delivery'] = validate_delivery(record)
 
 
 def retain_failed_handoff(record, token):
@@ -382,11 +502,13 @@ def run(pm, token, mode, lock, receipt, rehearsal=None):
     finally:
         os.close(parent)
     record = dict(run_id=token, mode=mode, event='started', passed=False,
+                  qualification_scope='functional-wake-and-device-recovery' if mode == 'rtc-wake' else 'awake-rehearsal',
                   sources=sources(), rtc={}, power_key={}, keypad={}, wifi_trace={}, usb_trace={})
     persist = lambda: pm.save(directory/'started.json', record)
     try:
         with keypad_pm.exclusive_pm(OWNED.parent):
             before = record['before'] = pm.snapshot()
+            record['cpu_idle_before'] = idle_snapshot()
             record['qualification'] = admission(pm, before, lock, receipt)
             record['policy_before'] = policy.inspect()
             record['audio_before'] = speaker_audio.idle()
@@ -423,6 +545,7 @@ def run(pm, token, mode, lock, receipt, rehearsal=None):
                                              keypad_pm.keypad_identity(record['keypad']['before']))
                         time.sleep(30)  # Recovery observation only; never an asleep watchdog.
                     record['after'] = pm.snapshot()
+                    record['cpu_idle_after'] = idle_snapshot()
                     record['audio_after'] = speaker_audio.idle()
                 health(pm, record, lock)
                 handoff = UntouchedHandoff(guard, record['pek_before'], record['after']['stats'])
@@ -479,12 +602,18 @@ def main():
     modes.add_argument('--rehearse', action='store_true')
     modes.add_argument('--rtc-wake', action='store_true')
     modes.add_argument('--recover', action='store_true')
-    parser.add_argument('--run-id', required=True)
+    modes.add_argument('--clock-inspect', action='store_true')
+    parser.add_argument('--run-id')
     parser.add_argument('--lock', type=Path)
     parser.add_argument('--receipt', type=Path)
     parser.add_argument('--rehearsal')
     parser.add_argument('--attended', action='store_true')
     args = parser.parse_args()
+    if args.clock_inspect:
+        print(json.dumps(inspect_clocks()))
+        return
+    if not args.run_id:
+        parser.error('Require --run-id for a rehearsal, sleep submission or recovery')
     if args.rtc_wake and not args.attended:
         parser.error('Actual sleep requires the separately confirmed attended run')
     os.umask(0o077)

@@ -1870,3 +1870,20 @@ An idle trace validates recorder operation, not notification delivery or resume.
 The separate sleep diagnostic now includes this recorder and requires a fresh
 same-source rehearsal. [Report 122](docs/122-usb-resume-metadata-recorder.md)
 records ownership, failure tests, awake evidence and the remaining qualification.
+
+Sleep measurement now reports functional RTC wake, timekeeping behavior and
+power qualification separately. A stopped MONOTONIC clock is not required for
+functional s2idle on the current WFI fallback. USB recovery and all other
+device checks remain mandatory. The recorder also rejects long resume delays
+being counted as time spent in the sleep loop.
+
+```sh
+task device:sleep-clock-inspect  # Awake CPU-idle/timer inventory and bounded clock samples
+task report:sleep-evidence RESULT=<saved-final-result.json> # Offline; preserves original failure
+```
+
+[Report 123](docs/123-sleep-measurement-criteria.md) documents the corrected
+criteria, tests and CPU-idle implementation still required. The original USB
+failure remains failed; neither command qualifies battery savings or enters
+sleep. Changed recorder sources require a fresh awake rehearsal before a new
+attended sleep attempt.

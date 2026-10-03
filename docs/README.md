@@ -250,6 +250,7 @@ new image build and the next hardware qualification sequence.
 - [120 — First RTC sleep findings](120-first-rtc-sleep-findings.md): RTC wake and same-boot Wi-Fi recovery, failed USB attachment, CPU-idle/timekeeping evidence and corrected measurement interpretation; retained key suppression and repeatable read-only recovery collection.
 - [121 — USB reconnect and clean boot](121-usb-reconnect-and-clean-boot.md): saved Mac-side network/sleep inspection, one successful cable-reconnect recovery, separated host-sleep timing and observed reboot restoring the ordinary diagnostic policy; original resume issue remains open.
 - [122 — USB resume metadata recorder](122-usb-resume-metadata-recorder.md): bounded MUSB/gadget tracing and audited ECM notification logging, owned cleanup, passive awake qualification and integration for the next attended sleep experiment; no driver fix or resume pass claimed.
+- [123 — Sleep measurement criteria](123-sleep-measurement-criteria.md): separates functional RTC wake from timekeeping/CPU-idle/energy, bounds clock sampling and in-loop waiting, preserves the original USB failure, and records the remaining WFI/timer integration work.
 - [119 — Guarded RTC sleep preparation](119-guarded-rtc-sleep-preparation.md): separate one-shot s2idle admission, RTC deadline and wake attribution, persistent key protection, failure tests and two successful awake rehearsals; the subsequent attempt is in report 120.
 
 ## Questions left open for the next phase

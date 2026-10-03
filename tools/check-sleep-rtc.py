@@ -93,12 +93,34 @@ def validate_result(value, token, before, mode):
     diagnostic.health(diagnostic.pm_module(), value, json.loads((ROOT/'build/sources.lock.json').read_text()))
 
 
+def inspect_clocks(config, capture):
+    with device(config, 'usb') as client:
+        directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-sleep.XXXXXXXX', display=False).decode().strip()
+        if not re.fullmatch(r'/tmp/gameshellneo-sleep\.[A-Za-z0-9]+', directory):
+            raise ValueError('Unexpected clock inspector helper path')
+        with client.open_sftp() as sftp:
+            for name in diagnostic.SOURCES:
+                upload(sftp, ROOT/'tools'/(name+'.py'), directory+'/'+name+'.py')
+        # No systemd unit, RTC programming, owner, inhibitor or PM submission.
+        value = json.loads(run(client, shlex.join(['python3', '-B', directory+'/sleep_rtc.py', '--clock-inspect']),
+                               display=False, timeout=20))
+        (capture/'clock-inspection.json').write_text(json.dumps(value, indent=2)+'\n')
+        if value['sources'] != diagnostic.sources():
+            raise ValueError('Clock inspector sources differ')
+        with client.open_sftp() as sftp:
+            for name in diagnostic.SOURCES:
+                sftp.remove(directory+'/'+name+'.py')
+            sftp.rmdir(directory)
+    print('Awake clock inspection saved; no alarm, PM or network settings changed.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument('--rehearse', action='store_true')
     modes.add_argument('--rtc-wake', action='store_true')
     modes.add_argument('--collect', action='store_true')
+    modes.add_argument('--clock-inspect', action='store_true')
     args = parser.parse_args()
     if args.rtc_wake and os.environ.get('NEO_SLEEP_ATTENDED') != '1':
         parser.error('Confirm observer readiness, then supply ATTENDED=1 for this one sleep attempt')
@@ -107,6 +129,9 @@ def main():
     print('Private RTC sleep evidence:', capture, flush=True)
     with (LOCAL/'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.clock_inspect:
+            inspect_clocks(config, capture)
+            return
         if args.collect:
             token = os.environ.get('NEO_PM_RUN', '')
             route = os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb')
@@ -177,7 +202,8 @@ def main():
                 raise ValueError('Boot changed after collection')
             value.update(usb_ssh_verified=True, wifi_ssh_verified=True)
             (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
-            print(mode, 'passed; original power policy and both SSH routes verified.', flush=True)
+            print(mode, 'functional/recovery checks passed; original power policy and both SSH routes verified.', flush=True)
+            print('CPU retention and energy savings remain unqualified.', flush=True)
             return
         raise TimeoutError('No complete result. Do not retry sleep; collect original RUN='+token)
 

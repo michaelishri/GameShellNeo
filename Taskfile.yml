@@ -31,6 +31,7 @@ env:
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
   NEO_SLEEP_ATTENDED: '{{.ATTENDED | default "0"}}'
+  NEO_SLEEP_RESULT: '{{.RESULT | default ""}}'
   NEO_SLEEP_COLLECT_ROUTE: '{{.ROUTE | default "usb"}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
   NEO_WIFI_TRACE: '{{.WIFI_TRACE | default "0"}}'
@@ -490,6 +491,14 @@ tasks:
   device:sleep-collect:
     desc: Read original sleep RUN and live recovery state; ROUTE=usb (default) or wifi, never resubmit
     cmds: [python3 tools/check-sleep-rtc.py --collect]
+
+  report:sleep-evidence:
+    desc: Offline RTC/trace/clock assessment of saved RESULT; never requalifies or rewrites the original
+    cmds: [python3 tools/report-sleep-evidence.py]
+
+  device:sleep-clock-inspect:
+    desc: Read CPU-idle/timer state and sample bracketed clocks while awake; no RTC or PM changes
+    cmds: [python3 tools/check-sleep-rtc.py --clock-inspect]
 
   device:pm-power-key:
     desc: Attended debug stage with exclusive power-key ownership; explicit STAGE and owner readiness required

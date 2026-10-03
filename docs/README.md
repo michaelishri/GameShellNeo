@@ -267,3 +267,5 @@ These are research gaps, not requests to choose an implementation now:
 The follow-up Python assessment includes the newly supplied local clone; the original historical analysis remains explicitly dated. Subsequent device inspection is recorded separately in report 21. During that inspection, no device was flashed, no original source checkout was changed, and no full multi-gigabyte OS image was downloaded or mounted. The device's boot region and boot partition were copied read-only for local reference. The later GameShellNeo build and offline image inspection are recorded in report 25; the original physical card remains untouched.
 
 - [125 — Traced RTC-wake USB failure](125-traced-rtc-wake-usb-failure.md): RTC, display, keypad and Wi-Fi return, but USB fails again; combined MUSB resume status and lost enumeration narrow the driver investigation, with no new Mac sleep event in the saved history.
+
+- [127 — USB endpoint trace formatting](127-usb-endpoint-trace-format.md): corrects the shadowed trace return value, adds 252 native/ARM32 formatting cases and an explicit recorder trust flag; image/live qualification remains pending.

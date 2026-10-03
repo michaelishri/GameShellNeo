@@ -30,6 +30,16 @@ def journal(*messages):
 
 
 class Parsing(unittest.TestCase):
+    def test_endpoint_return_format_detects_shadowed_or_missing_record_field(self):
+        names = ('gadget/usb_ep_enable', 'gadget/usb_ep_disable')
+        good = 'field:int ret;\nprint fmt: "endpoint --> %d", REC->ret\n'
+        formats = dict.fromkeys(names, good)
+        self.assertTrue(trace.endpoint_return_text_trusted(formats))
+        for bad in (good.replace('REC->ret', 'ret'), good.replace('REC->ret', '1'),
+                    good.replace('field:int ret;', ''), good+'print fmt: "bad", REC->ret\n', ''):
+            for name in names:
+                self.assertFalse(trace.endpoint_return_text_trusted(formats | {name: bad}))
+
     def test_only_audited_ecm_sites_are_selected(self):
         text = debug_text()
         self.assertEqual(len(trace.sites(text)), 10)

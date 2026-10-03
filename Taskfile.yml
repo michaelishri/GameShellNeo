@@ -100,6 +100,7 @@ tasks:
       - task: test:wake-irqs
       - task: test:sunxi-sdio-refs
       - task: test:musb-context
+      - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
       - task: build:kernel
@@ -195,6 +196,14 @@ tasks:
   check:musb-drivers:
     desc: Run context regressions and compile the full ARM MUSB core and Sunxi drivers
     cmds: [bash tools/run-logged.sh musb-drivers python3 tools/check-musb-context.py --compile-drivers]
+
+  test:udc-trace:
+    desc: Execute actual USB endpoint trace formatting natively and on ARM32, with negative controls
+    cmds: [bash tools/run-logged.sh udc-trace python3 tools/check-udc-trace.py]
+
+  check:udc-driver:
+    desc: Run trace-format regressions and compile the complete ARM USB device-controller core
+    cmds: [bash tools/run-logged.sh udc-driver python3 tools/check-udc-trace.py --compile-driver]
 
   check:usb-suspend-driver:
     desc: Run AXP suspend regressions and compile the complete ARM driver in isolated scratch

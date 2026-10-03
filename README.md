@@ -677,6 +677,18 @@ source regression. [Report 57](docs/57-musb-context-capability.md) records the
 unsupported-register correction; report 60 records seven diagnostic.8 driver
 cycles with zero unsupported-register warnings.
 
+For accurate USB endpoint trace return values, use:
+
+```sh
+task test:udc-trace     # Execute the actual format, native + ARM32; reject old/wrong formats
+task check:udc-driver  # Also compile the complete ARM USB device-controller core
+```
+
+`task build` includes the source check. [Report 127](docs/127-usb-endpoint-trace-format.md)
+records the formatter correction and pending image qualification. USB captures
+now label whether endpoint return text is trustworthy; diagnostic.17's trailing
+endpoint arrow values must not be treated as operation results.
+
 For the opt-in USB polling experiment, use:
 
 ```sh

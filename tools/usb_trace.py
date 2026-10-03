@@ -133,6 +133,18 @@ def summarize_journal(text, cursor, prefix):
     return dict(journal_rows=len(rows), events=events)
 
 
+def endpoint_return_text_trusted(formats):
+    # Old udc_log_ep prints the generated printer's local ret, not the event's
+    # saved result. Keep old images usable, but explicitly label that text.
+    for name in ('gadget/usb_ep_enable', 'gadget/usb_ep_disable'):
+        text = formats.get(name, '')
+        lines = [line for line in text.splitlines() if line.startswith('print fmt:')]
+        if ('field:int ret;' not in text or len(lines) != 1 or
+                not re.search(r',\s*REC->ret\s*$', lines[0])):
+            return False
+    return True
+
+
 def restore(token):
     run_id(token)
     if not OWNED.exists():
@@ -186,6 +198,7 @@ def capture(record, token):
     cursor = json.loads(command('journalctl', '-k', '-b', '-n', '1', '-o', 'json', '--no-pager'))['__CURSOR']
     keypad_pm.save_owned(dict(run_id=token, boot_id=before['boot_id'], sites=original), OWNED)
     record.update(before=before, formats=formats, sites_before=original, buffer_kb_per_cpu=256,
+                  endpoint_return_text_trusted=endpoint_return_text_trusted(formats),
                   started_monotonic=time.monotonic(), filters={})
     completed = False
     try:

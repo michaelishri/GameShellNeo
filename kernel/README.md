@@ -44,6 +44,15 @@ qualify the candidate against the recorded per-cycle count growth; hardware
 and energy claims remain pending. Remove the patch when equivalent upstream
 ownership is verified. See [report 117](../docs/117-sdio-runtime-reference-ownership.md).
 
+Patch 0024 prints the saved endpoint result in `udc_log_ep`, correcting a
+shadowed local variable in the generated trace printer. It changes no USB
+operation or event layout. The actual formatting expression passes 252 cases
+natively/ARM32 and rejects three negative controls; the complete ARM UDC core
+compiles. Use `task test:udc-trace` or `task check:udc-driver`.
+[Report 127](../docs/127-usb-endpoint-trace-format.md) records the evidence and
+pending image/live qualification. Remove when equivalent upstream formatting
+is verified.
+
 Patches 0014–0017 are integrated for image qualification in
 [diagnostic.12 preparation](../docs/85-diagnostic12-preparation.md). The ledger's
 source-test results do not establish hardware recovery or energy savings.

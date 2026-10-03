@@ -297,3 +297,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [138 — Shared kernel sources](138-kernel-source-reuse.md): verified source reuse, isolated ARM outputs and resumable compaction; 18 MUSB copies reduced to three with unchanged historical evidence and about 24.89 GiB reclaimed.
 
 - [139 — MUSB teardown audit](139-musb-teardown-power-audit.md): endpoint/work/IRQ cleanup ordering, PM and PHY/notifier ownership, reproducible native/ARM32 evidence and the limits on a safe recovery implementation.
+
+- [140 — Diagnostic.18 card installation](140-diagnostic18-card-installation.md): interrupted dongle-powered reader, read-only comparison, successful guarded flash/full readback and pending new-boot qualification.

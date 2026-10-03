@@ -1771,6 +1771,11 @@ persistent mount-policy changes. A missing compiler, failed veto or exited
 guard stops the operation. [Report 43](docs/43-macos-card-mount-guard.md) records
 the failure that prompted this change and its validation.
 
+Keep the reader's USB and any dongle charging connections intact until ejection.
+Disconnecting dongle power interrupted diagnostic.18's first readback; a fresh
+guarded flash then passed. [Report 140](docs/140-diagnostic18-card-installation.md)
+retains that failure, comparison and successful retry.
+
 If readback fails, keep the card in the reader and retain the failed log.
 Reinspect it because writing an image changes the boot volume UUID, then use:
 

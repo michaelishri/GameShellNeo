@@ -1,5 +1,9 @@
 # MUSB system-sleep connection candidate (NEO-95)
 
+Subsequent installation: [report 140](140-diagnostic18-card-installation.md)
+records the successful guarded flash/full readback after a dongle-power
+interruption. Boot and USB/sleep qualification are separate from preparation.
+
 3–4 October 2026, Pacific/Auckland. Diagnostic.18 is built, verified and staged
 on the Mac to test an underlying USB controller lifecycle correction. The
 installed diagnostic.17 remains unchanged after the

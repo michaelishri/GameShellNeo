@@ -31,6 +31,7 @@ env:
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
   NEO_SLEEP_ATTENDED: '{{.ATTENDED | default "0"}}'
+  NEO_SLEEP_COLLECT_ROUTE: '{{.ROUTE | default "usb"}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
   NEO_WIFI_TRACE: '{{.WIFI_TRACE | default "0"}}'
   NEO_KEYPAD_AUDIO: '{{.AUDIO | default "0"}}'
@@ -479,7 +480,7 @@ tasks:
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake]
 
   device:sleep-collect:
-    desc: Collect the original sleep/rehearsal RUN after uncertain SSH; never resubmit
+    desc: Read original sleep RUN and live recovery state; ROUTE=usb (default) or wifi, never resubmit
     cmds: [python3 tools/check-sleep-rtc.py --collect]
 
   device:pm-power-key:

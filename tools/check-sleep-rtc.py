@@ -61,14 +61,16 @@ def service(directory, token, mode, rehearsal):
     return command
 
 
-def collect(config, token):
+def collect(config, token, route='usb'):
     diagnostic.policy.run_id(token)
+    if route not in ('usb', 'wifi'):
+        raise ValueError('Collection route must be usb or wifi')
     # Read saved evidence without uploading/replacing the original helper.
     base = '/var/lib/gameshellneo/sleep-tests/'+token
     command = ['sudo', '-n', 'python3', '-c',
         'from pathlib import Path; import sys; p=Path(sys.argv[1]); '
         'f=p/"result.json"; f=f if f.exists() else p/"started.json"; print(f.read_text())', base]
-    with device(config, 'usb') as client:
+    with device(config, route) as client:
         result = json.loads(run(client, shlex.join(command), display=False))
     if result.get('run_id') != token:
         raise ValueError('Collected another run')
@@ -106,9 +108,21 @@ def main():
     with (LOCAL/'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.collect:
-            value = collect(config, os.environ.get('NEO_PM_RUN', ''))
+            token = os.environ.get('NEO_PM_RUN', '')
+            route = os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb')
+            value = collect(config, token, route)
             (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
-            print('Original evidence recovered; inspect status/ownership before further action.')
+            # Read-only postmortem, with no upload, policy cleanup or PM submission.
+            # Keep the original result even if the separate live snapshot fails.
+            with device(config, route) as client:
+                command = ['sudo', '-n', 'python3', '-c',
+                           (ROOT/'tools/sleep_recovery.py').read_text(), token]
+                snapshot = json.loads(run(client, shlex.join(command), display=False))
+            (capture/'recovery-snapshot.json').write_text(json.dumps(snapshot, indent=2)+'\n')
+            (capture/'collection.json').write_text(json.dumps(dict(route=route,
+                run_id=token, original_event=value.get('event'),
+                same_boot=snapshot['boot_id'] == value.get('before', {}).get('boot_id')))+'\n')
+            print('Original evidence recovered via '+route+'; this does not qualify recovery or retry sleep.')
             return
         qualification = os.environ.get('NEO_SLEEP_QUALIFICATION', '')
         if not qualification:

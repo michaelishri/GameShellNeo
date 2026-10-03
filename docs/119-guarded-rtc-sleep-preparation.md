@@ -1,5 +1,10 @@
 # Guarded RTC-wake sleep preparation (NEO-93)
 
+Subsequent result: [report 120](120-first-rtc-sleep-findings.md) records the
+first actual attempt and corrects the clock-residency assumption below. RTC
+wake worked; USB recovery failed, and no CPU-idle driver was registered.
+This report preserves the preparation as it stood before that attempt.
+
 3 October 2026, Pacific/Auckland. Added a separate one-shot s2idle recorder and
 an awake rehearsal. Diagnostic.17's kernel and normal sleep policy are unchanged.
 Both awake rehearsals pass, including the final helper revision.

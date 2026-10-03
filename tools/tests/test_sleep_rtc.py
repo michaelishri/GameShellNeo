@@ -1,5 +1,6 @@
 """Failure boundaries of the one-shot sleep controller; never access a real PM device."""
 from copy import deepcopy
+from contextlib import nullcontext
 import importlib.util
 import json
 import os
@@ -78,6 +79,49 @@ class Admission(unittest.TestCase):
                 rows[0]['capture']=str(root/'outside/result.json');(root/'outside').mkdir()
                 (root/'outside/result.json').write_text(json.dumps(records[0]));path.write_text(json.dumps({'cycles':rows}))
                 with self.assertRaisesRegex(ValueError,'saved diagnostic'):host.receipt(path,current)
+
+
+class Collection(unittest.TestCase):
+    def test_explicit_wifi_preserves_failed_original_and_rejects_wrong_run(self):
+        value = dict(run_id=TOKEN, event='failed', passed=False,
+                     error='USB did not return', policy_owner_retained=True)
+        with patch.object(host, 'device', return_value=nullcontext('client')) as device, \
+                patch.object(host, 'run', return_value=json.dumps(value).encode()):
+            self.assertEqual(host.collect({}, TOKEN, 'wifi'), value)
+            device.assert_called_once_with({}, 'wifi')
+            value['run_id'] = 'b'*32
+            with patch.object(host, 'run', return_value=json.dumps(value).encode()), \
+                    self.assertRaisesRegex(ValueError, 'another run'):
+                host.collect({}, TOKEN, 'wifi')
+
+    def test_bad_route_or_token_never_contacts_device(self):
+        with patch.object(host, 'device') as device:
+            for token, route in ((TOKEN, 'other'), ('../other', 'wifi')):
+                with self.assertRaises(ValueError):
+                    host.collect({}, token, route)
+            device.assert_not_called()
+
+    def test_collect_mode_never_submits_or_cleans_up_and_marks_a_changed_boot(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp); capture=root/'capture'; capture.mkdir()
+            value=dict(run_id=TOKEN, event='failed', passed=False, before={'boot_id':'old'})
+            with patch.object(host, 'LOCAL', root), \
+                    patch.object(host, 'evidence_directory', return_value=capture), \
+                    patch.object(host, 'load_env', return_value={}), \
+                    patch.object(host, 'collect', return_value=value) as collect, \
+                    patch.object(host, 'device', return_value=nullcontext('client')), \
+                    patch.object(host, 'run', return_value=b'{"boot_id":"new"}') as run, \
+                    patch.object(host, 'service') as service, patch.object(host, 'upload') as upload, \
+                    patch.object(host, 'pm_host') as pm, \
+                    patch.dict(os.environ, NEO_PM_RUN=TOKEN, NEO_SLEEP_COLLECT_ROUTE='wifi'), \
+                    patch.object(sys, 'argv', ['check-sleep-rtc.py', '--collect']):
+                host.main()
+                collect.assert_called_once_with({}, TOKEN, 'wifi')
+                service.assert_not_called(); upload.assert_not_called(); pm.assert_not_called()
+                self.assertEqual(run.call_count, 1)
+            self.assertEqual(json.loads((capture/'result.json').read_text()), value)
+            self.assertEqual(json.loads((capture/'collection.json').read_text()), dict(
+                route='wifi', run_id=TOKEN, original_event='failed', same_boot=False))
 
 
 class Entry(unittest.TestCase):

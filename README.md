@@ -1817,6 +1817,8 @@ task device:sleep-rehearse QUALIFICATION=.local/neo92-final-reference-history.js
 task device:sleep-rtc QUALIFICATION=.local/neo92-final-reference-history.json REHEARSAL=<run-id> ATTENDED=1
 # On uncertain SSH, collect the original attempt instead of resubmitting it.
 task device:sleep-collect RUN=<original-run-id>
+# If USB has not recovered but the configured Wi-Fi route works:
+task device:sleep-collect RUN=<original-run-id> ROUTE=wifi
 ```
 
 The rehearsal never writes the sleep state. Actual sleep requires matching
@@ -1831,4 +1833,13 @@ recovery limits and the two successful awake rehearsals. Ordinary sleep remains
 masked. Interrupted ownership can deliberately leave power-key actions ignored;
 preserve the evidence and review recovery before further tests. The device-side
 cleanup restores only its owned alarm/PM/trace resources, never an uncertain
-poweroff policy. First real sleep and physical key wake remain unqualified.
+poweroff policy. Collection saves the unchanged original result plus a separate
+read-only snapshot of current CPU-idle/USB/ownership state and boot identity;
+collecting over Wi-Fi does not count as USB recovery.
+
+[Report 120](docs/120-first-rtc-sleep-findings.md) records the first actual
+attempt: RTC wake, retained keypad and Wi-Fi return, but USB remains unattached.
+The CPU-idle driver is absent and stopped timekeeping is not demonstrated; the
+recorder's original residency assumption needs correction. Overall sleep
+qualification remains open, and the failed attempt retains diagnostic power-key
+suppression. Do not repeat that consumed qualification or delete its owners.

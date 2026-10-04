@@ -315,3 +315,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [147 — Extcon provider lifetime](147-extcon-provider-lifetime.md): linked lookup and Sunxi integration, explicit failed-probe cleanup contract, and real-kernel supplier/consumer ordering tests with inferred firmware links disabled; complete controller retirement and board qualification remain open.
 
 - [148 — Four consecutive RTC-wake cycles](148-diagnostic18-repeat-rtc-wake.md): fresh seven-debug baseline and same-source rehearsal, four actual sleeps with both-route recovery and owner-confirmed normal display, full lineage validation and remaining cable/host/energy limits.
+
+- [149 — USB reconnects after repeated sleep](149-diagnostic18-post-sleep-usb-reconnects.md): four physical awake reconnects with independent USB SSH proof, final both-route health checks and unchanged PM/reference state; battery-only and host-sleep cases remain open.

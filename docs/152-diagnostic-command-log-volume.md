@@ -174,9 +174,13 @@ Capture: `.local/neo111-fresh-boot-journal.jsonl`, SHA-256
 `e66b4ba02f5cbc2568d7d375529ca09798676b4e84b5805f677b9cf45e9142e8`;
 summary: `.local/neo111-fresh-boot-volume.json`.
 
-No further screen test is running. Owner confirmation of normal display return
-after this sequence is pending, as are the separate awake cable-removal rehearsal
-and fresh readiness for its actual-sleep attempt. The earlier failed boot's result
-and evidence remain unchanged; this fresh sequence does not retroactively pass it.
+The owner confirmed normal display return after the complete fresh sequence.
+NEO-111's bounded command-logging correction is complete: source tests, awake
+audit verification and the fresh hardware prerequisites pass. The separate
+USB-removal awake rehearsal also passed, as recorded in [report 151](151-usb-cable-sleep-diagnostics.md);
+actual cable-transition sleep still requires fresh readiness and its own evidence.
+The earlier failed boot's result and evidence remain unchanged; this fresh
+sequence does not retroactively pass it. Wider boot-identity/per-test retention
+across arbitrary old boots remains a separate follow-up.
 
 [journald]: https://github.com/systemd/systemd/blob/v257/man/journald.conf.xml

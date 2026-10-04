@@ -14,8 +14,9 @@ early journal history. No cable-transition sleep was submitted. [Report 152](152
 records the failed original, normal owner-observed display, excessive helper
 source logging and the verified transport correction. A later fresh boot now
 passes all seven automated prerequisites with journal continuity and both SSH
-routes intact; owner display confirmation and the separate removal rehearsal/
-actual-sleep readiness remain pending.
+routes intact; the owner confirmed normal display return. The removal awake
+rehearsal below also passed. Actual cable-transition sleep remains pending
+separate readiness and observation.
 
 ## What each case establishes
 
@@ -133,10 +134,35 @@ Existing RTC deadline, memory, input, PM failure, trace and successor-history
 tests continue to pass. These are simulated filesystems/transports and source
 execution, not real physical edges or a live PM transition.
 
+## Awake removal rehearsal
+
+The owner confirmed all fresh prerequisite cycles looked normal and explicitly
+gave readiness for the awake rehearsal, keeping USB connected and controls
+untouched. The saved task ran once:
+
+```sh
+task device:sleep-cable-remove-rehearse QUALIFICATION=.local/neo110-removal-reference-history.json CABLE_ACTION=1
+```
+
+Run `4dad01f01eab4c40a3d2760c7a3a5174` passed on the same diagnostic.18 boot
+`f2dfd67d-cf9a-4242-b9b7-58c1bc944357`. Its original capture is
+`.local/diagnostics/20261004T090940.115092Z/result.json`, SHA-256
+`eac1dc7ae024f0b084290ea69ec76cfe862108beae3bc7118e8c45cdf7ab90fa`.
+
+The RTC delivered one alarm after 30.536 seconds, IRQ31 count 1 → 2, then its
+owned state was restored. PM success remained 7 and every failure counter
+remained zero: this was awake throughout. USB remained configured with carrier
+and external power present at all three samples; every AC/VBUS transition count
+remained zero. Independent USB and Wi-Fi SSH proofs passed. Original power-key
+policy was restored and no diagnostic policy, control, RTC or console owner
+remained. Memory/input, journal continuity and trace checks passed.
+
+This qualifies the recording setup for a separate attended attempt. It does not
+establish sleep, cable handling while asleep, CPU retention or energy savings.
+
 ## Remaining work
 
-Qualify the new source's seven-debug prerequisites, then the connected removal
-rehearsal and one attended removal case first. Review original evidence and
+Run one attended removal case after fresh readiness. Review original evidence and
 observer response before restoring the cable or planning attachment. A source,
 boot or PM-history change must not silently reuse a consumed baseline.
 

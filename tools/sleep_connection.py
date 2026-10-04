@@ -6,9 +6,24 @@ import time
 
 
 def profile(value):
-    if value not in ('usb', 'battery'):
-        raise ValueError('Sleep connection must be usb or battery')
+    if value not in ('usb', 'battery', 'usb-remove', 'usb-attach'):
+        raise ValueError('Unknown sleep connection profile')
     return value
+
+
+def transition(value):
+    return profile(value) in ('usb-remove', 'usb-attach')
+
+
+def endpoint(value, mode='rtc-wake', side='before'):
+    """Ordinary health gates for the scenario's explicit starting/ending state."""
+    profile(value)
+    if mode not in ('rehearse', 'rtc-wake') or side not in ('before', 'after'):
+        raise ValueError('Unknown cable phase')
+    initial = {'usb-remove': 'usb', 'usb-attach': 'battery'}.get(value, value)
+    if transition(value) and mode == 'rtc-wake' and side == 'after':
+        return 'battery' if initial == 'usb' else 'usb'
+    return initial
 
 
 def cable_irqs(text):
@@ -61,6 +76,10 @@ def absent(value):
             value['extcon'].splitlines() != ['USB=0', 'USB-HOST=0'] or
             value['supplies'] != expected):
         raise ValueError('Battery sleep requires absent USB/AC, PHY cable and USB carrier')
+    evidence(value)
+
+
+def evidence(value):
     t = value['monotonic_seconds']
     irq = value['irqs']
     if (type(t) not in (int, float) or not math.isfinite(t) or t < 0 or
@@ -71,16 +90,39 @@ def absent(value):
         raise ValueError('Invalid battery cable observation time or interrupt evidence')
 
 
-def unchanged(before, after):
-    for value in (before, after):
+def present(value):
+    expected = {'axp20x-usb': dict(type='USB', present='1', online='1'),
+                'axp22x-ac': dict(type='Mains', present='1', online='1')}
+    if (value['udc'] != 'configured' or value['carrier'] != '1' or
+            value['extcon'].splitlines() != ['USB=1', 'USB-HOST=0'] or
+            value['supplies'] != expected):
+        raise ValueError('Cable test requires configured USB, carrier and both external inputs')
+    evidence(value)
+
+
+def state(value, connection):
+    if connection == 'battery':
         absent(value)
+    elif connection == 'usb':
+        present(value)
+    else:
+        raise ValueError('Expected an endpoint connection state')
+
+
+def unchanged(before, after, connection='battery'):
+    for value in (before, after):
+        state(value, connection)
     if (before['boot_id'] != after['boot_id'] or before['irqs'] != after['irqs'] or
             before['monotonic_seconds'] >= after['monotonic_seconds']):
         raise ValueError('Cable interrupt, boot or observation order changed')
 
 
 def validate(record):
-    if profile(record.get('connection', 'usb')) == 'usb':
+    connection = profile(record.get('connection', 'usb'))
+    if connection == 'usb':
+        return
+    if transition(connection):
+        validate_transition(record)
         return
     if record.get('cable_absent_confirmed') is not True:
         raise ValueError('Missing physical cable-absence confirmation')
@@ -91,3 +133,30 @@ def validate(record):
         raise ValueError('Cable observations belong to another boot')
     # Three state samples and IRQ counts are not electrical edge instrumentation.
     # Physical absence still requires the observer to leave the cable untouched.
+
+
+def validate_transition(record):
+    connection, mode = record['connection'], record['mode']
+    if record.get('cable_action_confirmed') is not True:
+        raise ValueError('Missing physical cable-action readiness')
+    if endpoint(connection) == 'battery' and record.get('cable_absent_confirmed') is not True:
+        raise ValueError('Missing initial physical cable-absence confirmation')
+    cable = record['cable']
+    initial = endpoint(connection, mode)
+    unchanged(cable['before'], cable['entry'], initial)
+    if mode == 'rehearse':
+        unchanged(cable['entry'], cable['after'], initial)
+    else:
+        a, b = cable['entry'], cable['after']
+        state(b, endpoint(connection, mode, 'after'))
+        if (a['boot_id'] != b['boot_id'] or a['irqs']['cpus'] != b['irqs']['cpus'] or
+                a['monotonic_seconds'] >= b['monotonic_seconds']):
+            raise ValueError('Cable-transition boot, CPU inventory or time order changed')
+        direction = 'PLUGIN' if connection == 'usb-attach' else 'REMOVAL'
+        expected = {k: v + int(k.endswith(direction)) for k, v in a['irqs']['counts'].items()}
+        if b['irqs']['counts'] != expected:
+            raise ValueError('Require exactly one observed AC/VBUS transition in the requested direction')
+    if any(cable[side]['boot_id'] != record['before']['boot_id'] for side in ('before', 'entry', 'after')):
+        raise ValueError('Cable observations belong to another boot')
+    # IRQ dispatch can be deferred until resume. These counts do not timestamp
+    # the electrical edge or prove it occurred inside machine_suspend.

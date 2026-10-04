@@ -67,8 +67,10 @@ def service(directory, token, mode, rehearsal, connection='usb'):
         '/usr/bin/python3', '-B', script, '--'+mode, '--run-id', token,
         '--lock', directory+'/sources.lock.json', '--receipt', directory+'/qualification.json',
         '--connection', connection]
-    if connection == 'battery':
+    if diagnostic.sleep_connection.endpoint(connection) == 'battery':
         command += ['--cable-absent-confirmed']
+    if diagnostic.sleep_connection.transition(connection):
+        command += ['--cable-action-confirmed']
     if mode == 'rtc-wake':
         command += ['--attended', '--rehearsal', diagnostic.policy.run_id(rehearsal)]
     return command
@@ -122,6 +124,13 @@ def inspect_live(config, capture, kind='clock', route='usb'):
     print('Awake '+kind+' inspection saved; no alarm, PM or network settings changed.')
 
 
+def usb_proof(config, expected_boot):
+    with device(config, 'usb') as client:
+        boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
+    if boot != expected_boot:
+        raise ValueError('Independent USB proof reached another boot')
+
+
 def experiment(config, capture, qualification, mode, rehearsal, connection='usb'):
     diagnostic.sleep_connection.profile(connection)
     route = 'usb' if connection == 'usb' else 'wifi'
@@ -130,9 +139,12 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
     with device(config, route) as client:
         before = json.loads(helper.inline(client, '--inspect'))
         (capture/'before.json').write_text(json.dumps(before, indent=2)+'\n')
-        diagnostic.pm_module().validate(before, json.loads((ROOT/'build/sources.lock.json').read_text()), connection)
+        diagnostic.pm_module().validate(before, json.loads((ROOT/'build/sources.lock.json').read_text()),
+                                        diagnostic.sleep_connection.endpoint(connection, mode))
         proof = receipt(Path(qualification), before, connection)
         helper.wifi_proof(config, before)
+        if diagnostic.sleep_connection.transition(connection) and diagnostic.sleep_connection.endpoint(connection, mode) == 'usb':
+            usb_proof(config, before['boot_id'])
         if run(client, 'systemctl show gameshellneo-sleep-test -p LoadState --value', display=False).decode().strip() != 'not-found':
             raise ValueError('An earlier sleep unit exists; collect it without resubmission')
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-sleep.XXXXXXXX', display=False).decode().strip()
@@ -146,6 +158,10 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
             upload(sftp, capture/'qualification.json', directory+'/qualification.json')
         (capture/'run.json').write_text(json.dumps(dict(run_id=token, mode=mode, connection=connection, route=route, helper=directory))+'\n')
         print('RTC sleep run:', token, 'mode:', mode, flush=True)
+        if diagnostic.sleep_connection.transition(connection):
+            print('Cable scenario:', connection, '; follow the on-screen instructions only during actual sleep.', flush=True)
+            if mode == 'rehearse':
+                print('Awake rehearsal: keep the starting cable state unchanged.', flush=True)
         try:
             run(client, shlex.join(command), display=False, timeout=20)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
@@ -163,18 +179,25 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
         (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
         if value.get('event') not in ('complete', 'failed'):
             continue
+        if diagnostic.sleep_connection.transition(connection):
+            print('Original cable wake observation:', json.dumps(value.get('wake_observation')), flush=True)
         validate_result(value, token, before, mode, connection)
         helper.wifi_proof(config, value['after'])
         with device(config, route) as client:
             boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
         if boot != before['boot_id']:
             raise ValueError('Boot changed after collection')
-        value.update(usb_ssh_verified=connection == 'usb', wifi_ssh_verified=True)
+        final_usb = diagnostic.sleep_connection.endpoint(connection, mode, 'after') == 'usb'
+        if final_usb and route != 'usb':
+            usb_proof(config, before['boot_id'])
+        value.update(usb_ssh_verified=final_usb, wifi_ssh_verified=True)
         (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
         print(mode, connection, 'functional/recovery and original power-policy checks passed;',
-              'both SSH routes verified.' if connection == 'usb' else 'Wi-Fi verified; USB recovery was not tested.',
+              'both SSH routes verified.' if final_usb else 'Wi-Fi verified; USB recovery was not tested.',
               flush=True)
         print('CPU retention and energy savings remain unqualified.', flush=True)
+        if diagnostic.sleep_connection.transition(connection) and mode == 'rtc-wake':
+            print('Automated result only. Record the observer report separately; electrical edge timing is unqualified.', flush=True)
         return value
     raise TimeoutError('No complete result. Do not retry sleep; collect original RUN='+token)
 
@@ -226,11 +249,13 @@ def main():
     modes.add_argument('--collect', action='store_true')
     modes.add_argument('--clock-inspect', action='store_true')
     modes.add_argument('--connection-inspect', action='store_true')
-    parser.add_argument('--connection', choices=('usb', 'battery'), default='usb')
+    parser.add_argument('--connection', choices=('usb', 'battery', 'usb-remove', 'usb-attach'), default='usb')
     args = parser.parse_args()
-    if args.connection == 'battery' and (args.rtc_batch or args.clock_inspect or args.connection_inspect or args.collect):
-        parser.error('Battery profile is only for explicit one-shot rehearsal or RTC wake; collect using ROUTE=wifi')
-    if args.connection == 'battery' and os.environ.get('NEO_SLEEP_CABLE_ABSENT') != '1':
+    if args.connection != 'usb' and (args.rtc_batch or args.clock_inspect or args.connection_inspect or args.collect):
+        parser.error('Special connection profiles require one-shot rehearsal or RTC wake; collect using ROUTE=wifi')
+    if diagnostic.sleep_connection.transition(args.connection) and os.environ.get('NEO_SLEEP_CABLE_ACTION') != '1':
+        parser.error('Confirm the starting cable state and action instructions, then supply CABLE_ACTION=1')
+    if diagnostic.sleep_connection.endpoint(args.connection) == 'battery' and os.environ.get('NEO_SLEEP_CABLE_ABSENT') != '1':
         parser.error('Confirm physical USB removal, then supply UNPLUGGED=1 for this battery test')
     if (args.rtc_wake or args.rtc_batch) and os.environ.get('NEO_SLEEP_ATTENDED') != '1':
         parser.error('Confirm observer readiness, then supply ATTENDED=1 for this sleep attempt or bounded batch')
@@ -272,7 +297,7 @@ def main():
         else:
             value = experiment(config, capture, Path(qualification),
                                'rtc-wake' if args.rtc_wake else 'rehearse', rehearsal, args.connection)
-            if args.rtc_wake:
+            if args.rtc_wake and not diagnostic.sleep_connection.transition(args.connection):
                 continuation = json.loads(Path(qualification).read_text())
                 continuation['sleeps'] = continuation.get('sleeps', []) + [dict(capture=str(capture/'result.json'))]
                 diagnostic.pm_module().save(capture/'qualification-next.json', continuation)

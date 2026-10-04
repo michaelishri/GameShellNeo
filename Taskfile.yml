@@ -31,6 +31,9 @@ env:
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
   NEO_SLEEP_ATTENDED: '{{.ATTENDED | default "0"}}'
+  NEO_SLEEP_CABLE_OBSERVATION: '{{.OBSERVATION | default ""}}'
+  NEO_SLEEP_CABLE_DISPLAY: '{{.DISPLAY | default ""}}'
+  NEO_SLEEP_CABLE_ACTION: '{{.CABLE_ACTION | default "0"}}'
   NEO_SLEEP_CABLE_ABSENT: '{{.UNPLUGGED | default "0"}}'
   NEO_SLEEP_RESULT: '{{.RESULT | default ""}}'
   NEO_SLEEP_COLLECT_ROUTE: '{{.ROUTE | default "usb"}}'
@@ -519,6 +522,26 @@ tasks:
   device:sleep-battery:
     desc: One attended battery-only RTC-wake attempt over Wi-Fi; USB absent, QUALIFICATION/REHEARSAL/UNPLUGGED/ATTENDED required
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake --connection battery]
+
+  report:sleep-cable:
+    desc: Bind observer action/display report to immutable cable-sleep result; RESULT/OBSERVATION/DISPLAY required, offline only
+    cmds: [python3 tools/report-sleep-cable.py]
+
+  device:sleep-cable-remove-rehearse:
+    desc: Awake rehearsal for USB removal scenario; USB connected, QUALIFICATION/CABLE_ACTION required
+    cmds: [python3 tools/check-sleep-rtc.py --rehearse --connection usb-remove]
+
+  device:sleep-cable-remove:
+    desc: One attended sleep with prompted USB removal; QUALIFICATION/REHEARSAL/CABLE_ACTION/ATTENDED required
+    cmds: [python3 tools/check-sleep-rtc.py --rtc-wake --connection usb-remove]
+
+  device:sleep-cable-attach-rehearse:
+    desc: Awake rehearsal for USB attachment scenario; USB absent, QUALIFICATION/CABLE_ACTION/UNPLUGGED required
+    cmds: [python3 tools/check-sleep-rtc.py --rehearse --connection usb-attach]
+
+  device:sleep-cable-attach:
+    desc: One attended sleep with prompted USB attachment; QUALIFICATION/REHEARSAL/CABLE_ACTION/UNPLUGGED/ATTENDED required
+    cmds: [python3 tools/check-sleep-rtc.py --rtc-wake --connection usb-attach]
 
   device:sleep-rtc:
     desc: One attended real s2idle attempt; QUALIFICATION, REHEARSAL and fresh ATTENDED=1 required

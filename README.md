@@ -1996,6 +1996,80 @@ seven-debug baseline and same-source battery rehearsal; no card reflash is
 needed. Normal product sleep remains masked. See
 [report 150](docs/150-battery-rtc-qualification.md) for validation and live limits.
 
+USB changes during sleep have two separately qualified one-shot scenarios.
+These tools are prepared and source-tested; hardware qualification is pending.
+Both submit and collect through Wi-Fi, keeping an uncertain USB result from
+triggering a second sleep. The Mac must remain awake on the same Wi-Fi; this
+is not the Mac-sleep test. Start each scenario with its own fresh, reviewed
+seven-debug baseline and matching awake rehearsal:
+
+```sh
+# Removal: start connected, and keep it connected throughout this awake rehearsal.
+task device:sleep-cable-remove-rehearse QUALIFICATION=<fresh-history.json> CABLE_ACTION=1
+# After successful rehearsal and fresh observer readiness:
+task device:sleep-cable-remove QUALIFICATION=<fresh-history.json> REHEARSAL=<run-id> CABLE_ACTION=1 ATTENDED=1
+
+# Attachment: finish another debug baseline connected, then confirm physical unplug.
+# Keep USB absent throughout this awake rehearsal.
+task device:sleep-cable-attach-rehearse QUALIFICATION=<fresh-history.json> CABLE_ACTION=1 UNPLUGGED=1
+# After successful rehearsal and fresh observer readiness:
+task device:sleep-cable-attach QUALIFICATION=<fresh-history.json> REHEARSAL=<run-id> CABLE_ACTION=1 UNPLUGGED=1 ATTENDED=1
+```
+
+`CABLE_ACTION=1` records that the observer has confirmed the starting state and
+understands the single requested action. It does not mean the action already
+happened. `ATTENDED=1` still requires fresh readiness for the actual sleep.
+`UNPLUGGED=1` is additionally required whenever the starting state is battery.
+No cable action is performed during either awake rehearsal.
+
+The actual test displays instructions for ten seconds before arming the RTC.
+When the screen goes dark, wait ten seconds, then perform **one** requested
+action at the GameShell: remove USB, or attach the cable connected to the awake
+Mac. Leave it in that resulting state. If the screen returns before the action,
+do not change the cable; report that the action was not performed. Leave all
+buttons untouched. After return, a message says to leave the cable alone while
+the original result is collected; the original console is then restored.
+
+Removal must finish with absent external power, UDC/carrier/PHY disconnected,
+valid battery discharge and independent Wi-Fi recovery. Attachment must finish
+with external power, configured USB/carrier/PHY and independent USB **and**
+Wi-Fi recovery. The before/entry states must match; a premature transition
+rejects admission before the handshake or sleep write. Final counts must show
+one AC/VBUS event in the requested direction with no opposite events. Missing
+interrupts also fail qualification, given the known PMIC detection limitations.
+Neither these counts nor screen darkness measures the electrical-edge time.
+
+RTC delivery is checked immediately at return, never after an awake wait.
+An early wake, another wake source or incomplete recovery is a failed RTC
+qualification, even if the cable seems to work. Wake observations and recovery
+state are preserved for diagnosis. No cause is assigned from IRQ counts alone.
+The original run is not retried and no continuation history is published for
+either cable scenario. On uncertainty:
+
+```sh
+task device:sleep-collect RUN=<original-run-id> ROUTE=wifi
+```
+
+After reviewing that result, record the observer's answer separately:
+
+```sh
+task report:sleep-cable RESULT=<capture/result.json> OBSERVATION=during-dark DISPLAY=normal
+```
+
+Use `during-dark` only for one requested action after the ten-second dark wait
+and before visible return. Other answers are `after-return`, `no-action` or
+`uncertain`; display answers are `normal`, `abnormal` or `unknown`. Do not guess
+on the observer's behalf. The offline task creates a separate, non-overwriting
+`result-cable-observation.json`, hashes the original, and cannot turn an
+automated failure into a pass. Even a successful attended result leaves precise
+electrical-edge timing and energy unqualified.
+
+New helper sources require fresh qualification; report150's consumed chain
+cannot admit these tasks. No new image/card flash is required. Failure can
+retain the existing diagnostic power-key suppression pending review; console,
+RTC, trace and PM cleanup remains bounded and ownership-checked. See
+[report 151](docs/151-usb-cable-sleep-diagnostics.md) for implementation and limits.
+
 [Report 119](docs/119-guarded-rtc-sleep-preparation.md) records admission,
 recovery limits and the two successful awake rehearsals. Ordinary sleep remains
 masked. Interrupted ownership can deliberately leave power-key actions ignored;

@@ -39,7 +39,8 @@ def snapshot(token):
         owners={str(p): read(p) for p in (
             Path('/run/gameshellneo-power-policy.json'),
             Path('/run/systemd/logind.conf.d/zz-gameshellneo-pm-guard.conf'),
-            Path('/run/gameshellneo-sleep-controls.json'))},
+            Path('/run/gameshellneo-sleep-controls.json'),
+            Path('/run/gameshellneo-sleep-console.json'))},
         interrupts=read('/proc/interrupts'))
 
 

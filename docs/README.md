@@ -319,3 +319,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [149 — USB reconnects after repeated sleep](149-diagnostic18-post-sleep-usb-reconnects.md): four physical awake reconnects with independent USB SSH proof, final both-route health checks and unchanged PM/reference state; battery-only and host-sleep cases remain open.
 
 - [150 — Battery-only RTC-wake tooling](150-battery-rtc-qualification.md): explicit absent-cable profile, Wi-Fi-only one-shot transport, separate recovery claims, passive cable/IRQ evidence and source/physical qualification gates.
+
+- [151 — USB transitions during sleep](151-usb-cable-sleep-diagnostics.md): separate removal/attachment tasks, owned screen prompts, original early-wake evidence and immutable observer reports; source-tested, hardware qualification pending.

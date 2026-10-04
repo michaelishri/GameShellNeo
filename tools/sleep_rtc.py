@@ -27,6 +27,7 @@ import wifi_trace
 import usb_trace
 import speaker_audio
 import sleep_connection
+import sleep_cable
 
 RESULTS = Path('/var/lib/gameshellneo/sleep-tests')
 OWNED = Path('/run/gameshellneo-sleep-controls.json')
@@ -38,7 +39,7 @@ SDIO_PATCH = 'kernel/patches/0023-sunxi-mmc-sdio-reference-ownership.patch'
 SDIO_SHA = '52f4e3d8b966f8f69718340697606e30d174033d998be84f98b42bc2c97e92ee'
 SOURCES = ('sleep_rtc', 'test-pm-stages', 'keypad_pm', 'power_key', 'power_key_policy',
            'power_key_pm', 'power_key_input', 'keypad_input', 'speaker_audio',
-           'rtc_alarm', 'pm_platform', 'wifi_trace', 'usb_trace', 'sleep_connection')
+           'rtc_alarm', 'pm_platform', 'wifi_trace', 'usb_trace', 'sleep_connection', 'sleep_cable')
 
 
 def pm_module():
@@ -114,15 +115,20 @@ def completed_result(pm, record, lock, mode):
                     ('handed_back', 'logical_release_verified', 'descriptor_closed'))):
         raise ValueError('Power-key policy or handback differs')
     connection = sleep_connection.profile(record.get('connection', 'usb'))
-    pm.validate(record['before'], lock, connection)
+    pm.validate(record['before'], lock, sleep_connection.endpoint(connection, mode))
     evaluated = deepcopy(record)
     health(pm, evaluated, lock)
     for field in ('delivery', 'sleep_trace') if mode == 'rtc-wake' else ('delivery',):
         if evaluated[field] != record.get(field):
             raise ValueError('Recorded wake assessment differs from original evidence')
+    if sleep_connection.transition(connection) and mode == 'rtc-wake':
+        if (record.get('cable_console', {}).get('restored') is not True or
+                record.get('console_owner_retained') is not False or
+                record.get('wake_observation') != sleep_cable.wake_observation(record)):
+            raise ValueError('Cable console restoration or wake observation differs')
     for side in ('before', 'after'):
         usb = record['usb_trace'][side]
-        expected = ('configured', '1') if connection == 'usb' else ('not attached', '0')
+        expected = ('configured', '1') if sleep_connection.endpoint(connection, mode, side) == 'usb' else ('not attached', '0')
         if (usb['state'], usb['carrier']) != expected:
             raise ValueError('USB configuration/carrier differs from connection profile')
 
@@ -132,6 +138,8 @@ def history(pm, records, sleeps, current, lock, connection='usb'):
     if not isinstance(sleeps, list) or len(sleeps) > MAX_SLEEP_CHAIN:
         raise ValueError('Sleep history exceeds the bounded qualification chain')
     sleep_connection.profile(connection)
+    if sleep_connection.transition(connection) and sleeps:
+        raise ValueError('Cable transitions require a fresh one-shot baseline, not a repeat chain')
     now = current['monotonic_seconds']
     if type(now) not in (int, float) or not math.isfinite(now) or now < 0:
         raise ValueError('Invalid current snapshot time')
@@ -200,7 +208,7 @@ def admission(pm, before, lock, receipt, connection='usb'):
     sleep_connection.profile(connection)
     if receipt.get('connection', 'usb') != connection:
         raise ValueError('Qualification receipt has another connection profile')
-    pm.validate(before, lock, connection)
+    pm.validate(before, lock, sleep_connection.endpoint(connection))
     if before['image']['project_inputs_sha256'].get(SDIO_PATCH) != SDIO_SHA:
         raise ValueError('Require the hardware-qualified SDIO reference fix')
     if OWNED.exists() or pm.STATE.exists():
@@ -423,9 +431,11 @@ def enter(pm, record, guard, fd, target, persist, mode):
     if mode not in ('rehearse', 'rtc-wake'):
         raise ValueError('Explicit rehearsal or RTC wake mode required')
     guard.before_entry()
-    if record.get('connection', 'usb') == 'battery':
+    connection = record.get('connection', 'usb')
+    if connection != 'usb':
         record['cable']['entry'] = sleep_connection.observe()
-        sleep_connection.unchanged(record['cable']['before'], record['cable']['entry'])
+        sleep_connection.unchanged(record['cable']['before'], record['cable']['entry'],
+                                   sleep_connection.endpoint(connection, mode))
     record['wakeup_count'] = wakeup_count()
     record['rtc']['margin_seconds'] = margin(fd, target)
     record['entry_intent'] = dict(mode=mode, state='freeze' if mode == 'rtc-wake' else None,
@@ -446,7 +456,18 @@ def enter(pm, record, guard, fd, target, persist, mode):
         single_write(pm.POWER/'state', 'freeze\n')  # Exactly one submission; no retry.
         record['returned'] = clock_pair()
         record['wake_irq'] = pm.read(pm.POWER/'pm_wakeup_irq')
-        record['rtc']['interrupt'] = delivery(fd, 0)  # Do not wait awake and misattribute later delivery.
+        if sleep_connection.transition(connection):
+            # Preserve an early wake and collect recovery state. The unchanged
+            # RTC acceptance below still rejects it; never wait awake for an alarm.
+            poll = select.poll(); poll.register(fd, select.POLLIN | select.POLLERR | select.POLLHUP)
+            events = poll.poll(0)
+            if events not in ([], [(fd, select.POLLIN)]):
+                raise ValueError('RTC descriptor error at cable-test return')
+            record['rtc']['interrupt'] = rtc.irq_event(os.read(fd, struct.calcsize('@L'))) if events else None
+            record['wake_observation'] = sleep_cable.wake_observation(record)
+            sleep_cable.returned(record)
+        else:
+            record['rtc']['interrupt'] = delivery(fd, 0)  # No awake wait for later delivery.
     guard.after_entry()
     record['rtc']['after_delivery'] = rtc.snapshot(fd)
     record['rtc']['irq_after'] = rtc_irq()
@@ -457,6 +478,8 @@ def validate_delivery(record):
     if record.get('mode') not in ('rehearse', 'rtc-wake'):
         raise ValueError('Unknown sleep evidence mode')
     rtc_data = record['rtc']
+    if rtc_data.get('interrupt') is None:
+        raise ValueError('No RTC event at return: early/unattributed wake, not an RTC-wake pass')
     a, b = rtc_data['irq_before'], rtc_data['irq_after']
     if a['irq'] != b['irq'] or a['cpus'] != b['cpus'] or b['count'] != a['count']+1:
         raise ValueError('RTC interrupt delivery identity/count mismatch')
@@ -567,7 +590,7 @@ def health(pm, record, lock):
     # Preserve the wake/clock result even if a later device recovery check fails.
     record['delivery'] = validate_delivery(record)
     before, after = record['before'], record['after']
-    pm.validate(after, lock, record.get('connection', 'usb'))
+    pm.validate(after, lock, sleep_connection.endpoint(record.get('connection', 'usb'), record['mode'], 'after'))
     sleep_connection.validate(record)
     keys = ('boot_id', 'kernel', 'image', 'pm', 'pm_test_delay', 'masks', 'inputs', 'backlight',
             'wifi_config_sha256', 'wifi_power_save', 'charger', 'cpu_policy')
@@ -639,10 +662,14 @@ def rehearsal_for_chain(pm, before, lock, qualification, rehearsal):
     return last['rtc']['irq_after']
 
 
-def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_absent=False):
+def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_absent=False, cable_action=False):
     sleep_connection.profile(connection)
     if connection == 'battery' and cable_absent is not True:
         raise ValueError('Battery test requires fresh physical cable-absence confirmation')
+    if sleep_connection.transition(connection) and cable_action is not True:
+        raise ValueError('Cable transition requires explicit observer/action readiness')
+    if sleep_connection.endpoint(connection) == 'battery' and cable_absent is not True:
+        raise ValueError('Battery-start cable test requires physical USB absence')
     policy.run_id(token)
     directory = RESULTS/token
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
@@ -652,7 +679,7 @@ def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_
     finally:
         os.close(parent)
     record = dict(run_id=token, mode=mode, connection=connection,
-                  cable_absent_confirmed=cable_absent, event='started', passed=False,
+                  cable_absent_confirmed=cable_absent, cable_action_confirmed=cable_action, event='started', passed=False,
                   qualification_scope='functional-wake-and-device-recovery' if mode == 'rtc-wake' else 'awake-rehearsal',
                   sources=sources(), rtc={}, power_key={}, keypad={}, wifi_trace={}, usb_trace={})
     persist = lambda: pm.save(directory/'started.json', record)
@@ -661,9 +688,9 @@ def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_
             before = record['before'] = pm.snapshot()
             record['cpu_idle_before'] = idle_snapshot()
             record['qualification'] = admission(pm, before, lock, receipt, connection)
-            if connection == 'battery':
+            if connection != 'usb':
                 record['cable'] = {'before': sleep_connection.observe()}
-                sleep_connection.absent(record['cable']['before'])
+                sleep_connection.state(record['cable']['before'], sleep_connection.endpoint(connection))
             record['policy_before'] = policy.inspect()
             record['audio_before'] = speaker_audio.idle()
             preceding = record['qualification']['sleep_runs']
@@ -681,36 +708,37 @@ def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_
                 guard.before_entry()
                 record['pek_before'] = power_key_pm.irq_counts()
                 policy.acquire(token, before['boot_id'])
-                with usb_trace.capture(record['usb_trace'], token), wifi_trace.capture(record['wifi_trace']), \
-                        keypad_pm.observe(record['keypad'], tracing=True):
-                    # Tag newly acquired trace ownership for this controller's
-                    # recovery; untagged or foreign traces are never removed.
-                    for owned in (wifi_trace.OWNED, keypad_pm.OWNED):
-                        pm.save(owned, json.loads(policy.read_owned(owned)) | {'sleep_run': token})
-                    with controls(pm, token):
-                        os.sync()
-                        record['rtc']['irq_before'] = rtc_irq()
-                        if mode == 'rtc-wake' and record['rtc']['irq_before'] != expected_rtc:
-                            raise ValueError('RTC activity changed before sleep admission')
-                        with deadline(record['rtc'], persist, token) as (fd, target):
-                            policy.verify(token)
-                            power_key_pm.require_delta(record['pek_before'], power_key_pm.irq_counts(), 0, 0)
-                            enter(pm, record, guard, fd, target, persist, mode)
-                    record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == checksum
-                    if mode == 'rtc-wake':
-                        record['keypad_ready'] = {}
-                        keypad_pm.wait_ready(record['keypad_ready'], time.monotonic(),
-                                             keypad_pm.keypad_identity(record['keypad']['before']))
-                        time.sleep(30)  # Recovery observation only; never an asleep watchdog.
-                    if connection == 'battery':
-                        record['cable']['after'] = sleep_connection.observe()
-                    record['after'] = pm.snapshot()
-                    record['cpu_idle_after'] = idle_snapshot()
-                    record['audio_after'] = speaker_audio.idle()
-                health(pm, record, lock)
-                handoff = UntouchedHandoff(guard, record['pek_before'], record['after']['stats'])
-                policy._restore_checked(token, handoff.check)
-                record['policy_restored'] = True
+                with sleep_cable.console(record, token):
+                    with usb_trace.capture(record['usb_trace'], token), wifi_trace.capture(record['wifi_trace']), \
+                            keypad_pm.observe(record['keypad'], tracing=True):
+                        # Tag newly acquired trace ownership for this controller's
+                        # recovery; untagged or foreign traces are never removed.
+                        for owned in (wifi_trace.OWNED, keypad_pm.OWNED):
+                            pm.save(owned, json.loads(policy.read_owned(owned)) | {'sleep_run': token})
+                        with controls(pm, token):
+                            os.sync()
+                            record['rtc']['irq_before'] = rtc_irq()
+                            if mode == 'rtc-wake' and record['rtc']['irq_before'] != expected_rtc:
+                                raise ValueError('RTC activity changed before sleep admission')
+                            with deadline(record['rtc'], persist, token) as (fd, target):
+                                policy.verify(token)
+                                power_key_pm.require_delta(record['pek_before'], power_key_pm.irq_counts(), 0, 0)
+                                enter(pm, record, guard, fd, target, persist, mode)
+                        record['process_memory_ok'] = hashlib.sha256(memory).hexdigest() == checksum
+                        if mode == 'rtc-wake':
+                            record['keypad_ready'] = {}
+                            keypad_pm.wait_ready(record['keypad_ready'], time.monotonic(),
+                                                 keypad_pm.keypad_identity(record['keypad']['before']))
+                            time.sleep(30)  # Recovery observation only; never an asleep watchdog.
+                        if connection != 'usb':
+                            record['cable']['after'] = sleep_connection.observe()
+                        record['after'] = pm.snapshot()
+                        record['cpu_idle_after'] = idle_snapshot()
+                        record['audio_after'] = speaker_audio.idle()
+                    health(pm, record, lock)
+                    handoff = UntouchedHandoff(guard, record['pek_before'], record['after']['stats'])
+                    policy._restore_checked(token, handoff.check)
+                    record['policy_restored'] = True
             if record['power_key']['events'] or record['power_key'].get('handed_back') is not True:
                 raise ValueError('Power-key activity/cleanup failure during final handoff')
             record['policy_after'] = policy.inspect()
@@ -726,6 +754,7 @@ def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_
         record['dropin_retained'] = os.path.lexists(policy.DROPIN)
         record['controls_retained'] = os.path.lexists(OWNED)
         record['rtc_owner_retained'] = os.path.lexists(rtc.OWNED)
+        record['console_owner_retained'] = os.path.lexists(sleep_cable.OWNED)
         pm.save(directory/'result.json', record)
 
 
@@ -737,7 +766,8 @@ def recover(pm, token):
         raise ValueError('Recovery belongs to another boot/run')
     with keypad_pm.exclusive_pm(OWNED.parent):
         failures = []
-        operations = ((rtc.OWNED, 'run_id', rtc.restore),
+        operations = ((sleep_cable.OWNED, 'run_id', lambda: sleep_cable.restore(token)),
+                      (rtc.OWNED, 'run_id', rtc.restore),
                       (OWNED, 'run_id', lambda: restore_controls(pm, token)),
                       (usb_trace.OWNED, 'run_id', lambda: usb_trace.restore(token)),
                       (wifi_trace.OWNED, 'sleep_run', wifi_trace.restore),
@@ -769,10 +799,13 @@ def main():
     parser.add_argument('--receipt', type=Path)
     parser.add_argument('--rehearsal')
     parser.add_argument('--attended', action='store_true')
-    parser.add_argument('--connection', choices=('usb', 'battery'), default='usb')
+    parser.add_argument('--connection', choices=('usb', 'battery', 'usb-remove', 'usb-attach'), default='usb')
     parser.add_argument('--cable-absent-confirmed', action='store_true')
+    parser.add_argument('--cable-action-confirmed', action='store_true')
     args = parser.parse_args()
-    if args.connection == 'battery' and not args.cable_absent_confirmed:
+    if sleep_connection.transition(args.connection) and not args.cable_action_confirmed:
+        parser.error('Cable transition requires explicit observer/action readiness')
+    if sleep_connection.endpoint(args.connection) == 'battery' and not args.cable_absent_confirmed:
         parser.error('Battery test requires fresh physical cable-absence confirmation')
     if args.connection_inspect:
         print(json.dumps(dict(sources=sources(), connection=sleep_connection.observe())))
@@ -794,7 +827,7 @@ def main():
         recover(pm, args.run_id)
     else:
         run(pm, args.run_id, 'rtc-wake' if args.rtc_wake else 'rehearse',
-            json.loads(args.lock.read_text()), json.loads(args.receipt.read_text()), args.rehearsal, args.connection, args.cable_absent_confirmed)
+            json.loads(args.lock.read_text()), json.loads(args.receipt.read_text()), args.rehearsal, args.connection, args.cable_absent_confirmed, args.cable_action_confirmed)
 
 
 if __name__ == '__main__':

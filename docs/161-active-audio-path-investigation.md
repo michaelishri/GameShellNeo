@@ -95,8 +95,23 @@ spaced 20 ms hardware snapshots. PL3 is the `enable` line at offset 3 of the
 `1f02c00.pinctrl` GPIO controller, mapped by the board DTS; its current global
 GPIO number happens to be 3.
 
-Owner short/long audibility observation is pending. Active PCM, DAPM and GPIO
-evidence alone does not establish analogue output or audible sound. Further
-sleep testing remains paused. Use the combined evidence to choose the next
-investigation rather than assuming a longer tone, gain increase or driver reload
-fixes the underlying issue.
+The owner answered: “I think I heard it, it's just really quiet. Can you turn
+the volume up a little bit”. This is a tentative sound observation rather than
+a definite confirmation of both durations. It changes the next comparison:
+test a modest increase in gain at the owner's request before pursuing an
+unproven driver fault. Active PCM, DAPM and GPIO evidence alone still does not
+establish analogue output or reliable audibility.
+
+## Owner-requested level increase
+
+`task device:audio-path ROUTE=usb LEVEL=4` selects headphone volume 54 (-9 dB),
+6 dB above the original level 3. The waveform peak, digital gains, fades,
+frequency and two durations remain unchanged. Level 3 remains reproducible
+through the same task. The candidate is bounded to these two comparison levels;
+normal warnings and button confirmations remain at level 3 until observation.
+Fresh readiness is required for the new comparison; further sleep remains
+paused. A gain adjustment is not evidence that a driver issue has been fixed.
+
+The level-selection change also passed `task check` with the same 13 runtime/
+567 tooling count (one optional skip), C and shell checks. Private log:
+`.local/neo116-level4-check.log`.

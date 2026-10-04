@@ -1487,6 +1487,10 @@ restoring the original mixer. Observations are bounded to eight seconds/400
 samples per cue; individual reads are sequential, not an atomic hardware
 snapshot. Successful capture does not establish audibility. Collect and recover
 with the same `device:audio-collect` and `device:audio-restore` tasks above.
+Use `LEVEL=4` for the owner-requested 6 dB increase (headphone volume 54,
+-9 dB); `LEVEL=3` retains the original comparison. These are the only two
+accepted comparison levels. The normal cue default remains level 3 until the
+higher level has been heard and assessed.
 This uses uploaded helpers, with their source hashes saved in `run.json`; it
 does not require a reflash. Changes to the shared audio helper invalidate older
 sleep source receipts: do not rewrite evidence or reuse a stale rehearsal.

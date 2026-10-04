@@ -96,7 +96,8 @@ class Result(unittest.TestCase):
                 record['restored'] = True
         with tempfile.TemporaryDirectory() as temporary, patch.object(probe, 'RESULTS', Path(temporary)), \
                 patch.object(audio, 'inspect', return_value={}), patch.object(audio, 'session', session), \
-                patch.object(audio, 'control', return_value='0'), patch.object(probe.time, 'sleep'), \
+                patch.object(audio, 'control', return_value='0'), patch.object(audio, 'set_control'), \
+                patch.object(probe.time, 'sleep'), \
                 patch.object(probe, 'reader', side_effect=OSError('observer failed')), \
                 self.assertRaisesRegex(OSError, 'observer failed'):
             try:
@@ -114,6 +115,10 @@ class Result(unittest.TestCase):
                       cues=[dict(level=3, duration_ms=x) for x in (80, 1000)],
                       paths=[dict(duration_ms=x, samples=[{}]) for x in (80, 1000)])
         host.validate(record, before, 'a'*32, True)
+        louder = record | {'cues': [dict(level=4, duration_ms=x) for x in (80, 1000)]}
+        host.validate(louder, before, 'a'*32, True, 4)
+        with self.assertRaises(ValueError):
+            host.validate(louder, before, 'a'*32, True, 3)
         for key, bad in (('cues', [{}]), ('paths', []), ('restored', False),
                          ('after', dict(boot_id='new-boot', controls='quiet')),
                          ('after', dict(boot_id='boot', controls='loud'))):

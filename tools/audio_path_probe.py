@@ -90,9 +90,11 @@ def capture_path(record):
             raise RuntimeError(record['error'])
 
 
-def test(run_id):
+def test(run_id, level=3):
     if not re.fullmatch('[a-f0-9]{32}', run_id):
         raise ValueError('Expected a private 32-character run ID')
+    if type(level) is not int or level not in (3, 4):
+        raise ValueError('Active path comparison supports only levels 3 and 4')
     directory = RESULTS / run_id
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     record = dict(run_id=run_id, kind='audio-path', passed=False,
@@ -100,14 +102,15 @@ def test(run_id):
     try:
         record['before'] = audio.inspect()
         with audio.session(record, owner=run_id) as cue:
+            audio.set_control('Headphone Playback Volume', str(audio.LEVELS[level]))
             record['active_controls'] = {name: audio.control(name) for name in audio.CONTROLS}
             print('Same-volume 80 ms and 1000 ms tones start in ten seconds.', flush=True)
             time.sleep(10)
             for duration in (80, 1000):
-                path = dict(duration_ms=duration, level=3)
+                path = dict(duration_ms=duration, level=level)
                 record['paths'].append(path)
                 with capture_path(path):
-                    cue.play('audio-path-' + str(duration), 3, duration_ms=duration)
+                    cue.play('audio-path-' + str(duration), level, duration_ms=duration)
                 time.sleep(2)
         record['after'] = audio.inspect()
         if (record['before']['boot_id'] != record['after']['boot_id'] or
@@ -127,13 +130,14 @@ def test(run_id):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_id')
+    parser.add_argument('--level', type=int, choices=(3, 4), default=3)
     args = parser.parse_args()
     os.umask(0o077)
     def interrupted(signum, _frame):
         raise SystemExit(128 + signum)
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, interrupted)
-    test(args.run_id)
+    test(args.run_id, args.level)
 
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ def collect(config, run_id, route='usb'):
             '/var/lib/gameshellneo/audio-tests/' + run_id + '/result.json']), display=False))
 
 
-def validate(result, before, run_id, path_test=False):
+def validate(result, before, run_id, path_test=False, path_level=3):
     if (result.get('passed') is not True or result.get('restored') is not True or
             result.get('run_id') != run_id or
             result['before']['boot_id'] != before['boot_id'] or
@@ -38,7 +38,7 @@ def validate(result, before, run_id, path_test=False):
         raise ValueError('Speaker cue or restoration checks failed; evidence retained')
     if path_test:
         if (result.get('kind') != 'audio-path' or
-                [(c.get('level'), c.get('duration_ms')) for c in result.get('cues', [])] != [(3, 80), (3, 1000)] or
+                [(c.get('level'), c.get('duration_ms')) for c in result.get('cues', [])] != [(path_level, 80), (path_level, 1000)] or
                 [p.get('duration_ms') for p in result.get('paths', [])] != [80, 1000] or
                 any('error' in p or not p.get('samples') for p in result['paths'])):
             raise ValueError('Incomplete active audio path comparison; evidence retained')
@@ -103,6 +103,9 @@ def main():
     mode.add_argument('--collect', action='store_true')
     mode.add_argument('--restore', action='store_true')
     args = parser.parse_args()
+    path_level = os.environ.get('NEO_AUDIO_LEVEL', '3')
+    if args.path_test and path_level not in ('3', '4'):
+        raise ValueError('Use LEVEL=3/4 for the active audio comparison')
     os.umask(0o077)
     config, capture = load_env(), evidence_directory()
     route = os.environ.get('NEO_AUDIO_ROUTE', 'usb')
@@ -149,7 +152,8 @@ def main():
                 '--property=TimeoutStopSec=15', '--property=UMask=0077',
                 '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
                 '/usr/bin/python3', '-B'] + (
-                    [directory + '/audio_path_probe.py', run_id] if args.path_test else [script, '--test', run_id])
+                    [directory + '/audio_path_probe.py', run_id, '--level', path_level]
+                    if args.path_test else [script, '--test', run_id])
             try:
                 run(client, shlex.join(command), display=False, timeout=20)
             except (OSError, RuntimeError, paramiko.SSHException) as error:
@@ -164,7 +168,7 @@ def main():
                     output.write(type(error).__name__ + '\n')
                 continue
             (capture / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
-            validate(result, before, run_id, args.path_test)
+            validate(result, before, run_id, args.path_test, int(path_level) if args.path_test else 3)
             print(('Short/long audio path comparison' if args.path_test else 'Three bounded cues') +
                   ' completed; mixer and amplifier idle state restored. Audibility needs owner confirmation.')
             if args.reboot:

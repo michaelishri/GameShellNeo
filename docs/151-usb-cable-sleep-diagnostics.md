@@ -15,8 +15,10 @@ records the failed original, normal owner-observed display, excessive helper
 source logging and the verified transport correction. A later fresh boot now
 passes all seven automated prerequisites with journal continuity and both SSH
 routes intact; the owner confirmed normal display return. The removal awake
-rehearsal below also passed. Actual cable-transition sleep remains pending
-separate readiness and observation.
+rehearsal below also passed. The subsequent attended removal attempt woke on
+RTC and returned a normal console but failed with stale gadget connection state;
+[report 153](153-usb-removal-sleep-state-failure.md) preserves the original and
+opens NEO-112 for driver investigation. Cable-transition qualification stays open.
 
 ## What each case establishes
 
@@ -162,8 +164,8 @@ establish sleep, cable handling while asleep, CPU retention or energy savings.
 
 ## Remaining work
 
-Run one attended removal case after fresh readiness. Review original evidence and
-observer response before restoring the cable or planning attachment. A source,
+Resolve NEO-112's stale disconnect state and review the missing PMIC removal
+events before planning another sleep case or attachment. A source,
 boot or PM-history change must not silently reuse a consumed baseline.
 
 Mac sleep/wake, another GameShell boot, CPU-idle/timekeeping, battery energy,

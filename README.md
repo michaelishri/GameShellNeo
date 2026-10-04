@@ -2070,6 +2070,12 @@ retain the existing diagnostic power-key suppression pending review; console,
 RTC, trace and PM cleanup remains bounded and ownership-checked. See
 [report 151](docs/151-usb-cable-sleep-diagnostics.md) for implementation and limits.
 
+The first attended removal attempt woke on RTC with a normal console but failed:
+external power/PHY reported removal while the gadget retained its connected state.
+[Report 153](docs/153-usb-removal-sleep-state-failure.md) records the preserved
+failure and NEO-112 driver investigation; further cable-transition sleep remains
+pending that review and correction.
+
 Diagnostic inspections send their Python helper source over SSH standard input.
 Only the short interpreter command and its arguments enter the usual sudo command
 audit; this avoids repeatedly logging the full helper source. The source payload

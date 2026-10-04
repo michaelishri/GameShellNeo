@@ -109,7 +109,26 @@ whose prepared source is absent in this isolated worktree. Logs are
 `work/battery-rtc-qualification`'s worktree. Tests use modeled transport and
 filesystem fixtures, not real sleep or electrical fault injection.
 
-Hardware import/state inspection, awake battery rehearsal, actual battery
-sleep and subsequent reattachment remain to qualify. NEO-109 stays open.
+Awake battery rehearsal, actual battery sleep and subsequent reattachment
+remain to qualify. NEO-109 stays open.
 CPU-idle/energy work, Mac sleep, power-button wake and product power policy
 remain separate; this tooling makes no performance or battery-life claim.
+
+## Read-only hardware inspection
+
+The saved connection inspector passes on the unchanged diagnostic.18 image,
+boot `e419f334-0a16-4b04-96d2-d97a2e4d5d0b`. Uploaded source identities match
+main commit `12e050c`. It reads configured UDC, carrier 1, PHY `USB=1` /
+`USB-HOST=0`, and both external inputs present/online. The four AC/VBUS
+plug/removal counters each read 4; all four CPU columns are present. This
+qualifies the passive reader's import, path and IRQ-layout assumptions while
+USB is connected, not absent-state admission or sleeping behavior.
+
+Capture: `.local/diagnostics/20261004T025746.439153Z/connection-inspection.json`.
+SHA-256: `c463c33b58da0a17c1d2402a732c239d9c85acecc4ebd207a83946cbcd0df2f9`.
+The subsequent PM inspection at
+`.local/diagnostics/20261004T025820.979608Z/inspection.json` passes the common
+validator on the original boot, with PM counts unchanged at 19 successes and
+zero failures. No RTC programming, PM entry, key ownership or settings change
+occurred during these inspections. Fresh observer readiness is still required
+for the next debug prerequisites and actual battery sleep.

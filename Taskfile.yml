@@ -248,6 +248,10 @@ tasks:
     desc: Check actual power-supply notification functions across freeze and thaw, native and ARM32
     cmds: [bash tools/run-logged.sh power-supply-suspend python3 tools/check-power-supply-suspend.py]
 
+  test:power-supply-lifetime:
+    desc: Reproduce deferred notification teardown with original and test-only reordered core functions; native and ARM32
+    cmds: [bash tools/run-logged.sh power-supply-lifetime python3 tools/check-power-supply-lifetime.py]
+
   check:power-supply-driver:
     desc: Run notification freeze/replay regressions and compile the complete ARM power-supply core
     cmds: [bash tools/run-logged.sh power-supply-driver python3 tools/check-power-supply-suspend.py --compile-driver]

@@ -564,6 +564,16 @@ concurrent changes, wake holds, abort/thaw replay and repeated cycles.
 use of the kernel freezer and the remaining hardware/wake-policy qualification.
 Both freezer options are required by the diagnostic configuration checks.
 
+For the separate deferred-registration/unregister lifetime audit, use
+`task test:power-supply-lifetime`. It reproduces the original cancellation
+order and a test-only reordered comparison using actual core functions on
+native and ARM32 builds. Evidence is saved under
+`.local/build/power-supply-lifetime-tests/`.
+[Report 157](docs/157-power-supply-unregister-lifetime.md) explains the late
+notification race, why ordinary AXP cleanup excludes it, and the independent
+producers that must be stopped before unregister. This task changes neither
+the production patch queue nor the installed image.
+
 For the brcmfmac Wi-Fi sleep and clock error paths, use:
 
 ```sh

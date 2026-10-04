@@ -1,0 +1,51 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: retire the gadget session on system-sleep detach
+
+Drain the controller IRQ after masking it, then notify a logical disconnect
+for the session intentionally detached by fixed-peripheral system PM with
+wakeup disabled. Retire before context save so cleanup runs while powered.
+Keep pull-up intent for resume and suppress duplicate disconnect callbacks
+once negotiated speed has been cleared. Callback lifetime is protected by
+the preceding UDC admission/drain patch.
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2823,6 +2823,9 @@
+ 	musb_gadget_suspend(musb);
+ 	musb_platform_disable(musb);
+ 	musb_disable_interrupts(musb);
++	/* No IRQ callback may overlap retirement of the detached session. */
++	if (musb->gadget_suspended)
++		synchronize_irq(musb->nIrq);
+ 
+ 	musb->flush_irq_work = true;
+ 	while (flush_delayed_work(&musb->irq_work))
+@@ -2835,6 +2838,12 @@
+ 	WARN_ON(!list_empty(&musb->pending_list));
+ 
+ 	spin_lock_irqsave(&musb->lock, flags);
++
++	/* The pull-up is gone: retire protocol state before saving context.
++	 * No later cable edge or host reset is required to finish disconnect.
++	 */
++	if (musb->gadget_suspended && musb->g.speed != USB_SPEED_UNKNOWN)
++		musb_g_disconnect(musb);
+ 
+ 	if (is_host_active(musb)) {
+ 		/* we know all the children are suspended; sometimes
+diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -2082,8 +2082,10 @@
+ 	/* don't draw vbus until new b-default session */
+ 	(void) musb_gadget_vbus_draw(&musb->g, 0);
+ 
++	/* Retire once, including an IRQ arriving after a system-PM detach. */
++	driver = musb->g.speed != USB_SPEED_UNKNOWN ?
++		 musb_gadget_get_driver(musb) : NULL;
+ 	musb->g.speed = USB_SPEED_UNKNOWN;
+-	driver = musb_gadget_get_driver(musb);
+ 	if (driver) {
+ 		if (driver->disconnect) {
+ 			spin_unlock(&musb->lock);

@@ -19,6 +19,18 @@ typedef uint32_t u32;
 #define OTG_STATE_UNDEFINED 0
 #define PHY_MODE_INVALID 0
 #define USB_STATE_NOTATTACHED 0
+#define USB_STATE_CONFIGURED 1
+#define USB_SPEED_UNKNOWN 0
+#define USB_SPEED_HIGH 2
+#define OTG_STATE_B_IDLE 1
+#define OTG_STATE_B_PERIPHERAL 2
+#define OTG_STATE_A_IDLE 3
+#define OTG_STATE_A_PERIPHERAL 4
+#define OTG_STATE_A_WAIT_BCON 5
+#define OTG_STATE_B_WAIT_ACON 6
+#define OTG_STATE_B_HOST 7
+#define OTG_STATE_B_SRP_INIT 8
+#define MUSB_HST_MODE(m) ((void)(m))
 #define container_of(ptr, type, member) ((type *)((char *)(ptr) - offsetof(type, member)))
 #include "musb_sleep_defs.h"
 
@@ -26,12 +38,14 @@ struct list_head { struct list_head *next, *prev; };
 struct device { bool wake; int refs, get_error; };
 struct work_struct { int unused; };
 struct delayed_work { struct work_struct work; bool queued; };
-struct usb_gadget { int unused; };
+struct usb_gadget { int speed, state; };
+struct usb_gadget_driver { void (*disconnect)(struct usb_gadget *); };
 struct transceiver { void *otg; };
 struct config { unsigned num_eps; };
 struct musb_platform_ops { unsigned quirks; };
 struct musb {
-	void *mregs, *phy, *gadget_driver;
+	void *mregs, *phy;
+	struct usb_gadget_driver *gadget_driver;
 	struct transceiver *xceiv;
 	struct device *controller;
 	struct config *config;
@@ -41,7 +55,10 @@ struct musb {
 	struct list_head pending_list;
 	struct musb_context_registers context;
 	struct { void *regs; } endpoints[MUSB_C_NUM_EPS];
-	int port_mode, lock, list_lock, port1_status;
+	int port_mode, lock, list_lock, port1_status, state, nIrq;
+	bool gadget_async_callbacks;
+	unsigned gadget_callback_count;
+	int gadget_callback_wait;
 	bool softconnect, gadget_suspended, flush_irq_work, dyn_fifo, is_active;
 	u16 intrtxe, intrrxe;
 };
@@ -55,10 +72,17 @@ static unsigned writes, scenarios;
 static bool gated_case, restoring, restored, irq_ready, platform_ready, work_ready;
 static bool cancel_runs_worker, unregister_queues, removing;
 static int pm_boundary_intent, callback_intent, errors;
+static unsigned disconnects, completed_requests, pending_requests;
+static bool irq_drained, irq_disconnect, change_intent;
+static struct usb_gadget_driver driver;
 static u8 banks[8][128];
 
 #define spin_lock_irqsave(lock, flags) do { (flags) = 0; assert(!*(lock)); *(lock) = 1; } while (0)
 #define spin_unlock_irqrestore(lock, flags) do { (void)(flags); assert(*(lock)); *(lock) = 0; } while (0)
+#define spin_lock(lock) do { assert(!*(lock)); *(lock) = 1; } while (0)
+#define spin_unlock(lock) do { assert(*(lock)); *(lock) = 0; } while (0)
+#define lockdep_assert_held(lock) assert(*(lock))
+static void wake_up_all(int *wait) { (void)wait; assert(active->lock); }
 #define WARN_ON(value) assert(!(value))
 #define dev_err(...) do { errors++; } while (0)
 #define musb_dbg(...) do {} while (0)
@@ -78,6 +102,7 @@ static bool device_may_wakeup(struct device *d) { return d->wake; }
 static void musb_gadget_work(struct work_struct *work);
 static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on);
 static int musb_gadget_stop(struct usb_gadget *gadget);
+void musb_g_disconnect(struct musb *musb);
 
 static int pm_runtime_get_sync(struct device *d) { assert(!active->lock); d->refs++; return d->get_error; }
 static int pm_runtime_resume_and_get(struct device *d)
@@ -120,7 +145,7 @@ static void musb_writeb(void *p, unsigned off, u8 v)
 	assert(active->controller->refs > 0);
 	if (p == active->mregs && off == MUSB_POWER && (v & MUSB_POWER_SOFTCONN) && gated_case)
 		assert(!restoring && restored && irq_ready && platform_ready && work_ready && !active->gadget_suspended);
-	if (p == active->mregs && off == MUSB_DEVCTL && !v && gated_case && !restoring)
+	if (p == active->mregs && off == MUSB_DEVCTL && !v && gated_case && active->gadget_suspended && !restoring)
 		assert(!(banks[0][MUSB_POWER] & MUSB_POWER_SOFTCONN));
 	((u8 *)p)[off] = v;
 	writes++;
@@ -144,12 +169,30 @@ static void musb_enable_interrupts(struct musb *m) { (void)m; restored = true; i
 static void musb_platform_enable(struct musb *m) { (void)m; assert(irq_ready); platform_ready = true; }
 static void musb_hnp_stop(struct musb *m) { (void)m; }
 static int musb_gadget_vbus_draw(struct usb_gadget *g, unsigned n) { (void)g; (void)n; return 0; }
-static void musb_set_state(struct musb *m, int n) { (void)m; (void)n; }
+static void musb_set_state(struct musb *m, int n) { m->state = n; }
+static int musb_get_state(struct musb *m) { return m->state; }
 static void musb_stop(struct musb *m) { (void)m; }
 static void otg_set_peripheral(void *otg, void *p) { (void)otg; (void)p; }
 static void phy_set_mode(void *phy, int mode) { (void)phy; (void)mode; }
 static void musb_platform_try_idle(struct musb *m, int n) { (void)m; (void)n; }
-static void usb_gadget_set_state(struct usb_gadget *g, int n) { (void)g; (void)n; }
+static void usb_gadget_set_state(struct usb_gadget *g, int n) { g->state = n; }
+static void __attribute__((unused)) synchronize_irq(int irq)
+{
+	assert(irq == active->nIrq && !active->lock && !irq_ready && !platform_ready);
+	irq_drained = true;
+	if (irq_disconnect) {
+		spin_lock(&active->lock); musb_g_disconnect(active); spin_unlock(&active->lock);
+	}
+}
+static bool connected(void);
+static void disconnected(struct usb_gadget *g)
+{
+	assert(g == &active->g && !active->lock && active->gadget_callback_count == 1);
+	assert(!irq_ready && !platform_ready && irq_drained && !connected());
+	assert(g->speed == USB_SPEED_UNKNOWN);
+	disconnects++; completed_requests += pending_requests; pending_requests = 0;
+	if (change_intent) musb_gadget_pullup(g, 0);
+}
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
@@ -161,7 +204,9 @@ static void init(struct musb *m, struct device *d, struct config *c, struct musb
 	memset(m, 0, sizeof(*m)); memset(d, 0, sizeof(*d)); memset(ops, 0, sizeof(*ops));
 	memset(banks, 0, sizeof(banks)); c->num_eps = MUSB_C_NUM_EPS;
 	m->controller = d; m->config = c; m->ops = ops; m->mregs = banks[0];
-	m->port_mode = MUSB_PERIPHERAL; m->softconnect = true; m->gadget_driver = m;
+	m->port_mode = MUSB_PERIPHERAL; m->softconnect = true; driver.disconnect = disconnected; m->gadget_driver = &driver;
+	m->gadget_async_callbacks = true; m->nIrq = 164; m->state = OTG_STATE_B_PERIPHERAL;
+	m->g.speed = USB_SPEED_HIGH; m->g.state = USB_STATE_CONFIGURED;
 	m->pending_list.next = m->pending_list.prev = &m->pending_list;
 	for (unsigned i = 0; i < MUSB_C_NUM_EPS; i++) m->endpoints[i].regs = banks[i + 1];
 	banks[0][MUSB_POWER] = MUSB_POWER_SOFTCONN | MUSB_POWER_HSENAB;
@@ -169,6 +214,8 @@ static void init(struct musb *m, struct device *d, struct config *c, struct musb
 	restored = irq_ready = platform_ready = work_ready = true;
 	cancel_runs_worker = unregister_queues = removing = false;
 	pm_boundary_intent = callback_intent = -1;
+	disconnects = completed_requests = 0; pending_requests = 3;
+	irq_drained = irq_disconnect = change_intent = false;
 }
 static int callback(struct musb *m, void *data)
 {
@@ -198,11 +245,13 @@ int main(void)
 		init(&m, &d, &c, &ops); m.port_mode = role; d.wake = wake;
 		ops.quirks = preserve ? MUSB_PRESERVE_SESSION : 0;
 		gated_case = role == MUSB_PERIPHERAL && !wake && !preserve;
-		m.gadget_driver = bound ? &m : NULL;
+		m.gadget_driver = bound ? &driver : NULL;
 		m.gadget_work.queued = true; cancel_runs_worker = true;
 		/* PM boundary worker must see the gate before cancel drains it. */
 		assert(!musb_suspend(&d)); assert(d.refs == 1);
 		assert(m.gadget_suspended == gated_case);
+		assert(disconnects == (unsigned)(gated_case && bound));
+		if (gated_case) assert(m.g.state == USB_STATE_NOTATTACHED && m.g.speed == USB_SPEED_UNKNOWN);
 		if (gated_case) {
 			assert(!connected() && !m.gadget_work.queued && m.softconnect);
 			assert(banks[0][MUSB_POWER] == MUSB_POWER_HSENAB);
@@ -266,6 +315,37 @@ int main(void)
 	init(&m, &d, &c, &ops); d.refs = 1;
 	musb_save_context(&m); banks[0][MUSB_POWER] = MUSB_POWER_RESUME;
 	musb_restore_context(&m); assert(connected() && (banks[0][MUSB_POWER] & MUSB_POWER_RESUME)); scenarios++;
+	/* Cable removal needs no later IRQ/reset to retire the configured session.
+	 * A retained cable later gets a fresh host reset, not old endpoint state.
+	 */
+	for (int cable = 0; cable < 2; cable++)
+	for (int pending_irq = 0; pending_irq < 2; pending_irq++) {
+		init(&m, &d, &c, &ops); gated_case = true; irq_disconnect = pending_irq;
+		assert(!musb_suspend(&d));
+		assert(disconnects == 1 && completed_requests == 3 && !pending_requests);
+		assert(m.g.speed == USB_SPEED_UNKNOWN && m.g.state == USB_STATE_NOTATTACHED);
+		assert(!musb_resume(&d));
+		assert(m.softconnect && connected() && m.g.state == USB_STATE_NOTATTACHED);
+		/* Late duplicate cable IRQ must not notify the driver twice. */
+		d.refs = 1; spin_lock(&m.lock); musb_g_disconnect(&m); spin_unlock(&m.lock); d.refs = 0;
+		assert(disconnects == 1);
+		if (cable) { m.g.speed = USB_SPEED_HIGH; m.g.state = USB_STATE_CONFIGURED; }
+		assert(!musb_suspend(&d)); assert(!musb_resume(&d));
+		assert(disconnects == (unsigned)(1 + cable)); scenarios++;
+	}
+	/* A disconnect callback can change desired connection while work is gated. */
+	init(&m, &d, &c, &ops); gated_case = change_intent = true;
+	assert(!musb_suspend(&d)); assert(!musb_resume(&d));
+	assert(disconnects == 1 && !m.softconnect && !connected() && !m.gadget_work.queued); scenarios++;
+	/* No established session: do not manufacture a disconnect notification. */
+	init(&m, &d, &c, &ops); gated_case = true;
+	m.g.speed = USB_SPEED_UNKNOWN; m.g.state = USB_STATE_NOTATTACHED; m.state = OTG_STATE_B_IDLE;
+	assert(!musb_suspend(&d)); assert(!musb_resume(&d)); assert(!disconnects); scenarios++;
+	/* UDC unbind already closed callback admission; do not use the driver. */
+	init(&m, &d, &c, &ops); gated_case = true; m.gadget_async_callbacks = false;
+	assert(!musb_suspend(&d)); assert(!disconnects && !m.gadget_callback_count);
+	assert(m.g.state == USB_STATE_NOTATTACHED); m.gadget_driver = NULL;
+	assert(!musb_resume(&d)); assert(!connected()); scenarios++;
 	printf("MUSB sleep: %u source-function scenarios passed\n", scenarios);
 	return 0;
 }

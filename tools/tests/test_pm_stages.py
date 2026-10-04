@@ -193,6 +193,20 @@ else:
 
 
 class Evidence(unittest.TestCase):
+    def test_cable_irq_policy_is_bound_to_installed_image_and_kernel(self):
+        good, lock = healthy_fixture()
+        lock['features'] = {'usb_system_wakeup': False,
+                            'sleep_cable_irq_policy': 'masked-removal-v1'}
+        good['usb_system_wakeup'] = ['disabled']
+        pm.validate(good, lock)
+        for mutate in (
+                lambda s: s['image']['sources']['features'].pop('sleep_cable_irq_policy'),
+                lambda s: s['image']['sources']['features'].update(sleep_cable_irq_policy='exact-v1'),
+                lambda s: s['image'].update(version='old'),
+                lambda s: s.update(kernel='old')):
+            bad = deepcopy(good); mutate(bad)
+            with self.subTest(mutate=mutate), self.assertRaises(ValueError): pm.validate(bad, lock)
+
     def test_rejected_preflight_is_saved_without_entering_pm(self):
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.object(pm, 'result_dir', return_value=Path(temporary)/'run'), \

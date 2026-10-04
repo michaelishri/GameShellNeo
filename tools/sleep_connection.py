@@ -122,8 +122,7 @@ def validate(record):
     if connection == 'usb':
         return
     if transition(connection):
-        validate_transition(record)
-        return
+        return validate_transition(record)
     if record.get('cable_absent_confirmed') is not True:
         raise ValueError('Missing physical cable-absence confirmation')
     cable = record['cable']
@@ -142,7 +141,17 @@ def validate_transition(record):
     if endpoint(connection) == 'battery' and record.get('cable_absent_confirmed') is not True:
         raise ValueError('Missing initial physical cable-absence confirmation')
     cable = record['cable']
+    sources = record['before']['image'].get('sources', {})
+    irq_policy = sources.get('features', {}).get('sleep_cable_irq_policy', 'exact-v1')
+    if irq_policy not in ('exact-v1', 'masked-removal-v1'):
+        raise ValueError('Unknown sleep cable IRQ policy')
+    if irq_policy == 'masked-removal-v1' and (
+            sources.get('board') != 'gameshellneo-cpi31' or
+            sources.get('features', {}).get('usb_system_wakeup') is not False or
+            record['before']['image'] != record['after']['image']):
+        raise ValueError('Masked removal policy requires the matching CPI v3.1 image')
     initial = endpoint(connection, mode)
+    assessment = None
     unchanged(cable['before'], cable['entry'], initial)
     if mode == 'rehearse':
         unchanged(cable['entry'], cable['after'], initial)
@@ -153,10 +162,20 @@ def validate_transition(record):
                 a['monotonic_seconds'] >= b['monotonic_seconds']):
             raise ValueError('Cable-transition boot, CPU inventory or time order changed')
         direction = 'PLUGIN' if connection == 'usb-attach' else 'REMOVAL'
-        expected = {k: v + int(k.endswith(direction)) for k, v in a['irqs']['counts'].items()}
-        if b['irqs']['counts'] != expected:
-            raise ValueError('Require exactly one observed AC/VBUS transition in the requested direction')
+        delta = {k: b['irqs']['counts'][k] - v for k, v in a['irqs']['counts'].items()}
+        masked = irq_policy == 'masked-removal-v1' and connection == 'usb-remove'
+        for name, count in delta.items():
+            allowed = (0, 1) if masked and name.endswith(direction) else (int(name.endswith(direction)),)
+            if count not in allowed:
+                raise ValueError('Cable IRQ delta violates the recorded image policy')
+        assessment = dict(policy=irq_policy, deltas=delta,
+            removal_dispatch_may_be_masked=masked,
+            requested_handlers_observed=all(v == 1 for k, v in delta.items() if k.endswith(direction)),
+            electrical_edge_timing_qualified=False,
+            limits='Handler counts are dispatch evidence, not electrical edge timestamps. '
+                   'Masked removal may be acknowledged by regmap before its handler runs.')
     if any(cable[side]['boot_id'] != record['before']['boot_id'] for side in ('before', 'entry', 'after')):
         raise ValueError('Cable observations belong to another boot')
     # IRQ dispatch can be deferred until resume. These counts do not timestamp
     # the electrical edge or prove it occurred inside machine_suspend.
+    return assessment

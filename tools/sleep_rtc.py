@@ -124,6 +124,7 @@ def completed_result(pm, record, lock, mode):
     if sleep_connection.transition(connection) and mode == 'rtc-wake':
         if (record.get('cable_console', {}).get('restored') is not True or
                 record.get('console_owner_retained') is not False or
+                record.get('cable_irq_observation') != evaluated.get('cable_irq_observation') or
                 record.get('wake_observation') != sleep_cable.wake_observation(record)):
             raise ValueError('Cable console restoration or wake observation differs')
     for side in ('before', 'after'):
@@ -591,7 +592,9 @@ def health(pm, record, lock):
     record['delivery'] = validate_delivery(record)
     before, after = record['before'], record['after']
     pm.validate(after, lock, sleep_connection.endpoint(record.get('connection', 'usb'), record['mode'], 'after'))
-    sleep_connection.validate(record)
+    cable_irqs = sleep_connection.validate(record)
+    if cable_irqs is not None:
+        record['cable_irq_observation'] = cable_irqs
     keys = ('boot_id', 'kernel', 'image', 'pm', 'pm_test_delay', 'masks', 'inputs', 'backlight',
             'wifi_config_sha256', 'wifi_power_save', 'charger', 'cpu_policy')
     if any(before[k] != after[k] for k in keys) or not after['journal'].startswith(before['journal']):

@@ -136,3 +136,13 @@ a hardware edge, and this original strict qualification remains failed either wa
 No new image has been built. Attachment-while-asleep and further actual sleep
 remain pending review/correction. Any subsequent physical reconnect is a separate
 recovery observation and cannot retroactively pass this run.
+
+## Subsequent candidate, 4 October 2026
+
+[Report 154](154-usb-sleep-session-retirement.md) records diagnostic.19 preparation:
+patch 0030 is selected unchanged as the callback-lifetime dependency for logical
+session retirement. Other prepared optimizations remain separate. Actual regmap
+source also reproduces masked removal acknowledgement without handler dispatch,
+leading to an explicitly versioned prospective diagnostic policy. No historical
+hardware result is reclassified; the stale USB failure remains failed and new
+hardware qualification is required.

@@ -115,3 +115,23 @@ paused. A gain adjustment is not evidence that a driver issue has been fixed.
 The level-selection change also passed `task check` with the same 13 runtime/
 567 tooling count (one optional skip), C and shell checks. Private log:
 `.local/neo116-level4-check.log`.
+
+After fresh owner readiness, the level-4 comparison was submitted once from
+commit `ad71aa9`. Both playback operations completed with the same boot, original
+mixer restoration and both amplifiers off afterward:
+
+| Identity | Value |
+| --- | --- |
+| Run | `2978da2a40054070b5c2892b7098927d` |
+| Result | `.local/diagnostics/20261004T225732.895022Z/result.json` |
+| Result SHA-256 | `e91ff53c7329ef4f624b7446fcae2ae1a69f472bd718f2021505df32338f7893` |
+| Applied headphone volume | 54; digital playback volumes both 160,160 |
+| 80 ms cue | 13 samples; both amplifiers On observed; 1.024 s complete operation |
+| 1,000 ms cue | 42 samples; PCM RUNNING and both amplifiers On observed; 1.911 s operation |
+| PL3 | Low at idle, high with speaker amplifier On in both comparisons |
+
+The owner answered: “Still too quiet but make it only slightly louder”. The
+next candidate is `LEVEL=5`: headphone volume 57 (-6 dB), a further 3 dB step.
+Frequency, waveform amplitude and durations stay the same; levels 3 and 4 remain
+reproducible. Normal cue defaults are still unchanged pending an acceptable
+listening result. No further audio or sleep test is running.

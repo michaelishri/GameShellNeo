@@ -115,10 +115,11 @@ class Result(unittest.TestCase):
                       cues=[dict(level=3, duration_ms=x) for x in (80, 1000)],
                       paths=[dict(duration_ms=x, samples=[{}]) for x in (80, 1000)])
         host.validate(record, before, 'a'*32, True)
-        louder = record | {'cues': [dict(level=4, duration_ms=x) for x in (80, 1000)]}
-        host.validate(louder, before, 'a'*32, True, 4)
-        with self.assertRaises(ValueError):
-            host.validate(louder, before, 'a'*32, True, 3)
+        for level in (4, 5):
+            louder = record | {'cues': [dict(level=level, duration_ms=x) for x in (80, 1000)]}
+            host.validate(louder, before, 'a'*32, True, level)
+            with self.assertRaises(ValueError):
+                host.validate(louder, before, 'a'*32, True, 3)
         for key, bad in (('cues', [{}]), ('paths', []), ('restored', False),
                          ('after', dict(boot_id='new-boot', controls='quiet')),
                          ('after', dict(boot_id='boot', controls='loud'))):

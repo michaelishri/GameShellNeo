@@ -93,8 +93,8 @@ def capture_path(record):
 def test(run_id, level=3):
     if not re.fullmatch('[a-f0-9]{32}', run_id):
         raise ValueError('Expected a private 32-character run ID')
-    if type(level) is not int or level not in (3, 4):
-        raise ValueError('Active path comparison supports only levels 3 and 4')
+    if type(level) is not int or level not in (3, 4, 5):
+        raise ValueError('Active path comparison supports only levels 3, 4 and 5')
     directory = RESULTS / run_id
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     record = dict(run_id=run_id, kind='audio-path', passed=False,
@@ -130,7 +130,7 @@ def test(run_id, level=3):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_id')
-    parser.add_argument('--level', type=int, choices=(3, 4), default=3)
+    parser.add_argument('--level', type=int, choices=(3, 4, 5), default=3)
     args = parser.parse_args()
     os.umask(0o077)
     def interrupted(signum, _frame):

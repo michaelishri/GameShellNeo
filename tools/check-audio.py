@@ -104,8 +104,8 @@ def main():
     mode.add_argument('--restore', action='store_true')
     args = parser.parse_args()
     path_level = os.environ.get('NEO_AUDIO_LEVEL', '3')
-    if args.path_test and path_level not in ('3', '4'):
-        raise ValueError('Use LEVEL=3/4 for the active audio comparison')
+    if args.path_test and path_level not in ('3', '4', '5'):
+        raise ValueError('Use LEVEL=3/4/5 for the active audio comparison')
     os.umask(0o077)
     config, capture = load_env(), evidence_directory()
     route = os.environ.get('NEO_AUDIO_ROUTE', 'usb')

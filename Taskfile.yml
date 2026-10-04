@@ -461,7 +461,7 @@ tasks:
     cmds: [python3 tools/check-audio.py --test]
 
   device:audio-path:
-    desc: Same-volume 80 ms and 1 s speaker tones with active PCM/amplifier/GPIO observations; LEVEL=3/4, owner listens
+    desc: Same-volume 80 ms and 1 s speaker tones with active PCM/amplifier/GPIO observations; LEVEL=3/4/5, owner listens
     cmds: [python3 tools/check-audio.py --path-test]
 
   device:reboot:

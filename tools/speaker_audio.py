@@ -27,7 +27,7 @@ CONTROLS = {
     'DAC Playback Volume': '160,160',
     'AIF1 Slot 0 Digital DAC Playback Switch': 'on,on',
 }
-LEVELS = {1: 36, 2: 42, 3: 48, 4: 54}  # Analogue -27/-21/-15/-9 dB; never positive digital gain.
+LEVELS = {1: 36, 2: 42, 3: 48, 4: 54, 5: 57}  # Analogue -27/-21/-15/-9/-6 dB; digital gain stays unity.
 
 
 def command(*args):
@@ -142,7 +142,7 @@ class Cue:
 
     def play(self, label, level=3, *, duration_ms=80):
         if type(level) is not int or level not in LEVELS:
-            raise ValueError('Speaker level must be 1, 2, 3 or 4')
+            raise ValueError('Speaker level must be 1, 2, 3, 4 or 5')
         payload = waveform(duration_ms)
         idle()
         set_control('Headphone Playback Volume', str(LEVELS[level]))

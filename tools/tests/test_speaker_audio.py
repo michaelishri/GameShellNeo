@@ -41,7 +41,7 @@ class Tone(unittest.TestCase):
         self.assertGreater(max(abs(value[0]) for value in values), 3000)
 
     def test_invalid_levels_never_open_pcm(self):
-        for level in (0, 5, True, '3', -1):
+        for level in (0, 6, True, '3', -1):
             with patch.object(audio.subprocess, 'Popen') as start, self.assertRaises(ValueError):
                 audio.Cue({}).play('fixture', level)
             start.assert_not_called()

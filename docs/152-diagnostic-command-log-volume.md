@@ -117,11 +117,11 @@ Private audit: `.local/neo111-stdin-audit.jsonl`; saved offline summary:
 after the failed test (`.local/neo111-wifi-status.log`). No RTC alarm, PM entry,
 reboot, journal setting or network setting was changed during this verification.
 
-The original failed record remains failed. Before resuming cable testing,
-establish a fresh boot/journal baseline with observer readiness, then complete
-the prerequisite sequence and matching rehearsal. Longer-term bounded boot-identity
-and per-test log preservation should be designed separately; reduced logging
-cannot guarantee indefinite retention on an arbitrarily old boot.
+The original failed record remains failed. The fresh boot and prerequisite
+sequence below establish a new baseline; the matching cable rehearsal and
+actual-sleep readiness remain separate. Longer-term bounded boot-identity and
+per-test log preservation should be designed separately; reduced logging cannot
+guarantee indefinite retention on an arbitrarily old boot.
 
 ## Fresh boot and debug sequence
 

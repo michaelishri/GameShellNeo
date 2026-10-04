@@ -9,7 +9,11 @@ board. Sleep, a launcher, OTA and other board revisions are later work.
 Diagnostic.19 is installed after full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and
 awake RTC checks pass; [report 155](docs/155-diagnostic19-installation-and-awake-checks.md)
-records the evidence. Its USB sleep-session fix still needs attended sleep testing.
+records the evidence. Fresh office startup checks and one freezer, one driver
+and five late/noirq debug cycles also passed, with owner-confirmed normal display,
+both SSH routes recovering, PM 7/0 and stable SDIO usage 2
+([report 158](docs/158-diagnostic19-attended-debug-qualification.md)).
+Its USB sleep-session fix still needs actual sleep and cable-transition testing.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.
 Diagnostic.18's removal-during-sleep failure remains preserved in

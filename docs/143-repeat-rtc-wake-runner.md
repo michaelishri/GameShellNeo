@@ -113,3 +113,12 @@ admission or successful batches. Fresh observer readiness is required for the
 new-source baseline, awake rehearsal and subsequent actual sleep qualification.
 No performance, CPU-retention or battery-life improvement is claimed by a
 diagnostic workflow change.
+
+## Subsequent hardware qualification
+
+The separately attended session in [report 148](148-diagnostic18-repeat-rtc-wake.md)
+now qualifies initial admission and four live successor cycles after a fresh
+seven-debug baseline and same-source awake rehearsal. All four actual sleeps
+passed both-route recovery, ownership/restoration and owner visual checks.
+The original source-only results and limits above describe the preparation
+stage; CPU retention, energy and wider cable/host coverage remain separate.

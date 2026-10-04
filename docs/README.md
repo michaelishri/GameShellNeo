@@ -313,3 +313,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [146 — Sunxi child notifier and work ownership](146-sunxi-child-notifier-work.md): explicit callback ownership, failed-init draining, terminal work shutdown and fresh rebind state; 240 native/ARM32 scenarios and three ARM builds, with provider/core retirement still open.
 
 - [147 — Extcon provider lifetime](147-extcon-provider-lifetime.md): linked lookup and Sunxi integration, explicit failed-probe cleanup contract, and real-kernel supplier/consumer ordering tests with inferred firmware links disabled; complete controller retirement and board qualification remain open.
+
+- [148 — Four consecutive RTC-wake cycles](148-diagnostic18-repeat-rtc-wake.md): fresh seven-debug baseline and same-source rehearsal, four actual sleeps with both-route recovery and owner-confirmed normal display, full lineage validation and remaining cable/host/energy limits.

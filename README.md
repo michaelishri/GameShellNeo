@@ -1479,6 +1479,18 @@ Improving that latency is recorded for later investigation.
 See [report 65](docs/65-speaker-confirmation-cues.md) for routing, levels,
 recovery and qualification status.
 
+For silent cues, `task device:audio-path ROUTE=usb` runs a saved audio-only
+comparison after fresh listening readiness: ten seconds of lead-in, an 80 ms
+tone, then a one-second tone at the **same level 3 gain**. It leaves the screen
+on and records active PCM, amplifier and GPIO states during both cues before
+restoring the original mixer. Observations are bounded to eight seconds/400
+samples per cue; individual reads are sequential, not an atomic hardware
+snapshot. Successful capture does not establish audibility. Collect and recover
+with the same `device:audio-collect` and `device:audio-restore` tasks above.
+This uses uploaded helpers, with their source hashes saved in `run.json`; it
+does not require a reflash. Changes to the shared audio helper invalidate older
+sleep source receipts: do not rewrite evidence or reuse a stale rehearsal.
+
 As requested on 5 October, saved workflows warn through the **GameShell speaker**
 before planned reboots and screen blanking. Devices/platform debug tests, actual
 RTC sleep, every off-cycle in the backlight test, and `BACKLIGHT=off` sampling

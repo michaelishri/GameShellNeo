@@ -459,6 +459,10 @@ tasks:
     desc: Three bounded quiet speaker cues at increasing conservative levels; owner listens
     cmds: [python3 tools/check-audio.py --test]
 
+  device:audio-path:
+    desc: Same-volume 80 ms and 1 s speaker tones with bounded active PCM/amplifier/GPIO observations; owner listens
+    cmds: [python3 tools/check-audio.py --path-test]
+
   device:reboot:
     desc: Play three GameShell speaker warning tones, restore audio, then queue one reboot; ROUTE=usb/wifi
     cmds: [python3 tools/check-audio.py --reboot]

@@ -2,6 +2,7 @@
 """Inspect or run bounded speaker cues on the audio-enabled diagnostic image."""
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import re
@@ -25,6 +26,24 @@ def collect(config, run_id, route='usb'):
     with device(config, route) as client:
         return json.loads(run(client, shlex.join(['sudo', '-n', 'cat',
             '/var/lib/gameshellneo/audio-tests/' + run_id + '/result.json']), display=False))
+
+
+def validate(result, before, run_id, path_test=False):
+    if (result.get('passed') is not True or result.get('restored') is not True or
+            result.get('run_id') != run_id or
+            result['before']['boot_id'] != before['boot_id'] or
+            result['after']['boot_id'] != before['boot_id'] or
+            result['before']['controls'] != before['controls'] or
+            result['after']['controls'] != before['controls']):
+        raise ValueError('Speaker cue or restoration checks failed; evidence retained')
+    if path_test:
+        if (result.get('kind') != 'audio-path' or
+                [(c.get('level'), c.get('duration_ms')) for c in result.get('cues', [])] != [(3, 80), (3, 1000)] or
+                [p.get('duration_ms') for p in result.get('paths', [])] != [80, 1000] or
+                any('error' in p or not p.get('samples') for p in result['paths'])):
+            raise ValueError('Incomplete active audio path comparison; evidence retained')
+    elif len(result.get('cues', [])) != 3:
+        raise ValueError('Expected three speaker cues')
 
 
 def request_reboot(config, route, capture, run_id, before, result):
@@ -79,6 +98,7 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--inspect', action='store_true')
     mode.add_argument('--test', action='store_true')
+    mode.add_argument('--path-test', action='store_true', help='Compare 80 ms and 1 s tones at the same level, with active path observations')
     mode.add_argument('--reboot', action='store_true', help='Play the three speaker cues, then queue one reboot')
     mode.add_argument('--collect', action='store_true')
     mode.add_argument('--restore', action='store_true')
@@ -117,13 +137,19 @@ def main():
             script, run_id = directory + '/speaker_audio.py', uuid.uuid4().hex
             with client.open_sftp() as sftp:
                 upload(sftp, ROOT / 'tools/speaker_audio.py', script)
-            (capture / 'run.json').write_text(json.dumps(dict(run_id=run_id, helper=directory)) + '\n')
+                if args.path_test:
+                    upload(sftp, ROOT / 'tools/audio_path_probe.py', directory + '/audio_path_probe.py')
+            sources = ['speaker_audio.py'] + (['audio_path_probe.py'] if args.path_test else [])
+            (capture / 'run.json').write_text(json.dumps(dict(run_id=run_id, helper=directory,
+                sources={name: hashlib.sha256((ROOT / 'tools' / name).read_bytes()).hexdigest()
+                         for name in sources})) + '\n')
             print('Audio run:', run_id, flush=True)
             command = ['sudo', '-n', 'systemd-run', '--quiet', '--collect',
                 '--unit=gameshellneo-audio-test', '--property=RuntimeMaxSec=90',
                 '--property=TimeoutStopSec=15', '--property=UMask=0077',
                 '--property=ExecStopPost=/usr/bin/python3 -B ' + script + ' --restore',
-                '/usr/bin/python3', '-B', script, '--test', run_id]
+                '/usr/bin/python3', '-B'] + (
+                    [directory + '/audio_path_probe.py', run_id] if args.path_test else [script, '--test', run_id])
             try:
                 run(client, shlex.join(command), display=False, timeout=20)
             except (OSError, RuntimeError, paramiko.SSHException) as error:
@@ -138,13 +164,9 @@ def main():
                     output.write(type(error).__name__ + '\n')
                 continue
             (capture / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
-            if (result.get('passed') is not True or result.get('restored') is not True or
-                    result.get('run_id') != run_id or
-                    result['after']['boot_id'] != before['boot_id'] or len(result['cues']) != 3 or
-                    result['before']['controls'] != before['controls'] or
-                    result['before']['controls'] != result['after']['controls']):
-                raise ValueError('Speaker cue or restoration checks failed; evidence retained')
-            print('Three bounded cues completed; mixer and amplifier idle state restored. Audibility needs owner confirmation.')
+            validate(result, before, run_id, args.path_test)
+            print(('Short/long audio path comparison' if args.path_test else 'Three bounded cues') +
+                  ' completed; mixer and amplifier idle state restored. Audibility needs owner confirmation.')
             if args.reboot:
                 request_reboot(config, route, capture, run_id, before, result)
             return

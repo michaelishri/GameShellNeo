@@ -98,9 +98,11 @@ def inspect():
         amplifiers=amplifiers(), gpio=Path('/sys/kernel/debug/gpio').read_text())
 
 
-def waveform():
-    """80 ms stereo 880 Hz cue, -20 dBFS peak, 10 ms fades, no external assets."""
-    rate, frames, fade = 48000, 3840, 480
+def waveform(duration_ms=80):
+    """Bounded stereo 880 Hz cue, -20 dBFS peak, 10 ms fades; 80 ms by default."""
+    if type(duration_ms) is not int or duration_ms not in (80, 1000):
+        raise ValueError('Speaker duration must be 80 or 1000 ms')
+    rate, frames, fade = 48000, 48 * duration_ms, 480
     samples = bytearray()
     for index in range(frames):
         envelope = min(1.0, index / fade, (frames - 1 - index) / fade)
@@ -138,9 +140,10 @@ class Cue:
     def __init__(self, record):
         self.record = record
 
-    def play(self, label, level=3):
+    def play(self, label, level=3, *, duration_ms=80):
         if type(level) is not int or level not in LEVELS:
             raise ValueError('Speaker level must be 1, 2 or 3')
+        payload = waveform(duration_ms)
         idle()
         set_control('Headphone Playback Volume', str(LEVELS[level]))
         started = time.monotonic()
@@ -149,7 +152,7 @@ class Cue:
         process = subprocess.Popen(['aplay', '-q', '-D', 'hw:CARD=' + CARD + ',DEV=0', '-t', 'wav'],
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            _, error = process.communicate(waveform(), timeout=5)
+            _, error = process.communicate(payload, timeout=5)
             if process.returncode:
                 raise RuntimeError('Speaker playback failed: ' + error.decode(errors='replace')[:400])
         finally:
@@ -165,7 +168,7 @@ class Cue:
                 if time.monotonic() >= deadline:
                     raise
                 time.sleep(0.1)
-        self.record.setdefault('cues', []).append(dict(label=label, level=level,
+        self.record.setdefault('cues', []).append(dict(label=label, level=level, duration_ms=duration_ms,
             started_seconds=started, completed_seconds=time.monotonic(), amplifiers_after=state))
 
 

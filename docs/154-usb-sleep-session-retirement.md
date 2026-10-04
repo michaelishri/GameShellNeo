@@ -113,7 +113,7 @@ connection changes, closed unbind admission and the existing role/wake/quirk
 and resume-failure cases. The callback harness executes 134 actual-source
 scenarios, including request completion from disconnect and duplicate callback
 suppression. Both run natively and on ARM32; 21 broken variants must fail
-assertions. Native callback concurrency uses pthread-controlled boundaries,
+native assertions. Native callback concurrency uses pthread-controlled boundaries,
 not the kernel scheduler or IRQ implementation.
 
 The driver build matrix covers the board peripheral configuration, host-only,
@@ -131,18 +131,80 @@ Private evidence lives in the isolated worktree's `.local/build/musb-sleep-tests
 and `.local/build/power-irq-mask-tests/`, with saved logs. The final matrix records
 patch/harness, archive, toolchain, configuration and object hashes.
 
+Compact copies and logs are also retained in the main checkout's
+`.local/diagnostic19-source-checks/`, independently of compiler scratch:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| `musb-matrix.json` | `e2a0b7c0611cf25c4d74ce5cab02ae383940f09e8e294b3514e7a6da20410905` |
+| `power-irq-mask.json` | `7f2297a72c0fd8552a5d1aa19baeda8aaa3c390c0230e5fb115b8f247c396588` |
+| Patch 0030 | `bd1e7875d690d6af360392a152ca49f5972145156549e282c91ec256f29d2f80` |
+| Patch 0033 | `15a26039cc495ff88312449a8d36e8f05da2775a5f6b8f290ac48b44144a10ec` |
+
+The final matrix passed all six configurations against the committed files;
+its recorded source-input hashes were rechecked afterward. The regular `build`
+task now includes `test:power-irq-mask` alongside the existing sleep regressions.
+
 ## Image and hardware handoff
 
 The candidate identity is `0.1.0-diagnostic.19` / `6.18.54-gameshellneo19`.
 Diagnostic.18 was checkpointed as `diagnostic18-before-session-retirement` before
 changing the build. The existing retention task verified recovery copies before
 removing one older raw image and two older kernel snapshots, reclaiming about
-4.74 GiB. The newest three of each were retained at that point.
+4.74 GiB. The newest three of each were retained at that point. After the new image was verified, a second
+retention pass removed the older diagnostic.16 raw image and one older kernel
+snapshot, retaining raw images 17/18/19 and three previous-kernel snapshots. It
+reclaimed another approximately 2.73 GiB after verifying all checkpoints and the
+compressed recovery image. Audit: `.local/retention/prune-20261004T103129.284763Z.json`.
 
-Build/image hashes and offline verification will be recorded after completion.
-The candidate must then pass flash/readback, startup and awake checks, fresh
+The full kernel build passed, followed by 164 configuration assertions and
+verification of 15 kernel/module artifacts. The compiled-board USB policy check
+passed 4,665 gate/state/race cases and 160 probe/unwind cases. Device-tree schema,
+PM, speaker and keypad-retention checks passed, including their negative controls.
+The shared build lock rejected overlapping board-check launches; those checks
+then ran sequentially and passed. No compiler warnings or errors were reported.
+
+The regular tasks completed image assembly, offline verification and Mac staging:
+
+```sh
+task kernel:reset
+task build:kernel
+task check:kernel
+task test:usb-policy-board
+task check:dt
+task build:image       # Includes offline filesystem/content verification
+task mac:stage         # Packs, uploads and checks compressed/decompressed hashes
+```
+
+The source change is main commit `01d89ff`. The rootfs was freshly bootstrapped
+because the conservative cache key changed; the final installed package inventory
+is byte-for-byte identical to the retained diagnostic.18 inventory. The bundled
+identity contains version 19 and the exact three expected feature fields.
+
+| Artifact | Identity |
+| --- | --- |
+| Image | `GameShellNeo-0.1.0-diagnostic.19-cpi31-9e82bbfa4319.img` |
+| Image bytes | 4,294,967,296 |
+| Image SHA-256 | `9e82bbfa4319398add0a214bf05b18f01537b971eedd43f0e349658c74bd4ee6` |
+| Gzip bytes | 269,718,866 |
+| Gzip SHA-256 | `df513fa8578824f9686cb093365e881d3eb6e49b40198a92c037f7ca00d7a7b5` |
+| Kernel completion record SHA-256 | `77f2c3fddbcd86503840b646dc7a9c43e74f66a14610e7cadfd4ed3aad632807` |
+
+Offline checks passed for MBR boundaries, bootloader readback, FAT16/ext4 fsck,
+U-Boot CRCs/load addresses, installed kernel/DTB/module/radio hashes, identity
+permissions and service policies. The image remains explicitly marked
+`hardware_qualified: false`.
+
+After the owner confirmed regular Wi-Fi, the 270 MB archive was staged beneath
+`~/.local/share/GameShellNeo/` on the Mac. Source-only verification checked both
+compressed and decompressed checksums; no card was written. Local verification
+and transfer records are `.local/artifacts/verification.json` and
+`.local/flash/transfer.json`, with `.local/neo112-mac-stage.log` retaining the
+successful remote check. Build logs remain under `.local/build/`.
+
+The candidate must now pass flash/readback, startup and awake checks, fresh
 attended debug prerequisites, an unchanged-cable RTC comparison, and a fresh
-removal rehearsal/one-shot with separate physical observations. Attachment needs
+removal debug baseline/rehearsal/one-shot with separate physical observations. Attachment needs
 its own baseline afterward. Normal sleep remains masked; neither faster resume
 nor lower energy consumption is claimed.
 

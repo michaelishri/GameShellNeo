@@ -103,6 +103,7 @@ tasks:
       - task: test:brcmfmac-tx-suspend
       - task: test:brcmfmac-band-queries
       - task: test:wake-irqs
+      - task: test:power-irq-mask
       - task: test:sunxi-sdio-refs
       - task: test:musb-context
       - task: test:musb-sleep

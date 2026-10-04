@@ -10,9 +10,10 @@ Diagnostic.18 is installed. USB-connected and battery RTC-wake tests have passed
 bounded hardware checks, but cable-transition qualification is still open.
 The first removal during sleep returned the normal console while leaving stale
 USB gadget state; [report 153](docs/153-usb-removal-sleep-state-failure.md) preserves
-the failed result. Diagnostic.19 is being prepared with logical session retirement
-and callback lifetime protection; [report 154](docs/154-usb-sleep-session-retirement.md)
-records the driver change, masked-interrupt findings and prospective test criteria.
+the failed result. Diagnostic.19 is built, verified offline and staged on the Mac,
+with logical session retirement and callback lifetime protection.
+[Report 154](docs/154-usb-sleep-session-retirement.md) records the driver change,
+masked-interrupt findings and prospective test criteria.
 Ordinary sleep remains disabled; production sleep, energy and wake-button
 qualification are still ahead. Historical image reports remain in the research index.
 

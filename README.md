@@ -6,16 +6,16 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.18 is installed. USB-connected and battery RTC-wake tests have passed
-bounded hardware checks, but cable-transition qualification is still open.
-The first removal during sleep returned the normal console while leaving stale
-USB gadget state; [report 153](docs/153-usb-removal-sleep-state-failure.md) preserves
-the failed result. Diagnostic.19 is built, verified offline and staged on the Mac,
-with logical session retirement and callback lifetime protection.
-[Report 154](docs/154-usb-sleep-session-retirement.md) records the driver change,
-masked-interrupt findings and prospective test criteria.
-Ordinary sleep remains disabled; production sleep, energy and wake-button
-qualification are still ahead. Historical image reports remain in the research index.
+Diagnostic.19 is installed after full card readback and owner-confirmed boot.
+Both SSH routes, integration, journal rotation, awake power-key ownership and
+awake RTC checks pass; [report 155](docs/155-diagnostic19-installation-and-awake-checks.md)
+records the evidence. Its USB sleep-session fix still needs attended sleep testing.
+[Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
+callback lifetime protection, masked-interrupt findings and verification.
+Diagnostic.18's removal-during-sleep failure remains preserved in
+[report 153](docs/153-usb-removal-sleep-state-failure.md), with a recovery image
+retained. Ordinary sleep is disabled; production sleep, energy and wake-button
+qualification remain ahead. Historical image reports are in the research index.
 
 Start with the [first-build specification](docs/23-first-build-spec.md),
 [build workflow](docs/24-building-and-testing.md),

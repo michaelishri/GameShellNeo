@@ -208,8 +208,8 @@ removal debug baseline/rehearsal/one-shot with separate physical observations. A
 its own baseline afterward. Normal sleep remains masked; neither faster resume
 nor lower energy consumption is claimed.
 
-The running diagnostic.18 was left untouched. Its failed-test power-key
-suppression remains pending deliberate recovery; do not ask for short-button
+At the end of image preparation, diagnostic.18 was still running with its
+failed-test power-key suppression retained; do not ask for short-button
 shutdown while that guard is retained. A later card swap should follow a
 confirmed remote shutdown and the normal physical handoff.
 
@@ -227,3 +227,11 @@ confirmed remote shutdown and the normal physical handoff.
 
 All are read from the archive pinned by [sources.lock.json](../build/sources.lock.json),
 with the repository patch queue applied where relevant.
+
+## Subsequent installation
+
+The owner then made the DEV card available. [Report 155](155-diagnostic19-installation-and-awake-checks.md)
+records deliberate remote shutdown, guarded flash/full readback, owner-confirmed
+boot and passing awake checks on diagnostic.19. The new boot cleared the old
+failed-test power-key guard. Observed PM/sleep testing remains pending; no result
+from diagnostic.18 was reclassified.

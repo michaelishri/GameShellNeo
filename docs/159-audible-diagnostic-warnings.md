@@ -95,3 +95,8 @@ retained diagnostic ownership and PM still 7/0. Result SHA-256:
 `e763ee1110bf389bb5b66f7bb023f54e18f183bb073af3ed5d771cea8053efd7`.
 The rehearsal intentionally remains silent; it establishes neither warning
 audibility nor actual sleep. Fresh observer readiness is still required.
+
+The later first actual sleep and its speaker observation are recorded in
+[report 160](160-diagnostic19-first-rtc-wake.md). The owner confirmed normal
+display recovery but missed the warning; recorded playback is not substituted
+for physical audibility. A separately attended audio-only check follows there.

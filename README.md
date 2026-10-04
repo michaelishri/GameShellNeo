@@ -1463,7 +1463,7 @@ See [report 64](docs/64-keypad-physical-input-validation.md) for qualification.
 
 On the audio-enabled diagnostic.10 image, first use
 `task device:audio-inspect`, then `task device:audio-test` with the owner
-listening. The latter plays three bounded quiet cues after a ten-second
+listening. The latter now plays three bounded one-second cues at level 5 after a ten-second
 lead-in and checks mixer restoration and amplifier power-down. Once sound is
 confirmed, `task device:keypad-input AUDIO=1` adds a speaker cue for each
 accepted tap and hold. Without `AUDIO=1`, key confirmations remain silent, but
@@ -1479,19 +1479,20 @@ Improving that latency is recorded for later investigation.
 See [report 65](docs/65-speaker-confirmation-cues.md) for routing, levels,
 recovery and qualification status.
 
-For silent cues, `task device:audio-path ROUTE=usb` runs a saved audio-only
-comparison after fresh listening readiness: ten seconds of lead-in, an 80 ms
-tone, then a one-second tone at the **same level 3 gain**. It leaves the screen
-on and records active PCM, amplifier and GPIO states during both cues before
+For quiet or unheard cues, `task device:audio-path ROUTE=usb` runs a saved audio-only
+check after fresh listening readiness: ten seconds of lead-in, then one
+one-second tone at **level 5**. It leaves the screen
+on and records active PCM, amplifier and GPIO states during playback before
 restoring the original mixer. Observations are bounded to eight seconds/400
 samples per cue; individual reads are sequential, not an atomic hardware
 snapshot. Successful capture does not establish audibility. Collect and recover
 with the same `device:audio-collect` and `device:audio-restore` tasks above.
-Use `LEVEL=4` for the owner-requested 6 dB increase (headphone volume 54,
--9 dB), or `LEVEL=5` for another 3 dB (57, -6 dB).
-`LEVEL=3` retains the original comparison. These are the only three
-accepted comparison levels. The normal cue default remains level 3 until the
-higher level has been heard and assessed.
+`LEVEL=3/4/5` selects headphone volume 48/54/57 (-15/-9/-6 dB);
+the default is 5. All normal warnings, button confirmations and this diagnostic
+use long tones, as requested after the owner confirmed the short tone works
+but the long one gets their attention. The historical short/long comparison and
+original results remain in [report 161](docs/161-active-audio-path-investigation.md)
+and its referenced source commits.
 This uses uploaded helpers, with their source hashes saved in `run.json`; it
 does not require a reflash. Changes to the shared audio helper invalidate older
 sleep source receipts: do not rewrite evidence or reuse a stale rehearsal.
@@ -1499,21 +1500,23 @@ sleep source receipts: do not rewrite evidence or reuse a stale rehearsal.
 As requested on 5 October, saved workflows warn through the **GameShell speaker**
 before planned reboots and screen blanking. Devices/platform debug tests, actual
 RTC sleep, every off-cycle in the backlight test, and `BACKLIGHT=off` sampling
-play one short tone and leave a one-second lead-in. Playback and amplifier
+play one one-second tone at level 5 and leave a one-second lead-in. Playback and amplifier
 power-down complete before the blanking operation; a failed warning stops that
 operation. The lead-in is outside reported PM-stage and energy-sampling windows.
 The timed power-key release test warns before asking for the one-second hold.
 Freezer checks and awake rehearsals do not blank the display and remain silent.
 
 Use `task device:reboot ROUTE=usb` (or `ROUTE=wifi`) for planned reboots instead
-of a raw `device:exec ... reboot`. It uses the existing three ascending speaker
-tones, verifies audio restoration and the unchanged boot, then queues one reboot
+of a raw `device:exec ... reboot`. It uses three one-second speaker
+tones at level 5, verifies audio restoration and the unchanged boot, then queues one reboot
 after two seconds. `reboot.json` records submission and acceptance; an uncertain
 SSH submission is never automatically retried. Verify the resulting boot
 separately. The USB idle comparison uses this same task for both of its reboots.
 Warnings do not replace fresh readiness for an attended test. These are helper
 changes; the installed power-button and normal sleep policies are unchanged.
 [Report 159](docs/159-audible-diagnostic-warnings.md) records validation and limits.
+[Report 161](docs/161-active-audio-path-investigation.md) records the subsequent
+audibility comparison and updated warning level/duration.
 
 The helper serializes driver callbacks with `pm_async=0`, records the original
 controls, and restores them on exit and through independent `ExecStopPost`.

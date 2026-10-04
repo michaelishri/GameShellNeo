@@ -43,7 +43,7 @@ env:
   NEO_KEYPAD_QUIRK: '{{.QUIRK | default ""}}'
   NEO_AUDIO_RUN: '{{.RUN | default ""}}'
   NEO_AUDIO_ROUTE: '{{.ROUTE | default "usb"}}'
-  NEO_AUDIO_LEVEL: '{{.LEVEL | default "3"}}'
+  NEO_AUDIO_LEVEL: '{{.LEVEL | default "5"}}'
   NEO_CHECKPOINT_NAME: '{{.NAME | default ""}}'
   NEO_SCRATCH_SUITE: '{{.SUITE | default ""}}'
   NEO_SCRATCH_APPLY: '{{.APPLY | default "0"}}'
@@ -457,11 +457,11 @@ tasks:
     cmds: [python3 tools/check-audio.py --inspect]
 
   device:audio-test:
-    desc: Three bounded quiet speaker cues at increasing conservative levels; owner listens
+    desc: Three bounded one-second speaker warnings at the owner-heard level; owner listens
     cmds: [python3 tools/check-audio.py --test]
 
   device:audio-path:
-    desc: Same-volume 80 ms and 1 s speaker tones with active PCM/amplifier/GPIO observations; LEVEL=3/4/5, owner listens
+    desc: One one-second speaker tone with active PCM/amplifier/GPIO observations; LEVEL=3/4/5 (default 5), owner listens
     cmds: [python3 tools/check-audio.py --path-test]
 
   device:reboot:

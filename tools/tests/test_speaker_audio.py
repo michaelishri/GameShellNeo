@@ -127,7 +127,8 @@ class Restoration(unittest.TestCase):
         record = {}
         with patch.object(audio.Cue, 'play') as play, patch.object(audio.time, 'sleep', side_effect=lead_in):
             audio.warn_screen(record, owner='a'*32)
-        play.assert_called_once_with('screen-blank')
+        play.assert_called_once_with('screen-blank', audio.WARNING_LEVEL,
+                                     duration_ms=audio.WARNING_DURATION_MS)
         self.assertTrue(record['passed'])
         self.assertTrue(record['restored'])
 
@@ -199,7 +200,8 @@ class RebootWarning(unittest.TestCase):
         self.capture = Path(self.directory.name)
         self.before = dict(boot_id='boot', controls='original')
         self.result = dict(run_id='a'*32, passed=True, restored=True,
-                           before=self.before.copy(), after=self.before.copy(), cues=[{}, {}, {}])
+                           before=self.before.copy(), after=self.before.copy(),
+                           cues=[dict(level=audio.WARNING_LEVEL, duration_ms=audio.WARNING_DURATION_MS)]*3)
         self.enterContext(patch.object(audio_host, 'device', return_value=nullcontext('client')))
 
     def request(self):
@@ -215,7 +217,9 @@ class RebootWarning(unittest.TestCase):
         self.assertTrue(json.loads((self.capture/'reboot.json').read_text())['accepted'])
 
     def test_playback_restore_identity_and_boot_failures_never_reboot(self):
-        for key, bad in [('passed', False), ('restored', False), ('run_id', 'b'*32), ('cues', [])]:
+        for key, bad in [('passed', False), ('restored', False), ('run_id', 'b'*32), ('cues', []),
+                         ('cues', [dict(level=3, duration_ms=80)]*3),
+                         ('cues', [dict(level=5, duration_ms=80)]*3)]:
             original = self.result[key]
             self.result[key] = bad
             with patch.object(audio_host, 'run') as run, self.assertRaises(ValueError):

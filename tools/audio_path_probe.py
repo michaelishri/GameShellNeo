@@ -1,4 +1,4 @@
-"""Audio-only short/long comparison with bounded observations during playback."""
+"""One long speaker cue with bounded observations during playback."""
 import argparse
 from contextlib import contextmanager
 import json
@@ -90,7 +90,7 @@ def capture_path(record):
             raise RuntimeError(record['error'])
 
 
-def test(run_id, level=3):
+def test(run_id, level=5):
     if not re.fullmatch('[a-f0-9]{32}', run_id):
         raise ValueError('Expected a private 32-character run ID')
     if type(level) is not int or level not in (3, 4, 5):
@@ -104,9 +104,9 @@ def test(run_id, level=3):
         with audio.session(record, owner=run_id) as cue:
             audio.set_control('Headphone Playback Volume', str(audio.LEVELS[level]))
             record['active_controls'] = {name: audio.control(name) for name in audio.CONTROLS}
-            print('Same-volume 80 ms and 1000 ms tones start in ten seconds.', flush=True)
+            print('One one-second speaker tone starts in ten seconds.', flush=True)
             time.sleep(10)
-            for duration in (80, 1000):
+            for duration in (1000,):
                 path = dict(duration_ms=duration, level=level)
                 record['paths'].append(path)
                 with capture_path(path):
@@ -130,7 +130,7 @@ def test(run_id, level=3):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_id')
-    parser.add_argument('--level', type=int, choices=(3, 4, 5), default=3)
+    parser.add_argument('--level', type=int, choices=(3, 4, 5), default=5)
     args = parser.parse_args()
     os.umask(0o077)
     def interrupted(signum, _frame):

@@ -13,6 +13,7 @@ import uuid
 import paramiko
 from private_config import load_env
 from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
+from speaker_audio import WARNING_DURATION_MS, WARNING_LEVEL
 
 
 def inline(client, option):
@@ -28,7 +29,7 @@ def collect(config, run_id, route='usb'):
             '/var/lib/gameshellneo/audio-tests/' + run_id + '/result.json']), display=False))
 
 
-def validate(result, before, run_id, path_test=False, path_level=3):
+def validate(result, before, run_id, path_test=False, path_level=5):
     if (result.get('passed') is not True or result.get('restored') is not True or
             result.get('run_id') != run_id or
             result['before']['boot_id'] != before['boot_id'] or
@@ -38,18 +39,19 @@ def validate(result, before, run_id, path_test=False, path_level=3):
         raise ValueError('Speaker cue or restoration checks failed; evidence retained')
     if path_test:
         if (result.get('kind') != 'audio-path' or
-                [(c.get('level'), c.get('duration_ms')) for c in result.get('cues', [])] != [(path_level, 80), (path_level, 1000)] or
-                [p.get('duration_ms') for p in result.get('paths', [])] != [80, 1000] or
+                [(c.get('level'), c.get('duration_ms')) for c in result.get('cues', [])] != [(path_level, 1000)] or
+                [p.get('duration_ms') for p in result.get('paths', [])] != [1000] or
                 any('error' in p or not p.get('samples') for p in result['paths'])):
             raise ValueError('Incomplete active audio path comparison; evidence retained')
-    elif len(result.get('cues', [])) != 3:
-        raise ValueError('Expected three speaker cues')
+    elif [(c.get('level'), c.get('duration_ms')) for c in result.get('cues', [])] != [(WARNING_LEVEL, WARNING_DURATION_MS)] * 3:
+        raise ValueError('Expected three cues at the qualified warning level and duration')
 
 
 def request_reboot(config, route, capture, run_id, before, result):
     """Queue once, only after the original cue and mixer restoration passed."""
     if (result.get('passed') is not True or result.get('restored') is not True or
-            result.get('run_id') != run_id or len(result.get('cues', [])) != 3 or
+            result.get('run_id') != run_id or
+            [(c.get('level'), c.get('duration_ms')) for c in result.get('cues', [])] != [(WARNING_LEVEL, WARNING_DURATION_MS)] * 3 or
             result['before']['boot_id'] != before['boot_id'] or
             result['after']['boot_id'] != before['boot_id'] or
             result['before']['controls'] != before['controls'] or
@@ -98,12 +100,12 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--inspect', action='store_true')
     mode.add_argument('--test', action='store_true')
-    mode.add_argument('--path-test', action='store_true', help='Compare 80 ms and 1 s tones at the same level, with active path observations')
+    mode.add_argument('--path-test', action='store_true', help='Play one long tone with active path observations')
     mode.add_argument('--reboot', action='store_true', help='Play the three speaker cues, then queue one reboot')
     mode.add_argument('--collect', action='store_true')
     mode.add_argument('--restore', action='store_true')
     args = parser.parse_args()
-    path_level = os.environ.get('NEO_AUDIO_LEVEL', '3')
+    path_level = os.environ.get('NEO_AUDIO_LEVEL', '5')
     if args.path_test and path_level not in ('3', '4', '5'):
         raise ValueError('Use LEVEL=3/4/5 for the active audio comparison')
     os.umask(0o077)
@@ -169,7 +171,7 @@ def main():
                 continue
             (capture / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
             validate(result, before, run_id, args.path_test, int(path_level) if args.path_test else 3)
-            print(('Short/long audio path comparison' if args.path_test else 'Three bounded cues') +
+            print(('Active audio path check' if args.path_test else 'Three bounded cues') +
                   ' completed; mixer and amplifier idle state restored. Audibility needs owner confirmation.')
             if args.reboot:
                 request_reboot(config, route, capture, run_id, before, result)

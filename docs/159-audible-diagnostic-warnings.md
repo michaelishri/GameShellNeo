@@ -2,6 +2,11 @@
 
 5 October 2026, Pacific/Auckland. NEO-115.
 
+Subsequent audibility testing in [report 161](161-active-audio-path-investigation.md)
+replaced the initial short warnings described below with one-second, level-5
+tones. The owner requested long tones for all feedback because they attract
+attention; the original implementation and observations remain recorded here.
+
 The owner requested GameShell speaker warnings before reboots, then extended
 the requirement to every planned screen blanking. The pending actual sleep
 test was not started. The seven passing debug stages and original awake

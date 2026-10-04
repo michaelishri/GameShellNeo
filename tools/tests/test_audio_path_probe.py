@@ -112,14 +112,14 @@ class Result(unittest.TestCase):
         before = dict(boot_id='boot', controls='quiet')
         record = dict(run_id='a'*32, passed=True, restored=True, kind='audio-path',
                       before=before.copy(), after=before.copy(),
-                      cues=[dict(level=3, duration_ms=x) for x in (80, 1000)],
-                      paths=[dict(duration_ms=x, samples=[{}]) for x in (80, 1000)])
+                      cues=[dict(level=5, duration_ms=1000)],
+                      paths=[dict(duration_ms=1000, samples=[{}])])
         host.validate(record, before, 'a'*32, True)
-        for level in (4, 5):
-            louder = record | {'cues': [dict(level=level, duration_ms=x) for x in (80, 1000)]}
-            host.validate(louder, before, 'a'*32, True, level)
+        for level in (3, 4):
+            quieter = record | {'cues': [dict(level=level, duration_ms=1000)]}
+            host.validate(quieter, before, 'a'*32, True, level)
             with self.assertRaises(ValueError):
-                host.validate(louder, before, 'a'*32, True, 3)
+                host.validate(quieter, before, 'a'*32, True, 5)
         for key, bad in (('cues', [{}]), ('paths', []), ('restored', False),
                          ('after', dict(boot_id='new-boot', controls='quiet')),
                          ('after', dict(boot_id='boot', controls='loud'))):

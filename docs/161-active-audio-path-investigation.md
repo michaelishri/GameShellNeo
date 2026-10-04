@@ -1,7 +1,8 @@
 # Active speaker-path investigation
 
 5 October 2026, Pacific/Auckland. NEO-116; warning qualification remains under
-NEO-115.
+NEO-115. The comparison below is historical: following the owner's final
+choice, the saved audio-path task now plays only one long tone at level 5.
 
 The owner heard none of diagnostic.19's three isolated speaker cues and
 visually confirmed an empty headphone socket. The original playback and
@@ -107,8 +108,9 @@ establish analogue output or reliable audibility.
 `task device:audio-path ROUTE=usb LEVEL=4` selects headphone volume 54 (-9 dB),
 6 dB above the original level 3. The waveform peak, digital gains, fades,
 frequency and two durations remain unchanged. Level 3 remains reproducible
-through the same task. The candidate is bounded to these two comparison levels;
-normal warnings and button confirmations remain at level 3 until observation.
+through the same task at this checkpoint. The initial candidate was bounded to
+these two levels; normal warnings and button confirmations remained at level 3
+during comparison.
 Fresh readiness is required for the new comparison; further sleep remains
 paused. A gain adjustment is not evidence that a driver issue has been fixed.
 
@@ -133,5 +135,59 @@ mixer restoration and both amplifiers off afterward:
 The owner answered: “Still too quiet but make it only slightly louder”. The
 next candidate is `LEVEL=5`: headphone volume 57 (-6 dB), a further 3 dB step.
 Frequency, waveform amplitude and durations stay the same; levels 3 and 4 remain
-reproducible. Normal cue defaults are still unchanged pending an acceptable
-listening result. No further audio or sleep test is running.
+reproducible in the recorded source commits. Normal cue defaults were unchanged
+during comparison.
+
+## Selected cue
+
+After another fresh ready response, the level-5 comparison was submitted once:
+
+| Identity | Value |
+| --- | --- |
+| Source at submission | `a0cda50` |
+| Run | `66c31a7fcad247fe98e1e87b453785c7` |
+| Result | `.local/diagnostics/20261004T225950.244114Z/result.json` |
+| Result SHA-256 | `ac611c31751fd59847152e5e9a906dec7eb1891170dfef345b8172a809031a22` |
+| Applied headphone volume | 57; digital playback volumes both 160,160 |
+| 80 ms cue | 12 samples; both amplifiers On observed; 0.939 s complete operation |
+| 1,000 ms cue | 43 samples; PCM RUNNING and both amplifiers On observed; 1.880 s operation |
+| PL3 | Low at idle, high with speaker amplifier On during both cues |
+| Cleanup | Same original boot, mixer restored, both amplifiers Off |
+
+The owner first selected “Only the longer tone is clear”, then requested only
+long tones moving forward, clarifying: **“The short tone works but the long one
+get's my attention.”** This supports an attention/volume choice, not a claim
+that the short waveform or driver failed. Both are audible at the latest
+setting by that clarification; the long one is preferred. No further gain
+increase or speculative driver fix is warranted by these observations.
+
+All feedback now defaults to the one-second, level-5 cue, including button
+confirmations and screen-blanking warnings. The screen warning retains its
+one-second observer lead-in after audio returns to idle. `device:audio-test`
+and `device:reboot` play three such cues at the same level, separated by the
+existing two-second gaps. The reboot validator rejects records with the old
+short duration or gain even if their playback/restoration passed. The ordinary
+`device:audio-path` task now plays just one long cue and defaults to level 5;
+explicit levels 3 and 4 remain available for gain comparisons. Historical
+short/long runs remain reproducible from commits `4e675f8`, `ad71aa9` and
+`a0cda50`, with their original results preserved.
+
+No reboot or additional sleep was performed to validate the new defaults.
+Observing the long warning immediately before darkness and the next necessary
+reboot remains NEO-115 work. No physical button sequence was requalified here.
+The existing amplifier startup delay remains; choosing a longer cue does not
+optimize keypress-to-sound latency, and synchronous feedback now occupies
+longer. That already-deferred investigation remains separate.
+
+Controls restore after every session, so this is a saved cue policy rather than
+a permanent mixer change. Uploaded helpers need no image flash. Final host
+checks are recorded below; no further audio or sleep test is
+running. Refresh current-source sleep admission before resuming NEO-112,
+preserving all original evidence.
+
+Final `task check` passed 13 runtime and 567 tooling tests (one optional skip),
+C regressions, Bash syntax and ShellCheck. This includes rejecting old short
+reboot warnings and rejecting a result from a different selected level. Private
+log: `.local/neo116-long-cues-check.log`. NEO-116's immediate audibility
+investigation and requested cue policy are complete; NEO-115's action-specific
+observations and wider audio/latency qualification remain separate.

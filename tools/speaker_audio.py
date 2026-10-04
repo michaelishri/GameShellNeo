@@ -20,7 +20,7 @@ ASOC = Path('/sys/kernel/debug/asoc')
 BOOT = Path('/proc/sys/kernel/random/boot_id')
 CONTROLS = {
     'Speaker Switch': 'on',
-    'Headphone Playback Volume': '48',  # -15 dB, plus -20 dBFS waveform peak.
+    'Headphone Playback Volume': '57',  # -6 dB, plus -20 dBFS waveform peak.
     'Headphone Playback Switch': 'on,on',
     'Headphone Source Playback Route': '0,0',  # Direct DAC, no analogue input mixing.
     'AIF1 DA0 Playback Volume': '160,160',  # -120 dB + 160 * 0.75 dB = unity.
@@ -28,6 +28,8 @@ CONTROLS = {
     'AIF1 Slot 0 Digital DAC Playback Switch': 'on,on',
 }
 LEVELS = {1: 36, 2: 42, 3: 48, 4: 54, 5: 57}  # Analogue -27/-21/-15/-9/-6 dB; digital gain stays unity.
+WARNING_LEVEL = 5
+WARNING_DURATION_MS = 1000
 
 
 def command(*args):
@@ -140,7 +142,7 @@ class Cue:
     def __init__(self, record):
         self.record = record
 
-    def play(self, label, level=3, *, duration_ms=80):
+    def play(self, label, level=WARNING_LEVEL, *, duration_ms=WARNING_DURATION_MS):
         if type(level) is not int or level not in LEVELS:
             raise ValueError('Speaker level must be 1, 2, 3, 4 or 5')
         payload = waveform(duration_ms)
@@ -198,10 +200,10 @@ def session(record, owner=None):
 
 
 def warn_screen(record, owner=None):
-    """Finish a quiet cue and restore idle audio before allowing darkness."""
+    """Finish the owner-heard warning and restore idle audio before darkness."""
     record['passed'] = False
     with session(record, owner=owner) as cue:
-        cue.play('screen-blank')
+        cue.play('screen-blank', WARNING_LEVEL, duration_ms=WARNING_DURATION_MS)
     time.sleep(1)  # Observer lead-in; outside PM/energy measurement windows.
     record['passed'] = True
 
@@ -241,10 +243,11 @@ def main():
         try:
             record['before'] = inspect()
             with session(record) as cue:
-                print('Three quiet speaker cues start in ten seconds.', flush=True)
+                print('Three one-second speaker warnings start in ten seconds.', flush=True)
                 time.sleep(10)
-                for level in (1, 2, 3):
-                    cue.play('speaker-check-' + str(level), level)
+                for index in (1, 2, 3):
+                    cue.play('speaker-check-' + str(index), WARNING_LEVEL,
+                             duration_ms=WARNING_DURATION_MS)
                     time.sleep(2)
             record['after'] = inspect()
             record['passed'] = True

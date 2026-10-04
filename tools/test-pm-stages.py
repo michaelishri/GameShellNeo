@@ -174,7 +174,9 @@ def snapshot():
                 journal=journal)
 
 
-def validate(snapshot, lock):
+def validate(snapshot, lock, connection='usb'):
+    if connection not in ('usb', 'battery'):
+        raise ValueError('Unknown PM connection profile')
     experiments = lock.get('experiments', {})
     retention = experiments.get('keypad_supply_retention', False)
     if (experiments not in ({'suspend_diagnostics': True},
@@ -227,9 +229,18 @@ def validate(snapshot, lock):
         battery_status=b.get('status') in ('Charging', 'Discharging', 'Full', 'Not charging'),
         battery_capacity=b.get('capacity_percent', 0) > 20,
         services=all(v == {'ActiveState': 'active', 'NRestarts': '0'} for v in s['services'].values()))
+    if connection == 'battery':
+        health.pop('usb_configured')
+        health.pop('usb_external_power')
+        health.update(usb_absent=s['usb'] == ['not attached'],
+            usb_external_power_absent=usb_supply == {'type': 'USB', 'present': '0', 'online': '0'},
+            ac_external_power_absent=s.get('external_power', {}).get('axp22x-ac') ==
+                {'type': 'Mains', 'present': '0', 'online': '0'},
+            battery_discharging=b.get('status') == 'Discharging')
     failed = [name for name, passed in health.items() if not passed]
     if failed:
-        raise ValueError('Device must be healthy, USB-powered and connected to Wi-Fi; failed: ' + ', '.join(failed))
+        raise ValueError('Device must be healthy, match connection profile '+connection+
+                         ' and be connected to Wi-Fi; failed: ' + ', '.join(failed))
 
 
 def check_result(before, after, stage, memory_ok):

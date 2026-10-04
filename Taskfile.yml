@@ -31,6 +31,7 @@ env:
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
   NEO_SLEEP_ATTENDED: '{{.ATTENDED | default "0"}}'
+  NEO_SLEEP_CABLE_ABSENT: '{{.UNPLUGGED | default "0"}}'
   NEO_SLEEP_RESULT: '{{.RESULT | default ""}}'
   NEO_SLEEP_COLLECT_ROUTE: '{{.ROUTE | default "usb"}}'
   NEO_KEYPAD_TRACE: '{{.KEYPAD_TRACE | default "0"}}'
@@ -511,6 +512,14 @@ tasks:
     desc: Awake RTC deadline/key-policy/trace rehearsal; QUALIFICATION required, no sleep submission
     cmds: [python3 tools/check-sleep-rtc.py --rehearse]
 
+  device:sleep-battery-rehearse:
+    desc: Awake battery-only RTC rehearsal over Wi-Fi; USB physically absent, QUALIFICATION/UNPLUGGED required
+    cmds: [python3 tools/check-sleep-rtc.py --rehearse --connection battery]
+
+  device:sleep-battery:
+    desc: One attended battery-only RTC-wake attempt over Wi-Fi; USB absent, QUALIFICATION/REHEARSAL/UNPLUGGED/ATTENDED required
+    cmds: [python3 tools/check-sleep-rtc.py --rtc-wake --connection battery]
+
   device:sleep-rtc:
     desc: One attended real s2idle attempt; QUALIFICATION, REHEARSAL and fresh ATTENDED=1 required
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake]
@@ -528,6 +537,10 @@ tasks:
   report:sleep-evidence:
     desc: Offline RTC/trace/clock assessment of saved RESULT; never requalifies or rewrites the original
     cmds: [python3 tools/report-sleep-evidence.py]
+
+  device:sleep-connection-inspect:
+    desc: Read cable/PHY/power/IRQ state without alarm or PM changes; ROUTE=usb (default) or wifi
+    cmds: [python3 tools/check-sleep-rtc.py --connection-inspect]
 
   device:sleep-clock-inspect:
     desc: Read CPU-idle/timer state and sample bracketed clocks while awake; no RTC or PM changes

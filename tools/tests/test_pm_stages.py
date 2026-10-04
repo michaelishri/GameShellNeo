@@ -26,6 +26,28 @@ pm = load('pm_stages', 'test-pm-stages.py')
 host = load('pm_stage_host', 'check-pm-stages.py')
 
 
+def healthy_fixture():
+    lock = dict(experiments={'suspend_diagnostics': True}, image_version='diagnostic-test',
+                linux={'tag': 'v6.18.54', 'localversion': '-test'},
+                radio={'firmware': {'sha256': 'fw', 'runtime_identity': 'Firmware: expected'},
+                       'nvram': {'sha256': 'nv'}})
+    good = dict(image={'board': 'gameshellneo-cpi31', 'version': 'diagnostic-test', 'sources': lock},
+                kernel='6.18.54-test', firmware_sha256='fw', nvram_sha256='nv',
+                kernel_config='CONFIG_SUSPEND=y\nCONFIG_PM_SLEEP_DEBUG=y\nCONFIG_PM_ADVANCED_DEBUG=y\n',
+                journal='brcmf_c_preinit_dcmds: Firmware: expected\n',
+                pm={'pm_test': '[none] freezer devices', 'mem_sleep': '[s2idle]', 'state': 'freeze mem'},
+                pm_test_delay='5', masks={n: '/dev/null' for n in pm.MASKS}, sleep_config='AllowSuspend=no',
+                usb_experiments={'gameshellneo_slow_poll': 'N', 'gameshellneo_diagnostics': 'N'},
+                sdio_retains_power=True, keypad_retains_supply=False, cmdline='mem_sleep_default=s2idle',
+                taint='0', failed_units='', usb=['configured'], wifi='wpa_state=COMPLETED\n',
+                battery={'monitoring': 'valid', 'status': 'Charging', 'capacity_percent': 70},
+                battery_age_seconds=2,
+                external_power={'axp20x-usb': {'type': 'USB', 'present': '1', 'online': '1'},
+                                'axp22x-ac': {'type': 'Mains', 'present': '1', 'online': '1'}},
+                services={n: {'ActiveState': 'active', 'NRestarts': '0'} for n in pm.SERVICES})
+    return good, lock
+
+
 class Controls(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -189,24 +211,7 @@ class Evidence(unittest.TestCase):
             enter.assert_not_called()
 
     def test_preflight_accepts_only_the_isolated_healthy_image(self):
-        lock = dict(experiments={'suspend_diagnostics': True}, image_version='diagnostic-test',
-                    linux={'tag': 'v6.18.54', 'localversion': '-test'},
-                    radio={'firmware': {'sha256': 'fw', 'runtime_identity': 'Firmware: expected'},
-                           'nvram': {'sha256': 'nv'}})
-        good = dict(image={'board': 'gameshellneo-cpi31', 'version': 'diagnostic-test', 'sources': lock},
-                    kernel='6.18.54-test', firmware_sha256='fw', nvram_sha256='nv',
-                    kernel_config='CONFIG_SUSPEND=y\nCONFIG_PM_SLEEP_DEBUG=y\nCONFIG_PM_ADVANCED_DEBUG=y\n',
-                    journal='brcmf_c_preinit_dcmds: Firmware: expected\n',
-                    pm={'pm_test': '[none] freezer devices', 'mem_sleep': '[s2idle]', 'state': 'freeze mem'},
-                    pm_test_delay='5', masks={n: '/dev/null' for n in pm.MASKS}, sleep_config='AllowSuspend=no',
-                    usb_experiments={'gameshellneo_slow_poll': 'N', 'gameshellneo_diagnostics': 'N'},
-                    sdio_retains_power=True, keypad_retains_supply=False, cmdline='mem_sleep_default=s2idle',
-                    taint='0', failed_units='', usb=['configured'], wifi='wpa_state=COMPLETED\n',
-                    battery={'monitoring': 'valid', 'status': 'Charging', 'capacity_percent': 70},
-                    battery_age_seconds=2,
-                    external_power={'axp20x-usb': {'type': 'USB', 'present': '1', 'online': '1'},
-                                    'axp22x-ac': {'type': 'Mains', 'present': '1', 'online': '1'}},
-                    services={n: {'ActiveState': 'active', 'NRestarts': '0'} for n in pm.SERVICES})
+        good, lock = healthy_fixture()
         pm.validate(good, lock)
         wake_lock = deepcopy(lock)
         wake_lock['features'] = {'usb_system_wakeup': False}

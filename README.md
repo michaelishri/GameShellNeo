@@ -1959,6 +1959,43 @@ new-source awake rehearsal before the first batch. No card reflash is needed.
 [Report 143](docs/143-repeat-rtc-wake-runner.md) records the admission design,
 failure tests and remaining hardware qualification.
 
+The separate battery-only workflow uses Wi-Fi SSH and requires physical USB
+absence. Finish a fresh seven-debug sequence while USB is connected, verify
+Wi-Fi independently, then ask the observer to unplug and leave the cable
+untouched. After checking the absent state and current battery health:
+
+```sh
+task device:sleep-connection-inspect ROUTE=wifi  # Passive PHY/power/UDC/IRQ capture
+task device:sleep-battery-rehearse QUALIFICATION=<fresh-history.json> UNPLUGGED=1
+# Only after a passing same-source battery rehearsal and fresh observer readiness:
+task device:sleep-battery QUALIFICATION=<fresh-history.json> REHEARSAL=<run-id> UNPLUGGED=1 ATTENDED=1
+# Uncertain result: collect the original attempt; do not submit another sleep.
+task device:sleep-collect RUN=<original-run-id> ROUTE=wifi
+```
+
+`UNPLUGGED=1` records a fresh physical confirmation; it is not inferred from
+elapsed time or a failed USB connection. Software also requires both external
+supply objects to report absent/offline, battery discharge with fresh valid
+telemetry above 20%, UDC unattached, carrier 0 and PHY cable/host state 0. Three
+passive cable snapshots and unchanged AC/VBUS interrupt counts detect observed
+state changes, but cannot prove every electrical edge occurred or was reported.
+Keep the cable untouched until the original result is reviewed; inspect USB
+reattachment separately afterward. This mode does not qualify USB recovery or
+energy savings. It leaves `usb_ssh_verified=false` explicitly and requires
+fresh Wi-Fi route proof on the original boot.
+
+Connection profile is bound into the receipt, rehearsal and sleep history;
+USB and battery histories cannot be mixed. The existing USB tasks remain
+strict about external power, configured USB and independent proofs over both
+routes. Battery tests are one-shot commands, not an automatic batch. Each
+accepted attempt may provide a continuation for another separately attended
+one-shot; all original-result/source/boot/counter and successor-claim rules
+still apply. Sources changed for this addition: report148's earlier chain
+remains historical evidence and cannot admit this new helper. Establish a fresh
+seven-debug baseline and same-source battery rehearsal; no card reflash is
+needed. Normal product sleep remains masked. See
+[report 150](docs/150-battery-rtc-qualification.md) for validation and live limits.
+
 [Report 119](docs/119-guarded-rtc-sleep-preparation.md) records admission,
 recovery limits and the two successful awake rehearsals. Ordinary sleep remains
 masked. Interrupted ownership can deliberately leave power-key actions ignored;

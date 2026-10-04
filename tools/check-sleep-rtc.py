@@ -24,31 +24,34 @@ def pm_host():
     return module
 
 
-def saved_result(item):
+def saved_result(item, connection='usb'):
+    diagnostic.sleep_connection.profile(connection)
     source = (ROOT/Path(item['capture'])).resolve(strict=True)
     if not source.is_relative_to((LOCAL/'diagnostics').resolve()) or source.name != 'result.json':
         raise ValueError('Qualification must reference saved diagnostic result files')
     value = json.loads(source.read_text())
-    if value.get('usb_ssh_verified') is not True or value.get('wifi_ssh_verified') is not True:
-        raise ValueError('Missing both-route prerequisite proof')
+    expected_usb = connection == 'usb'
+    if value.get('usb_ssh_verified') is not expected_usb or value.get('wifi_ssh_verified') is not True:
+        raise ValueError('Missing connection-profile route proof')
     return value
 
 
-def receipt(path, before):
+def receipt(path, before, connection='usb'):
     summary = json.loads(path.read_text())
     records = [saved_result(item) for item in summary['cycles']]
-    sleeps = [saved_result(item) for item in summary.get('sleeps', [])]
+    sleeps = [saved_result(item, connection) for item in summary.get('sleeps', [])]
     if len(sleeps) >= diagnostic.MAX_SLEEP_CHAIN:
         raise ValueError('Sleep history reached its admission limit')
     qualified = diagnostic.history(diagnostic.pm_module(), records, sleeps, before,
-                                   json.loads((ROOT/'build/sources.lock.json').read_text()))
+                                   json.loads((ROOT/'build/sources.lock.json').read_text()), connection)
     by_id = {r['run_id']: r for r in records+sleeps}
     entries = lambda tokens: [dict(run_id=token, sha256=diagnostic.digest(by_id[token])) for token in tokens]
-    return dict(boot_id=before['boot_id'], runs=entries(qualified['runs']),
+    return dict(boot_id=before['boot_id'], connection=connection, runs=entries(qualified['runs']),
                 sleeps=entries(qualified['sleep_runs']))
 
 
-def service(directory, token, mode, rehearsal):
+def service(directory, token, mode, rehearsal, connection='usb'):
+    diagnostic.sleep_connection.profile(connection)
     if not re.fullmatch(r'/tmp/gameshellneo-sleep\.[A-Za-z0-9]+', directory):
         raise ValueError('Unexpected sleep helper path')
     diagnostic.policy.run_id(token)
@@ -62,7 +65,10 @@ def service(directory, token, mode, rehearsal):
         '/usr/bin/systemd-inhibit', '--what=handle-power-key:sleep:idle', '--mode=block',
         '--who=GameShellNeo PM diagnostic', '--why=Guarded RTC sleep qualification',
         '/usr/bin/python3', '-B', script, '--'+mode, '--run-id', token,
-        '--lock', directory+'/sources.lock.json', '--receipt', directory+'/qualification.json']
+        '--lock', directory+'/sources.lock.json', '--receipt', directory+'/qualification.json',
+        '--connection', connection]
+    if connection == 'battery':
+        command += ['--cable-absent-confirmed']
     if mode == 'rtc-wake':
         command += ['--attended', '--rehearsal', diagnostic.policy.run_id(rehearsal)]
     return command
@@ -84,15 +90,19 @@ def collect(config, token, route='usb'):
     return result
 
 
-def validate_result(value, token, before, mode):
+def validate_result(value, token, before, mode, connection='usb'):
+    if value.get('connection', 'usb') != connection:
+        raise ValueError('Returned result has another connection profile')
     if value.get('run_id') != token or value['before']['boot_id'] != before['boot_id']:
         raise ValueError('Experiment run or boot identity mismatch')
     diagnostic.completed_result(diagnostic.pm_module(), value,
         json.loads((ROOT/'build/sources.lock.json').read_text()), mode)
 
 
-def inspect_clocks(config, capture):
-    with device(config, 'usb') as client:
+def inspect_live(config, capture, kind='clock', route='usb'):
+    if kind not in ('clock', 'connection') or route not in ('usb', 'wifi'):
+        raise ValueError('Unknown sleep inspection or route')
+    with device(config, route) as client:
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-sleep.XXXXXXXX', display=False).decode().strip()
         if not re.fullmatch(r'/tmp/gameshellneo-sleep\.[A-Za-z0-9]+', directory):
             raise ValueError('Unexpected clock inspector helper path')
@@ -100,31 +110,33 @@ def inspect_clocks(config, capture):
             for name in diagnostic.SOURCES:
                 upload(sftp, ROOT/'tools'/(name+'.py'), directory+'/'+name+'.py')
         # No systemd unit, RTC programming, owner, inhibitor or PM submission.
-        value = json.loads(run(client, shlex.join(['python3', '-B', directory+'/sleep_rtc.py', '--clock-inspect']),
+        value = json.loads(run(client, shlex.join(['python3', '-B', directory+'/sleep_rtc.py', '--'+kind+'-inspect']),
                                display=False, timeout=20))
-        (capture/'clock-inspection.json').write_text(json.dumps(value, indent=2)+'\n')
+        (capture/(kind+'-inspection.json')).write_text(json.dumps(value, indent=2)+'\n')
         if value['sources'] != diagnostic.sources():
-            raise ValueError('Clock inspector sources differ')
+            raise ValueError('Sleep inspector sources differ')
         with client.open_sftp() as sftp:
             for name in diagnostic.SOURCES:
                 sftp.remove(directory+'/'+name+'.py')
             sftp.rmdir(directory)
-    print('Awake clock inspection saved; no alarm, PM or network settings changed.')
+    print('Awake '+kind+' inspection saved; no alarm, PM or network settings changed.')
 
 
-def experiment(config, capture, qualification, mode, rehearsal):
+def experiment(config, capture, qualification, mode, rehearsal, connection='usb'):
+    diagnostic.sleep_connection.profile(connection)
+    route = 'usb' if connection == 'usb' else 'wifi'
     token = uuid.uuid4().hex
     helper = pm_host()
-    with device(config, 'usb') as client:
+    with device(config, route) as client:
         before = json.loads(helper.inline(client, '--inspect'))
         (capture/'before.json').write_text(json.dumps(before, indent=2)+'\n')
-        diagnostic.pm_module().validate(before, json.loads((ROOT/'build/sources.lock.json').read_text()))
-        proof = receipt(Path(qualification), before)
+        diagnostic.pm_module().validate(before, json.loads((ROOT/'build/sources.lock.json').read_text()), connection)
+        proof = receipt(Path(qualification), before, connection)
         helper.wifi_proof(config, before)
         if run(client, 'systemctl show gameshellneo-sleep-test -p LoadState --value', display=False).decode().strip() != 'not-found':
             raise ValueError('An earlier sleep unit exists; collect it without resubmission')
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-sleep.XXXXXXXX', display=False).decode().strip()
-        command = service(directory, token, mode, rehearsal)
+        command = service(directory, token, mode, rehearsal, connection)
         (capture/'qualification.json').write_text(json.dumps(proof, indent=2)+'\n')
         (capture/'source.json').write_text(json.dumps(diagnostic.sources(), indent=2)+'\n')
         with client.open_sftp() as sftp:
@@ -132,7 +144,7 @@ def experiment(config, capture, qualification, mode, rehearsal):
                 upload(sftp, ROOT/'tools'/(name+'.py'), directory+'/'+name+'.py')
             upload(sftp, ROOT/'build/sources.lock.json', directory+'/sources.lock.json')
             upload(sftp, capture/'qualification.json', directory+'/qualification.json')
-        (capture/'run.json').write_text(json.dumps(dict(run_id=token, mode=mode, helper=directory))+'\n')
+        (capture/'run.json').write_text(json.dumps(dict(run_id=token, mode=mode, connection=connection, route=route, helper=directory))+'\n')
         print('RTC sleep run:', token, 'mode:', mode, flush=True)
         try:
             run(client, shlex.join(command), display=False, timeout=20)
@@ -143,7 +155,7 @@ def experiment(config, capture, qualification, mode, rehearsal):
     while time.monotonic() < timeout:
         time.sleep(5)
         try:
-            value = collect(config, token)
+            value = collect(config, token, route)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             with (capture/'collection-errors.txt').open('a') as output:
                 output.write(type(error).__name__+': '+str(error)+'\n')
@@ -151,15 +163,17 @@ def experiment(config, capture, qualification, mode, rehearsal):
         (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
         if value.get('event') not in ('complete', 'failed'):
             continue
-        validate_result(value, token, before, mode)
+        validate_result(value, token, before, mode, connection)
         helper.wifi_proof(config, value['after'])
-        with device(config, 'usb') as client:
+        with device(config, route) as client:
             boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
         if boot != before['boot_id']:
             raise ValueError('Boot changed after collection')
-        value.update(usb_ssh_verified=True, wifi_ssh_verified=True)
+        value.update(usb_ssh_verified=connection == 'usb', wifi_ssh_verified=True)
         (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
-        print(mode, 'functional/recovery checks passed; original power policy and both SSH routes verified.', flush=True)
+        print(mode, connection, 'functional/recovery and original power-policy checks passed;',
+              'both SSH routes verified.' if connection == 'usb' else 'Wi-Fi verified; USB recovery was not tested.',
+              flush=True)
         print('CPU retention and energy savings remain unqualified.', flush=True)
         return value
     raise TimeoutError('No complete result. Do not retry sleep; collect original RUN='+token)
@@ -211,7 +225,13 @@ def main():
     modes.add_argument('--rtc-batch', action='store_true')
     modes.add_argument('--collect', action='store_true')
     modes.add_argument('--clock-inspect', action='store_true')
+    modes.add_argument('--connection-inspect', action='store_true')
+    parser.add_argument('--connection', choices=('usb', 'battery'), default='usb')
     args = parser.parse_args()
+    if args.connection == 'battery' and (args.rtc_batch or args.clock_inspect or args.connection_inspect or args.collect):
+        parser.error('Battery profile is only for explicit one-shot rehearsal or RTC wake; collect using ROUTE=wifi')
+    if args.connection == 'battery' and os.environ.get('NEO_SLEEP_CABLE_ABSENT') != '1':
+        parser.error('Confirm physical USB removal, then supply UNPLUGGED=1 for this battery test')
     if (args.rtc_wake or args.rtc_batch) and os.environ.get('NEO_SLEEP_ATTENDED') != '1':
         parser.error('Confirm observer readiness, then supply ATTENDED=1 for this sleep attempt or bounded batch')
     os.umask(0o077)
@@ -219,8 +239,9 @@ def main():
     print('Private RTC sleep evidence:', capture, flush=True)
     with (LOCAL/'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        if args.clock_inspect:
-            inspect_clocks(config, capture)
+        if args.clock_inspect or args.connection_inspect:
+            inspect_live(config, capture, 'connection' if args.connection_inspect else 'clock',
+                         os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb'))
             return
         if args.collect:
             token = os.environ.get('NEO_PM_RUN', '')
@@ -250,7 +271,7 @@ def main():
                   int(os.environ.get('NEO_PM_CYCLES', '4')))
         else:
             value = experiment(config, capture, Path(qualification),
-                               'rtc-wake' if args.rtc_wake else 'rehearse', rehearsal)
+                               'rtc-wake' if args.rtc_wake else 'rehearse', rehearsal, args.connection)
             if args.rtc_wake:
                 continuation = json.loads(Path(qualification).read_text())
                 continuation['sleeps'] = continuation.get('sleeps', []) + [dict(capture=str(capture/'result.json'))]

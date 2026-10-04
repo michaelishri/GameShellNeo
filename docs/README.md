@@ -317,3 +317,5 @@ The follow-up Python assessment includes the newly supplied local clone; the ori
 - [148 — Four consecutive RTC-wake cycles](148-diagnostic18-repeat-rtc-wake.md): fresh seven-debug baseline and same-source rehearsal, four actual sleeps with both-route recovery and owner-confirmed normal display, full lineage validation and remaining cable/host/energy limits.
 
 - [149 — USB reconnects after repeated sleep](149-diagnostic18-post-sleep-usb-reconnects.md): four physical awake reconnects with independent USB SSH proof, final both-route health checks and unchanged PM/reference state; battery-only and host-sleep cases remain open.
+
+- [150 — Battery-only RTC-wake tooling](150-battery-rtc-qualification.md): explicit absent-cable profile, Wi-Fi-only one-shot transport, separate recovery claims, passive cable/IRQ evidence and source/physical qualification gates.

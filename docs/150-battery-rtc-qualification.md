@@ -132,3 +132,40 @@ validator on the original boot, with PM counts unchanged at 19 successes and
 zero failures. No RTC programming, PM entry, key ownership or settings change
 occurred during these inspections. Fresh observer readiness is still required
 for the next debug prerequisites and actual battery sleep.
+
+## Fresh debug prerequisites
+
+After new owner readiness, the updated tools completed seven sequential debug
+checks on the same diagnostic.18 boot. Each result was reviewed before the
+next submission. All passed independent USB/Wi-Fi access, original input and
+policy restoration, trace checks and stable SDIO usage 2. These checks do not
+enter actual sleep. Final owner screen confirmation and physical USB removal
+are pending; no battery rehearsal or battery sleep has been submitted.
+
+Capture directories below are relative to `.local/diagnostics/`; each contains
+`cycle-1/result.json`.
+
+| Stage | Capture | Run ID | PM successes |
+| --- | --- | --- | --- |
+| Freezer | `20261004T044102.273356Z` | `acf72704d2be47a191a8b3a28e568db3` | 19 → 20 |
+| Devices | `20261004T044216.786117Z` | `ad9f936d94754860a9e9871dc8f19258` | 20 → 21 |
+| Late/noirq 1 | `20261004T044339.182655Z` | `d2b83a8fb2664887ac96798d6284c894` | 21 → 22 |
+| Late/noirq 2 | `20261004T044453.549291Z` | `045e9304f3074a449bc039b6ab4d7608` | 22 → 23 |
+| Late/noirq 3 | `20261004T044612.389598Z` | `bb1830f8ead6403cab73f5b2be3b35cc` | 23 → 24 |
+| Late/noirq 4 | `20261004T044732.767735Z` | `b5ea95a3bceb47b4ab0a0e3a124b74fc` | 24 → 25 |
+| Late/noirq 5 | `20261004T044849.012048Z` | `3e53fef15d8f46d5bf0b69529786977f` | 25 → 26 |
+
+The saved `check:sdio-ref-history --require-stable` task produced
+`.local/neo109-reference-history.json` (SHA-256: `782ab212f10e5a3b50d4e53eb3e29340efbba8e86bb5b3aca72c5cfa994beaac`).
+The final independent PM inspection at
+`.local/diagnostics/20261004T045012.908755Z/inspection.json` passes the common
+validator with PM26/0 and unchanged settings. Pre-test board/Mac captures are
+`20261004T044027.107939Z/` and `20261004T044027.109885Z/` respectively. Temporary
+USB route failures remain in the `.local/neo109-debug-*.log` files and original
+capture directories; all were collected using the original run IDs without
+resubmitting a PM stage.
+
+This baseline can admit the new-source awake battery rehearsal only while
+boot, image, helper sources and PM history remain unchanged. Source/boot
+changes or further PM activity require the appropriate new qualification;
+waiting alone does not establish physical readiness or cable absence.

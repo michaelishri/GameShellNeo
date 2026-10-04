@@ -235,3 +235,14 @@ records deliberate remote shutdown, guarded flash/full readback, owner-confirmed
 boot and passing awake checks on diagnostic.19. The new boot cleared the old
 failed-test power-key guard. Observed PM/sleep testing remains pending; no result
 from diagnostic.18 was reclassified.
+
+## Subsequent hardware qualification
+
+The installation checkpoint above was followed by passing connected-USB RTC
+sleep in [report 160](160-diagnostic19-first-rtc-wake.md). Fresh debug and awake
+rehearsal admission in [report 162](162-diagnostic19-long-cue-debug-qualification.md)
+then led to one passing attended removal-during-sleep case and a separate awake
+reconnect in [report 163](163-diagnostic19-usb-removal-sleep-validation.md).
+The gadget correctly reports not attached/carrier 0 after removal, with logical
+retirement traced before s2idle. This completes NEO-112's bounded correction;
+attachment, wider repetition, retention and energy remain separate work.

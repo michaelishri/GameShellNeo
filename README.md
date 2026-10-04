@@ -4,7 +4,7 @@ A modern, maintainable Linux foundation for the ClockworkPi GameShell **CPI v3.1
 
 The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
-board. Sleep, a launcher, OTA and other board revisions are later work.
+board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
 Diagnostic.19 is installed after full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and
@@ -15,8 +15,13 @@ both SSH routes recovering, PM 7/0 and stable SDIO usage 2
 ([report 158](docs/158-diagnostic19-attended-debug-qualification.md)).
 The first actual connected-USB RTC sleep/wake test also passed: both SSH routes
 recovered, the keypad connection survived and the owner confirmed normal display
-([report 160](docs/160-diagnostic19-first-rtc-wake.md)); PM is now 8/0.
-Its USB sleep-session fix still needs cable-transition testing.
+([report 160](docs/160-diagnostic19-first-rtc-wake.md)). Refreshed debug checks
+confirmed the long audible warnings ([report 162](docs/162-diagnostic19-long-cue-debug-qualification.md)).
+One attended USB-removal-during-sleep case now passes: RTC wake, normal display,
+Wi-Fi recovery and correct disconnected USB state, followed by a separately
+verified awake reconnect ([report 163](docs/163-diagnostic19-usb-removal-sleep-validation.md)).
+PM is now 16/0, with stable SDIO usage 2. Attachment during sleep and wider
+repetition remain open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.
 Diagnostic.18's removal-during-sleep failure remains preserved in
@@ -2127,9 +2132,11 @@ The first attended removal attempt woke on RTC with a normal console but failed:
 external power/PHY reported removal while the gadget retained its connected state.
 [Report 153](docs/153-usb-removal-sleep-state-failure.md) records the preserved
 failure and NEO-112 driver investigation. The candidate correction is installed
-in diagnostic.19; its connected-USB sleep comparison passed, and fresh
-qualification for the removal scenario is in progress. The original failure
-remains unchanged.
+in diagnostic.19; its connected-USB sleep comparison and one freshly qualified
+removal-during-sleep case passed. The latter includes the owner's physical
+observation, an independently saved absent state and a separate successful
+awake reconnect ([report 163](docs/163-diagnostic19-usb-removal-sleep-validation.md)).
+Attachment during sleep remains open. The original failure remains unchanged.
 
 Diagnostic inspections send their Python helper source over SSH standard input.
 Only the short interpreter command and its arguments enter the usual sudo command

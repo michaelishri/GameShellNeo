@@ -3,6 +3,7 @@
 import argparse
 from contextlib import contextmanager
 import json
+import os
 from pathlib import Path
 import re
 import signal
@@ -29,6 +30,10 @@ def backlight_mode(mode, directory=Path('/sys/class/backlight/ocp8178')):
     if (mode != 'off' or not 0 < previous <= int(read(directory / 'max_brightness')) or
             int(read(directory / 'bl_power')) != 0):
         raise ValueError('Backlight-off comparison requires a lit, unblanked display')
+    from speaker_audio import warn_screen
+    warning = {}
+    warn_screen(warning, owner=os.environ.get('NEO_WARNING_OWNER'))
+    emit('screen_warning', **warning)
     try:
         (directory / 'brightness').write_text('0\n')
         if int(read(directory / 'actual_brightness')) != 0:

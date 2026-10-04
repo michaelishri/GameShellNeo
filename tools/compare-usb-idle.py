@@ -229,8 +229,7 @@ def main():
                 already_rebooted = bool(resume and index == completed and boot != previous_boot)
                 if index and not already_rebooted:
                     policy(capture, name + '-select', previous_mode, mode)
-                    task(capture, name + '-reboot', ['device:exec', 'ROUTE=wifi', '--',
-                                                   'sudo', '-n', 'systemctl', 'reboot'], tolerate_disconnect=True)
+                    task(capture, name + '-reboot', ['device:reboot', 'ROUTE=wifi'])
                     fresh = wait_new_boot(config, boot, baseline)
                     boot = fresh['health']['boot_id']
                 phase = dict(mode=mode, boot_id=boot, passed=False)

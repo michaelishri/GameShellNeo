@@ -8,7 +8,13 @@ previous=$(cat "$backlight/brightness")
     echo 'Panel must be unblanked before the visual test.' >&2
     exit 1
 }
-[ "$previous" -ge 0 ] && [ "$previous" -le 31 ]
+[ "$previous" -gt 0 ] && [ "$previous" -le 31 ]
+warning_script=$(dirname "$0")/speaker_audio.py
+[ -f "$warning_script" ]
+warning_owner=${NEO_WARNING_OWNER:-}
+if [ -z "$warning_owner" ]; then
+    warning_owner=$(/usr/bin/python3 -c 'import uuid; print(uuid.uuid4().hex)')
+fi
 [ -c /dev/tty1 ] && [ -w /dev/tty1 ] || {
     echo 'The local tty1 console is required for the visual test.' >&2
     exit 1
@@ -42,6 +48,9 @@ trap restore EXIT
 trap 'exit 130' HUP INT TERM
 
 step() {
+    if [ "$1" -eq 0 ]; then
+        /usr/bin/python3 -B "$warning_script" --warn-screen --owner "$warning_owner"
+    fi
     printf '%s\n' "$1" > "$backlight/brightness"
     actual=$(cat "$backlight/actual_brightness")
     printf '%s requested=%s actual=%s\n' "$(date -u +%FT%TZ)" "$1" "$actual"

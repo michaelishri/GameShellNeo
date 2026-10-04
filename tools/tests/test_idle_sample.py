@@ -46,7 +46,7 @@ class BacklightRestoration(unittest.TestCase):
                     (root / name).write_text(value)
                 # Model hardware that immediately reports the requested brightness.
                 (root / 'actual_brightness').symlink_to(root / 'brightness')
-                with patch.object(idle, 'emit'):
+                with patch.object(idle, 'emit'), patch('speaker_audio.warn_screen'):
                     try:
                         with idle.backlight_mode('off', root):
                             self.assertEqual((root / 'brightness').read_text().strip(), '0')
@@ -64,7 +64,19 @@ class BacklightRestoration(unittest.TestCase):
             for name, value in dict(brightness='1', actual_brightness='1',
                                     max_brightness='31', bl_power='0').items():
                 (root / name).write_text(value)
-            with patch.object(idle, 'emit'), self.assertRaisesRegex(ValueError, 'did not report off'):
+            with patch.object(idle, 'emit'), patch('speaker_audio.warn_screen'), \
+                    self.assertRaisesRegex(ValueError, 'did not report off'):
                 with idle.backlight_mode('off', root):
                     self.fail('Must not begin measurement after failed off readback')
             self.assertEqual((root / 'brightness').read_text().strip(), '1')
+
+    def test_failed_warning_keeps_display_lit_and_skips_measurement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name, value in dict(brightness='1', max_brightness='31', bl_power='0').items():
+                (root/name).write_text(value)
+            with patch('speaker_audio.warn_screen', side_effect=RuntimeError('speaker')), \
+                    self.assertRaisesRegex(RuntimeError, 'speaker'):
+                with idle.backlight_mode('off', root):
+                    self.fail('Cannot begin a blank-screen measurement after a failed warning')
+            self.assertEqual((root/'brightness').read_text(), '1')

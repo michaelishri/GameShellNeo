@@ -113,10 +113,12 @@ def waveform():
     return output.getvalue()
 
 
-def restore():
+def restore(owner=None):
     if not OWNED.exists():
         return
     saved = json.loads(OWNED.read_text())
+    if owner is not None and (not re.fullmatch('[a-f0-9]{32}', owner) or saved.get('notice_owner') != owner):
+        raise ValueError('Speaker warning belongs to another owner; record retained')
     card()
     original = saved.get('controls', {})
     if saved.get('boot_id') != BOOT.read_text().strip() or set(original) != set(CONTROLS):
@@ -168,12 +170,15 @@ class Cue:
 
 
 @contextmanager
-def session(record):
+def session(record, owner=None):
+    if owner is not None and not re.fullmatch('[a-f0-9]{32}', owner):
+        raise ValueError('Invalid speaker warning owner')
     idle()
     original = {name: control(name) for name in CONTROLS}
     with OWNED.open('x') as output:
         os.fchmod(output.fileno(), 0o600)
-        json.dump(dict(boot_id=BOOT.read_text().strip(), controls=original), output)
+        json.dump(dict(boot_id=BOOT.read_text().strip(), controls=original,
+                       notice_owner=owner), output)
         output.flush()
         os.fsync(output.fileno())
     record.update(original_controls=original, restored=False, cues=[])
@@ -189,18 +194,37 @@ def session(record):
         record['restored'] = not OWNED.exists()
 
 
+def warn_screen(record, owner=None):
+    """Finish a quiet cue and restore idle audio before allowing darkness."""
+    record['passed'] = False
+    with session(record, owner=owner) as cue:
+        cue.play('screen-blank')
+    time.sleep(1)  # Observer lead-in; outside PM/energy measurement windows.
+    record['passed'] = True
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--inspect', action='store_true')
     mode.add_argument('--restore', action='store_true')
     mode.add_argument('--test', metavar='RUN')
+    mode.add_argument('--warn-screen', action='store_true')
+    parser.add_argument('--owner', help='Limit warning ownership/recovery to this 32-character run ID')
     args = parser.parse_args()
     os.umask(0o077)
     if args.restore:
-        restore()
+        restore(args.owner)
     elif args.inspect:
         print(json.dumps(inspect()))
+    elif args.warn_screen:
+        def interrupted(signum, _frame):
+            raise SystemExit(128 + signum)
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(sig, interrupted)
+        record = {}
+        warn_screen(record, owner=args.owner)
+        print(json.dumps(record))
     else:
         if not re.fullmatch('[a-f0-9]{32}', args.test):
             raise ValueError('Expected a private 32-character run ID')

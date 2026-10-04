@@ -463,13 +463,16 @@ class Recovery(unittest.TestCase):
             root=Path(temp);results=root/'results';directory=results/TOKEN;directory.mkdir(parents=True)
             (directory/'started.json').write_text(json.dumps({'run_id':TOKEN,'before':{'boot_id':'boot'}}))
             pm=sleep.pm_module();pm.BOOT=root/'boot';pm.BOOT.write_text('boot')
-            paths={'rtc':root/'rtc','controls':root/'controls','wifi':root/'wifi','keypad':root/'keypad','usb':root/'usb'}
+            paths={'rtc':root/'rtc','controls':root/'controls','wifi':root/'wifi','keypad':root/'keypad',
+                   'usb':root/'usb','audio':root/'audio'}
             for name,path in paths.items():
-                key='sleep_run' if name in ('wifi','keypad') else 'run_id'
+                key='notice_owner' if name == 'audio' else 'sleep_run' if name in ('wifi','keypad') else 'run_id'
                 path.write_text(json.dumps({key:TOKEN}));path.chmod(0o600)
             with patch.object(sleep,'RESULTS',results),patch.object(sleep,'OWNED',paths['controls']), \
                     patch.object(sleep.rtc,'OWNED',paths['rtc']),patch.object(sleep.wifi_trace,'OWNED',paths['wifi']), \
                     patch.object(sleep.keypad_pm,'OWNED',paths['keypad']), \
+                    patch.object(sleep.speaker_audio,'OWNED',paths['audio']), \
+                    patch.object(sleep.speaker_audio,'restore') as audio, \
                     patch.object(sleep.usb_trace,'OWNED',paths['usb']),patch.object(sleep.usb_trace,'restore') as usb, \
                     patch.object(sleep.rtc,'restore',side_effect=OSError('rtc failed')) as rtc, \
                     patch.object(sleep,'restore_controls') as controls,patch.object(sleep.wifi_trace,'restore') as wifi, \
@@ -478,12 +481,16 @@ class Recovery(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'Incomplete recovery'):sleep.recover(pm,TOKEN)
                 rtc.assert_called_once();controls.assert_called_once();wifi.assert_called_once();keypad.assert_called_once()
                 usb.assert_called_once_with(TOKEN)
+                audio.assert_called_once_with()
                 poweroff.assert_not_called()
                 record=json.loads((directory/'recovery.json').read_text())
                 self.assertFalse(record['controls_restored'])
                 paths['rtc'].write_text(json.dumps({'run_id':'b'*32}));rtc.reset_mock()
                 with self.assertRaisesRegex(ValueError,'foreign ownership'):sleep.recover(pm,TOKEN)
                 rtc.assert_not_called();self.assertTrue(paths['rtc'].exists())
+                paths['audio'].write_text(json.dumps({'notice_owner':'b'*32}));audio.reset_mock()
+                with self.assertRaisesRegex(ValueError,'foreign ownership'):sleep.recover(pm,TOKEN)
+                audio.assert_not_called();self.assertTrue(paths['audio'].exists())
                 pm.BOOT.write_text('other');controls.reset_mock()
                 with self.assertRaisesRegex(ValueError,'another boot'):sleep.recover(pm,TOKEN)
                 controls.assert_not_called()

@@ -346,7 +346,7 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
               if power_key else nullcontext()) as power_owner:
             with observe(record['keypad'], tracing=keypad_trace) as original_fd:
                 from keypad_input import capture
-                from speaker_audio import session as speaker_session, idle as speaker_idle
+                from speaker_audio import session as speaker_session, idle as speaker_idle, warn_screen
                 record['physical_input'] = {}
                 record['speaker_audio'] = {}
                 if keypad_input:
@@ -359,6 +359,14 @@ def test_stage(lock, stage, run_id, keypad_trace=False, keypad_persist=None, key
                         validate(record['entry_preflight'], lock)
                         if record['entry_preflight']['boot_id'] != before['boot_id']:
                             raise ValueError('Boot changed while waiting for physical input')
+                        save(directory / 'started.json', record)
+                    if stage != 'freezer':
+                        if cue:
+                            cue.play('screen-blank')
+                            time.sleep(1)
+                        else:
+                            record['screen_warning'] = {}
+                            warn_screen(record['screen_warning'])
                         save(directory / 'started.json', record)
                     started = time.monotonic()
                     with stage_controls(stage, late_ready=stage == 'platform'):

@@ -208,7 +208,7 @@ class PromptedCycle(unittest.TestCase):
         pm.validate_input(self.record)
         self.backend.enter_stage.assert_called_once_with('devices')
         self.assertEqual([c.args[0] for c in self.cue.play.call_args_list],
-                         ['tap-1','tap-2','release-during-pm','tap-4'])
+                         ['tap-1','tap-2','screen-blank','release-during-pm','tap-4'])
         lines=self.record['physical_power']['prompts']
         hold=next(p for p in lines if p['lines'][0]=='3/4: Press POWER.')
         self.assertIn('Release even if screen is dark!',hold['lines'])

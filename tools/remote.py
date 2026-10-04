@@ -14,6 +14,7 @@ import shlex
 import shutil
 import socket
 import sys
+import uuid
 
 import paramiko
 from private_config import load_env
@@ -236,12 +237,17 @@ def device_action(config, action, route):
                 raise ValueError('SECONDS must be a multiple of 10 in 60..3600')
             if backlight not in ('keep', 'off'):
                 raise ValueError('BACKLIGHT must be keep or off')
+            remote_dir = stage_helpers(client, 'idle', ('sample-idle.py', 'speaker_audio.py'))
+            warning_owner = uuid.uuid4().hex
+            (directory / 'warning.json').write_text(json.dumps(dict(owner=warning_owner, helper=remote_dir)) + '\n')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-idle-sample',
                          '--property=RuntimeMaxSec=' + str(seconds + 120),
                          '--property=TimeoutStopSec=10', '--property=Nice=10',
-                         '/usr/bin/python3', '-B', '-u', '-c',
-                         (ROOT / 'tools/sample-idle.py').read_text(), '--seconds', str(seconds),
+                         '--property=Environment=NEO_WARNING_OWNER=' + warning_owner,
+                         '--property=ExecStopPost=/usr/bin/python3 -B ' + remote_dir +
+                         '/speaker_audio.py --restore --owner ' + warning_owner,
+                         '/usr/bin/python3', '-B', '-u', remote_dir + '/sample-idle.py', '--seconds', str(seconds),
                          '--backlight', backlight]
             with (directory / 'idle-sample.jsonl').open('wb') as output:
                 run(client, shlex.join(arguments), output=output, timeout=90)
@@ -398,10 +404,16 @@ def device_action(config, action, route):
             with (directory / 'stability.jsonl').open('wb') as output:
                 run(client, shlex.join(arguments), output=output)
         elif action == 'backlight':
+            remote_dir = stage_helpers(client, 'backlight', ('check-backlight.sh', 'speaker_audio.py'))
+            warning_owner = uuid.uuid4().hex
+            (directory / 'warning.json').write_text(json.dumps(dict(owner=warning_owner, helper=remote_dir)) + '\n')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-backlight-test',
-                         '--property=RuntimeMaxSec=60', '--property=TimeoutStopSec=5',
-                         '/bin/sh', '-c', (ROOT / 'tools/check-backlight.sh').read_text()]
+                         '--property=RuntimeMaxSec=120', '--property=TimeoutStopSec=15',
+                         '--property=Environment=NEO_WARNING_OWNER=' + warning_owner,
+                         '--property=ExecStopPost=/usr/bin/python3 -B ' + remote_dir +
+                         '/speaker_audio.py --restore --owner ' + warning_owner,
+                         '/bin/sh', remote_dir + '/check-backlight.sh']
             with (directory / 'backlight.txt').open('wb') as output:
                 run(client, shlex.join(arguments), output=output)
         elif action == 'status':
@@ -424,6 +436,22 @@ def device_action(config, action, route):
             stdout.close()
             stderr.close()
         print('Private capture:', directory)
+
+
+def stage_helpers(client, purpose, names):
+    """Keep standalone diagnostic dependencies together until recovery finishes."""
+    if purpose not in ('idle', 'backlight'):
+        raise ValueError('Unknown diagnostic helper purpose')
+    prefix = '/tmp/gameshellneo-' + purpose + '.'
+    directory = run(client, 'umask 077; mktemp -d ' + prefix + 'XXXXXXXX', display=False).decode().strip()
+    if not re.fullmatch(re.escape(prefix) + r'[A-Za-z0-9]+', directory):
+        raise ValueError('Unexpected diagnostic helper directory')
+    with client.open_sftp() as sftp:
+        for name in names:
+            if Path(name).name != name or name not in ('sample-idle.py', 'check-backlight.sh', 'speaker_audio.py'):
+                raise ValueError('Unknown diagnostic helper')
+            upload(sftp, ROOT / 'tools' / name, directory + '/' + name)
+    return directory
 
 
 def upload(sftp, source, destination):

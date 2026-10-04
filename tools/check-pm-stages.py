@@ -280,7 +280,7 @@ def validate_physical_result(result, retention):
 
 
 def validate_audio_result(record):
-    expected = ['before-' + button for button in ('A', 'B', 'X', 'Y')] + ['hold-A'] + [
+    expected = ['before-' + button for button in ('A', 'B', 'X', 'Y')] + ['hold-A', 'screen-blank'] + [
         'after-' + button for button in ('A', 'B', 'X', 'Y')]
     off = {'Speaker Amp DRV': 'Off', 'Headphone Amp': 'Off'}
     if (record.get('restored') is not True or record.get('idle_before_pm') != off or

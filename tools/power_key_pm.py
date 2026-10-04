@@ -117,6 +117,10 @@ class Sequence(awake.Sequence):
         power_key.verify_inhibitor()
         with pm.stage_controls('devices'):
             os.sync()  # Complete disk synchronization BEFORE requesting the hold.
+            # Playback takes about a second: finish it BEFORE the timed hold,
+            # so it cannot consume the operator's one-second release window.
+            self.cue.play('screen-blank')
+            self.quiet(4, 1)
             self.record['hold_prompt'] = self.prompt('3/4: Press POWER.', 'Hold for ONE second, then RELEASE.',
                 'Release even if screen is dark!', 'Do NOT wait for a tone or prompt.', 'Never hold longer than 2 seconds.')
             self.wait(5, 25)
@@ -204,7 +208,7 @@ def validate_result(record):
         raise ValueError('Original internal keypad connection was not retained')
     cues = record['speaker_audio']
     if (cues.get('restored') is not True or [c['label'] for c in cues['cues']] !=
-            ['tap-1', 'tap-2', 'release-during-pm', 'tap-4'] or
+            ['tap-1', 'tap-2', 'screen-blank', 'release-during-pm', 'tap-4'] or
             any(c['amplifiers_after'] != {'Speaker Amp DRV':'Off', 'Headphone Amp':'Off'} for c in cues['cues'])):
         raise ValueError('Speaker cues or idle restoration incomplete')
 

@@ -42,6 +42,7 @@ env:
   NEO_KEYPAD_AUDIO: '{{.AUDIO | default "0"}}'
   NEO_KEYPAD_QUIRK: '{{.QUIRK | default ""}}'
   NEO_AUDIO_RUN: '{{.RUN | default ""}}'
+  NEO_AUDIO_ROUTE: '{{.ROUTE | default "usb"}}'
   NEO_CHECKPOINT_NAME: '{{.NAME | default ""}}'
   NEO_SCRATCH_SUITE: '{{.SUITE | default ""}}'
   NEO_SCRATCH_APPLY: '{{.APPLY | default "0"}}'
@@ -457,6 +458,10 @@ tasks:
   device:audio-test:
     desc: Three bounded quiet speaker cues at increasing conservative levels; owner listens
     cmds: [python3 tools/check-audio.py --test]
+
+  device:reboot:
+    desc: Play three GameShell speaker warning tones, restore audio, then queue one reboot; ROUTE=usb/wifi
+    cmds: [python3 tools/check-audio.py --reboot]
 
   device:audio-collect:
     desc: Retrieve a saved speaker test result; RUN required

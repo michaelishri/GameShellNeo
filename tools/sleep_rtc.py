@@ -719,6 +719,11 @@ def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_
                         for owned in (wifi_trace.OWNED, keypad_pm.OWNED):
                             pm.save(owned, json.loads(policy.read_owned(owned)) | {'sleep_run': token})
                         with controls(pm, token):
+                            if mode == 'rtc-wake':
+                                record['screen_warning'] = {}
+                                persist()
+                                speaker_audio.warn_screen(record['screen_warning'], owner=token)
+                                persist()
                             os.sync()
                             record['rtc']['irq_before'] = rtc_irq()
                             if mode == 'rtc-wake' and record['rtc']['irq_before'] != expected_rtc:
@@ -770,6 +775,7 @@ def recover(pm, token):
     with keypad_pm.exclusive_pm(OWNED.parent):
         failures = []
         operations = ((sleep_cable.OWNED, 'run_id', lambda: sleep_cable.restore(token)),
+                      (speaker_audio.OWNED, 'notice_owner', speaker_audio.restore),
                       (rtc.OWNED, 'run_id', rtc.restore),
                       (OWNED, 'run_id', lambda: restore_controls(pm, token)),
                       (usb_trace.OWNED, 'run_id', lambda: usb_trace.restore(token)),

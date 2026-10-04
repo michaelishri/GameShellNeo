@@ -830,10 +830,12 @@ task build:perf # Optional diagnostic tool from the locked source/container; no 
 task device:governor-profile ROUTE=wifi SECONDS=30 # Separate kernel-function sample; USB unplugged
 task device:boot-cycles CYCLES=4 # Wait for ready, then operate the power button
 task device:boot-cycles CYCLES=0 # Capture/check this boot without starting a batch
+task device:reboot ROUTE=usb # Three speaker warning tones, verified audio restoration, then one reboot
 task device:exec ROUTE=usb -- systemctl --failed --no-pager
 ```
 
-The default route is Wi-Fi. `ROUTE=usb` tunnels through Mac SSH to the board's
+The general remote-task default route is Wi-Fi; audio and `device:reboot` default
+to USB and accept `ROUTE=wifi`. `ROUTE=usb` tunnels through Mac SSH to the board's
 USB address, so the Intel host needs no route to that USB subnet. Status and
 diagnostic archives are retained privately in `.local/diagnostics/<timestamp>/`.
 `device:exec` runs the explicitly supplied command and returns its failure
@@ -1461,7 +1463,8 @@ On the audio-enabled diagnostic.10 image, first use
 listening. The latter plays three bounded quiet cues after a ten-second
 lead-in and checks mixer restoration and amplifier power-down. Once sound is
 confirmed, `task device:keypad-input AUDIO=1` adds a speaker cue for each
-accepted tap and hold. The default remains silent. Playback closes and both
+accepted tap and hold. Without `AUDIO=1`, key confirmations remain silent, but
+the screen-blanking warning still plays. Playback closes and both
 amplifiers must be idle before entering PM. The upstream amplifier startup
 delay is retained, so confirmation is not instantaneous.
 Use `task device:audio-collect RUN=...` to retrieve an interrupted standalone
@@ -1472,6 +1475,25 @@ powers the amplifiers up again and repeats the upstream 700 ms startup wait.
 Improving that latency is recorded for later investigation.
 See [report 65](docs/65-speaker-confirmation-cues.md) for routing, levels,
 recovery and qualification status.
+
+As requested on 5 October, saved workflows warn through the **GameShell speaker**
+before planned reboots and screen blanking. Devices/platform debug tests, actual
+RTC sleep, every off-cycle in the backlight test, and `BACKLIGHT=off` sampling
+play one short tone and leave a one-second lead-in. Playback and amplifier
+power-down complete before the blanking operation; a failed warning stops that
+operation. The lead-in is outside reported PM-stage and energy-sampling windows.
+The timed power-key release test warns before asking for the one-second hold.
+Freezer checks and awake rehearsals do not blank the display and remain silent.
+
+Use `task device:reboot ROUTE=usb` (or `ROUTE=wifi`) for planned reboots instead
+of a raw `device:exec ... reboot`. It uses the existing three ascending speaker
+tones, verifies audio restoration and the unchanged boot, then queues one reboot
+after two seconds. `reboot.json` records submission and acceptance; an uncertain
+SSH submission is never automatically retried. Verify the resulting boot
+separately. The USB idle comparison uses this same task for both of its reboots.
+Warnings do not replace fresh readiness for an attended test. These are helper
+changes; the installed power-button and normal sleep policies are unchanged.
+[Report 159](docs/159-audible-diagnostic-warnings.md) records validation and limits.
 
 The helper serializes driver callbacks with `pm_async=0`, records the original
 controls, and restores them on exit and through independent `ExecStopPost`.

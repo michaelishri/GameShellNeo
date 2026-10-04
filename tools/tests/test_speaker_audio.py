@@ -1,5 +1,6 @@
 """Bounded waveform, mixer ownership and PM isolation for physical speaker cues."""
 import importlib.util
+from contextlib import contextmanager, nullcontext
 import io
 import json
 from pathlib import Path
@@ -117,6 +118,47 @@ class Restoration(unittest.TestCase):
         console.assert_called_once_with()
         power.assert_called_once_with()
 
+    def test_screen_warning_restores_mixer_before_observer_lead_in(self):
+        original = self.values.copy()
+        def lead_in(seconds):
+            self.assertEqual(seconds, 1)
+            self.assertEqual(self.values, original)
+            self.assertFalse(audio.OWNED.exists())
+        record = {}
+        with patch.object(audio.Cue, 'play') as play, patch.object(audio.time, 'sleep', side_effect=lead_in):
+            audio.warn_screen(record, owner='a'*32)
+        play.assert_called_once_with('screen-blank')
+        self.assertTrue(record['passed'])
+        self.assertTrue(record['restored'])
+
+    def test_failed_warning_restores_mixer_and_does_not_report_pass(self):
+        record = {}
+        original = self.values.copy()
+        with patch.object(audio.Cue, 'play', side_effect=RuntimeError('playback')), \
+                patch.object(audio.time, 'sleep') as wait, self.assertRaisesRegex(RuntimeError, 'playback'):
+            audio.warn_screen(record)
+        self.assertEqual(self.values, original)
+        self.assertFalse(record['passed'])
+        wait.assert_not_called()
+
+    def test_warning_ownership_survives_failed_restore(self):
+        record = {}
+        with patch.object(audio.Cue, 'play'), patch.object(audio, 'restore', side_effect=OSError('restore')), \
+                self.assertRaises(OSError):
+            audio.warn_screen(record, owner='a'*32)
+        self.assertEqual(json.loads(audio.OWNED.read_text())['notice_owner'], 'a'*32)
+        self.assertFalse(record['passed'])
+
+    def test_warning_cleanup_cannot_restore_another_owners_mixer(self):
+        original = self.values.copy()
+        audio.OWNED.write_text(json.dumps(dict(boot_id='same-boot', controls=original, notice_owner='a'*32)))
+        with patch.object(audio, 'set_control') as write, self.assertRaisesRegex(ValueError, 'another owner'):
+            audio.restore(owner='b'*32)
+        write.assert_not_called()
+        self.assertTrue(audio.OWNED.exists())
+        audio.restore(owner='a'*32)
+        self.assertFalse(audio.OWNED.exists())
+
 
 class Gating(unittest.TestCase):
     def test_host_restore_survives_collected_unit_or_failed_stop(self):
@@ -139,8 +181,8 @@ class Gating(unittest.TestCase):
                           'devices', 'a'*32, True, None, True, True)
         directory.assert_not_called()
 
-    def test_all_nine_cues_and_quiescence_are_required(self):
-        labels = ['before-' + b for b in 'ABXY'] + ['hold-A'] + ['after-' + b for b in 'ABXY']
+    def test_input_cues_screen_warning_and_quiescence_are_required(self):
+        labels = ['before-' + b for b in 'ABXY'] + ['hold-A', 'screen-blank'] + ['after-' + b for b in 'ABXY']
         off = {'Speaker Amp DRV': 'Off', 'Headphone Amp': 'Off'}
         record = dict(restored=True, idle_before_pm=off,
                       cues=[dict(label=label, amplifiers_after=off) for label in labels])
@@ -148,6 +190,70 @@ class Gating(unittest.TestCase):
         record['cues'].pop()
         with self.assertRaises(ValueError):
             host.validate_audio_result(record)
+
+
+class RebootWarning(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.capture = Path(self.directory.name)
+        self.before = dict(boot_id='boot', controls='original')
+        self.result = dict(run_id='a'*32, passed=True, restored=True,
+                           before=self.before.copy(), after=self.before.copy(), cues=[{}, {}, {}])
+        self.enterContext(patch.object(audio_host, 'device', return_value=nullcontext('client')))
+
+    def request(self):
+        audio_host.request_reboot({}, 'wifi', self.capture, 'a'*32, self.before, self.result)
+
+    def test_only_verified_audio_can_queue_one_reboot(self):
+        with patch.object(audio_host, 'run', side_effect=[b'boot\n', b'']) as run:
+            self.request()
+        self.assertEqual(run.call_count, 2)
+        command = run.call_args_list[-1].args[1]
+        self.assertIn('--on-active=2s', command)
+        self.assertIn('/usr/bin/systemctl reboot', command)
+        self.assertTrue(json.loads((self.capture/'reboot.json').read_text())['accepted'])
+
+    def test_playback_restore_identity_and_boot_failures_never_reboot(self):
+        for key, bad in [('passed', False), ('restored', False), ('run_id', 'b'*32), ('cues', [])]:
+            original = self.result[key]
+            self.result[key] = bad
+            with patch.object(audio_host, 'run') as run, self.assertRaises(ValueError):
+                self.request()
+            run.assert_not_called()
+            self.result[key] = original
+        with patch.object(audio_host, 'run', return_value=b'other-boot\n') as run, self.assertRaises(ValueError):
+            self.request()
+        self.assertEqual(run.call_count, 1)
+
+    def test_uncertain_submission_is_recorded_and_never_retried(self):
+        with patch.object(audio_host, 'run', side_effect=[b'boot\n', OSError('transport')]) as run, \
+                self.assertRaisesRegex(RuntimeError, 'uncertain'):
+            self.request()
+        self.assertEqual(run.call_count, 2)
+        record = json.loads((self.capture/'reboot.json').read_text())
+        self.assertTrue(record['submission_attempted'])
+        self.assertFalse(record['accepted'])
+
+
+class PMWarning(unittest.TestCase):
+    def test_failed_notice_prevents_device_suspend_but_freezer_needs_no_notice(self):
+        @contextmanager
+        def observe(*args, **kwargs):
+            yield 10
+        for stage, failure in [('devices', True), ('devices', False), ('freezer', False)]:
+            with tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(pm, 'result_dir', return_value=Path(temporary)/'run'), \
+                    patch.object(pm, 'STATE', Path(temporary)/'pm-owned.json'), \
+                    patch.object(pm, 'snapshot', return_value={}), patch.object(pm, 'validate'), \
+                    patch.object(pm, 'command', return_value=''), patch('keypad_pm.observe', observe), \
+                    patch.object(pm, 'stage_controls', return_value=nullcontext()), patch.object(pm.os, 'sync'), \
+                    patch.object(audio, 'warn_screen', side_effect=ValueError('notice') if failure else None) as warning, \
+                    patch.object(pm, 'enter_stage', side_effect=RuntimeError('entered')) as enter:
+                with self.assertRaisesRegex(ValueError if failure else RuntimeError, 'notice' if failure else 'entered'):
+                    pm.test_stage({}, stage, 'a'*32)
+                self.assertEqual(enter.call_count, 0 if failure else 1)
+                self.assertEqual(warning.call_count, 0 if stage == 'freezer' else 1)
 
 
 if __name__ == '__main__':

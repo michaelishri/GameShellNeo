@@ -7,7 +7,10 @@ The saved RTC diagnostic now has an explicit battery-only profile. It submits
 and collects one original attempt over Wi-Fi, while the existing USB profile
 continues to require external power, a configured USB gadget and independent
 USB/Wi-Fi recovery. This changes diagnostic tooling, not the kernel image,
-charging policy or ordinary sleep behavior. No battery-only sleep has yet run.
+charging policy or ordinary sleep behavior. The awake rehearsal and one attended
+battery-only actual sleep now pass on unchanged diagnostic.18. The owner
+confirmed normal dim-console return without intervention; separate USB
+reattachment remains to qualify.
 
 ## Why a separate profile
 
@@ -109,8 +112,8 @@ whose prepared source is absent in this isolated worktree. Logs are
 `work/battery-rtc-qualification`'s worktree. Tests use modeled transport and
 filesystem fixtures, not real sleep or electrical fault injection.
 
-Awake battery rehearsal, actual battery sleep and subsequent reattachment
-remain to qualify. NEO-109 stays open.
+The awake battery rehearsal and one actual sleep have now passed, as recorded
+below. Subsequent USB reattachment remains to qualify. NEO-109 stays open.
 CPU-idle/energy work, Mac sleep, power-button wake and product power policy
 remain separate; this tooling makes no performance or battery-life claim.
 
@@ -130,8 +133,8 @@ The subsequent PM inspection at
 `.local/diagnostics/20261004T025820.979608Z/inspection.json` passes the common
 validator on the original boot, with PM counts unchanged at 19 successes and
 zero failures. No RTC programming, PM entry, key ownership or settings change
-occurred during these inspections. Fresh observer readiness is still required
-for the next debug prerequisites and actual battery sleep.
+occurred during these inspections. The subsequent debug checks and awake
+battery rehearsal are recorded below; actual sleep requires fresh readiness.
 
 ## Fresh debug prerequisites
 
@@ -139,8 +142,9 @@ After new owner readiness, the updated tools completed seven sequential debug
 checks on the same diagnostic.18 boot. Each result was reviewed before the
 next submission. All passed independent USB/Wi-Fi access, original input and
 policy restoration, trace checks and stable SDIO usage 2. These checks do not
-enter actual sleep. Final owner screen confirmation and physical USB removal
-are pending; no battery rehearsal or battery sleep has been submitted.
+enter actual sleep. The owner subsequently confirmed normal dim-console
+returns after every dark interval, then physically removed USB for the
+separately recorded battery rehearsal below.
 
 Capture directories below are relative to `.local/diagnostics/`; each contains
 `cycle-1/result.json`.
@@ -169,3 +173,108 @@ This baseline can admit the new-source awake battery rehearsal only while
 boot, image, helper sources and PM history remain unchanged. Source/boot
 changes or further PM activity require the appropriate new qualification;
 waiting alone does not establish physical readiness or cable absence.
+
+## Awake battery rehearsal
+
+The initial physical confirmation did not match the hardware readings: captures
+`20261004T045249.604694Z` and `20261004T045751.385524Z` still showed external
+power, configured UDC, carrier 1 and PHY `USB=1`. The absent-cable validator
+rejected both. No rehearsal or sleep was submitted in that state. The owner
+then clarified that USB was still connected and removed it from the GameShell.
+
+The fresh passive capture at `20261004T045904.794573Z` passes absent-state
+validation: both external inputs absent/offline, UDC `not attached`, carrier 0
+and PHY `USB=0` / `USB-HOST=0`. AC/VBUS removal counters advanced from 4 to 5;
+plug counters remained 4. Boot and helper sources were unchanged.
+
+The saved task then passed without entering sleep:
+
+```sh
+task device:sleep-battery-rehearse QUALIFICATION=.local/neo109-reference-history.json UNPLUGGED=1
+```
+
+Run `e0de7c35a0044bf99149e2bff9d0d4a9`, capture
+`.local/diagnostics/20261004T045932.183842Z/result.json`, establishes:
+
+- RTC IRQ 31 advanced from 9 to 10, with exactly one alarm delivery after
+  30.781 seconds and successful restoration of the original RTC state.
+- PM counts remained 26 successes / zero failures. The trace contains no
+  sleep transition. Original keypad, process memory, audio and power policy
+  remained intact, with trace and diagnostic ownership cleanup complete.
+- Cable state and all four cable IRQ counts remained unchanged across the
+  before/entry/after observations. Battery monitoring was valid and discharging,
+  reporting 98% before and 97% afterward; these are gauge readings, not a
+  measurement of energy consumed by this short test.
+- Independent Wi-Fi SSH reached the original boot. The result explicitly
+  records `usb_ssh_verified=false`; absent USB is not a recovery claim.
+
+The original result also passes offline revalidation against unchanged helper
+sources and the image lock. No image, driver, charging or network settings were
+changed. The separately attended actual sleep follows below; physical
+reattachment remains a distinct check.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Absent connection inspection | `bdf7cdf05cd9817ab0ce166fc7119ab84abdefed42bfc3082056f5b658a93887` |
+| Awake rehearsal result | `379ecb8d1630700448594ba28084ff8b3928cf72c8d2a6217433a97ae82e80a7` |
+
+## One actual battery-only sleep
+
+After fresh observer readiness, the unchanged saved task submitted exactly one
+actual `freeze` request, with `pm_test=none` and `pm_async=0` temporarily selected:
+
+```sh
+task device:sleep-battery QUALIFICATION=.local/neo109-reference-history.json REHEARSAL=e0de7c35a0044bf99149e2bff9d0d4a9 UNPLUGGED=1 ATTENDED=1
+```
+
+Run `b646d6376cbd47f2bbb739cce201cd2d` completed successfully. Its original result
+is `.local/diagnostics/20261004T050133.659161Z/result.json`. Independent Wi-Fi
+SSH recovered to boot `e419f334-0a16-4b04-96d2-d97a2e4d5d0b`, and offline
+revalidation passed. The owner confirmed that the normal dim login console
+returned without touching either the cable or controls.
+
+| Observation | Result |
+| --- | --- |
+| PM successes / failures | 26 → 27 / zero failures |
+| RTC IRQ 31 | 10 → 11; exactly one alarm interrupt, original RTC state restored |
+| Alarm elapsed time | 31.743 seconds |
+| State-write-to-return interval | 30.858 seconds; includes entry, RTC wait and resume |
+| Actual s2idle trace interval | 28.439 seconds, inside the expected late/noirq boundaries |
+| Cable state | Absent before, immediately before entry and after recovery |
+| Cable IRQ counts | Plug counts 4, removal counts 5; unchanged throughout |
+| Battery telemetry | Valid/discharging, 95% before and 94% after |
+| SDIO runtime usage | 2 before and after, unchanged policy |
+| Original input and memory | Preserved; original evdev handle remained connected |
+| Display / idle audio / policies | Restored to original values |
+| Cleanup | RTC, trace, power-key and PM ownership fully released |
+| USB SSH proof | Explicitly false; physically absent, not tested |
+
+The parent debug run was consumed once through the durable successor claim.
+The saved `qualification-next.json` preserves the accepted result for any
+later separately attended battery attempt; it does not authorize another
+unobserved submission.
+
+No CPU-idle driver is installed (`none`), and the trace contains zero
+timekeeping-freeze pairs. This establishes the functional s2idle/RTC-wake path
+and device recovery on battery, not CPU retention, standby energy, deep suspend
+or subsecond resume. The one-point percentage difference cannot quantify
+energy use. No repair, reboot, cable intervention or automatic retry was used.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Actual battery sleep result | `99d5d59c923a17950ca01da66b2b458b8db0fb8001206ed8456eaf0bea828fd7` |
+| Continuation qualification | `fdd7c9efc23fb6a80f8349725ef5d33309564908a872b9a92d70213f42c3e58e` |
+
+Before requesting reattachment, `task device:sleep-collect` retrieved the same
+original run over Wi-Fi into `20261004T050423.642052Z`. Its normalized digest
+matches the accepted result. The separate live snapshot confirms the same
+boot, absent USB, disabled USB wake, restored `pm_async=1` / `pm_test=none`
+and no retained policy or PM owners; the service cleanup record has no errors.
+Mac capture `20261004T050355.381052Z` has no GameShell USB device and unchanged
+sleep/wake history compared with the pre-debug capture.
+
+An attempted `device:pm-inspect ROUTE=wifi` at `20261004T050355.397541Z`
+timed out because that task currently ignores `ROUTE` and always connects by
+USB. It produced no health snapshot and made no PM submission. This tooling
+limitation is recorded in `FOLLOW-UP.md`; the battery test's validated after
+snapshot and Wi-Fi original-result collection remain the relevant evidence.

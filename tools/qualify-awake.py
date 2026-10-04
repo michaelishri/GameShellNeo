@@ -45,13 +45,34 @@ PLAN = (
 )
 # Read-only preflight. Existing recovery files are evidence, never deleted here.
 GUARD = r'''
-import json, pathlib, subprocess
+import fcntl, json, os, pathlib, stat, subprocess
+
+def recovery_records(directory):
+    owned = []
+    for path in directory.glob('gameshellneo-*'):
+        if path.name == 'gameshellneo-pm-experiment.lock':
+            # Experiment helpers deliberately retain this inode after releasing
+            # flock. Probe ownership, never unlink it or ignore a held lock.
+            try:
+                fd = os.open(path, os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK)
+                try:
+                    if not stat.S_ISREG(os.fstat(fd).st_mode):
+                        raise ValueError('Unexpected experiment lock type')
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                finally:
+                    os.close(fd)
+            except (OSError, ValueError):
+                owned.append(str(path))
+        else:
+            owned.append(str(path))
+    return owned
+
 units = subprocess.check_output(['systemctl', 'list-units', '--all', '--plain',
     '--no-legend', '--state=active,activating,deactivating', 'gameshellneo-*.service'],
     text=True, stderr=subprocess.PIPE, timeout=20).splitlines()
 ordinary = {'gameshellneo-usb.service', 'gameshellneo-battery.service', 'gameshellneo-ready.service'}
 active = [line.split()[0] for line in units if line.split()[0] not in ordinary]
-owned = [str(p) for p in pathlib.Path('/run').glob('gameshellneo-*')]
+owned = recovery_records(pathlib.Path('/run'))
 usb_record = pathlib.Path('/run/gameshellneo/usb-diagnostic-test.json')
 if usb_record.exists():
     owned.append(str(usb_record))

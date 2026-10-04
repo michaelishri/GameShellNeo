@@ -1042,6 +1042,13 @@ commands concurrently. Connection credentials remain in `.env`. Use
 `ACTIVE_COUNTRY=AU` for this board's accepted AP announcement; omit the override
 when the active country matches `GAMESHELL_WIFI_COUNTRY`.
 
+The guard checks ownership of the persistent PM experiment lock with a
+nonblocking `flock`; an unlocked inode left by a completed RTC/key check is
+normal. A held lock, an invalid lock path, another diagnostic service or any
+recovery record still stops qualification. Never delete a lock file to bypass
+this check. This is a preflight snapshot, not exclusive ownership for the
+whole sequence; the prohibition on concurrent diagnostics still applies.
+
 The fixed sequence checks the current boot and both SSH routes, saves read-only
 PM/keypad/audio baselines, runs installed-firmware recovery with four software
 reconnections and two 120-second windows, verifies restoration, then runs the

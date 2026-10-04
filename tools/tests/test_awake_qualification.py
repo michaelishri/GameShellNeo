@@ -1,5 +1,7 @@
 """Fail-stop, timeout cleanup, evidence ownership and unchanged-state boundaries."""
 from copy import deepcopy
+import ast
+import fcntl
 import importlib.util
 import json
 import os
@@ -166,6 +168,49 @@ class Evidence(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
         self.context = {'boot_id': BOOT}
+
+    def test_guard_probes_persistent_lock_without_removing_it(self):
+        # Execute the device-side function, including real Linux flock behavior.
+        tree = ast.parse(awake.GUARD)
+        tree.body = [node for node in tree.body if isinstance(node, (ast.Import, ast.FunctionDef))]
+        namespace = {}
+        exec(compile(tree, '<awake guard>', 'exec'), namespace)
+        records = namespace['recovery_records']
+        lock = self.directory / 'gameshellneo-pm-experiment.lock'
+        self.assertEqual(records(self.directory), [])
+        lock.touch()
+        inode = lock.stat().st_ino
+        self.assertEqual(records(self.directory), [])
+        with lock.open('a') as owner:
+            fcntl.flock(owner, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(records(self.directory), [str(lock)])
+        self.assertEqual(records(self.directory), [])
+        self.assertEqual(lock.stat().st_ino, inode)
+        recovery = self.directory / 'gameshellneo-power-key.json'
+        recovery.write_text('{}')
+        self.assertEqual(records(self.directory), [str(recovery)])
+
+    def test_guard_rejects_invalid_lock_types_and_keeps_unknown_records(self):
+        tree = ast.parse(awake.GUARD)
+        tree.body = [node for node in tree.body if isinstance(node, (ast.Import, ast.FunctionDef))]
+        namespace = {}
+        exec(compile(tree, '<awake guard>', 'exec'), namespace)
+        records = namespace['recovery_records']
+        lock = self.directory / 'gameshellneo-pm-experiment.lock'
+        target = self.directory / 'target'
+        target.touch()
+        lock.symlink_to(target)
+        self.assertEqual(records(self.directory), [str(lock)])
+        lock.unlink()
+        lock.mkdir()
+        self.assertEqual(records(self.directory), [str(lock)])
+        lock.rmdir()
+        os.mkfifo(lock)
+        self.assertEqual(records(self.directory), [str(lock)])
+        lock.unlink()
+        unknown = self.directory / 'gameshellneo-future-experiment.lock'
+        unknown.touch()
+        self.assertEqual(records(self.directory), [str(unknown)])
 
     def test_guard_blocks_other_diagnostics_and_recovery_records(self):
         for field, value in (('active_diagnostics', ['gameshellneo-pm-test.service']),

@@ -92,8 +92,13 @@ def device(config, route):
         yield client
 
 
-def run(client, command, password=None, output=None, display=True, timeout=300):
+def run(client, command, password=None, output=None, display=True, timeout=300, input_data=None):
     """Drain one combined channel to avoid stdout/stderr deadlocks."""
+    # This input path is for bounded Python source, read before execution.
+    # Do not mix it with password input or use it as an interactive protocol.
+    if input_data is not None and (not isinstance(input_data, bytes) or
+            len(input_data) > 1024 * 1024 or password is not None):
+        raise ValueError('Command input requires at most 1 MiB of bytes and no password')
     channel = client.get_transport().open_session(timeout=10)
     channel.settimeout(timeout)
     channel.set_combine_stderr(True)
@@ -101,6 +106,8 @@ def run(client, command, password=None, output=None, display=True, timeout=300):
         channel.exec_command(command)
         if password is not None:
             channel.sendall((password + '\n').encode())
+        if input_data is not None:
+            channel.sendall(input_data)
         channel.shutdown_write()
         data = bytearray()
         while True:
@@ -120,6 +127,22 @@ def run(client, command, password=None, output=None, display=True, timeout=300):
         return bytes(data)
     finally:
         channel.close()
+
+
+def python_command(source, *arguments):
+    """Pass helper source over stdin, keeping it out of sudo's command log.
+
+    Return run() keyword arguments so callers retain their output/timeout and
+    transport-failure handling. Python reads the source to EOF before running;
+    helpers needing an interactive stdin must use a different transport.
+    """
+    if not isinstance(source, str) or not source.strip() or '\0' in source:
+        raise ValueError('Expected nonempty Python source without NUL bytes')
+    payload = source.encode('utf-8')
+    if len(payload) > 1024 * 1024:
+        raise ValueError('Python helper exceeds the 1 MiB transport bound')
+    return dict(command=shlex.join(['sudo', '-n', 'python3', '-B', '-', *arguments]),
+                input_data=payload)
 
 
 def evidence_directory():
@@ -193,10 +216,9 @@ def device_action(config, action, route):
             mode = os.environ.get('NEO_USB_POLL_MODE', 'status')
             if mode not in ('status', 'stock', 'experimental'):
                 raise ValueError('MODE must be status, stock or experimental')
-            arguments = ['sudo', '-n', 'python3', '-c',
-                         (ROOT / 'tools/usb_poll_boot.py').read_text(), '--mode', mode]
             with (directory / 'usb-policy.txt').open('wb') as output:
-                run(client, shlex.join(arguments), output=output, timeout=30)
+                run(client, **python_command((ROOT / 'tools/usb_poll_boot.py').read_text(), '--mode', mode),
+                    output=output, timeout=30)
         elif action == 'battery-check':
             source = ROOT / 'runtime/usr/local/lib/gameshellneo/battery_guard.py'
             digest = hashlib.sha256(source.read_bytes()).hexdigest()

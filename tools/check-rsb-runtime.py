@@ -8,7 +8,7 @@ import re
 import shlex
 
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run, upload
+from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
 
 
 def service_command(directory, seconds, delay):
@@ -43,10 +43,9 @@ def main():
             if args.restore:
                 if loaded != 'not-found':
                     run(client, 'sudo -n systemctl stop gameshellneo-rsb-comparison', timeout=30)
-                command = ['sudo', '-n', 'python3', '-B', '-c',
-                           (ROOT / 'tools/compare-rsb.py').read_text(), '--restore']
                 with (capture / 'restore.txt').open('wb') as output:
-                    run(client, shlex.join(command), output=output, timeout=30)
+                    run(client, **python_command((ROOT / 'tools/compare-rsb.py').read_text(), '--restore'),
+                        output=output, timeout=30)
                 print('RSB comparison stopped and owned delay restored.')
                 return
             if loaded != 'not-found':

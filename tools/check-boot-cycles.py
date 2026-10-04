@@ -5,13 +5,12 @@ from datetime import datetime, timezone
 import fcntl
 import json
 import os
-import shlex
 import sys
 import time
 
 import paramiko
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run
+from remote import LOCAL, ROOT, device, evidence_directory, run, python_command
 
 
 PROBE = r'''
@@ -101,7 +100,7 @@ def validate(snapshot, lock):
 
 def capture(config, directory, lock):
     with device(config, 'usb') as client, (directory / 'latest-probe.txt').open('wb') as output:
-        snapshot = json.loads(run(client, shlex.join(['sudo', '-n', 'python3', '-c', PROBE]),
+        snapshot = json.loads(run(client, **python_command(PROBE),
                                   output=output, display=False, timeout=30))
     path = directory / (snapshot['boot_id'] + '.json')
     snapshot['checked_at'] = datetime.now(timezone.utc).isoformat()

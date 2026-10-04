@@ -1,5 +1,9 @@
 """Mac transport selection must preserve the already trusted SSH identity."""
 from pathlib import Path
+import io
+import json
+import shlex
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -9,6 +13,81 @@ import paramiko
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import remote
+
+
+class PythonTransportTests(unittest.TestCase):
+    def test_real_interpreter_preserves_source_and_literal_arguments(self):
+        source = 'import json, sys\nprint(json.dumps(sys.argv[1:]))\n# café \' " $() `literal`\n'
+        arguments = ('--inspect', 'spaces and quotes \' "', '$(must-not-run)', '--flag=é')
+        payload = remote.python_command(source, *arguments)
+        argv = shlex.split(payload['command'])
+        self.assertEqual(argv[:5], ['sudo', '-n', 'python3', '-B', '-'])
+        self.assertNotIn(source, payload['command'])
+        process = subprocess.run([sys.executable, *argv[3:]], input=payload['input_data'],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        self.assertEqual(json.loads(process.stdout), list(arguments))
+
+    def test_full_pm_helper_stays_out_of_audited_command(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('stdin_pm_host', remote.ROOT/'tools/check-pm-stages.py')
+        host = importlib.util.module_from_spec(spec); spec.loader.exec_module(host)
+        with patch.object(host, 'run') as run:
+            host.inline(object(), '--help')
+        kwargs = run.call_args.kwargs
+        self.assertGreater(len(kwargs['input_data']), 50000)
+        self.assertLess(len(kwargs['command']), 100)
+        argv = shlex.split(kwargs['command'])
+        process = subprocess.run([sys.executable, *argv[3:]], input=kwargs['input_data'],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        self.assertIn(b'--stage', process.stdout)
+
+    def client(self):
+        client = MagicMock()
+        channel = client.get_transport.return_value.open_session.return_value
+        channel.recv.side_effect = [b'first\n', b'last\n', b'']
+        channel.recv_exit_status.return_value = 0
+        return client, channel
+
+    def test_source_sent_once_before_eof_and_output_retained(self):
+        client, channel = self.client(); output = io.BytesIO()
+        source = '# marker\n' * 20000 + 'print("done")\n'
+        result = remote.run(client, **remote.python_command(source), output=output, display=False)
+        channel.sendall.assert_called_once_with(source.encode())
+        names = [c[0] for c in channel.method_calls]
+        self.assertLess(names.index('sendall'), names.index('shutdown_write'))
+        self.assertLess(names.index('shutdown_write'), names.index('recv'))
+        self.assertEqual(result, b'first\nlast\n'); self.assertEqual(output.getvalue(), result)
+        channel.close.assert_called_once()
+
+    def test_uncertain_send_or_read_failure_closes_without_resubmission(self):
+        for method in ('sendall', 'recv'):
+            with self.subTest(method=method):
+                client, channel = self.client()
+                getattr(channel, method).side_effect = TimeoutError('interrupted')
+                with self.assertRaises(TimeoutError):
+                    remote.run(client, **remote.python_command('print(1)'), display=False)
+                channel.exec_command.assert_called_once()
+                channel.sendall.assert_called_once()
+                channel.close.assert_called_once()
+
+    def test_nonzero_exit_preserves_output_and_reports_failure(self):
+        client, channel = self.client(); channel.recv_exit_status.return_value = 7
+        output = io.BytesIO()
+        with self.assertRaisesRegex(RuntimeError, 'exit 7'):
+            remote.run(client, **remote.python_command('raise SystemExit(7)'), output=output, display=False)
+        self.assertEqual(output.getvalue(), b'first\nlast\n')
+        channel.close.assert_called_once()
+
+    def test_invalid_input_rejected_before_opening_channel(self):
+        for payload, password in [('text', None), (b'x' * (1024 * 1024 + 1), None), (b'x', 'secret')]:
+            client, channel = self.client()
+            with self.assertRaises(ValueError):
+                remote.run(client, 'unused', input_data=payload, password=password)
+            channel.exec_command.assert_not_called()
+            client.get_transport.return_value.open_session.assert_not_called()
+        for source in ('', ' ', 'x\0y', 'é' * (512 * 1024 + 1), None):
+            with self.assertRaises(ValueError):
+                remote.python_command(source)
 
 
 class MacConnectionTests(unittest.TestCase):

@@ -527,6 +527,10 @@ tasks:
     desc: Bind observer action/display report to immutable cable-sleep result; RESULT/OBSERVATION/DISPLAY required, offline only
     cmds: [python3 tools/report-sleep-cable.py]
 
+  report:journal-volume:
+    desc: Summarize a private journalctl JSON-lines capture supplied after --; no message text or device access
+    cmds: [python3 tools/report-journal-volume.py]
+
   device:sleep-cable-remove-rehearse:
     desc: Awake rehearsal for USB removal scenario; USB connected, QUALIFICATION/CABLE_ACTION required
     cmds: [python3 tools/check-sleep-rtc.py --rehearse --connection usb-remove]

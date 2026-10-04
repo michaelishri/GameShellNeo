@@ -6,14 +6,13 @@ import json
 import os
 from pathlib import Path
 import re
-import shlex
 import subprocess
 import sys
 import time
 
 import paramiko
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run
+from remote import LOCAL, ROOT, device, evidence_directory, run, python_command
 
 
 def state(config):
@@ -31,7 +30,7 @@ def state(config):
             'firmware_sha256=hashlib.sha256(Path("/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.bin").read_bytes()).hexdigest(), '
             'wifi_config_sha256=hashlib.sha256(Path("/etc/wpa_supplicant/wpa_supplicant-wlan0.conf").read_bytes()).hexdigest())))\n')
     with device(config, 'wifi') as client:
-        return json.loads(run(client, shlex.join(['sudo', '-n', 'python3', '-B', '-c', code]), display=False))
+        return json.loads(run(client, **python_command(code), display=False))
 
 
 def fixed(value):

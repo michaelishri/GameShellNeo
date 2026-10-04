@@ -16,7 +16,7 @@ import sys
 import time
 
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run
+from remote import LOCAL, ROOT, device, evidence_directory, run, python_command
 
 LIMITS = ('Awake software qualification only. No sleep/wake, physical controls, cable, '
           'visual/audio quality, battery endurance or energy qualification. '
@@ -376,7 +376,7 @@ def main():
     if args.guard:
         directory = evidence_directory()
         with device(load_env(), 'usb') as client:
-            data = run(client, shlex.join(['sudo', '-n', 'python3', '-B', '-c', GUARD]), display=False, timeout=75)
+            data = run(client, **python_command(GUARD), display=False, timeout=75)
         (directory / 'guard.json').write_bytes(data)
         return 0
     config = load_env()

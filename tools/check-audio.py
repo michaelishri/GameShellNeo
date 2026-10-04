@@ -11,12 +11,12 @@ import uuid
 
 import paramiko
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run, upload
+from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
 
 
 def inline(client, option):
-    return run(client, shlex.join(['sudo', '-n', 'python3', '-B', '-c',
-        (ROOT / 'tools/speaker_audio.py').read_text(), option]), display=False, timeout=45)
+    return run(client, **python_command((ROOT / 'tools/speaker_audio.py').read_text(), option),
+               display=False, timeout=45)
 
 
 def collect(config, run_id):

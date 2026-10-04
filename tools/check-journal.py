@@ -5,11 +5,10 @@ import fcntl
 import hashlib
 import json
 import os
-import shlex
 
 from journal_policy import FILES, validate_continuity, validate_policy, validate_rotation
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run
+from remote import LOCAL, ROOT, device, evidence_directory, run, python_command
 
 
 def main():
@@ -30,7 +29,7 @@ def main():
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         with device(load_env(), 'usb') as client:
             def collect(name, extra=()):
-                data = run(client, shlex.join(['sudo', '-n', 'python3', '-B', '-c', code, *extra]),
+                data = run(client, **python_command(code, *extra),
                            display=False, timeout=180)
                 (capture / name).write_bytes(data)
                 return json.loads(data)

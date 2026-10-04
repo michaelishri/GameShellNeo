@@ -2070,6 +2070,29 @@ retain the existing diagnostic power-key suppression pending review; console,
 RTC, trace and PM cleanup remains bounded and ownership-checked. See
 [report 151](docs/151-usb-cable-sleep-diagnostics.md) for implementation and limits.
 
+Diagnostic inspections send their Python helper source over SSH standard input.
+Only the short interpreter command and its arguments enter the usual sudo command
+audit; this avoids repeatedly logging the full helper source. The source payload
+is bounded to 1 MiB, and transport failures never trigger command resubmission.
+Uploaded independent PM workers keep their existing execution and recovery paths.
+Journal limits, audit settings and strict evidence-continuity checks are unchanged.
+
+To inspect retained journal volume without printing its potentially private messages:
+
+```sh
+umask 077
+task device:journal-inspect
+task device:exec ROUTE=usb -- sudo -n journalctl -b --no-pager -o json --output-fields=SYSLOG_IDENTIFIER,_COMM,_UID,MESSAGE --all > .local/journal-volume.jsonl
+task report:journal-volume -- .local/journal-volume.jsonl
+```
+
+The offline report hashes the original and counts message bytes in fixed categories;
+it does not equate uncompressed text with disk usage or infer a deletion cause.
+Keep the raw capture private. Missing boot logs still fail PM admission: do not
+clear logs, substitute old records or repeat PM to bypass that failure.
+[Report 152](docs/152-diagnostic-command-log-volume.md) records the stopped
+prerequisite sequence, excessive command logging and the transport correction.
+
 [Report 119](docs/119-guarded-rtc-sleep-preparation.md) records admission,
 recovery limits and the two successful awake rehearsals. Ordinary sleep remains
 masked. Interrupted ownership can deliberately leave power-key actions ignored;

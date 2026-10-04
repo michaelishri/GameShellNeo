@@ -13,7 +13,7 @@ import uuid
 
 import paramiko
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run, upload
+from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
 import sleep_rtc as diagnostic
 
 
@@ -82,11 +82,11 @@ def collect(config, token, route='usb'):
         raise ValueError('Collection route must be usb or wifi')
     # Read saved evidence without uploading/replacing the original helper.
     base = '/var/lib/gameshellneo/sleep-tests/'+token
-    command = ['sudo', '-n', 'python3', '-c',
+    command = python_command(
         'from pathlib import Path; import sys; p=Path(sys.argv[1]); '
-        'f=p/"result.json"; f=f if f.exists() else p/"started.json"; print(f.read_text())', base]
+        'f=p/"result.json"; f=f if f.exists() else p/"started.json"; print(f.read_text())', base)
     with device(config, route) as client:
-        result = json.loads(run(client, shlex.join(command), display=False))
+        result = json.loads(run(client, **command, display=False))
     if result.get('run_id') != token:
         raise ValueError('Collected another run')
     return result
@@ -276,9 +276,8 @@ def main():
             # Read-only postmortem, with no upload, policy cleanup or PM submission.
             # Keep the original result even if the separate live snapshot fails.
             with device(config, route) as client:
-                command = ['sudo', '-n', 'python3', '-c',
-                           (ROOT/'tools/sleep_recovery.py').read_text(), token]
-                snapshot = json.loads(run(client, shlex.join(command), display=False))
+                snapshot = json.loads(run(client, **python_command(
+                    (ROOT/'tools/sleep_recovery.py').read_text(), token), display=False))
             (capture/'recovery-snapshot.json').write_text(json.dumps(snapshot, indent=2)+'\n')
             (capture/'collection.json').write_text(json.dumps(dict(route=route,
                 run_id=token, original_event=value.get('event'),

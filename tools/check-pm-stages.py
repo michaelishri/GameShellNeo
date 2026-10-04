@@ -14,7 +14,7 @@ import uuid
 
 import paramiko
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run, upload
+from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
 
 
 def module(name, filename):
@@ -72,8 +72,7 @@ def inline(client, *args):
                     'exec(' + repr((ROOT / 'tools' / (name + '.py')).read_text()) + ', keypad_helper.__dict__)\n'
                     'sys.modules[' + repr(name) + '] = keypad_helper\n')
     program += (ROOT / 'tools/test-pm-stages.py').read_text()
-    return run(client, shlex.join(['sudo', '-n', 'python3', '-B', '-c',
-               program, *args]), display=False, timeout=40)
+    return run(client, **python_command(program, *args), display=False, timeout=40)
 
 
 def wifi_proof(config, snapshot):

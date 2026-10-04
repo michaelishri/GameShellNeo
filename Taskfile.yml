@@ -219,6 +219,10 @@ tasks:
     desc: Test actual MUSB system-sleep connection ownership on native and ARM32
     cmds: [bash tools/run-logged.sh musb-sleep python3 tools/check-musb-sleep.py]
 
+  check:musb-sleep-configs:
+    desc: Check sleep/disconnect and callback regressions plus six isolated ARM configurations
+    cmds: [bash tools/run-logged.sh musb-sleep-configs python3 tools/check-musb-sleep.py --compile-matrix]
+
   check:musb-sleep-drivers:
     desc: Test MUSB sleep ownership and compile the complete ARM controller/gadget/glue
     cmds: [bash tools/run-logged.sh musb-sleep-drivers python3 tools/check-musb-sleep.py --compile-drivers]
@@ -254,6 +258,10 @@ tasks:
   test:wake-irqs:
     desc: Check actual IRQ-core/regmap/PEK/RTC/AC wake ownership and failures, native and ARM32
     cmds: [bash tools/run-logged.sh wake-irqs python3 tools/check-wake-irqs.py]
+
+  test:power-irq-mask:
+    desc: Reproduce masked AXP223 edge loss with actual regmap functions; native and ARM32, no hardware access
+    cmds: [bash tools/run-logged.sh power-irq-mask python3 tools/check-power-irq-mask.py]
 
   test:power-key-events:
     desc: Reproduce PEK/input-core synthetic release and duplicate filtering, native and ARM32; no hardware

@@ -116,6 +116,93 @@ class StateEvidence(unittest.TestCase):
                 with self.assertRaises(ValueError): sleep.history(pm, debug, [value], current, {}, 'usb')
 
 
+class MaskedRemoval(unittest.TestCase):
+    def candidate(self, scenario='usb-remove', mode='rtc-wake'):
+        value = record(scenario, mode)
+        image = dict(board='gameshellneo-cpi31', version='0.1.0-diagnostic.19',
+                     sources=dict(board='gameshellneo-cpi31', features={
+                         'usb_system_wakeup': False, 'sleep_cable_irq_policy': 'masked-removal-v1'}))
+        for side in ('before', 'after'):
+            value[side]['image'] = deepcopy(image)
+        return value
+
+    def test_masked_removal_records_each_actual_dispatch_without_inventing_edges(self):
+        for ac, usb in ((0, 0), (0, 1), (1, 0), (1, 1)):
+            value = self.candidate()
+            initial = value['cable']['entry']['irqs']['counts']
+            counts = value['cable']['after']['irqs']['counts']
+            counts['ACIN_REMOVAL'] = initial['ACIN_REMOVAL'] + ac
+            counts['VBUS_REMOVAL'] = initial['VBUS_REMOVAL'] + usb
+            with self.subTest(ac=ac, usb=usb):
+                assessment = connection.validate(value)
+                self.assertEqual(assessment['deltas']['ACIN_REMOVAL'], ac)
+                self.assertEqual(assessment['deltas']['VBUS_REMOVAL'], usb)
+                self.assertEqual(assessment['requested_handlers_observed'], bool(ac and usb))
+                self.assertTrue(assessment['removal_dispatch_may_be_masked'])
+                self.assertFalse(assessment['electrical_edge_timing_qualified'])
+
+    def test_old_policy_does_not_accept_missing_removal(self):
+        value = record()
+        value['cable']['after']['irqs'] = deepcopy(value['cable']['entry']['irqs'])
+        with self.assertRaises(ValueError): connection.validate(value)
+
+    def test_mask_policy_never_allows_extra_reverse_or_regressed_counters(self):
+        for name in ('ACIN_REMOVAL', 'VBUS_REMOVAL', 'ACIN_PLUGIN', 'VBUS_PLUGIN'):
+            for delta in (-1, 2):
+                value = self.candidate()
+                value['cable']['after']['irqs']['counts'][name] = value['cable']['entry']['irqs']['counts'][name] + delta
+                with self.subTest(name=name, delta=delta), self.assertRaises(ValueError):
+                    connection.validate(value)
+        value = self.candidate()
+        value['cable']['after']['irqs']['counts']['ACIN_PLUGIN'] += 1
+        with self.assertRaises(ValueError): connection.validate(value)
+
+    def test_stale_usb_missing_power_or_changed_provenance_still_fail(self):
+        mutations = (
+            lambda r: r['cable']['after'].update(udc='configured'),
+            lambda r: r['cable']['after'].update(carrier='1'),
+            lambda r: r['cable']['after'].update(extcon='USB=1\nUSB-HOST=0'),
+            lambda r: r['cable']['after']['supplies']['axp20x-usb'].update(present='1'),
+            lambda r: r['cable']['after'].update(boot_id='other'),
+            lambda r: r['cable']['after']['irqs'].update(cpus=['CPU7']),
+            lambda r: r['before']['image']['sources'].update(board='other'),
+            lambda r: r['before']['image']['sources']['features'].update(usb_system_wakeup=True),
+            lambda r: r['before']['image']['sources']['features'].update(sleep_cable_irq_policy='unknown'),
+            lambda r: r['after']['image'].update(version='other'),
+            lambda r: r.update(cable_action_confirmed=False))
+        for mutate in mutations:
+            value = self.candidate(); mutate(value)
+            with self.subTest(mutate=mutate), self.assertRaises(ValueError): connection.validate(value)
+
+    def test_attach_and_awake_rehearsal_keep_their_strict_counter_contract(self):
+        value = self.candidate('usb-attach')
+        connection.validate(value)
+        value['cable']['after']['irqs'] = deepcopy(value['cable']['entry']['irqs'])
+        with self.assertRaises(ValueError): connection.validate(value)
+        value = self.candidate(mode='rehearse')
+        connection.validate(value)
+        value['cable']['after']['irqs']['counts']['ACIN_REMOVAL'] += 1
+        with self.assertRaises(ValueError): connection.validate(value)
+
+    def test_assessment_revalidated_and_failed_original_cannot_be_promoted(self):
+        value = self.candidate()
+        value['cable']['after']['irqs'] = deepcopy(value['cable']['entry']['irqs'])
+        pm = Mock(FAULTS=sleep.pm_module().FAULTS)
+        sleep.health(pm, value, {})
+        with patch.object(sleep, 'sources', return_value=chain.SOURCE), \
+                patch.object(sleep, 'pm_module', return_value=pm):
+            sleep.completed_result(pm, value, {}, 'rtc-wake')
+            good = report.assessment(value, 'during-dark', 'normal', {})
+            self.assertTrue(good['attended_case_passed'])
+            self.assertFalse(good['cable_irq_observation']['requested_handlers_observed'])
+            bad = deepcopy(value); bad['cable_irq_observation']['requested_handlers_observed'] = True
+            with self.assertRaises(ValueError): sleep.completed_result(pm, bad, {}, 'rtc-wake')
+            bad = deepcopy(value); bad.pop('cable_irq_observation')
+            with self.assertRaises(ValueError): sleep.completed_result(pm, bad, {}, 'rtc-wake')
+            value.update(event='failed', passed=False, error='usb_absent')
+            self.assertFalse(report.assessment(value, 'during-dark', 'normal', {})['attended_case_passed'])
+
+
 class Entry(unittest.TestCase):
     setUp = existing.Entry.setUp
     enter = existing.Entry.enter

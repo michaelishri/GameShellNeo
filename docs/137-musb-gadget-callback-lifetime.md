@@ -235,3 +235,13 @@ Diagnostic.18 remains the next isolated sleep-reconnection trial.
 The source archive, builder and board configuration remain pinned in
 [sources.lock.json](../build/sources.lock.json). No firmware binary, battery
 policy, charger setting or installed-device configuration was changed.
+
+## Subsequent candidate, 4 October 2026
+
+[Report 154](154-usb-sleep-session-retirement.md) records diagnostic.19 preparation:
+patch 0030 is selected unchanged as the callback-lifetime dependency for logical
+session retirement. Other prepared optimizations remain separate. Actual regmap
+source also reproduces masked removal acknowledgement without handler dispatch,
+leading to an explicitly versioned prospective diagnostic policy. No historical
+hardware result is reclassified; the stale USB failure remains failed and new
+hardware qualification is required.

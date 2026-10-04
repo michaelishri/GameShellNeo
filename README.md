@@ -6,34 +6,15 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.16 is installed after full 4 GiB readback and owner-confirmed boot.
-Startup, both SSH routes, integration, journal and awake prerequisites passed,
-along with one freezer, one driver and five attended late/noirq cycles. The owner
-confirmed normal display return; final settings, health and idle audio matched
-the baseline. The earlier rejected-transmit warning did not recur in this
-bounded comparison. The
-[preparation report](docs/111-diagnostic16-preparation.md) records the transmit
-suspend and band-query changes, recovery and offline checks;
-[hardware report](docs/112-diagnostic16-hardware-qualification.md) records the
-installation, completed comparison and remaining limits.
-
-The previous diagnostic.15 baseline includes the
-[country-request suspend fix](docs/106-brcmfmac-regulatory-suspend.md).
-Full card readback, owner-confirmed boot, both SSH routes, all six integration
-groups, journal rotation and awake power-key/RTC checks passed.
-[Preparation](docs/107-diagnostic15-preparation.md) records recovery and build
-verification; [hardware qualification](docs/108-diagnostic15-hardware-qualification.md)
-records the running baseline, one freezer, one devices and five attended
-late/noirq passes, with normal display return confirmed by the owner.
-Country/control timeouts did not recur. A
-[transmit-admission fix](docs/109-wifi-transmit-suspend-ownership.md) is included
-in diagnostic.16's hardware comparison above.
-Actual sleep remains disabled.
-Diagnostic.15 is retained for recovery and comparison.
-Diagnostic.14 is retained for recovery and comparison:
-its [five observed late/noirq cycles](docs/105-diagnostic14-late-noirq-repeats.md)
-passed the restoration checks but exposed the recurring radio control errors
-addressed by this candidate.
+Diagnostic.18 is installed. USB-connected and battery RTC-wake tests have passed
+bounded hardware checks, but cable-transition qualification is still open.
+The first removal during sleep returned the normal console while leaving stale
+USB gadget state; [report 153](docs/153-usb-removal-sleep-state-failure.md) preserves
+the failed result. Diagnostic.19 is being prepared with logical session retirement
+and callback lifetime protection; [report 154](docs/154-usb-sleep-session-retirement.md)
+records the driver change, masked-interrupt findings and prospective test criteria.
+Ordinary sleep remains disabled; production sleep, energy and wake-button
+qualification are still ahead. Historical image reports remain in the research index.
 
 Start with the [first-build specification](docs/23-first-build-spec.md),
 [build workflow](docs/24-building-and-testing.md),
@@ -2156,3 +2137,19 @@ criteria, tests and CPU-idle implementation still required. The original USB
 failure remains failed; neither command qualifies battery savings or enters
 sleep. Changed recorder sources require a fresh awake rehearsal before a new
 attended sleep attempt.
+
+The USB sleep/disconnect candidate has saved source and configuration checks:
+
+```sh
+task test:musb-sleep            # Native/ARM32 sleep and callback-lifetime regressions
+task check:musb-sleep-configs   # Those regressions plus six ARM driver configurations
+task test:power-irq-mask       # Actual regmap mask/ack behavior with modeled registers
+```
+
+Diagnostic.19's removal test records observed PMIC handler deltas separately.
+Masked removal may produce zero dispatches; stale UDC/carrier or supply state
+still fails. Attachment and awake rehearsal retain their exact-count criteria.
+Changed helper/image inputs require fresh debug prerequisites and rehearsal.
+[Report 154](docs/154-usb-sleep-session-retirement.md) explains the prospective
+policy, source-test limits and required hardware qualification. Report 153's
+original failed result is unchanged.

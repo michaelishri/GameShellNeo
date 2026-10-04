@@ -1,0 +1,231 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: suppress and drain gadget callbacks before unbind
+
+Implement UDC callback admission separately from connection intent. Hold a
+callback count while the controller lock is dropped and use the admitted
+driver pointer. Closing admission waits for outstanding callbacks from IRQ,
+OTG timer and process-context callers without polling or masking a shared
+IRQ. Preserve request completions and soft-stop/start admission.
+
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -23,6 +23,7 @@
+ #include <linux/usb/musb.h>
+ #include <linux/phy/phy.h>
+ #include <linux/workqueue.h>
++#include <linux/wait.h>
+ 
+ struct musb;
+ struct musb_hw_ep;
+@@ -412,6 +413,10 @@
+ 	enum musb_g_ep0_state	ep0_state;
+ 	struct usb_gadget	g;			/* the gadget */
+ 	struct usb_gadget_driver *gadget_driver;	/* its driver */
++	/* Admission/count use lock; the drain drops it while sleeping. */
++	bool			gadget_async_callbacks;
++	unsigned int		gadget_callback_count;
++	wait_queue_head_t	gadget_callback_wait;
+ 	struct usb_hcd		*hcd;			/* the usb hcd */
+ 
+ 	const struct musb_hdrc_config *config;
+diff --git a/drivers/usb/musb/musb_gadget.h b/drivers/usb/musb/musb_gadget.h
+--- a/drivers/usb/musb/musb_gadget.h
++++ b/drivers/usb/musb/musb_gadget.h
+@@ -25,6 +25,8 @@
+ extern void musb_gadget_resume(struct musb *musb);
+ extern void musb_gadget_cleanup(struct musb *);
+ extern int musb_gadget_setup(struct musb *);
++extern struct usb_gadget_driver *musb_gadget_get_driver(struct musb *musb);
++extern void musb_gadget_put_driver(struct musb *musb);
+ 
+ #else
+ static inline irqreturn_t musb_g_ep0_irq(struct musb *musb)
+diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -1705,6 +1705,38 @@
+ 		struct usb_gadget_driver *driver);
+ static int musb_gadget_stop(struct usb_gadget *g);
+ 
++/* Callers hold the controller lock until the callback has been admitted. */
++struct usb_gadget_driver *musb_gadget_get_driver(struct musb *musb)
++{
++	lockdep_assert_held(&musb->lock);
++	if (!musb->gadget_async_callbacks || !musb->gadget_driver)
++		return NULL;
++
++	musb->gadget_callback_count++;
++	return musb->gadget_driver;
++}
++
++void musb_gadget_put_driver(struct musb *musb)
++{
++	lockdep_assert_held(&musb->lock);
++	if (!--musb->gadget_callback_count && !musb->gadget_async_callbacks)
++		wake_up_all(&musb->gadget_callback_wait);
++}
++
++static void musb_gadget_async_callbacks(struct usb_gadget *g, bool enable)
++{
++	struct musb *musb = gadget_to_musb(g);
++
++	spin_lock_irq(&musb->lock);
++	musb->gadget_async_callbacks = enable;
++
++	/* Drains IRQ, OTG timer and process callbacks without holding the lock. */
++	if (!enable)
++		wait_event_lock_irq(musb->gadget_callback_wait,
++				    !musb->gadget_callback_count, musb->lock);
++	spin_unlock_irq(&musb->lock);
++}
++
+ static const struct usb_gadget_ops musb_gadget_operations = {
+ 	.get_frame		= musb_gadget_get_frame,
+ 	.wakeup			= musb_gadget_wakeup,
+@@ -1714,6 +1746,7 @@
+ 	.pullup			= musb_gadget_pullup,
+ 	.udc_start		= musb_gadget_start,
+ 	.udc_stop		= musb_gadget_stop,
++	.udc_async_callbacks	= musb_gadget_async_callbacks,
+ };
+ 
+ /* ----------------------------------------------------------------------- */
+@@ -1812,6 +1845,9 @@
+ 	 * is probably held.
+ 	 */
+ 
++	init_waitqueue_head(&musb->gadget_callback_wait);
++	musb->gadget_callback_count = 0;
++	musb->gadget_async_callbacks = false;
+ 	musb->g.ops = &musb_gadget_operations;
+ 	musb->g.max_speed = USB_SPEED_HIGH;
+ 	musb->g.speed = USB_SPEED_UNKNOWN;
+@@ -1967,6 +2003,8 @@
+ 
+ void musb_g_resume(struct musb *musb)
+ {
++	struct usb_gadget_driver *driver;
++
+ 	musb->is_suspended = 0;
+ 	switch (musb_get_state(musb)) {
+ 	case OTG_STATE_B_IDLE:
+@@ -1974,10 +2012,14 @@
+ 	case OTG_STATE_B_WAIT_ACON:
+ 	case OTG_STATE_B_PERIPHERAL:
+ 		musb->is_active = 1;
+-		if (musb->gadget_driver && musb->gadget_driver->resume) {
+-			spin_unlock(&musb->lock);
+-			musb->gadget_driver->resume(&musb->g);
+-			spin_lock(&musb->lock);
++		driver = musb_gadget_get_driver(musb);
++		if (driver) {
++			if (driver->resume) {
++				spin_unlock(&musb->lock);
++				driver->resume(&musb->g);
++				spin_lock(&musb->lock);
++			}
++			musb_gadget_put_driver(musb);
+ 		}
+ 		break;
+ 	default:
+@@ -1989,6 +2031,7 @@
+ /* called when SOF packets stop for 3+ msec */
+ void musb_g_suspend(struct musb *musb)
+ {
++	struct usb_gadget_driver *driver;
+ 	u8	devctl;
+ 
+ 	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+@@ -2001,10 +2044,14 @@
+ 		break;
+ 	case OTG_STATE_B_PERIPHERAL:
+ 		musb->is_suspended = 1;
+-		if (musb->gadget_driver && musb->gadget_driver->suspend) {
+-			spin_unlock(&musb->lock);
+-			musb->gadget_driver->suspend(&musb->g);
+-			spin_lock(&musb->lock);
++		driver = musb_gadget_get_driver(musb);
++		if (driver) {
++			if (driver->suspend) {
++				spin_unlock(&musb->lock);
++				driver->suspend(&musb->g);
++				spin_lock(&musb->lock);
++			}
++			musb_gadget_put_driver(musb);
+ 		}
+ 		break;
+ 	default:
+@@ -2025,6 +2072,7 @@
+ /* called when VBUS drops below session threshold, and in other cases */
+ void musb_g_disconnect(struct musb *musb)
+ {
++	struct usb_gadget_driver *driver;
+ 	void __iomem	*mregs = musb->mregs;
+ 	u8	devctl = musb_readb(mregs, MUSB_DEVCTL);
+ 
+@@ -2037,10 +2085,14 @@
+ 	(void) musb_gadget_vbus_draw(&musb->g, 0);
+ 
+ 	musb->g.speed = USB_SPEED_UNKNOWN;
+-	if (musb->gadget_driver && musb->gadget_driver->disconnect) {
+-		spin_unlock(&musb->lock);
+-		musb->gadget_driver->disconnect(&musb->g);
+-		spin_lock(&musb->lock);
++	driver = musb_gadget_get_driver(musb);
++	if (driver) {
++		if (driver->disconnect) {
++			spin_unlock(&musb->lock);
++			driver->disconnect(&musb->g);
++			spin_lock(&musb->lock);
++		}
++		musb_gadget_put_driver(musb);
+ 	}
+ 
+ 	switch (musb_get_state(musb)) {
+@@ -2072,6 +2124,7 @@
+ __releases(musb->lock)
+ __acquires(musb->lock)
+ {
++	struct usb_gadget_driver *driver;
+ 	void __iomem	*mbase = musb->mregs;
+ 	u8		devctl = musb_readb(mbase, MUSB_DEVCTL);
+ 	u8		power;
+@@ -2085,10 +2138,13 @@
+ 			);
+ 
+ 	/* report reset, if we didn't already (flushing EP state) */
+-	if (musb->gadget_driver && musb->g.speed != USB_SPEED_UNKNOWN) {
++	driver = musb->g.speed != USB_SPEED_UNKNOWN ?
++		 musb_gadget_get_driver(musb) : NULL;
++	if (driver) {
+ 		spin_unlock(&musb->lock);
+-		usb_gadget_udc_reset(&musb->g, musb->gadget_driver);
++		usb_gadget_udc_reset(&musb->g, driver);
+ 		spin_lock(&musb->lock);
++		musb_gadget_put_driver(musb);
+ 	}
+ 
+ 	/* clear HR */
+diff --git a/drivers/usb/musb/musb_gadget_ep0.c b/drivers/usb/musb/musb_gadget_ep0.c
+--- a/drivers/usb/musb/musb_gadget_ep0.c
++++ b/drivers/usb/musb/musb_gadget_ep0.c
+@@ -624,12 +624,16 @@
+ __releases(musb->lock)
+ __acquires(musb->lock)
+ {
++	struct usb_gadget_driver *driver;
+ 	int retval;
+-	if (!musb->gadget_driver)
++
++	driver = musb_gadget_get_driver(musb);
++	if (!driver)
+ 		return -EOPNOTSUPP;
+ 	spin_unlock(&musb->lock);
+-	retval = musb->gadget_driver->setup(&musb->g, ctrlrequest);
++	retval = driver->setup(&musb->g, ctrlrequest);
+ 	spin_lock(&musb->lock);
++	musb_gadget_put_driver(musb);
+ 	return retval;
+ }
+ 

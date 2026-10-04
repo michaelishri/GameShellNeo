@@ -29,6 +29,7 @@ def assessment(value, observation, display, lock):
     return dict(run_id=value['run_id'], connection=connection,
         original_event=value.get('event'), original_passed=value.get('passed'),
         original_error=value.get('error'), wake_observation=value.get('wake_observation'),
+        cable_irq_observation=value.get('cable_irq_observation'),
         automated_passed=accepted, observer_action=observation, observer_display=display,
         attended_case_passed=accepted and observation == 'during-dark' and display == 'normal',
         electrical_edge_timing_qualified=False, energy_qualified=False,

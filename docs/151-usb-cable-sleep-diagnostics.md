@@ -9,6 +9,12 @@ No new image was built, no live helper uploaded, and no hardware setting or
 sleep test was run during this preparation. Hardware qualification remains
 open; the preceding diagnostic.18 results remain unchanged.
 
+The later fresh hardware sequence stopped after the driver prerequisite lost
+early journal history. No cable-transition sleep was submitted. [Report 152](152-diagnostic-command-log-volume.md)
+records the failed original, normal owner-observed display, excessive helper
+source logging and the verified awake transport correction. Fresh boot/prerequisite
+qualification is required before continuing.
+
 ## What each case establishes
 
 | Case | Starting condition and awake rehearsal | Required final recovery |

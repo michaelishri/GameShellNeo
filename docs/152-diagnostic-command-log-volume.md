@@ -92,11 +92,35 @@ The real composed PM helper parses `--help` with an audited command below 100
 bytes while its source payload exceeds 50 KB. No live suspend was used for these
 tests. Host log: `.local/neo111-check.log` after integration.
 
-Awake hardware verification of the changed transport is the next step. The
-original failed record remains failed. Before resuming cable testing, preserve
-the old evidence, establish a fresh boot/journal baseline with observer readiness,
-then complete the prerequisite sequence and matching rehearsal. Longer-term
-bounded boot-identity and per-test log preservation should be designed separately;
-reduced logging cannot guarantee indefinite retention on an arbitrarily old boot.
+## Awake hardware verification
+
+Commit `304314f` is integrated into main and pushed. On the same unchanged boot,
+the new transport passes these saved read-only tasks:
+
+| Task | Capture beneath `.local/diagnostics/` | Observation |
+| --- | --- | --- |
+| `device:pm-inspect` | `20261004T074218.136914Z` | Original boot/image, PM29/0, input identity and settings unchanged; battery 100%, charging |
+| `device:journal-inspect` | `20261004T074255.958305Z` | Existing policy passes; journald unchanged; remaining journal prefix retained |
+| `device:pm-collect` | `20261004T074325.433638Z` | Original failed result is identical after collection with the new transport |
+
+The independently captured sudo audit window contains exactly the three short
+Python commands, twelve sudo records and 1,050 sudo message bytes. There are zero
+helper-source fragments. The PM inspection command is 30 bytes before sudo's
+executable-path expansion; its transmitted source is 104,772 bytes. Source still
+travels over SSH and is parsed on the device, so no corresponding network/CPU
+or energy reduction is claimed. This directly verifies removal of source-code
+logging while retaining command auditing, rather than merely assuming that the
+new transport avoids logs.
+
+Private audit: `.local/neo111-stdin-audit.jsonl`; saved offline summary:
+`.local/neo111-stdin-audit-summary.json`. Independent Wi-Fi status also passed
+after the failed test (`.local/neo111-wifi-status.log`). No RTC alarm, PM entry,
+reboot, journal setting or network setting was changed during this verification.
+
+The original failed record remains failed. Before resuming cable testing,
+establish a fresh boot/journal baseline with observer readiness, then complete
+the prerequisite sequence and matching rehearsal. Longer-term bounded boot-identity
+and per-test log preservation should be designed separately; reduced logging
+cannot guarantee indefinite retention on an arbitrarily old boot.
 
 [journald]: https://github.com/systemd/systemd/blob/v257/man/journald.conf.xml

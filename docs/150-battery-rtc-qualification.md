@@ -9,8 +9,9 @@ continues to require external power, a configured USB gadget and independent
 USB/Wi-Fi recovery. This changes diagnostic tooling, not the kernel image,
 charging policy or ordinary sleep behavior. The awake rehearsal and one attended
 battery-only actual sleep now pass on unchanged diagnostic.18. The owner
-confirmed normal dim-console return without intervention; separate USB
-reattachment remains to qualify.
+confirmed normal dim-console return without intervention. Subsequent physical
+USB reattachment also passed independently, completing NEO-109's bounded
+tooling and first hardware qualification.
 
 ## Why a separate profile
 
@@ -112,8 +113,9 @@ whose prepared source is absent in this isolated worktree. Logs are
 `work/battery-rtc-qualification`'s worktree. Tests use modeled transport and
 filesystem fixtures, not real sleep or electrical fault injection.
 
-The awake battery rehearsal and one actual sleep have now passed, as recorded
-below. Subsequent USB reattachment remains to qualify. NEO-109 stays open.
+The awake battery rehearsal, one actual sleep and subsequent USB reattachment
+have now passed, as recorded below. NEO-109 is complete for this bounded scope;
+NEO-95 retains broader cable/host and repeat-boot qualification.
 CPU-idle/energy work, Mac sleep, power-button wake and product power policy
 remain separate; this tooling makes no performance or battery-life claim.
 
@@ -278,3 +280,58 @@ timed out because that task currently ignores `ROUTE` and always connects by
 USB. It produced no health snapshot and made no PM submission. This tooling
 limitation is recorded in `FOLLOW-UP.md`; the battery test's validated after
 snapshot and Wi-Fi original-result collection remain the relevant evidence.
+
+## Separate USB reattachment
+
+Only after the original battery result and the owner's untouched screen-return
+confirmation were saved did the owner receive the separate instruction to
+reconnect USB, wait thirty seconds and leave it connected. The owner confirmed
+completion. Saved read-only tasks then checked the board and Mac:
+
+```sh
+task device:pm-inspect
+task device:status ROUTE=wifi
+task mac:usb-inspect
+task device:sleep-connection-inspect
+task device:sleep-collect RUN=b646d6376cbd47f2bbb739cce201cd2d ROUTE=wifi
+```
+
+USB SSH reached the original boot and the common connected-health validator
+passed. UDC was `configured`, carrier 1, PHY `USB=1` / `USB-HOST=0`, and both
+external supplies were present/online. AC/VBUS plug counters each advanced
+from 4 to 5; removal counts stayed at 5. The Mac saw GameShellNeo in its USB
+tree, all six host capture groups succeeded, and its sleep/wake history was
+unchanged from the pre-debug capture. Independent Wi-Fi collection reached
+the same boot and retrieved the unchanged original battery result.
+
+PM remained 27 successes / zero failures, with SDIO runtime usage 2 and
+unchanged policy. Image, kernel, PM controls, ordinary sleep masks, original
+input identity, display settings, Wi-Fi configuration/policy, charger settings
+and CPU policy matched the successful battery result. No new kernel journal
+entries appeared. Battery monitoring reported valid/charging at 92%; this is
+not a capacity or charging-accuracy measurement. The live recovery snapshot
+confirmed complete original cleanup and no retained diagnostic policy owners.
+
+This is one physical reattachment after an independently successful battery
+sleep. It is not a plug-to-ready latency measurement, a cable change during
+sleep, host-sleep coverage or repeated qualification on another boot. No gadget
+restart, network repair, new PM submission or hardware-policy change occurred.
+The battery sleep record retains `usb_ssh_verified=false`; the later USB proof
+belongs to this separate check.
+
+Capture paths are relative to `.local/diagnostics/`:
+
+| Evidence | Capture |
+| --- | --- |
+| Connected PM health and USB SSH | `20261004T050848.834026Z/inspection.json` |
+| Mac USB/network/sleep history | `20261004T050850.227609Z/` |
+| Cable/PHY/IRQ inspection | `20261004T050927.748915Z/connection-inspection.json` |
+| Independent Wi-Fi original-result collection and live state | `20261004T050953.423025Z/` |
+
+`.local/neo109-reattach-review.json` records the checks and capture hashes.
+Its SHA-256 is
+`9e0c6e32feeb3bab69ac4ccb45ed520a4dfad9d901b826c56b57b017bd02f2f6`.
+The offline review also revalidates all seven debug records and the one actual
+battery sleep against unchanged sources/image/boot and PM history. The present
+connected state is not admission for another battery attempt: a later attempt
+still requires cable removal, fresh physical readiness and current validation.

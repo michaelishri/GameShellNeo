@@ -2082,10 +2082,15 @@ Removal must finish with absent external power, UDC/carrier/PHY disconnected,
 valid battery discharge and independent Wi-Fi recovery. Attachment must finish
 with external power, configured USB/carrier/PHY and independent USB **and**
 Wi-Fi recovery. The before/entry states must match; a premature transition
-rejects admission before the handshake or sleep write. Final counts must show
-one AC/VBUS event in the requested direction with no opposite events. Missing
-interrupts also fail qualification, given the known PMIC detection limitations.
-Neither these counts nor screen darkness measures the electrical-edge time.
+rejects admission before the handshake or sleep write. Attachment requires one
+AC/VBUS insertion dispatch per supply with no opposite events. Diagnostic.19's
+explicit `masked-removal-v1` policy permits zero or one dispatch per removal
+handler, with no insertion dispatch, regression or extra counts: a masked
+removal status can be acknowledged before its handler runs. All disconnected
+endpoint and Wi-Fi recovery gates still apply. Older images retain the exact
+count policy. [Report 154](docs/154-usb-sleep-session-retirement.md) records the
+source evidence and prospective criteria. Neither these counts nor screen
+darkness measures the electrical-edge time.
 
 RTC delivery is checked immediately at return, never after an awake wait.
 An early wake, another wake source or incomplete recovery is a failed RTC
@@ -2121,8 +2126,10 @@ RTC, trace and PM cleanup remains bounded and ownership-checked. See
 The first attended removal attempt woke on RTC with a normal console but failed:
 external power/PHY reported removal while the gadget retained its connected state.
 [Report 153](docs/153-usb-removal-sleep-state-failure.md) records the preserved
-failure and NEO-112 driver investigation; further cable-transition sleep remains
-pending that review and correction.
+failure and NEO-112 driver investigation. The candidate correction is installed
+in diagnostic.19; its connected-USB sleep comparison passed, and fresh
+qualification for the removal scenario is in progress. The original failure
+remains unchanged.
 
 Diagnostic inspections send their Python helper source over SSH standard input.
 Only the short interpreter command and its arguments enter the usual sudo command

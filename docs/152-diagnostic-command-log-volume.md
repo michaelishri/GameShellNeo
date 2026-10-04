@@ -123,4 +123,60 @@ the prerequisite sequence and matching rehearsal. Longer-term bounded boot-ident
 and per-test log preservation should be designed separately; reduced logging
 cannot guarantee indefinite retention on an arbitrarily old boot.
 
+## Fresh boot and debug sequence
+
+After fresh owner readiness, one remote reboot established boot
+`f2dfd67d-cf9a-4242-b9b7-58c1bc944357` on the same diagnostic.18 image.
+The first USB inspection preceded route recovery and failed to connect; the next
+read-only inspection succeeded without another reboot or cable intervention.
+Both network paths worked. The new boot passed the common firmware/image/PM
+validator with PM0/0 and SDIO usage 2.
+
+All six integration groups passed, including the previously accepted AU access-point
+country state (`20261004T084919.427784Z`). Ordinary journal rotation preserved
+the new boot history and journald identity (`20261004T084943.383796Z`). Awake
+power-key ownership/handback passed (`20261004T085006.857520Z`), followed by
+RTC delivery/restoration (`20261004T085028.387911Z`, run
+`ffa36aa6037b4977b2700602dd7f032b`, 10.247 seconds). No actual sleep occurred.
+
+The seven saved debug tasks were then run sequentially and reviewed before the
+next submission. Each passed journal-prefix continuity, independent USB/Wi-Fi
+recovery, its applicable input/memory/policy/trace checks and stable SDIO usage 2.
+All PM failure counters remain zero. Transient USB collection failures in the
+private logs were followed by collection of the original run, never resubmission.
+
+Capture directories below are relative to `.local/diagnostics/`, each with
+`cycle-1/result.json`.
+
+| Stage | Capture | Run | PM successes |
+| --- | --- | --- | --- |
+| Freezer | `20261004T085055.456380Z` | `0a15ed12e43047af889926c145f5935c` | 0 → 1 |
+| Devices | `20261004T085156.466955Z` | `e3f6ee19c76d4de5a63fd2c4bd1a7943` | 1 → 2 |
+| Late/noirq 1 | `20261004T085318.298282Z` | `9699f01d4b8c4af5ac83e6e567d48bd5` | 2 → 3 |
+| Late/noirq 2 | `20261004T085429.478658Z` | `984aa84728814e14b651ffe3e6b2f468` | 3 → 4 |
+| Late/noirq 3 | `20261004T085536.036310Z` | `8f00c91977954f67822dfebf3a84b0dc` | 4 → 5 |
+| Late/noirq 4 | `20261004T085638.736886Z` | `a685e9a79a77455f957656a27432ab67` | 5 → 6 |
+| Late/noirq 5 | `20261004T085743.775407Z` | `fdbff4092e8243eaad6d3cbdfb6e7567` | 6 → 7 |
+
+The saved `check:sdio-ref-history --require-stable` task produced
+`.local/neo110-removal-reference-history.json`, SHA-256
+`82acdcfd5bb569441f70cc0cd1281bf9742fdc0a464ab9fcb468d0bfe3dcd9f1`.
+The final independent PM inspection (`20261004T085905.461268Z/inspection.json`)
+passes the common validator. The complete seven-record admission was recomputed
+against that snapshot for the future USB-removal scenario, with no PM submission.
+Receipt review: `.local/neo110-removal-admission-review.json`.
+
+The retained new-boot journal has 5,278 records, including 54 sudo command
+records and **zero inline Python command records**. Sudo contributes 17,019
+of 300,049 message bytes in this bounded window. This is not a matched-duration
+comparison with the previous boot or an energy/write-amplification measurement.
+Capture: `.local/neo111-fresh-boot-journal.jsonl`, SHA-256
+`e66b4ba02f5cbc2568d7d375529ca09798676b4e84b5805f677b9cf45e9142e8`;
+summary: `.local/neo111-fresh-boot-volume.json`.
+
+No further screen test is running. Owner confirmation of normal display return
+after this sequence is pending, as are the separate awake cable-removal rehearsal
+and fresh readiness for its actual-sleep attempt. The earlier failed boot's result
+and evidence remain unchanged; this fresh sequence does not retroactively pass it.
+
 [journald]: https://github.com/systemd/systemd/blob/v257/man/journald.conf.xml

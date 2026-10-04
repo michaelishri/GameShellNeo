@@ -12,8 +12,10 @@ open; the preceding diagnostic.18 results remain unchanged.
 The later fresh hardware sequence stopped after the driver prerequisite lost
 early journal history. No cable-transition sleep was submitted. [Report 152](152-diagnostic-command-log-volume.md)
 records the failed original, normal owner-observed display, excessive helper
-source logging and the verified awake transport correction. Fresh boot/prerequisite
-qualification is required before continuing.
+source logging and the verified transport correction. A later fresh boot now
+passes all seven automated prerequisites with journal continuity and both SSH
+routes intact; owner display confirmation and the separate removal rehearsal/
+actual-sleep readiness remain pending.
 
 ## What each case establishes
 

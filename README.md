@@ -6,9 +6,10 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.20 has been written to the Samsung DEV card, passed full 4 GiB
-readback, and been safely ejected. First boot and live wake-policy checks await
-the owner’s login-screen confirmation
+Diagnostic.20 has booted after verified full 4 GiB card readback. Both SSH
+routes, integration and awake journal/POWER/RTC checks pass. The MUSB and both
+supply wake controls are disabled as intended; attended sleep qualification
+remains pending
 ([report 167](docs/167-diagnostic20-installation-and-awake-checks.md)).
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
@@ -35,13 +36,13 @@ Before the card swap, diagnostic.19 reached PM24/0 with stable SDIO usage 2. The
 NEO-117 has built and offline-verified diagnostic.20 using the existing supply
 wake controls. Host checks pass, and the 270 MB archive is now staged on the
 Mac with compressed/decompressed checksums verified. Card flash/readback also
-passed; first boot and hardware qualification remain pending
+passed, followed by first boot and awake startup checks; sleep qualification
+remains pending
 ([report 166](docs/166-stay-asleep-usb-charging-policy.md)).
-The retained diagnostic guard explains the suppressed POWER button. Following
-the owner’s request, long speaker warnings and audio restoration passed, then
-the remote shutdown command was accepted for the card swap (report 166).
-The confirmed DEV card has now passed flash/readback; new-boot confirmation
-is pending and further sleep testing is stopped.
+The old diagnostic guard explained the suppressed POWER button before the
+card swap. Long speaker warnings preceded the requested remote shutdown
+(report 166). No retained key guard exists on diagnostic.20's new boot.
+No debug suspend or actual sleep test has run on the new image.
 Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.

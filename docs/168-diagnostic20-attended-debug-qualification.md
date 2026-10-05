@@ -8,8 +8,8 @@ and the MUSB/AC/USB supply wake policies stayed disabled. PM successes advanced
 from zero to seven with all failure counters zero; SDIO usage stayed at 2.
 The owner confirmed a clear driver warning and normal display return, then
 gave fresh readiness for late/noirq. The first platform warning/display were
-also confirmed normal before fresh readiness for four repeats. The final
-four-cycle sound/display confirmation is pending.
+also confirmed normal before fresh readiness for four repeats. The owner then
+confirmed clear warnings and normal console returns after the complete batch.
 No actual sleep has run on this image and no further screen test is running.
 
 [Report 167](167-diagnostic20-installation-and-awake-checks.md) records verified
@@ -69,8 +69,9 @@ RSB noirq suspend/resume callbacks.
 Each driver/platform warning records one level-5, 1,000 ms `screen-blank` cue with playback
 and mixer restoration passing, and both speaker/headphone amplifiers off before
 PM entry. The freezer check does not blank the display and has no warning.
-The driver and first platform cue/display were owner-confirmed; final batch
-observation is pending.
+The driver, first platform and final four-cycle batch cues/display were
+owner-confirmed. The final reply was **"Confirmed"** to the request to confirm
+clear warnings, normal console returns after every cycle and normal brightness.
 
 The driver, first platform and platform repeats 1, 3 and 4 recorded
 `SSHException: No existing session`; their local logs also contain protocol-banner
@@ -107,10 +108,35 @@ The existing sleep controller's receipt validator accepted all seven originals
 for the unchanged-USB profile, with zero prior sleep records in this new chain.
 This was an offline admission check, not rehearsal or sleep submission.
 
+## Confirmed display and awake RTC rehearsal
+
+After the owner confirmed the complete batch, the saved awake command ran:
+
+```sh
+task device:sleep-rehearse QUALIFICATION=.local/neo117-debug-history.json
+```
+
+Capture `20261005T052845.561558Z/result.json`, run
+`25114c89789149759c63cb19070959cc`, passed on the same boot and source baseline.
+Its SHA-256 is
+`1f684c6b36d9fd6d202cf946b55004ef5631658f1fad0a37d90d2c713da0754d`.
+The RTC delivered one event with flags `0xa0` after 30.290 seconds; IRQ31 count
+advanced 1 to 2 and the original disabled alarm was restored. This was alarm
+delivery while awake, not RTC wake from sleep.
+
+The original power policy, input ownership and all diagnostic controls were
+restored; no policy/drop-in, RTC, console or control owner remains. There were
+no POWER events. The original keypad handle remained connected, process memory
+was intact, and keypad/Wi-Fi/USB traces were complete and restored. USB and Wi-Fi
+SSH were independently verified. PM stays 7/0, SDIO usage stays 2, and MUSB plus
+both supply wake controls stay disabled. The screen stayed on; no sound or PM
+entry was submitted by the rehearsal.
+
 ## Remaining admission and qualification
 
-The final display/sound confirmation, an awake rehearsal, an unchanged-cable
-RTC comparison and an independent attachment baseline/rehearsal
-remain ahead. Successful debug stages do not prove staying asleep and charging
+Fresh readiness has been requested for one unchanged-cable RTC sleep/wake
+comparison, with a long warning and USB/controls left untouched. No actual
+sleep is running. An independent attachment baseline/rehearsal remains ahead.
+Successful debug stages and awake rehearsal do not prove staying asleep and charging
 on insertion, POWER wake, deep retention or energy savings. NEO-117 remains
 in progress; the diagnostic.19 early-wake failure remains unchanged.

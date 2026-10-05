@@ -13,9 +13,11 @@ remains pending
 ([report 167](docs/167-diagnostic20-installation-and-awake-checks.md)).
 One freezer, one driver and five late/noirq debug checks also pass, with both
 routes recovering, the original keypad connection retained, PM7/0 and stable
-SDIO usage 2. The driver and first platform warning/display were owner-confirmed;
-final batch observation is pending
+SDIO usage 2. The owner confirmed clear warnings and normal console returns
+throughout the complete sequence
 ([report 168](docs/168-diagnostic20-attended-debug-qualification.md)).
+The awake RTC rehearsal also passes with full restoration and both routes
+verified. The first actual sleep test awaits fresh observer readiness.
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and

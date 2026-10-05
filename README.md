@@ -22,7 +22,8 @@ recovering, unchanged wake settings and owner-confirmed clear warning/normal
 dim console ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Attachment
 during sleep still needs independent qualification.
 Its fresh seven-stage debug baseline now passes at PM15/0 with SDIO usage 2;
-final observation and physical unplug are pending before the awake rehearsal
+the owner confirmed normal warnings/display and unplugged USB. Strict absent-state
+checks and the awake attachment rehearsal pass; actual attachment awaits readiness
 ([report 170](docs/170-diagnostic20-usb-attachment-preparation.md)).
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.

@@ -5,9 +5,10 @@
 The fresh freezer/driver/five-late-noirq sequence passes on diagnostic.20,
 preparing independent evidence for attaching USB during sleep. PM successes
 advanced from 8 to 15, with every failure counter zero and Wi-Fi SDIO usage
-remaining 2. All three USB/supply wake controls stayed disabled. The owner's
-final sound/display confirmation and physical unplug are pending.
-No attachment rehearsal or attachment-during-sleep attempt has run.
+remaining 2. All three USB/supply wake controls stayed disabled. The owner
+confirmed normal sounds/display and physically unplugged USB; live absent-state
+validation and the awake attachment rehearsal then passed. No attachment-during-
+sleep attempt has run; fresh described readiness is pending.
 
 The successful connected-USB sleep in [report 169](169-diagnostic20-first-rtc-wake.md)
 remains separate evidence. Its consumed first-sleep baseline was not replayed
@@ -98,12 +99,43 @@ The existing sleep controller's receipt validator accepts all seven originals
 for `usb-attach`, with no sleep records in this independent chain. This offline
 validation did not submit a rehearsal or sleep.
 
-The owner was asked to confirm clear warnings and normal display returns, then
-physically unplug the GameShell's micro-USB cable while leaving it running and
-the Mac awake on the same Wi-Fi. Await that confirmation, then verify absent
-USB/PHY/supply state over Wi-Fi before the awake attachment rehearsal. Any
-actual insertion-during-sleep test still needs separately described readiness
-and the original result must be preserved before recovery actions.
+The owner confirmed **"All normal; USB unplugged; GameShell running"** after
+being asked to confirm clear warnings/normal display and physically remove the
+GameShell's micro-USB cable. The Mac remains awake on the same Wi-Fi.
+
+Saved `task device:sleep-connection-inspect ROUTE=wifi` capture
+`20261005T054932.425837Z/connection-inspection.json` passed strict absent-state
+validation: UDC not attached, carrier 0, PHY USB/HOST 0 and both supplies
+absent/offline on the original boot. ACIN/VBUS plugin counters were 0 and both
+removal counters 1. Its SHA-256 is
+`bfdd361080912ba813c543b8668104eafb36a4e9fbe46fc076feb2fff8100539`.
+
+## Awake attachment rehearsal
+
+```sh
+task device:sleep-cable-attach-rehearse \
+  QUALIFICATION=.local/neo117-attach-debug-history.json \
+  CABLE_ACTION=1 UNPLUGGED=1
+```
+
+Capture `20261005T055022.819976Z/result.json`, run
+`c548a689188f4c1983b57d4febbf80a9`, passed with the original sources/boot;
+SHA-256 `8a7c969a12fd79796a0d2f633a00da3d5bffc5c6774e9b077790d962af3e382a`.
+The alarm delivered one event, flags `0xa0`, after 30.015 seconds. RTC IRQ31
+count advanced 3 to 4 and its original disabled alarm was restored. All three
+cable observations stayed absent with all four handler counters unchanged.
+
+Original power policy, input handback and tracing/controls restored, with no
+retained policy/drop-in, RTC, PM-control or console ownership. Independent Wi-Fi
+SSH passed. USB recovery was not tested because the cable stayed unplugged.
+PM remains 15/0. The rehearsal kept the screen on and submitted no actual sleep.
+
+Fresh readiness was requested for the single attachment attempt: long warning,
+wait ten seconds after darkness, connect USB once, then leave it connected.
+If the display returns before attachment, leave USB unplugged. The expected
+new behavior is to stay asleep when USB is connected and wake on the RTC at
+roughly 30 seconds total. No actual sleep is currently running. Preserve the
+original result and observer report before any recovery action.
 
 The new policy's intended outcome is staying asleep on insertion and charging;
 these debug checks do not establish that outcome. POWER wake, deep retention,

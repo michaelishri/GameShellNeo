@@ -28,8 +28,9 @@ console recovered, but the RTC test remains failed ([report 165](docs/165-diagno
 PM is now 24/0, with stable SDIO usage 2. The agreed policy is:
 **connecting USB during sleep leaves the device asleep and charging**.
 NEO-117 has built and offline-verified diagnostic.20 using the existing supply
-wake controls. Host checks pass and the 270 MB archive is ready on the Intel
-host; transfer, installation and hardware qualification remain pending
+wake controls. Host checks pass, and the 270 MB archive is now staged on the
+Mac with compressed/decompressed checksums verified; card installation and
+hardware qualification remain pending
 ([report 166](docs/166-stay-asleep-usb-charging-policy.md)).
 The diagnostic power-button suppression remains retained pending deliberate
 recovery; further sleep testing is stopped. Wider repetition remains open.

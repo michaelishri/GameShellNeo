@@ -155,9 +155,33 @@ passed. The image remains explicitly `hardware_qualified=false`.
 The package inventory is byte-identical to diagnostic.19's. The raw image,
 compressed archive and recovery checkpoint remain on the Intel host, under this
 worktree's `.local/artifacts`, `.local/flash` and
-`.local/recovery/diagnostic20-stay-asleep-candidate`. Nothing was transferred to
-the Mac or written to a card. Verification workspace preflight and further
+`.local/recovery/diagnostic20-stay-asleep-candidate`. At build completion nothing
+had been transferred to the Mac or written to a card. Verification workspace preflight and further
 rootfs-cache dependency refinement are recorded in `FOLLOW-UP.md`.
+
+## Subsequent Mac transfer
+
+The owner confirmed regular Wi-Fi and explicitly requested transfer before
+switching the Mac back to the PXL10 hotspot. From the candidate worktree:
+
+```sh
+task mac:stage
+```
+
+The task packed the same verified image, reached the Mac through its configured
+tailnet route using the existing SSH host-key trust, uploaded the archive,
+manifest and saved flash helper, and ran its `--source-only` check. It completed
+successfully at **2026-10-05 04:20:09 UTC**. Both the 269,716,241-byte compressed
+archive and the full 4,294,967,296-byte decompressed stream matched their recorded
+SHA-256 values above.
+
+The selected image is staged under the Mac account's
+`~/.local/share/GameShellNeo/`, ready for a separately arranged card flash.
+The private transfer log is `.local/neo117-mac-stage.log`, SHA-256
+`d99509c020af496321a8e8111cc355cec1c6bb465cb9c12144d836db5a703763`.
+No card access, device command, reboot or sleep test was performed. The owner
+was told they could switch the Mac to PXL10 after both checks passed; this does
+not claim that the network switch has happened.
 
 ## Remaining board qualification
 

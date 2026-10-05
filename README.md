@@ -11,6 +11,11 @@ routes, integration and awake journal/POWER/RTC checks pass. The MUSB and both
 supply wake controls are disabled as intended; attended sleep qualification
 remains pending
 ([report 167](docs/167-diagnostic20-installation-and-awake-checks.md)).
+The first freezer, driver and late/noirq debug checks also pass, with both routes
+recovering, the original keypad connection retained and stable SDIO usage 2.
+The driver warning/display were owner-confirmed; the first late/noirq observation
+and four-repeat readiness are pending
+([report 168](docs/168-diagnostic20-attended-debug-qualification.md)).
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and
@@ -42,7 +47,7 @@ remains pending
 The old diagnostic guard explained the suppressed POWER button before the
 card swap. Long speaker warnings preceded the requested remote shutdown
 (report 166). No retained key guard exists on diagnostic.20's new boot.
-No debug suspend or actual sleep test has run on the new image.
+No actual sleep test has run on the new image.
 Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.

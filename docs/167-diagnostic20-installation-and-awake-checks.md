@@ -6,8 +6,9 @@ Diagnostic.20 is installed and running on the owner's CPI v3.1. Full 4 GiB
 readback matched the verified image, the owner confirmed the boot handoff, and
 both SSH routes and all awake startup checks passed. The live MUSB, USB-supply
 and AC-supply wake controls are all disabled as specified.
-**No debug suspend or actual sleep test has run on this image.** Staying asleep
-when USB is attached remains pending attended qualification.
+**No debug suspend or actual sleep test had run at this startup checkpoint.**
+Subsequent attended checks are recorded in [report 168](168-diagnostic20-attended-debug-qualification.md).
+Staying asleep when USB is attached remains pending attended qualification.
 
 [Report 166](166-stay-asleep-usb-charging-policy.md) records the stay-asleep
 charging policy, source tests, offline image verification, Mac transfer and
@@ -120,7 +121,7 @@ Original evidence SHA-256 values:
 | PM `inspection.json` | `6399388fa8039b91f3c47982e8cba2c7de5da05d4d68d224163af0d16c9d05a2` |
 | POWER policy `before.json` | `cc0289556556b9a3cd0963f8e1bfbe815c51e24f101736df6e2f7d4d3cd6a582` |
 
-## Next checks
+## Handoff to attended checks
 
 Obtain fresh readiness for freezer/driver and late/noirq debug checks, with a
 long audible warning before every dark interval and review of each original
@@ -128,7 +129,7 @@ result before continuing. Then qualify an unchanged-cable RTC sleep/wake before
 the independent USB-attachment baseline, awake rehearsal and single attended
 attachment attempt. The old consumed diagnostic.19 baselines remain historical.
 Collect the original result and requested display/cable observations before any
-recovery action. No further screen or sleep test is currently running.
+recovery action. No screen or sleep test was running at this startup checkpoint.
 
 Card verification alone does not prove staying asleep during USB insertion,
 charging through sleep, wake-button behavior, deep retention or energy savings.

@@ -127,8 +127,43 @@ PM submission or attempt to force an absent state. Their
 9c9eacd26f27ccd32d2fda94d6e6eeedf9ca09e6369375ef116a46415fafa679
 ```
 
-Attachment still requires an independently verified absent state, matching
-awake rehearsal, then separate readiness for one actual attachment during
-darkness. No actual sleep was submitted as part of this debug batch. Ordinary
-sleep remains disabled; retention, energy and general sleep reliability are
-not established by these debug results.
+The owner subsequently clarified **“No, I haven't unplugged it. It's still
+connected.”** This resolves the apparent mismatch: the connected-state readings
+were correct. Neither snapshot is evidence of failed physical disconnect
+handling. A new, explicit unplug instruction was issued before the battery
+rehearsal; no rehearsal was started on the connected supply.
+
+## Confirmed unplug and awake attachment rehearsal
+
+After the separate unplug instruction, the owner confirmed **“I've unplugged
+it”**. Read-only Wi-Fi capture `20261005T015844.525981Z` then passed strict
+absent-state validation on the same boot: both external supplies absent/offline,
+PHY USB/HOST 0, UDC not attached and carrier 0. AC/VBUS removal counts each
+advanced from 1 to 2 while insertion counts remained 2. Its
+`connection-inspection.json` SHA-256 is
+`680f54be63d74ca5aed2510caeedfa0fc247440e674f40871f19fd64c19ad243`.
+
+The valid, unconsumed seven-debug baseline did not need repeating. The saved
+awake command rechecked its source, boot, image and PM history before execution:
+
+```sh
+task device:sleep-cable-attach-rehearse \
+  QUALIFICATION=.local/neo110-attach-debug-history.json \
+  CABLE_ACTION=1 UNPLUGGED=1
+```
+
+Capture `20261005T015914.490294Z/result.json`, run
+`d6eb5b5a53f046e6bd7baab1eb967d79`, passed original-result revalidation; SHA-256
+`489bd0f6943b3ec19d9477e21eb500bc60a84d774cc3fea67124c840694678ea`.
+The awake alarm delivered one event with flags `0xa0`, IRQ31 count 6 → 7,
+then restored the original disabled alarm. All three cable observations stayed
+absent with all four handler counts unchanged at 2. Wi-Fi SSH was independently
+verified; USB recovery was intentionally not tested for the absent profile.
+PM counters stayed 23/0, SDIO usage 2 and battery telemetry was valid at
+99%/discharging. Original policy and owned controls were restored with no RTC,
+policy, drop-in or console ownership retained.
+
+Attachment now requires separate readiness for one actual attachment during
+darkness. No actual sleep was submitted as part of this debug batch or awake
+rehearsal. Ordinary sleep remains disabled; retention, energy and general sleep
+reliability are not established by these results.

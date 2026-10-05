@@ -8,8 +8,7 @@ board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
 Diagnostic.20 has booted after verified full 4 GiB card readback. Both SSH
 routes, integration and awake journal/POWER/RTC checks pass. The MUSB and both
-supply wake controls are disabled as intended; attended sleep qualification
-remains pending
+supply wake controls are disabled as intended
 ([report 167](docs/167-diagnostic20-installation-and-awake-checks.md)).
 One freezer, one driver and five late/noirq debug checks also pass, with both
 routes recovering, the original keypad connection retained, PM7/0 and stable
@@ -25,10 +24,13 @@ One attended USB-attachment-during-sleep case now passes: the owner confirmed
 the screen stayed dark after insertion, the RTC woke it later, both routes
 recovered and Charging was reported after resume. PM16/0 and SDIO usage 2 remain
 healthy ([report 171](docs/171-diagnostic20-usb-attachment-sleep-validation.md)).
-Removal under the new policy, repeated cases and charging during sleep remain open.
 The independent removal debug baseline and connected awake rehearsal pass,
-with owner-confirmed warnings/display and PM23/0; the actual unplug-during-sleep
-attempt awaits fresh readiness ([report 172](docs/172-diagnostic20-usb-removal-preparation.md)).
+with owner-confirmed warnings/display and PM23/0 ([report 172](docs/172-diagnostic20-usb-removal-preparation.md)).
+One attended removal-during-sleep case then passed: RTC wake, Wi-Fi recovery,
+correct absent USB state and normal dim-console return. The separately requested
+awake reconnect restored both SSH routes and external-power detection, with
+PM24/0 and SDIO usage 2 unchanged ([report 173](docs/173-diagnostic20-usb-removal-sleep-validation.md)).
+Repeated cases and charging during sleep remain open.
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and
@@ -54,13 +56,13 @@ Before the card swap, diagnostic.19 reached PM24/0 with stable SDIO usage 2. The
 NEO-117 has built and offline-verified diagnostic.20 using the existing supply
 wake controls. Host checks pass, and the 270 MB archive is now staged on the
 Mac with compressed/decompressed checksums verified. Card flash/readback also
-passed, followed by first boot and awake startup checks; sleep qualification
-remains pending
+passed, followed by first boot, awake startup checks and the bounded attended
+sleep cases above
 ([report 166](docs/166-stay-asleep-usb-charging-policy.md)).
 The old diagnostic guard explained the suppressed POWER button before the
 card swap. Long speaker warnings preceded the requested remote shutdown
 (report 166). No retained key guard exists on diagnostic.20's new boot.
-The first connected-USB RTC wake and one attended sleep-time attachment case pass.
+The first connected-USB RTC wake and one attended case in each cable direction pass.
 Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.

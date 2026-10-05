@@ -140,11 +140,13 @@ submitted no sleep or cable action.
 
 ## Next attended steps
 
-Fresh described readiness is pending for one sleep attempt
-with a single unplug ten seconds after darkness. Collect the original result
-over Wi-Fi while USB is still absent, preserve the separate observer report,
-and only then request an awake reconnect and record it separately.
+The owner subsequently gave fresh described readiness for one sleep attempt
+with a single unplug ten seconds after darkness. The original result collected
+over Wi-Fi and the separate observer report both pass; [report 173](173-diagnostic20-usb-removal-sleep-validation.md)
+records the result and the independently preserved absent state before the
+requested awake reconnect. This removal baseline is now consumed.
 
 The prior connected-sleep and attachment baselines are consumed and must not
-be reused or replayed. No actual removal, repeated-case or charging-through-
-sleep result is claimed by this admission checkpoint.
+be reused or replayed. This report records the preparation checkpoint; the
+later actual removal result belongs to report 173. Repeated-case and
+charging-through-sleep evidence remain open.

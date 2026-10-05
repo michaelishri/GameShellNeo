@@ -1,11 +1,12 @@
 {
   "schema_version": 1,
   "board": "gameshellneo-cpi31",
-  "image_version": "0.1.0-diagnostic.19",
+  "image_version": "0.1.0-diagnostic.20",
   "features": {
     "speaker_audio": true,
     "usb_system_wakeup": false,
-    "sleep_cable_irq_policy": "masked-removal-v1"
+    "power_supply_system_wakeup": false,
+    "sleep_cable_irq_policy": "masked-cable-v2"
   },
   "experiments": {
     "suspend_diagnostics": true,

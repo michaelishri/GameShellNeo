@@ -42,6 +42,20 @@ def qualified():
 
 
 class Admission(unittest.TestCase):
+    def test_supply_wake_policy_cannot_change_between_debug_anchor_and_sleep(self):
+        records, current = qualified()
+        snapshots = [current] + [r[side] for r in records for side in ('before', 'after')]
+        for snapshot in snapshots:
+            snapshot['image']['sources'] = {'features': {'power_supply_system_wakeup': False}}
+            snapshot['power_supply_system_wakeup'] = {'axp20x-usb': 'disabled', 'axp22x-ac': 'disabled'}
+        self.assertEqual(len(sleep.prerequisite(records, current)), 7)
+        for snapshot in snapshots:
+            for supply in ('axp20x-usb', 'axp22x-ac'):
+                snapshot['power_supply_system_wakeup'][supply] = 'enabled'
+                with self.assertRaisesRegex(ValueError, 'power-supply wake policy'):
+                    sleep.prerequisite(records, current)
+                snapshot['power_supply_system_wakeup'][supply] = 'disabled'
+
     def test_exact_baseline_and_rejected_evidence(self):
         records,current=qualified()
         self.assertEqual(len(sleep.prerequisite(records,current)),7)

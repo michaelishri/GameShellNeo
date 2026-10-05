@@ -160,6 +160,8 @@ def snapshot():
                 usb=[read(p) for p in Path('/sys/class/udc').glob('*/state')],
                 usb_system_wakeup=[optional(p / 'device/power/wakeup')
                                    for p in sorted(Path('/sys/class/udc').glob('*'))],
+                power_supply_system_wakeup={name: optional('/sys/class/power_supply/' + name + '/power/wakeup')
+                                            for name in ('axp20x-usb', 'axp22x-ac')},
                 wifi=command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'status'),
                 wifi_config_sha256=hashlib.sha256(Path('/etc/wpa_supplicant/wpa_supplicant-wlan0.conf').read_bytes()).hexdigest(),
                 wifi_power_save=command('/usr/sbin/iw', 'dev', 'wlan0', 'get', 'power_save'),
@@ -216,6 +218,13 @@ def validate(snapshot, lock, connection='usb'):
                 s['image']['sources'].get('features') != features or
                 s.get('usb_system_wakeup') != ['disabled']):
             raise ValueError('USB system wake policy differs from the qualified image inputs')
+    if 'power_supply_system_wakeup' in features:
+        if (features['power_supply_system_wakeup'] is not False or
+                features.get('usb_system_wakeup') is not False or
+                s['image']['sources'].get('features') != features or
+                s.get('power_supply_system_wakeup') !=
+                {'axp20x-usb': 'disabled', 'axp22x-ac': 'disabled'}):
+            raise ValueError('Power-supply wake policy differs from the qualified image inputs')
     # Battery status describes current flow, not whether the PMIC has USB input.
     # Require a fresh USB supply observation as well as the configured UDC below.
     usb_supply = s.get('external_power', {}).get('axp20x-usb', {})

@@ -97,5 +97,29 @@ int main(void)
 	init(&map, &chip); chip.init_ack_masked = false;
 	change(1, false); status[0] = ACIN_REMOVAL; change(0, true); change(1, true); dispatch();
 	assert(delivered[1] == 1); cases++;
+	/* Stay-asleep policy masks insertion too. A separate PMIC mask sync
+	 * can retire both pending events; unmasking a supply first preserves
+	 * that supply's event while acknowledging the other still-masked one. */
+	for (unsigned sync_before = 0; sync_before < 2; sync_before++)
+	for (unsigned first = 0; first < 2; first++) {
+		init(&map, &chip);
+		for (unsigned i = 0; i < 4; i++) change(i, false);
+		assert(!enabled[0]);
+		status[0] = ACIN_PLUGIN | VBUS_PLUGIN; dispatch();
+		assert(!delivered[0] && !delivered[2]);
+		if (sync_before) {
+			change(1, false);
+			assert(!status[0]);
+		}
+		unsigned first_irq = first ? 2 : 0;
+		change(first_irq, true); dispatch();
+		assert(delivered[first_irq] == !sync_before);
+		assert(!delivered[first ? 0 : 2]);
+		for (unsigned i = 0; i < 4; i++) change(i, true);
+		dispatch();
+		assert(delivered[first_irq] == !sync_before);
+		assert(!delivered[first ? 0 : 2]);
+		assert(!delivered[1] && !delivered[3]); cases++;
+	}
 	printf("AXP223 masked IRQ: %u source-function scenarios passed\n", cases);
 }

@@ -25,8 +25,11 @@ A fresh, owner-observed attachment prerequisite sequence also passed
 The attachment attempt then woke early through the PMIC, before the RTC:
 both supply insertion-wake policies were enabled. USB/Wi-Fi and the normal
 console recovered, but the RTC test remains failed ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)).
-PM is now 24/0, with stable SDIO usage 2. NEO-117 will implement the agreed
-policy: **connecting USB during sleep leaves the device asleep and charging**.
+PM is now 24/0, with stable SDIO usage 2. The agreed policy is:
+**connecting USB during sleep leaves the device asleep and charging**.
+NEO-117 prepares diagnostic.20 using the existing supply wake controls; host
+checks pass, while installation and hardware qualification remain pending
+([report 166](docs/166-stay-asleep-usb-charging-policy.md)).
 The diagnostic power-button suppression remains retained pending deliberate
 recovery; further sleep testing is stopped. Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
@@ -2095,15 +2098,20 @@ Removal must finish with absent external power, UDC/carrier/PHY disconnected,
 valid battery discharge and independent Wi-Fi recovery. Attachment must finish
 with external power, configured USB/carrier/PHY and independent USB **and**
 Wi-Fi recovery. The before/entry states must match; a premature transition
-rejects admission before the handshake or sleep write. Attachment requires one
-AC/VBUS insertion dispatch per supply with no opposite events. Diagnostic.19's
-explicit `masked-removal-v1` policy permits zero or one dispatch per removal
-handler, with no insertion dispatch, regression or extra counts: a masked
-removal status can be acknowledged before its handler runs. All disconnected
-endpoint and Wi-Fi recovery gates still apply. Older images retain the exact
-count policy. [Report 154](docs/154-usb-sleep-session-retirement.md) records the
-source evidence and prospective criteria. Neither these counts nor screen
-darkness measures the electrical-edge time.
+rejects admission before the handshake or sleep write. Diagnostic.19 requires
+one AC/VBUS insertion dispatch per supply with no opposite events. Its explicit
+`masked-removal-v1` policy permits zero or one dispatch per removal handler,
+with no insertion dispatch, regression or extra counts: a masked removal status
+can be acknowledged before its handler runs. Older images retain the exact
+count policy ([report 154](docs/154-usb-sleep-session-retirement.md)).
+
+Diagnostic.20's prospective `masked-cable-v2` policy also permits zero or one
+insertion dispatch per supply. It requires matching image provenance and both
+supply wake controls disabled before and after the test. Opposite events, extra
+counts and regressing counts still fail. All RTC, endpoint and independent route
+recovery gates remain required. [Report 166](docs/166-stay-asleep-usb-charging-policy.md)
+records the startup policy, source tests and pending hardware qualification.
+Neither handler counts nor screen darkness measures the electrical-edge time.
 
 RTC delivery is checked immediately at return, never after an awake wait.
 An early wake, another wake source or incomplete recovery is a failed RTC
@@ -2131,7 +2139,9 @@ automated failure into a pass. Even a successful attended result leaves precise
 electrical-edge timing and energy unqualified.
 
 New helper sources require fresh qualification; report150's consumed chain
-cannot admit these tasks. No new image/card flash is required. Failure can
+cannot admit these tasks. The original helper-only addition needed no card
+flash; diagnostic.20 adds an image-bound startup policy and requires a new
+installation and baseline. Failure can
 retain the existing diagnostic power-key suppression pending review; console,
 RTC, trace and PM cleanup remains bounded and ownership-checked. See
 [report 151](docs/151-usb-cable-sleep-diagnostics.md) for implementation and limits.

@@ -193,6 +193,27 @@ else:
 
 
 class Evidence(unittest.TestCase):
+    def test_disabled_supply_wake_is_image_bound_and_required_for_both_paths(self):
+        good, lock = healthy_fixture()
+        lock['features'] = {'usb_system_wakeup': False, 'power_supply_system_wakeup': False,
+                            'sleep_cable_irq_policy': 'masked-cable-v2'}
+        good['usb_system_wakeup'] = ['disabled']
+        good['power_supply_system_wakeup'] = {'axp20x-usb': 'disabled', 'axp22x-ac': 'disabled'}
+        pm.validate(good, lock)
+        for name in ('axp20x-usb', 'axp22x-ac'):
+            for state in ('enabled', None, ''):
+                bad = deepcopy(good); bad['power_supply_system_wakeup'][name] = state
+                with self.subTest(name=name, state=state), self.assertRaisesRegex(ValueError, 'Power-supply wake'):
+                    pm.validate(bad, lock)
+        for values in (None, {}, {'axp20x-usb': 'disabled'},
+                       good['power_supply_system_wakeup'] | {'other': 'disabled'}):
+            with self.assertRaisesRegex(ValueError, 'Power-supply wake'):
+                pm.validate(good | {'power_supply_system_wakeup': values}, lock)
+        for state in (True, 0, None):
+            bad_lock = deepcopy(lock); bad_lock['features']['power_supply_system_wakeup'] = state
+            bad = deepcopy(good); bad['image']['sources'] = bad_lock
+            with self.assertRaisesRegex(ValueError, 'Power-supply wake'): pm.validate(bad, bad_lock)
+
     def test_cable_irq_policy_is_bound_to_installed_image_and_kernel(self):
         good, lock = healthy_fixture()
         lock['features'] = {'usb_system_wakeup': False,

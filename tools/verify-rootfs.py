@@ -140,6 +140,8 @@ def main():
                 f'Service not enabled: {name}')
     require(identity['sources'].get('features', {}).get('usb_system_wakeup') is False,
             'Image must explicitly disable USB system wake policy')
+    require(identity['sources'].get('features', {}).get('power_supply_system_wakeup') is False,
+            'Image must explicitly disable external-power insertion wake policy')
     usb_script = Path('usr/local/sbin/gameshellneo-usb')
     require((root / usb_script).read_bytes() == (project / 'runtime' / usb_script).read_bytes(),
             'USB connection/wake policy script differs from the source')

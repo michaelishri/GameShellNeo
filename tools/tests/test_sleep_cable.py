@@ -116,6 +116,76 @@ class StateEvidence(unittest.TestCase):
                 with self.assertRaises(ValueError): sleep.history(pm, debug, [value], current, {}, 'usb')
 
 
+class MaskedCable(unittest.TestCase):
+    def candidate(self, scenario='usb-attach', mode='rtc-wake'):
+        value = MaskedRemoval().candidate(scenario, mode)
+        for side in ('before', 'after'):
+            value[side]['image']['version'] = '0.1.0-diagnostic.20'
+            value[side]['image']['sources']['features'].update(
+                power_supply_system_wakeup=False, sleep_cable_irq_policy='masked-cable-v2')
+            value[side]['power_supply_system_wakeup'] = {'axp20x-usb': 'disabled', 'axp22x-ac': 'disabled'}
+        return value
+
+    def test_either_masked_direction_records_zero_or_one_without_synthetic_dispatch(self):
+        for scenario, direction in (('usb-attach', 'PLUGIN'), ('usb-remove', 'REMOVAL')):
+            for ac, usb in ((0, 0), (0, 1), (1, 0), (1, 1)):
+                value = self.candidate(scenario)
+                initial = value['cable']['entry']['irqs']['counts']
+                final = value['cable']['after']['irqs']['counts']
+                final['ACIN_' + direction] = initial['ACIN_' + direction] + ac
+                final['VBUS_' + direction] = initial['VBUS_' + direction] + usb
+                assessment = connection.validate(value)
+                self.assertEqual(assessment['deltas']['ACIN_' + direction], ac)
+                self.assertEqual(assessment['deltas']['VBUS_' + direction], usb)
+                self.assertEqual(assessment['insertion_dispatch_may_be_masked'], scenario == 'usb-attach')
+                self.assertEqual(assessment['removal_dispatch_may_be_masked'], scenario == 'usb-remove')
+                self.assertFalse(assessment['electrical_edge_timing_qualified'])
+
+    def test_policy_requires_matching_image_and_disabled_controls_on_both_sides(self):
+        for side in ('before', 'after'):
+            for supply in ('axp20x-usb', 'axp22x-ac'):
+                for state in ('enabled', None):
+                    value = self.candidate()
+                    value[side]['power_supply_system_wakeup'][supply] = state
+                    with self.assertRaises(ValueError): connection.validate(value)
+            value = self.candidate(); value[side].pop('power_supply_system_wakeup')
+            with self.assertRaises(ValueError): connection.validate(value)
+        for policy in (True, 0, None):
+            value = self.candidate()
+            for side in ('before', 'after'):
+                value[side]['image']['sources']['features']['power_supply_system_wakeup'] = policy
+            with self.assertRaises(ValueError): connection.validate(value)
+        value = self.candidate(); value['after']['image']['version'] = 'old'
+        with self.assertRaises(ValueError): connection.validate(value)
+
+    def test_wrong_endpoints_extra_opposite_or_regressed_events_still_fail(self):
+        for scenario in ('usb-attach', 'usb-remove'):
+            for name in ('ACIN_PLUGIN', 'ACIN_REMOVAL', 'VBUS_PLUGIN', 'VBUS_REMOVAL'):
+                for delta in (-1, 2):
+                    value = self.candidate(scenario)
+                    value['cable']['after']['irqs']['counts'][name] = value['cable']['entry']['irqs']['counts'][name] + delta
+                    with self.assertRaises(ValueError): connection.validate(value)
+            value = self.candidate(scenario)
+            opposite = 'REMOVAL' if scenario == 'usb-attach' else 'PLUGIN'
+            value['cable']['after']['irqs']['counts']['ACIN_' + opposite] += 1
+            with self.assertRaises(ValueError): connection.validate(value)
+            for key in ('udc', 'carrier', 'extcon', 'supplies'):
+                value = self.candidate(scenario)
+                value['cable']['after'][key] = deepcopy(value['cable']['before'][key])
+                with self.assertRaises(ValueError): connection.validate(value)
+
+    def test_rtc_missing_and_rehearsal_transitions_remain_failures(self):
+        value = self.candidate()
+        value['rtc']['interrupt'] = None
+        with self.assertRaisesRegex(ValueError, 'RTC event'):
+            sleep.health(Mock(FAULTS=sleep.pm_module().FAULTS), value, {})
+        for scenario in ('usb-attach', 'usb-remove'):
+            value = self.candidate(scenario, 'rehearse')
+            connection.validate(value)
+            value['cable']['after']['irqs']['counts']['VBUS_PLUGIN'] += 1
+            with self.assertRaises(ValueError): connection.validate(value)
+
+
 class MaskedRemoval(unittest.TestCase):
     def candidate(self, scenario='usb-remove', mode='rtc-wake'):
         value = record(scenario, mode)

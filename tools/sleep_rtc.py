@@ -78,6 +78,10 @@ def prerequisite(records, current):
             if (s['boot_id'] != current['boot_id'] or s['image'] != current['image'] or
                     s['kernel'] != current['kernel'] or s['rsb_links'][SDIO]['consumer']['power'] != reference):
                 raise ValueError('Prerequisite boot/image/reference mismatch')
+            if current['image'].get('sources', {}).get('features', {}).get('power_supply_system_wakeup') is False:
+                expected = {'axp20x-usb': 'disabled', 'axp22x-ac': 'disabled'}
+                if s.get('power_supply_system_wakeup') != expected or current.get('power_supply_system_wakeup') != expected:
+                    raise ValueError('Prerequisite power-supply wake policy changed')
         a, b = r['before'], r['after']
         if a['monotonic_seconds'] >= b['monotonic_seconds'] or (previous is not None and
                 (previous['monotonic_seconds'] >= a['monotonic_seconds'] or previous['stats'] != a['stats'])):

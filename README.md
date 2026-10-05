@@ -22,8 +22,13 @@ Wi-Fi recovery and correct disconnected USB state, followed by a separately
 verified awake reconnect ([report 163](docs/163-diagnostic19-usb-removal-sleep-validation.md)).
 A fresh, owner-observed attachment prerequisite sequence also passed
 ([report 164](docs/164-diagnostic19-usb-attachment-debug-qualification.md));
-PM is now 23/0, with stable SDIO usage 2. Actual attachment during sleep and
-wider repetition remain open.
+The attachment attempt then woke early through the PMIC, before the RTC:
+both supply insertion-wake policies were enabled. USB/Wi-Fi and the normal
+console recovered, but the RTC test remains failed ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)).
+PM is now 24/0, with stable SDIO usage 2. NEO-117 will implement the agreed
+policy: **connecting USB during sleep leaves the device asleep and charging**.
+The diagnostic power-button suppression remains retained pending deliberate
+recovery; further sleep testing is stopped. Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.
 Diagnostic.18's removal-during-sleep failure remains preserved in
@@ -2139,7 +2144,10 @@ in diagnostic.19; its connected-USB sleep comparison and one freshly qualified
 removal-during-sleep case passed. The latter includes the owner's physical
 observation, an independently saved absent state and a separate successful
 awake reconnect ([report 163](docs/163-diagnostic19-usb-removal-sleep-validation.md)).
-Attachment during sleep remains open. The original failure remains unchanged.
+The first attachment attempt returned early with supply insertion wake enabled
+([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). NEO-117 tracks
+the owner's selected stay-asleep-and-charge policy and fresh qualification.
+Both historical failures remain unchanged.
 
 Diagnostic inspections send their Python helper source over SSH standard input.
 Only the short interpreter command and its arguments enter the usual sudo command

@@ -167,3 +167,11 @@ Attachment now requires separate readiness for one actual attachment during
 darkness. No actual sleep was submitted as part of this debug batch or awake
 rehearsal. Ordinary sleep remains disabled; retention, energy and general sleep
 reliability are not established by these results.
+
+## Subsequent attachment attempt
+
+The separately attended attempt in [report 165](165-diagnostic19-usb-attachment-early-wake.md)
+woke early through the PMIC while insertion wake was enabled. The original RTC
+qualification remains failed; this baseline is now consumed and must not be
+retried. NEO-117 tracks the owner's subsequently selected stay-asleep-and-charge
+policy and future qualification.

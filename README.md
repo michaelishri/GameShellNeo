@@ -32,8 +32,11 @@ wake controls. Host checks pass, and the 270 MB archive is now staged on the
 Mac with compressed/decompressed checksums verified; card installation and
 hardware qualification remain pending
 ([report 166](docs/166-stay-asleep-usb-charging-policy.md)).
-The diagnostic power-button suppression remains retained pending deliberate
-recovery; further sleep testing is stopped. Wider repetition remains open.
+The retained diagnostic guard explains the suppressed POWER button. Following
+the owner’s request, long speaker warnings and audio restoration passed, then
+the remote shutdown command was accepted for the card swap (report 166).
+Card placement and installation are pending; further sleep testing is stopped.
+Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.
 Diagnostic.18's removal-during-sleep failure remains preserved in

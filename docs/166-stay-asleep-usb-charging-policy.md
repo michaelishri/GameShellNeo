@@ -181,7 +181,32 @@ The private transfer log is `.local/neo117-mac-stage.log`, SHA-256
 `d99509c020af496321a8e8111cc355cec1c6bb465cb9c12144d836db5a703763`.
 No card access, device command, reboot or sleep test was performed. The owner
 was told they could switch the Mac to PXL10 after both checks passed; this does
-not claim that the network switch has happened.
+not claim that the network switch had happened at transfer completion.
+
+The owner subsequently confirmed switching to the hotspot and requested remote
+shutdown because the POWER button was suppressed. Using the installed image's
+existing tools in the main checkout, the operator ran:
+
+```sh
+task device:audio-test ROUTE=usb
+task device:exec ROUTE=usb -- sudo -n systemctl --no-block poweroff
+```
+
+The saved speaker test completed three level-5, one-second warnings and verified
+mixer/amplifier restoration on the original boot
+`2fa86697-ead3-4e6f-a295-44e6ad203983`. Main-checkout capture
+`.local/diagnostics/20261005T042340.005303Z/result.json`, run
+`6a7c8cef24d34b24bd85852d04a49faa`, has SHA-256
+`f419227a55184d79811397e6278438618d492defa5da8870bea9c6b87b7b1604`.
+This establishes successful playback execution and restoration; audibility was
+not separately confirmed by the owner in this shutdown sequence.
+
+Only after that success was one normal `poweroff` request submitted over USB;
+the command returned exit status zero. The retained diagnostic guard was not
+manually removed or used as a reason to re-enable uncertain button handling.
+The owner was asked to wait for darkness, wait another ten seconds, unplug USB
+and move the Samsung DEV card into the Mac reader. Physical power-off/card
+placement and the flash remain pending confirmation.
 
 ## Remaining board qualification
 
@@ -200,7 +225,9 @@ charge; a full battery is not evidence of charging throughout sleep. Measured
 charge accumulation, energy, deeper retention and production POWER wake remain
 separate work.
 
-Diagnostic.19 remains connected with its failed run and retained diagnostic
-power-key suppression intact. No live wake policy was changed and no additional
-sleep, reboot, sound or cable test was submitted while preparing this candidate.
+At build completion diagnostic.19 remained connected with its failed run and
+retained diagnostic power-key suppression intact; no live wake policy or device
+test was changed during candidate preparation. The separately requested warning
+and shutdown above followed the later successful Mac transfer. No additional
+sleep or reboot test has been submitted.
 NEO-117 remains open pending hardware qualification; ordinary sleep stays disabled.

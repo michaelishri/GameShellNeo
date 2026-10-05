@@ -20,8 +20,10 @@ confirmed the long audible warnings ([report 162](docs/162-diagnostic19-long-cue
 One attended USB-removal-during-sleep case now passes: RTC wake, normal display,
 Wi-Fi recovery and correct disconnected USB state, followed by a separately
 verified awake reconnect ([report 163](docs/163-diagnostic19-usb-removal-sleep-validation.md)).
-PM is now 16/0, with stable SDIO usage 2. Attachment during sleep and wider
-repetition remain open.
+A fresh, owner-observed attachment prerequisite sequence also passed
+([report 164](docs/164-diagnostic19-usb-attachment-debug-qualification.md));
+PM is now 23/0, with stable SDIO usage 2. Actual attachment during sleep and
+wider repetition remain open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.
 Diagnostic.18's removal-during-sleep failure remains preserved in
@@ -2050,7 +2052,8 @@ needed. Normal product sleep remains masked. See
 [report 150](docs/150-battery-rtc-qualification.md) for validation and live limits.
 
 USB changes during sleep have two separately qualified one-shot scenarios.
-These tools are prepared and source-tested; hardware qualification is pending.
+The removal scenario has one hardware pass on diagnostic.19; attachment
+qualification is in progress.
 Both submit and collect through Wi-Fi, keeping an uncertain USB result from
 triggering a second sleep. The Mac must remain awake on the same Wi-Fi; this
 is not the Mac-sleep test. Start each scenario with its own fresh, reviewed

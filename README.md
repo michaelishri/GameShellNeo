@@ -11,10 +11,10 @@ routes, integration and awake journal/POWER/RTC checks pass. The MUSB and both
 supply wake controls are disabled as intended; attended sleep qualification
 remains pending
 ([report 167](docs/167-diagnostic20-installation-and-awake-checks.md)).
-The first freezer, driver and late/noirq debug checks also pass, with both routes
-recovering, the original keypad connection retained and stable SDIO usage 2.
-The driver warning/display were owner-confirmed; the first late/noirq observation
-and four-repeat readiness are pending
+One freezer, one driver and five late/noirq debug checks also pass, with both
+routes recovering, the original keypad connection retained, PM7/0 and stable
+SDIO usage 2. The driver and first platform warning/display were owner-confirmed;
+final batch observation is pending
 ([report 168](docs/168-diagnostic20-attended-debug-qualification.md)).
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.

@@ -27,8 +27,9 @@ both supply insertion-wake policies were enabled. USB/Wi-Fi and the normal
 console recovered, but the RTC test remains failed ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)).
 PM is now 24/0, with stable SDIO usage 2. The agreed policy is:
 **connecting USB during sleep leaves the device asleep and charging**.
-NEO-117 prepares diagnostic.20 using the existing supply wake controls; host
-checks pass, while installation and hardware qualification remain pending
+NEO-117 has built and offline-verified diagnostic.20 using the existing supply
+wake controls. Host checks pass and the 270 MB archive is ready on the Intel
+host; transfer, installation and hardware qualification remain pending
 ([report 166](docs/166-stay-asleep-usb-charging-policy.md)).
 The diagnostic power-button suppression remains retained pending deliberate
 recovery; further sleep testing is stopped. Wider repetition remains open.

@@ -1,11 +1,12 @@
 # Stay asleep when USB power is attached
 
-5 October 2026. NEO-117; prospective diagnostic.20 candidate.
+5 October 2026. NEO-117; verified diagnostic.20 candidate, hardware pending.
 
 The owner selected **stay asleep and charge** when USB is connected during
 sleep. [Report 165](165-diagnostic19-usb-attachment-early-wake.md) preserves the
 diagnostic.19 attempt that woke before the RTC. That result is still failed;
-this candidate has not been installed or tested on the board.
+this candidate has passed offline image verification but has not been installed
+or tested on the board.
 
 ## Policy and implementation
 
@@ -84,6 +85,9 @@ task check:kernel
   The compiled current-selector and Mac mount-guard checks pass. The first
   combined check found one ShellCheck quoting warning in the new array; it was
   corrected, then shell lint and all seven actual-startup-script tests passed.
+  Once the pinned Armbian checkout was prepared, all nine journal-policy tests
+  also passed, including the previously skipped real-helper guard test. Only
+  the opt-in user-systemd recovery test remains unexecuted in this host run.
 - Startup fixtures execute the real shell policy against isolated controls:
   repeated starts, the supply-registration gap and retry, invalid settings,
   ineffective setters/readback failures, and untouched POWER policy.
@@ -98,12 +102,66 @@ task check:kernel
   15 completed-artifact hashes, including the unchanged patch/config identity.
 
 Private logs are `.local/neo117-check.log`, `.local/neo117-lint.log`,
-`.local/neo117-startup-recheck.log`, and
+`.local/neo117-startup-recheck.log`, `.local/neo117-journal-recheck.log`, and
 `.local/build/power-irq-mask-tests/evidence.json` in that worktree.
+
+## Verified image
+
+The existing build/provision/verification tools were used, with a separate
+Armbian checkout and output directory so diagnostic.19's retained artifacts were
+not overwritten. Private provisioning reuses the existing device identity and
+reads the current credentials from `.env`.
+
+```sh
+task provision
+task check:kernel
+task build:image \
+  BOOTLOADER=/home/mishri/workspace/clockworkpi/GameShell/Code/Kernel/v0.2/u-boot-sunxi-with-spl.bin \
+  RADIO_DIR=/home/mishri/workspace/clockworkpi/GameShellNeo/.local/hardware-baseline/2026-09-27/radio-reference
+# After supplying the missing verification inputs described below:
+python3 tools/bundle-image.py --latest
+task image:pack
+task image:checkpoint NAME=diagnostic20-stay-asleep-candidate
+```
+
+The changed features correctly invalidated the conservative rootfs cache key,
+so the build bootstrapped a fresh signed-snapshot Debian root filesystem. Armbian
+reported 19 minutes 36 seconds for assembly. The first automatic verification
+then failed: the isolated workspace had the completed kernel artifacts but not
+the kernel's regulatory signing certificates. The original log is retained as
+`.local/build/image-verify-missing-certificates.log`. This was an incomplete
+verification workspace, not a signature bypass or accepted image result.
+
+The locked Linux archive hash was checked, its full source extracted into the
+worktree, and the unchanged patch queue applied with `tools/kernel-inputs.py`.
+The existing bundle tool then verified the **unchanged assembled image** with
+the original certificate trust check intact. Layout, bootloader readback,
+FAT/ext4 checks, kernel/DTB/module/radio hashes, regulatory CMS signature, private
+identity permissions, service policies and the installed wake-policy script all
+passed. The image remains explicitly `hardware_qualified=false`.
+
+| Artifact | Value |
+| --- | --- |
+| Implementation commit | `97cbc11` on `work/power-insertion-wake` |
+| Image | `GameShellNeo-0.1.0-diagnostic.20-cpi31-0f8763c74426.img` |
+| Raw size | 4,294,967,296 bytes |
+| Raw SHA-256 | `0f8763c744265e52b935abc0df8eb34cf0fc05ebd5492b15437211a4f773e52a` |
+| Gzip size | 269,716,241 bytes |
+| Gzip SHA-256 | `fc79f7f095c319819f0e47f8f8274a101ac23fbbd26fda931863a6fdb583959e` |
+| Package inventory SHA-256 | `66dc03283bb690e55ab2b2540b0ffe43310dfb39f872672c4d6b3884ecc3358b` |
+| Completed-kernel manifest SHA-256 | `77f2c3fddbcd86503840b646dc7a9c43e74f66a14610e7cadfd4ed3aad632807` |
+| Regmap harness evidence SHA-256 | `20858db8d5ff84a985df15fe72d5b47e441fb731208d79660efeee86d5d2b584` |
+
+The package inventory is byte-identical to diagnostic.19's. The raw image,
+compressed archive and recovery checkpoint remain on the Intel host, under this
+worktree's `.local/artifacts`, `.local/flash` and
+`.local/recovery/diagnostic20-stay-asleep-candidate`. Nothing was transferred to
+the Mac or written to a card. Verification workspace preflight and further
+rootfs-cache dependency refinement are recorded in `FOLLOW-UP.md`.
 
 ## Remaining board qualification
 
-After offline image verification, a separately arranged installation must check
+A separately arranged installation must check
 all three live wake settings, both SSH routes, charging telemetry, journal
 continuity and the existing awake POWER/RTC ownership tests. Establish a fresh
 same-image, same-source debug baseline and awake rehearsal before any actual

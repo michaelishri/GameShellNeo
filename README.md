@@ -17,7 +17,10 @@ SDIO usage 2. The owner confirmed clear warnings and normal console returns
 throughout the complete sequence
 ([report 168](docs/168-diagnostic20-attended-debug-qualification.md)).
 The awake RTC rehearsal also passes with full restoration and both routes
-verified. The first actual sleep test awaits fresh observer readiness.
+verified. The first connected-USB actual RTC sleep/wake passes, with both routes
+recovering, unchanged wake settings and owner-confirmed clear warning/normal
+dim console ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Attachment
+during sleep still needs independent qualification.
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and
@@ -49,7 +52,7 @@ remains pending
 The old diagnostic guard explained the suppressed POWER button before the
 card swap. Long speaker warnings preceded the requested remote shutdown
 (report 166). No retained key guard exists on diagnostic.20's new boot.
-No actual sleep test has run on the new image.
+The first connected-USB RTC wake passed; attaching USB during sleep remains open.
 Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.

@@ -10,7 +10,8 @@ The owner confirmed a clear driver warning and normal display return, then
 gave fresh readiness for late/noirq. The first platform warning/display were
 also confirmed normal before fresh readiness for four repeats. The owner then
 confirmed clear warnings and normal console returns after the complete batch.
-No actual sleep has run on this image and no further screen test is running.
+No actual sleep had run at this debug checkpoint. The subsequent connected-USB
+RTC sleep/wake is recorded separately in [report 169](169-diagnostic20-first-rtc-wake.md).
 
 [Report 167](167-diagnostic20-installation-and-awake-checks.md) records verified
 installation and awake admission. The image is `0.1.0-diagnostic.20`, running
@@ -134,9 +135,10 @@ entry was submitted by the rehearsal.
 
 ## Remaining admission and qualification
 
-Fresh readiness has been requested for one unchanged-cable RTC sleep/wake
-comparison, with a long warning and USB/controls left untouched. No actual
-sleep is running. An independent attachment baseline/rehearsal remains ahead.
+After fresh readiness, the unchanged-cable RTC sleep/wake comparison passed in
+[report 169](169-diagnostic20-first-rtc-wake.md), with a clear warning and normal
+display return confirmed by the owner. The first-sleep baseline is now consumed.
+An independent attachment baseline/rehearsal remains ahead.
 Successful debug stages and awake rehearsal do not prove staying asleep and charging
 on insertion, POWER wake, deep retention or energy savings. NEO-117 remains
 in progress; the diagnostic.19 early-wake failure remains unchanged.

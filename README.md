@@ -26,6 +26,9 @@ the screen stayed dark after insertion, the RTC woke it later, both routes
 recovered and Charging was reported after resume. PM16/0 and SDIO usage 2 remain
 healthy ([report 171](docs/171-diagnostic20-usb-attachment-sleep-validation.md)).
 Removal under the new policy, repeated cases and charging during sleep remain open.
+The independent removal debug baseline and connected awake rehearsal pass,
+with owner-confirmed warnings/display and PM23/0; the actual unplug-during-sleep
+attempt awaits fresh readiness ([report 172](docs/172-diagnostic20-usb-removal-preparation.md)).
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and

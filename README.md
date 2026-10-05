@@ -21,6 +21,9 @@ verified. The first connected-USB actual RTC sleep/wake passes, with both routes
 recovering, unchanged wake settings and owner-confirmed clear warning/normal
 dim console ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Attachment
 during sleep still needs independent qualification.
+Its fresh seven-stage debug baseline now passes at PM15/0 with SDIO usage 2;
+final observation and physical unplug are pending before the awake rehearsal
+([report 170](docs/170-diagnostic20-usb-attachment-preparation.md)).
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and

@@ -7,8 +7,9 @@ preparing independent evidence for attaching USB during sleep. PM successes
 advanced from 8 to 15, with every failure counter zero and Wi-Fi SDIO usage
 remaining 2. All three USB/supply wake controls stayed disabled. The owner
 confirmed normal sounds/display and physically unplugged USB; live absent-state
-validation and the awake attachment rehearsal then passed. No attachment-during-
-sleep attempt has run; fresh described readiness is pending.
+validation and the awake attachment rehearsal then passed. The subsequent
+attended attachment attempt passed in [report 171](171-diagnostic20-usb-attachment-sleep-validation.md);
+this preparation baseline is now consumed.
 
 The successful connected-USB sleep in [report 169](169-diagnostic20-first-rtc-wake.md)
 remains separate evidence. Its consumed first-sleep baseline was not replayed
@@ -134,8 +135,8 @@ Fresh readiness was requested for the single attachment attempt: long warning,
 wait ten seconds after darkness, connect USB once, then leave it connected.
 If the display returns before attachment, leave USB unplugged. The expected
 new behavior is to stay asleep when USB is connected and wake on the RTC at
-roughly 30 seconds total. No actual sleep is currently running. Preserve the
-original result and observer report before any recovery action.
+roughly 30 seconds total. That separately readied attempt and the preserved
+original/observer results are recorded in report 171. No sleep is currently running.
 
 The new policy's intended outcome is staying asleep on insertion and charging;
 these debug checks do not establish that outcome. POWER wake, deep retention,

@@ -19,12 +19,13 @@ throughout the complete sequence
 The awake RTC rehearsal also passes with full restoration and both routes
 verified. The first connected-USB actual RTC sleep/wake passes, with both routes
 recovering, unchanged wake settings and owner-confirmed clear warning/normal
-dim console ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Attachment
-during sleep still needs independent qualification.
-Its fresh seven-stage debug baseline now passes at PM15/0 with SDIO usage 2;
-the owner confirmed normal warnings/display and unplugged USB. Strict absent-state
-checks and the awake attachment rehearsal pass; actual attachment awaits readiness
-([report 170](docs/170-diagnostic20-usb-attachment-preparation.md)).
+dim console ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Independent
+attachment prerequisites and rehearsal passed ([report 170](docs/170-diagnostic20-usb-attachment-preparation.md)).
+One attended USB-attachment-during-sleep case now passes: the owner confirmed
+the screen stayed dark after insertion, the RTC woke it later, both routes
+recovered and Charging was reported after resume. PM16/0 and SDIO usage 2 remain
+healthy ([report 171](docs/171-diagnostic20-usb-attachment-sleep-validation.md)).
+Removal under the new policy, repeated cases and charging during sleep remain open.
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and
@@ -56,7 +57,7 @@ remains pending
 The old diagnostic guard explained the suppressed POWER button before the
 card swap. Long speaker warnings preceded the requested remote shutdown
 (report 166). No retained key guard exists on diagnostic.20's new boot.
-The first connected-USB RTC wake passed; attaching USB during sleep remains open.
+The first connected-USB RTC wake and one attended sleep-time attachment case pass.
 Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.

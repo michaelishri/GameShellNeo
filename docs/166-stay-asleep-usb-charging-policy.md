@@ -205,8 +205,10 @@ Only after that success was one normal `poweroff` request submitted over USB;
 the command returned exit status zero. The retained diagnostic guard was not
 manually removed or used as a reason to re-enable uncertain button handling.
 The owner was asked to wait for darkness, wait another ten seconds, unplug USB
-and move the Samsung DEV card into the Mac reader. Physical power-off/card
-placement and the flash remain pending confirmation.
+and move the Samsung DEV card into the Mac reader. The owner subsequently confirmed card
+placement, and guarded flash/full readback and ejection passed;
+[report 167](167-diagnostic20-installation-and-awake-checks.md) records that
+result and the pending first-boot confirmation.
 
 ## Remaining board qualification
 

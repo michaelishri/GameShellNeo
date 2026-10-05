@@ -6,7 +6,12 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.19 is installed after full card readback and owner-confirmed boot.
+Diagnostic.20 has been written to the Samsung DEV card, passed full 4 GiB
+readback, and been safely ejected. First boot and live wake-policy checks await
+the owner’s login-screen confirmation
+([report 167](docs/167-diagnostic20-installation-and-awake-checks.md)).
+
+The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and
 awake RTC checks pass; [report 155](docs/155-diagnostic19-installation-and-awake-checks.md)
 records the evidence. Fresh office startup checks and one freezer, one driver
@@ -25,17 +30,18 @@ A fresh, owner-observed attachment prerequisite sequence also passed
 The attachment attempt then woke early through the PMIC, before the RTC:
 both supply insertion-wake policies were enabled. USB/Wi-Fi and the normal
 console recovered, but the RTC test remains failed ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)).
-PM is now 24/0, with stable SDIO usage 2. The agreed policy is:
+Before the card swap, diagnostic.19 reached PM24/0 with stable SDIO usage 2. The agreed policy is:
 **connecting USB during sleep leaves the device asleep and charging**.
 NEO-117 has built and offline-verified diagnostic.20 using the existing supply
 wake controls. Host checks pass, and the 270 MB archive is now staged on the
-Mac with compressed/decompressed checksums verified; card installation and
-hardware qualification remain pending
+Mac with compressed/decompressed checksums verified. Card flash/readback also
+passed; first boot and hardware qualification remain pending
 ([report 166](docs/166-stay-asleep-usb-charging-policy.md)).
 The retained diagnostic guard explains the suppressed POWER button. Following
 the owner’s request, long speaker warnings and audio restoration passed, then
 the remote shutdown command was accepted for the card swap (report 166).
-Card placement and installation are pending; further sleep testing is stopped.
+The confirmed DEV card has now passed flash/readback; new-boot confirmation
+is pending and further sleep testing is stopped.
 Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.

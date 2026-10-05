@@ -2,6 +2,7 @@
 """Prepare attended RTC-wake attempts/batches, or an awake rehearsal."""
 import argparse
 import fcntl
+import hashlib
 import importlib.util
 import json
 import os
@@ -39,15 +40,45 @@ def saved_result(item, connection='usb'):
 def receipt(path, before, connection='usb'):
     summary = json.loads(path.read_text())
     records = [saved_result(item) for item in summary['cycles']]
-    sleeps = [saved_result(item, connection) for item in summary.get('sleeps', [])]
+    batch = summary.get('cable_batch')
+    sleeps, rehearsals, observations = [], [], []
+    for index, item in enumerate(summary.get('sleeps', [])):
+        if batch is None:
+            sleeps.append(saved_result(item, connection))
+            continue
+        if index >= len(diagnostic.sleep_cable_batch.SEQUENCE):
+            raise ValueError('Cable batch is already complete')
+        profile = diagnostic.sleep_cable_batch.SEQUENCE[index]
+        value = saved_result(item, diagnostic.sleep_connection.endpoint(profile, 'rtc-wake', 'after'))
+        awake = saved_result(dict(capture=item['rehearsal']), diagnostic.sleep_connection.endpoint(profile))
+        source = (ROOT/Path(item['capture'])).resolve(strict=True)
+        observer_path = source.with_name('result-cable-observation.json')
+        observed = json.loads(observer_path.read_text())
+        if (observed.get('original_sha256') != hashlib.sha256(source.read_bytes()).hexdigest() or
+                observed.get('run_id') != value['run_id'] or observed.get('connection') != profile or
+                observed.get('assessment_sources') != diagnostic.sources() or
+                observed.get('automated_passed') is not True or observed.get('attended_case_passed') is not True or
+                observed.get('observer_action') != 'during-dark' or observed.get('observer_display') != 'normal'):
+            raise ValueError('Cable predecessor lacks its successful original observer report')
+        # Device admission binds this explicit human attestation to its own
+        # unchanged result, not to mutable host-only route proof fields.
+        observations.append(dict(run_id=value['run_id'], device_sha256=diagnostic.digest(value),
+                                 action='during-dark', display='normal'))
+        sleeps.append(value)
+        rehearsals.append(awake)
     if len(sleeps) >= diagnostic.MAX_SLEEP_CHAIN:
         raise ValueError('Sleep history reached its admission limit')
     qualified = diagnostic.history(diagnostic.pm_module(), records, sleeps, before,
-                                   json.loads((ROOT/'build/sources.lock.json').read_text()), connection)
+                                   json.loads((ROOT/'build/sources.lock.json').read_text()), connection,
+                                   batch, rehearsals, observations)
     by_id = {r['run_id']: r for r in records+sleeps}
     entries = lambda tokens: [dict(run_id=token, sha256=diagnostic.digest(by_id[token])) for token in tokens]
-    return dict(boot_id=before['boot_id'], connection=connection, runs=entries(qualified['runs']),
-                sleeps=entries(qualified['sleep_runs']))
+    proof = dict(boot_id=before['boot_id'], connection=connection, runs=entries(qualified['runs']),
+                 sleeps=entries(qualified['sleep_runs']))
+    if batch is not None:
+        proof.update(cable_batch=batch, cable_observations=observations,
+                     rehearsals=[dict(run_id=r['run_id'], sha256=diagnostic.digest(r)) for r in rehearsals])
+    return proof
 
 
 def service(directory, token, mode, rehearsal, connection='usb'):

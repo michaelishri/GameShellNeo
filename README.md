@@ -2092,8 +2092,9 @@ needed. Normal product sleep remains masked. See
 [report 150](docs/150-battery-rtc-qualification.md) for validation and live limits.
 
 USB changes during sleep have two separately qualified one-shot scenarios.
-The removal scenario has one hardware pass on diagnostic.19; attachment
-qualification is in progress.
+Diagnostic.20 has one attended pass in each direction, recorded in
+[reports 171](docs/171-diagnostic20-usb-attachment-sleep-validation.md) and
+[173](docs/173-diagnostic20-usb-removal-sleep-validation.md).
 Both submit and collect through Wi-Fi, keeping an uncertain USB result from
 triggering a second sleep. The Mac must remain awake on the same Wi-Fi; this
 is not the Mac-sleep test. Start each scenario with its own fresh, reviewed
@@ -2142,7 +2143,8 @@ insertion dispatch per supply. It requires matching image provenance and both
 supply wake controls disabled before and after the test. Opposite events, extra
 counts and regressing counts still fail. All RTC, endpoint and independent route
 recovery gates remain required. [Report 166](docs/166-stay-asleep-usb-charging-policy.md)
-records the startup policy, source tests and pending hardware qualification.
+records the startup policy and source tests; reports 171 and 173 record the
+first attended attachment and removal passes.
 Neither handler counts nor screen darkness measures the electrical-edge time.
 
 RTC delivery is checked immediately at return, never after an awake wait.
@@ -2190,6 +2192,63 @@ The first attachment attempt returned early with supply insertion wake enabled
 ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). NEO-117 tracks
 the owner's selected stay-asleep-and-charge policy and fresh qualification.
 Both historical failures remain unchanged.
+
+For repeat coverage, the saved guided batch uses **remove → attach → remove →
+attach**, starting and ending connected. It requires diagnostic.20's qualified
+`masked-cable-v2` image/wake policy and one fresh seven-debug baseline. Each
+step runs its own matching awake RTC rehearsal, then exactly one actual sleep.
+The screen identifies the cycle and cable action; the long warning precedes
+darkness. The runner stops after collection and a separate endpoint inspection
+to await the owner's observation. It never advances on a timer or interprets
+silence as confirmation.
+
+```sh
+# After the fresh debug baseline passes, explain cycle 1 and confirm readiness.
+# Keep USB connected through the awake rehearsal; follow the later screen prompt.
+task device:sleep-cable-batch-start QUALIFICATION=<fresh-history.json> ATTENDED=1 CABLE_ACTION=1
+
+# Use the printed private batch directory for every remaining command.
+task report:sleep-cable-batch-status BATCH=<batch-directory>
+
+# Only after the owner confirms one action during darkness and normal return:
+task report:sleep-cable-batch BATCH=<batch-directory> OBSERVATION=during-dark DISPLAY=normal
+
+# After readiness for the next described direction; runs just that next step.
+task device:sleep-cable-batch-next BATCH=<batch-directory> ATTENDED=1 CABLE_ACTION=1
+# Repeat observe/next through cycle 4, then record its final observation.
+```
+
+Use the same honest `OBSERVATION`/`DISPLAY` choices as the one-shot report above.
+An uncertain action, abnormal display, failed recovery or incomplete command
+stops the session; a later answer cannot overwrite the first observer report.
+The final observation marks the batch complete and does not run a fifth cycle.
+Readiness includes leaving the cable in the preceding cycle's ending state:
+unplugged after removal, connected after attachment. Do not perform an extra
+awake reconnect between steps. The previous physical observation and fresh
+cable/IRQ checks establish the next starting state; the batch does not require
+another `UNPLUGGED` flag. Every step still requires explicit `ATTENDED=1` and
+`CABLE_ACTION=1`.
+
+Keep the Mac awake on the same Wi-Fi and leave all buttons untouched. A removal
+must prove Wi-Fi recovery while USB stays absent; an attachment must prove
+both routes. Each original result, rehearsal, observation and endpoint capture
+is retained beneath its numbered cycle directory. Same-source/boot/image,
+PM/RTC continuity and durable single-successor checks bind the sequence.
+These records cannot be used to extend an ordinary connected-sleep chain.
+
+On a failed or interrupted step, read `batch.json` and the original
+`cycle-N/awake/run.json` or `cycle-N/sleep/run.json`, then use
+`task device:sleep-collect RUN=<original-run-id> ROUTE=wifi`. Collection never
+retries PM or advances the batch. A `running`/`failed` batch is deliberately
+not resumable through `next`; preserve it for diagnosis. If a command stopped
+before creating a run ID, do not invent one or submit another attempt through
+that session. The old one-shot tasks retain their original admission rules.
+
+This tooling change needs no image build or card swap. The previous consumed
+baselines and rehearsals cannot admit it; a new baseline is required. Hardware
+batch qualification remains pending, and no live tests were started while the
+owner disconnected the device. [Report 174](docs/174-guided-cable-sleep-batch.md)
+records the implementation, offline tests and remaining limits.
 
 Diagnostic inspections send their Python helper source over SSH standard input.
 Only the short interpreter command and its arguments enter the usual sudo command

@@ -28,6 +28,7 @@ import usb_trace
 import speaker_audio
 import sleep_connection
 import sleep_cable
+import sleep_cable_batch
 
 RESULTS = Path('/var/lib/gameshellneo/sleep-tests')
 OWNED = Path('/run/gameshellneo-sleep-controls.json')
@@ -39,7 +40,8 @@ SDIO_PATCH = 'kernel/patches/0023-sunxi-mmc-sdio-reference-ownership.patch'
 SDIO_SHA = '52f4e3d8b966f8f69718340697606e30d174033d998be84f98b42bc2c97e92ee'
 SOURCES = ('sleep_rtc', 'test-pm-stages', 'keypad_pm', 'power_key', 'power_key_policy',
            'power_key_pm', 'power_key_input', 'keypad_input', 'speaker_audio',
-           'rtc_alarm', 'pm_platform', 'wifi_trace', 'usb_trace', 'sleep_connection', 'sleep_cable')
+           'rtc_alarm', 'pm_platform', 'wifi_trace', 'usb_trace', 'sleep_connection', 'sleep_cable',
+           'sleep_cable_batch')
 
 
 def pm_module():
@@ -138,11 +140,17 @@ def completed_result(pm, record, lock, mode):
             raise ValueError('USB configuration/carrier differs from connection profile')
 
 
-def history(pm, records, sleeps, current, lock, connection='usb'):
+def history(pm, records, sleeps, current, lock, connection='usb', cable_batch=None,
+            rehearsals=None, observations=None):
     """An unchanged debug anchor followed by contiguous, fully checked sleeps."""
     if not isinstance(sleeps, list) or len(sleeps) > MAX_SLEEP_CHAIN:
         raise ValueError('Sleep history exceeds the bounded qualification chain')
     sleep_connection.profile(connection)
+    if cable_batch is not None:
+        return sleep_cable_batch.history(pm, records, sleeps, current, lock, connection,
+            cable_batch, rehearsals, observations, prerequisite, completed_result, digest)
+    if any('cable_batch' in r.get('qualification', {}) for r in sleeps):
+        raise ValueError('Cable batch cannot become an ordinary sleep chain')
     if sleep_connection.transition(connection) and sleeps:
         raise ValueError('Cable transitions require a fresh one-shot baseline, not a repeat chain')
     now = current['monotonic_seconds']
@@ -209,7 +217,7 @@ def claim_successor(pm, qualification, token, boot_id):
     return claim
 
 
-def admission(pm, before, lock, receipt, connection='usb'):
+def admission(pm, before, lock, receipt, connection='usb', rehearsal=None):
     sleep_connection.profile(connection)
     if receipt.get('connection', 'usb') != connection:
         raise ValueError('Qualification receipt has another connection profile')
@@ -246,8 +254,23 @@ def admission(pm, before, lock, receipt, connection='usb'):
         if claim != record.get('parent_claim'):
             raise ValueError('Device successor ledger differs from the sleep evidence')
         sleeps.append(record)
-    qualified = history(pm, records, sleeps, before, lock, connection)
-    if sleeps and rtc_irq() != sleeps[-1]['rtc']['irq_after']:
+    batch = receipt.get('cable_batch')
+    rehearsals = []
+    if batch is not None:
+        entries = receipt.get('rehearsals', [])
+        if not isinstance(entries, list) or len(entries) != len(sleeps):
+            raise ValueError('Missing cable rehearsal receipts')
+        for entry in entries:
+            token = policy.run_id(entry['run_id'])
+            record = json.loads((RESULTS/token/'result.json').read_text())
+            if record.get('run_id') != token or digest(record) != entry['sha256']:
+                raise ValueError('Device cable rehearsal differs from host evidence')
+            rehearsals.append(record)
+    qualified = history(pm, records, sleeps, before, lock, connection, batch,
+                        rehearsals, receipt.get('cable_observations', []))
+    # A cable step has its own intervening awake alarm. Actual entry checks that
+    # exact rehearsal below; an awake rehearsal must start at the prior IRQ count.
+    if sleeps and (batch is None or rehearsal is None) and rtc_irq() != sleeps[-1]['rtc']['irq_after']:
         raise ValueError('RTC activity occurred after the supplied sleep history')
     if successor_path(pm, qualified).exists():
         raise ValueError('Qualification already claimed; collect its original successor')
@@ -649,6 +672,12 @@ def rehearsal_for_chain(pm, before, lock, qualification, rehearsal):
     preceding = qualification['sleep_runs']
     connection = sleep_connection.profile(qualification.get('connection', 'usb'))
     prior = json.loads((RESULTS/policy.run_id(rehearsal)/'result.json').read_text())
+    if 'cable_batch' in qualification:
+        if prior.get('run_id') != rehearsal:
+            raise ValueError('Cable rehearsal run identity differs')
+        previous = json.loads((RESULTS/preceding[-1]/'result.json').read_text()) if preceding else None
+        return sleep_cable_batch.rehearsal(pm, prior, before, qualification, lock,
+                                          completed_result, previous)
     if prior.get('connection', 'usb') != connection:
         raise ValueError('Awake rehearsal has another connection profile')
     completed_result(pm, prior, lock, 'rehearse')
@@ -694,14 +723,25 @@ def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_
         with keypad_pm.exclusive_pm(OWNED.parent):
             before = record['before'] = pm.snapshot()
             record['cpu_idle_before'] = idle_snapshot()
-            record['qualification'] = admission(pm, before, lock, receipt, connection)
+            record['qualification'] = admission(pm, before, lock, receipt, connection,
+                                                rehearsal if mode == 'rtc-wake' else None)
             if connection != 'usb':
                 record['cable'] = {'before': sleep_connection.observe()}
                 sleep_connection.state(record['cable']['before'], sleep_connection.endpoint(connection))
             record['policy_before'] = policy.inspect()
             record['audio_before'] = speaker_audio.idle()
             preceding = record['qualification']['sleep_runs']
-            if mode == 'rehearse' and preceding:
+            batch = record['qualification'].get('cable_batch')
+            if batch is not None:
+                if preceding:
+                    previous = json.loads((RESULTS/preceding[-1]/'result.json').read_text())
+                    sleep_connection.unchanged(previous['cable']['after'], record['cable']['before'],
+                                               sleep_connection.endpoint(connection))
+                if mode == 'rtc-wake':
+                    awake = json.loads((RESULTS/policy.run_id(rehearsal)/'result.json').read_text())
+                    sleep_connection.unchanged(awake['cable']['after'], record['cable']['before'],
+                                               sleep_connection.endpoint(connection))
+            if mode == 'rehearse' and preceding and batch is None:
                 raise ValueError('A repeat chain retains its original awake rehearsal')
             if mode == 'rtc-wake':
                 expected_rtc = rehearsal_for_chain(pm, before, lock, record['qualification'], rehearsal)

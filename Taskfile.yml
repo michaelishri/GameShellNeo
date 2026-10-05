@@ -30,6 +30,7 @@ env:
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
+  NEO_SLEEP_BATCH: '{{.BATCH | default ""}}'
   NEO_SLEEP_ATTENDED: '{{.ATTENDED | default "0"}}'
   NEO_SLEEP_CABLE_OBSERVATION: '{{.OBSERVATION | default ""}}'
   NEO_SLEEP_CABLE_DISPLAY: '{{.DISPLAY | default ""}}'
@@ -557,6 +558,22 @@ tasks:
   device:sleep-cable-remove-rehearse:
     desc: Awake rehearsal for USB removal scenario; USB connected, QUALIFICATION/CABLE_ACTION required
     cmds: [python3 tools/check-sleep-rtc.py --rehearse --connection usb-remove]
+
+  device:sleep-cable-batch-start:
+    desc: Start four alternating cable sleeps; runs first rehearsal/sleep only, QUALIFICATION/ATTENDED/CABLE_ACTION required
+    cmds: [python3 tools/check-sleep-cable-batch.py --start]
+
+  device:sleep-cable-batch-next:
+    desc: Run the next cable rehearsal/sleep after accepted observation; BATCH/ATTENDED/CABLE_ACTION required
+    cmds: [python3 tools/check-sleep-cable-batch.py --next]
+
+  report:sleep-cable-batch:
+    desc: Record the pending cycle's owner observation; BATCH/OBSERVATION/DISPLAY required, no device action
+    cmds: [python3 tools/check-sleep-cable-batch.py --observe]
+
+  report:sleep-cable-batch-status:
+    desc: Read saved batch state without contacting the device; BATCH required
+    cmds: [python3 tools/check-sleep-cable-batch.py --status]
 
   device:sleep-cable-remove:
     desc: One attended sleep with prompted USB removal; QUALIFICATION/REHEARSAL/CABLE_ACTION/ATTENDED required

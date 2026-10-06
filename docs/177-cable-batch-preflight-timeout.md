@@ -110,3 +110,32 @@ unconsumed baseline and must perform its own fresh awake rehearsal. Preserve
 this failed session and request fresh described readiness before that new
 actual cable attempt. Never restart an uncertain or previously submitted sleep.
 No image, driver, firmware, charging setting or production sleep policy changed.
+
+## Hotspot follow-up
+
+The owner subsequently moved the Mac onto a nearby hotspot and updated the
+shared `.env`. The saved `task device:wifi-config` transaction applied those
+credentials over USB without rebooting. Capture
+`20261006T093232.465181Z/wifi-change.json` records successful verification,
+commit and cleanup; SHA-256
+`743c40968a1f1d55ad6906bc951fbd8be05a8941964e976fda53d539639591f6`.
+The shared `.env` symlink remains intact; credentials and addresses stay private.
+
+Independent Wi-Fi status `20261006T093316.896734Z` passes. The link reports
+−47 dBm and 72.2 Mbit/s receive/transmit rates, a substantially stronger signal
+than the earlier −88 dBm reading. These remain link readings, not measured
+throughput or proof of the original timeout’s cause.
+
+Fresh PM inspection `20261006T093315.835270Z/inspection.json` passes the existing
+health validator on the same boot, at PM7/0 and SDIO usage 2; SHA-256
+`195fa4ab847f3ced5e14548ca77c89452e7beef2dea722c7bec620d28999cb6e`.
+The existing receipt validator accepts the unchanged seven-debug history for
+`usb-remove` against this snapshot, with no prior sleep in its lineage.
+
+Wi-Fi collection `20261006T093348.980015Z` also retrieves the original awake
+run and live recovery state. The result SHA-256 is again
+`ade47d0e2fcc8716fbcdbacc142b7260d0bda1f3c2c3a9eb7160989acb153770`,
+and its device digest matches the initial result. No retained diagnostic owners
+are present. All these follow-up commands kept the screen on and submitted no
+sleep. Fresh described readiness has been requested for a new guided session;
+the original failed batch remains unchanged.

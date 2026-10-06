@@ -6,10 +6,13 @@ Record deferred questions and activities here as they arise.
 the GameShell at its login screen and USB connected to the Mac. The first saved
 USB-status command failed locally with `Operation not permitted` under the
 session's newly restricted network policy, before any device Wi-Fi change or
-physical test. Network access restoration has been requested; afterward apply
-the current `.env` Wi-Fi settings, verify both routes and health, and prepare
-NEO-118's fresh attended baseline. The same session policy also rejected
-creation of a Kaneo ticket for the shared-`.env` correction below.
+physical test. The owner restored access and the retry succeeded: home Wi-Fi
+was applied from `.env`, both routes and awake PM/POWER/RTC checks pass on new
+boot `34483a13-9373-4ee3-8984-fd81a99bc5de`, at PM0/0 and SDIO usage 2. The shared
+`.env` link is intact; NEO-119 and its pushed fix record the correction below.
+[Report 175](docs/175-home-wifi-and-batch-admission.md) preserves the evidence.
+Readiness for NEO-118's fresh seven-debug preparation is pending; no screen or
+sleep test has run in this new session.
 
 **Latest diagnostic checkpoint, 5 October 2026:** diagnostic.20 is running with MUSB and both power-supply wake controls disabled, following verified card readback, startup/integration checks and attended debug qualification ([reports 167](docs/167-diagnostic20-installation-and-awake-checks.md)–[168](docs/168-diagnostic20-attended-debug-qualification.md)). One connected-USB RTC sleep/wake passes ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Independent debug baselines and awake rehearsals then supported one passing attended case in each cable direction: attachment stays dark until RTC wake, and removal returns correct disconnected USB/power state ([reports 170](docs/170-diagnostic20-usb-attachment-preparation.md)–[173](docs/173-diagnostic20-usb-removal-sleep-validation.md)). The owner confirmed long warnings and normal display returns. Removal evidence was saved over Wi-Fi before a separately requested awake reconnect; both SSH routes and external-power detection then passed, with exactly one AC/VBUS insertion dispatch each. Current PM24/0 and SDIO usage 2 are healthy. USB is connected; battery reports 99%/Charging, with the existing uncalibrated charging-voltage observation under NEO-10. No retained key guard remains and no further sleep test is running. NEO-117/NEO-110 retain repetition and separate charging-through-sleep evidence. All used baselines are consumed; diagnostic.19's original early-wake failure remains unchanged ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). Ordinary automatic/button sleep and energy qualification remain ahead.
 
@@ -31,14 +34,15 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 ## Diagnostic implementation follow-up
 
-- [x] Preserve the shared `.env` symlink when a verified Wi-Fi change updates
+- [x] NEO-119: preserve the shared `.env` symlink when a verified Wi-Fi change updates
   `GAMESHELL_IP`. The helper now resolves the existing target before atomic
   replacement, so subsequent credential edits remain visible in the worktree.
   All ten Wi-Fi transaction regressions pass, including shared-file updates,
   retained private permissions and rejection of concurrent target edits.
-  Tests use temporary synthetic credentials; no real credential file or device
-  setting was changed. Tracker synchronization is pending because the current
-  session denied the ticket-creation tool's required approval.
+  Tests use temporary synthetic credentials. Commit `3313069` is pushed; the
+  subsequent saved home Wi-Fi transaction passed with verified Wi-Fi SSH,
+  cleanup and the shared link still intact ([report 175](docs/175-home-wifi-and-batch-admission.md)).
+  Initial session permission failures and their resolution remain documented.
 
 - [ ] NEO-118: qualify the saved four-cycle alternating cable-sleep batch. Offline implementation adds explicit remove/attach/remove/attach lineage from one fresh debug baseline, per-step awake rehearsals, original-result/route checks, immutable owner observations and a stop on interruption or failure ([report 174](docs/174-guided-cable-sleep-batch.md)). No device access or physical test ran during implementation; the owner disconnected the board for about an hour. Recheck access/health when it returns, then obtain readiness for fresh debug preparation and each described cable step. No card swap is needed. Previous one-shot baselines remain consumed; repeat hardware coverage and charging-through-sleep evidence remain open under NEO-110/117.
 

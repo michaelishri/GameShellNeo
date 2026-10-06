@@ -23,9 +23,14 @@ walls. The owner then selected a nearby hotspot and updated `.env`; the saved
 USB Wi-Fi transaction, independent Wi-Fi status and original-result retrieval
 all pass. Signal improves to −47 dBm (reported link rates 72.2 Mbit/s). Fresh
 health and unused-baseline admission remain valid at PM7/0, SDIO2, with no
-retained owners. The failed session remains unchanged; fresh readiness for a
-new guided session is pending ([report 177](docs/177-cable-batch-preflight-timeout.md)).
-Keep USB connected until its described dark interval.
+retained owners ([report 177](docs/177-cable-batch-preflight-timeout.md)). The
+new guided session now passes cycles 1 and 2, removal and attachment during
+actual sleep, with RTC wakes, correct final cable states and the required route
+proofs. The owner confirms normal returns and staying dark after insertion
+([report 178](docs/178-guided-cable-batch-hardware-validation.md)). Cycle 3
+removal now passes its automated checks and awaits the owner's observation.
+PM is 10/0, SDIO2; USB is unplugged. The final attachment has not run. Preserve
+the failed earlier session and leave the cable unchanged between guided steps.
 
 **Latest diagnostic checkpoint, 5 October 2026:** diagnostic.20 is running with MUSB and both power-supply wake controls disabled, following verified card readback, startup/integration checks and attended debug qualification ([reports 167](docs/167-diagnostic20-installation-and-awake-checks.md)–[168](docs/168-diagnostic20-attended-debug-qualification.md)). One connected-USB RTC sleep/wake passes ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Independent debug baselines and awake rehearsals then supported one passing attended case in each cable direction: attachment stays dark until RTC wake, and removal returns correct disconnected USB/power state ([reports 170](docs/170-diagnostic20-usb-attachment-preparation.md)–[173](docs/173-diagnostic20-usb-removal-sleep-validation.md)). The owner confirmed long warnings and normal display returns. Removal evidence was saved over Wi-Fi before a separately requested awake reconnect; both SSH routes and external-power detection then passed, with exactly one AC/VBUS insertion dispatch each. Current PM24/0 and SDIO usage 2 are healthy. USB is connected; battery reports 99%/Charging, with the existing uncalibrated charging-voltage observation under NEO-10. No retained key guard remains and no further sleep test is running. NEO-117/NEO-110 retain repetition and separate charging-through-sleep evidence. All used baselines are consumed; diagnostic.19's original early-wake failure remains unchanged ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). Ordinary automatic/button sleep and energy qualification remain ahead.
 

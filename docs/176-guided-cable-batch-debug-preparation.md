@@ -9,9 +9,9 @@ on diagnostic.20, with unchanged kernel `6.18.54-gameshellneo19` and boot
 every failure counter zero; SDIO usage remains 2. USB is connected. No actual
 sleep or cable transition has run in this new session.
 
-The owner’s final sound/display observation is pending. The next actual sleep
-also requires its separately described cable-action readiness. This report
-does not claim those physical observations or qualify the new four-cycle batch.
+After the batch, the owner confirmed **“Yes—warnings clear and all returns
+normal.”** The next actual sleep requires its separately described cable-action
+readiness. This preparation does not qualify the new four-cycle batch.
 
 ## Original debug results
 
@@ -49,7 +49,7 @@ disconnect, poll/ioctl errors or held keys. Keypad and Wi-Fi traces are complete
 and restored. Every platform trace contains the ordered late/noirq phases and
 successful RSB callbacks. Each dark interval has recorded successful level-5,
 1,000 ms warning playback, mixer restoration and idle amplifiers before entry.
-Audibility and visible screen return still require the owner’s observation.
+The owner confirmed audibility and normal visible screen return after the batch.
 The timings include the five-second debug delay and are not wake-latency or
 energy measurements.
 

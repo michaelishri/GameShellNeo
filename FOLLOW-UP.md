@@ -13,9 +13,10 @@ boot `34483a13-9373-4ee3-8984-fd81a99bc5de`, at PM0/0 and SDIO usage 2. The shar
 [Report 175](docs/175-home-wifi-and-batch-admission.md) preserves the evidence.
 The subsequently readied seven-debug preparation now passes at PM7/0, with
 both SSH routes, retained keypad, restored long warnings and SDIO usage 2
-([report 176](docs/176-guided-cable-batch-debug-preparation.md)). Final owner
-sound/display confirmation is pending; no actual sleep or cable transition has
-run in this new session. Keep USB connected until the separate cable sequence.
+([report 176](docs/176-guided-cable-batch-debug-preparation.md)). The owner
+confirmed clear warnings and normal returns. No actual sleep or cable transition
+has run in this new session; fresh readiness for the first removal step has been
+requested. Keep USB connected until its described dark interval.
 
 **Latest diagnostic checkpoint, 5 October 2026:** diagnostic.20 is running with MUSB and both power-supply wake controls disabled, following verified card readback, startup/integration checks and attended debug qualification ([reports 167](docs/167-diagnostic20-installation-and-awake-checks.md)–[168](docs/168-diagnostic20-attended-debug-qualification.md)). One connected-USB RTC sleep/wake passes ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Independent debug baselines and awake rehearsals then supported one passing attended case in each cable direction: attachment stays dark until RTC wake, and removal returns correct disconnected USB/power state ([reports 170](docs/170-diagnostic20-usb-attachment-preparation.md)–[173](docs/173-diagnostic20-usb-removal-sleep-validation.md)). The owner confirmed long warnings and normal display returns. Removal evidence was saved over Wi-Fi before a separately requested awake reconnect; both SSH routes and external-power detection then passed, with exactly one AC/VBUS insertion dispatch each. Current PM24/0 and SDIO usage 2 are healthy. USB is connected; battery reports 99%/Charging, with the existing uncalibrated charging-voltage observation under NEO-10. No retained key guard remains and no further sleep test is running. NEO-117/NEO-110 retain repetition and separate charging-through-sleep evidence. All used baselines are consumed; diagnostic.19's original early-wake failure remains unchanged ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). Ordinary automatic/button sleep and energy qualification remain ahead.
 

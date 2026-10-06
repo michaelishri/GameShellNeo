@@ -865,6 +865,7 @@ task device:wifi-recovery SECONDS=120 # Installed firmware: four reconnections, 
 task device:rsb-compare SECONDS=120 DELAY_MS=100 # USB-powered bus-delay comparison
 task device:rsb-restore # Stop/recover an interrupted RSB comparison
 task device:pm-inspect # Read-only capabilities, counters and device links over USB
+task device:charge-inspect # Read-only documented charger/gauge inventory; USB remains connected
 task device:pm-test STAGE=freezer # Diagnostic.7 only, owner present; one debug cycle
 task device:pm-test STAGE=devices CYCLES=1 # Only after the freezer test passes
 task device:wifi-trace-smoke # One awake reconnect; verify metadata recorder and restoration first
@@ -1603,6 +1604,22 @@ records every would-be shutdown command. The live battery service continues
 running; no real shutdown request, charger write or gauge change occurs. This
 qualifies simulated behavior of the installed software, not physical low-battery
 shutdown reserve, percentage accuracy or charging limits. It needs no image rebuild.
+
+`device:charge-inspect` captures one awake charger/gauge inventory over USB.
+Keep USB connected. It checks the matching image/kernel and AXP223 identity,
+reads existing battery/input sysfs telemetry and eight documented registers,
+and saves the original JSON plus helper/source-lock hashes under
+`.local/diagnostics/`. No charger, gauge, cache, screen or sleep setting is written.
+The local PM lock prevents overlap with another saved PM workflow.
+
+The targeted regmap reads verify the Linux 6.18.54 map layout and use exact
+seven-byte reads without buffered read-ahead. Undocumented charge registers
+E2/E3 and IRQ status are excluded. Nonvolatile fields, including calibration
+status and configured capacity, are explicitly labeled as possibly cached.
+Changing kernel series or map layout requires a new source audit. A completed
+inventory is not a charging test: instantaneous current and percentage do not
+measure charge gained while asleep. See [measurement design](docs/180-sleep-charge-measurement-design.md)
+and [inventory validation](docs/181-charge-inventory-validation.md).
 
 `device:idle-sample ROUTE=wifi SECONDS=600` records a repeatable awake-idle
 scenario after one minute of settling. Unplug USB, keep Wi-Fi associated and

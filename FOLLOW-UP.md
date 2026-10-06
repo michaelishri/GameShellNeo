@@ -66,6 +66,25 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 ## Diagnostic implementation follow-up
 
+- [x] NEO-120: saved `device:charge-inspect` reads documented AXP223 charger/gauge
+  fields and sysfs telemetry with strict identity/layout/cache checks, bounded
+  allowlisted reads and provenance. Nine focused tests and the full host checks
+  pass; one awake diagnostic.20 hardware inventory and both surrounding health
+  checks pass at unchanged PM11/0 and SDIO2. Cached gauge/counting enables are
+  set, but E0/E1 report the capacity-configured flag clear. No controls changed.
+  [Source design](docs/180-sleep-charge-measurement-design.md);
+  [implementation/hardware report](docs/181-charge-inventory-validation.md).
+- [ ] Resolve AXP223-specific remaining-charge measurement before adding a new
+  power-supply property. Both supplied manuals omit candidate E2/E3 semantics;
+  vendor code scales it by 1,456 µAh but also writes/clamps it to full capacity.
+  Do not label it a monotonic `charge_counter`. Current Linux caches B8's dynamic
+  calibration bit and E0–E3, and RSB reads do not establish an atomic two-byte
+  sample. Audit validity, corrections, reset/retention, coherent reads and shared
+  variant access tables in the driver. No cache-bypass/raw-bus workaround or
+  gauge programming has been performed. Preserve the unset cached capacity
+  observation from NEO-120 without inferring actual pack health or configuration
+  accuracy. Direct charging-through-sleep evidence remains NEO-117.
+
 - [ ] Qualify software charge inhibition separately from forced battery discharge.
   The installed AXP22x battery driver already exposes a root-writable `status`
   control that clears the charger-enable bit; it does not disconnect external

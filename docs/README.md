@@ -24,6 +24,10 @@ Charging during sleep and standby energy remain unqualified.
 [179 — Software charging control](179-software-charge-inhibit-and-discharge.md)
 distinguishes the existing charge-inhibit control from forcing battery discharge
 while USB remains attached. No charging setting was changed in that review.
+[180 — Sleep charge measurement](180-sleep-charge-measurement-design.md)
+records the counter, cache and attribution limits;
+[181 — Charge inventory](181-charge-inventory-validation.md) records the saved
+read-only task and its passing awake hardware inspection.
 
 Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)

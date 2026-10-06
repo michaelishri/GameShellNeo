@@ -395,6 +395,10 @@ tasks:
     desc: Capture kernel, service, power and access status (ROUTE=wifi or usb)
     cmds: [python3 tools/remote.py device status]
 
+  device:charge-inspect:
+    desc: Read documented AXP223 charge/gauge inventory over USB; no control writes or sleep
+    cmds: [python3 tools/check-charge-inventory.py]
+
   device:wifi-config:
     desc: Apply Wi-Fi credentials from .env over USB, verify Wi-Fi SSH, then update GAMESHELL_IP
     cmds:

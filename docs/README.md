@@ -16,7 +16,16 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current installed image: diagnostic.17.
+Current installed image: diagnostic.20.
+[178 — Guided cable batch](178-guided-cable-batch-hardware-validation.md)
+records four observed alternating USB removal/attachment sleeps, RTC wakes,
+restored endpoints and normal display returns, followed by return to home Wi-Fi.
+Charging during sleep and standby energy remain unqualified.
+[179 — Software charging control](179-software-charge-inhibit-and-discharge.md)
+distinguishes the existing charge-inhibit control from forcing battery discharge
+while USB remains attached. No charging setting was changed in that review.
+
+Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)
 records verified card installation, startup/awake checks and observed freezer,
 driver and five late/noirq passes. The SDIO count stays at 2 throughout, with

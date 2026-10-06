@@ -66,6 +66,19 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 ## Diagnostic implementation follow-up
 
+- [ ] Qualify software charge inhibition separately from forced battery discharge.
+  The installed AXP22x battery driver already exposes a root-writable `status`
+  control that clears the charger-enable bit; it does not disconnect external
+  power from the system. The AXP22x USB and AC input controls do not expose a
+  supported force-off switch, and the board schematic joins both inputs.
+  For NEO-117's discharge preparation, physical USB removal remains the tested
+  route. Any future software-only discharge mode needs a board power-path audit
+  and evidence of negative battery current with USB data retained. Charge-inhibit
+  qualification needs bounded restoration and direct enable-state readback;
+  observed Charging/Full status alone is not the original enable setting.
+  No charging or power-path setting was changed during this read-only review.
+  [Report 179](docs/179-software-charge-inhibit-and-discharge.md).
+
 - [x] NEO-119: preserve the shared `.env` symlink when a verified Wi-Fi change updates
   `GAMESHELL_IP`. The helper now resolves the existing target before atomic
   replacement, so subsequent credential edits remain visible in the worktree.

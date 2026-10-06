@@ -192,3 +192,56 @@ reliability, precise electrical-edge timing or subsecond wake qualification.
 Charging during sleep,
 standby energy, CPU retention, Mac sleep, power-button wake and production policy
 remain separate qualification work. Ordinary automatic/button sleep is disabled.
+
+## Subsequent return to home Wi-Fi
+
+After completing the batch, the owner switched the Mac to home Wi-Fi and
+requested the same change on the GameShell. The saved commands were:
+
+```sh
+task device:wifi-config
+task device:status ROUTE=usb
+task device:pm-inspect
+task device:status ROUTE=wifi
+task device:exec ROUTE=wifi -- /usr/sbin/iw dev wlan0 link
+```
+
+The transaction applied the current `.env` credentials through USB, verified
+Wi-Fi SSH, committed the address update and verified cleanup. The shared `.env`
+symlink remains intact. Independent status checks on both routes passed.
+PM inspection uses USB; its saved snapshot passes the existing health/source
+validator. Boot identity, PM11/0, SDIO usage 2, disabled MUSB/supply wake controls
+and brightness 1/backlight power 0 are unchanged. There are no failed units or
+kernel taint. Both input supplies report present/online. Battery monitoring is
+valid at 100%/Charging, with reported voltage 4.1624 V; this is uncalibrated
+telemetry, not new electrical or charging-through-sleep qualification.
+
+Private evidence beneath `.local/diagnostics/`:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| Wi-Fi transaction `20261006T100743.218289Z/wifi-change.json` | `3c05d938892d7e337c0da2500a5343ac025ee28c54983a2fa8f687d2ef43ac31` |
+| PM `20261006T100810.098057Z/inspection.json` | `3f485fe6bf53973e7b59e78f8a38e5f9244cb7167c3e346ae13105c815b7f9b1` |
+
+USB status is saved under `20261006T100810.790288Z`; independent Wi-Fi status
+under `20261006T100836.086737Z`. The link capture is
+`.local/home-wifi-return-link-20261006.log`. It reports −81 dBm, receive rate
+26.0 Mbit/s and transmit rate 19.5 Mbit/s. These are a single link observation,
+not throughput measurements or proof of sustained reliability. The signal is
+still weak; a future test relying on Wi-Fi alone needs fresh access checks.
+Credentials and network addresses remain private. No new sleep, reboot,
+screen blanking, charger-setting or diagnostic-source change occurred.
+
+The next proposed slice is NEO-117's remaining charging evidence: establish
+which PMIC observations can demonstrate charge acceptance over the sleeping
+interval, then prepare a reproducible bounded test with battery charge headroom
+and explicit limits on software-only measurement. A full battery and Charging
+status after resume are insufficient evidence. The four cable cycles above
+remain complete and are not repeated merely to update Wi-Fi.
+
+The subsequent efficiency candidate is the
+[CPI WFI CPU-idle integration](134-cpi-wfi-s2idle-candidate.md), preceded by the
+[BOOTTIME battery-record change](133-battery-boottime.md) and its measurement
+clock guards. That work needs a new image and actual clock/device/energy
+qualification. The candidate's source tests do not establish standby savings
+or the week-long standby target.

@@ -2,6 +2,19 @@
 
 Record deferred questions and activities here as they arise.
 
+**Home Wi-Fi return, 6 October 2026, after the completed cable batch:** the
+owner switched the Mac back to home Wi-Fi and requested the matching GameShell
+change. The saved `.env` transaction committed, cleanup passed, and independent
+USB/Wi-Fi status checks succeeded on the same boot at PM11/0, SDIO usage 2.
+Battery telemetry reports 100%/Charging. The sampled home signal is still weak
+at −81 dBm, despite successful access; this does not qualify an unattended
+Wi-Fi-only test. No new sleep, reboot or screen test ran. Details and the next
+proposed slice are appended to [report 178](docs/178-guided-cable-batch-hardware-validation.md).
+NEO-117 still needs evidence of charging during sleep, with battery headroom
+and a measurement method that distinguishes the sleeping interval from awake
+charging. CPU-idle integration follows with the NEO-100 battery-clock
+prerequisite; power savings remain unmeasured.
+
 **Access checkpoint, 6 October 2026:** the owner returned to home Wi-Fi with
 the GameShell at its login screen and USB connected to the Mac. The first saved
 USB-status command failed locally with `Operation not permitted` under the

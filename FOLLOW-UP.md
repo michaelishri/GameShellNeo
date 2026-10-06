@@ -2,6 +2,19 @@
 
 Record deferred questions and activities here as they arise.
 
+**Unattended awake preparation, 6 October 2026:** NEO-120 and NEO-121 add saved
+read-only charging inventory and a bounded awake baseline. Both pass host and
+awake hardware checks ([reports 180](docs/180-sleep-charge-measurement-design.md)–[182](docs/182-awake-charging-baseline.md)).
+The 13-sample/two-minute trace reports 100%/Charging and 1–2 mA; this is an
+uncalibrated awake baseline, not sleep charge evidence. Cached E0/E1 report no
+configured capacity. The manuals leave candidate charge-register semantics
+unresolved, and current regmap caching/coherent reads need driver work before
+adding a trustworthy accumulated-charge interface. Final USB access and PM
+health pass on the same boot at PM11/0, SDIO2 and normal dim console settings.
+USB and charging remain connected/enabled, with no controls changed and no
+test left running. Physical partial discharge and any sleep comparison wait
+for the owner's return; NEO-117's direct charging criterion remains open.
+
 **Home Wi-Fi return, 6 October 2026, after the completed cable batch:** the
 owner switched the Mac back to home Wi-Fi and requested the matching GameShell
 change. The saved `.env` transaction committed, cleanup passed, and independent
@@ -65,6 +78,15 @@ Agreed scope and policies are recorded in [the initial base requirements](docs/0
 The feasibility investigation, supplied Allwinner-document review and focused firmware/PMIC trace are complete. **Start with [the implementation plan](docs/20-base-implementation-plan.md)** and its supporting reports 17–19. The first [read-only device baseline](docs/21-installed-hardware-baseline.md) is now captured. Unchecked items below require implementation, a design decision or hardware validation. At baseline capture, no image build, suspend experiment or battery-endurance test had been performed; the later build workflow is in [report 24](docs/24-building-and-testing.md).
 
 ## Diagnostic implementation follow-up
+
+- [x] NEO-121: `device:charge-baseline SECONDS=120` records bounded awake,
+  USB-connected telemetry with timestamp/boot/PM and state checks, private
+  provenance, preserved failures and a remote deadline. Eleven focused tests
+  and full host checks pass (13 runtime/616 tooling, one optional skip).
+  The first full-battery hardware baseline passes 13 samples in 120.021 seconds;
+  final USB/PM checks pass unchanged PM11/0 and SDIO2. Source hashes and summary
+  recomputation match. The sampled charge estimate is explicitly uncalibrated
+  and awake-only. [Report 182](docs/182-awake-charging-baseline.md).
 
 - [x] NEO-120: saved `device:charge-inspect` reads documented AXP223 charger/gauge
   fields and sysfs telemetry with strict identity/layout/cache checks, bounded

@@ -866,6 +866,7 @@ task device:rsb-compare SECONDS=120 DELAY_MS=100 # USB-powered bus-delay compari
 task device:rsb-restore # Stop/recover an interrupted RSB comparison
 task device:pm-inspect # Read-only capabilities, counters and device links over USB
 task device:charge-inspect # Read-only documented charger/gauge inventory; USB remains connected
+task device:charge-baseline SECONDS=120 # Two-minute awake charging trace; USB stays connected
 task device:pm-test STAGE=freezer # Diagnostic.7 only, owner present; one debug cycle
 task device:pm-test STAGE=devices CYCLES=1 # Only after the freezer test passes
 task device:wifi-trace-smoke # One awake reconnect; verify metadata recorder and restoration first
@@ -1620,6 +1621,25 @@ Changing kernel series or map layout requires a new source audit. A completed
 inventory is not a charging test: instantaneous current and percentage do not
 measure charge gained while asleep. See [measurement design](docs/180-sleep-charge-measurement-design.md)
 and [inventory validation](docs/181-charge-inventory-validation.md).
+
+`device:charge-baseline SECONDS=120` records a connected, awake baseline with
+one sample every ten seconds. `SECONDS` must be a multiple of ten from 60 to
+600. Keep USB connected and the screen/controls unchanged. It uses the same
+read-only inventory first, then directly samples battery and external-power
+sysfs values with BOOTTIME/MONOTONIC brackets and boot/PM counters. It rejects
+detected sleep, missing/late samples, slow reads, lost external power, discharge,
+invalid battery readings, low capacity, excess temperature, taint, and observed
+changes to brightness or charger/input-limit settings. No setting is changed.
+
+Original JSON-lines observations (including a rejected sample), source hashes
+and requested duration remain private under `.local/diagnostics/`. A remote
+deadline bounds execution independently of SSH collection. Lost SSH or partial
+output cannot pass and does not cause an automatic rerun. A successful summary
+includes a trapezoidal **uncalibrated sampled charge estimate** for the awake
+interval only; it does not account for unseen current variation between samples
+and is not a sleep-charge measurement. A full-battery plateau is not evidence
+that charging during sleep is broken. [Baseline validation](docs/182-awake-charging-baseline.md)
+records the initial result and remaining physical work.
 
 `device:idle-sample ROUTE=wifi SECONDS=600` records a repeatable awake-idle
 scenario after one minute of settling. Unplug USB, keep Wi-Fi associated and

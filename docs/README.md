@@ -28,6 +28,9 @@ while USB remains attached. No charging setting was changed in that review.
 records the counter, cache and attribution limits;
 [181 — Charge inventory](181-charge-inventory-validation.md) records the saved
 read-only task and its passing awake hardware inspection.
+[182 — Awake charging baseline](182-awake-charging-baseline.md) records the
+bounded telemetry task, passing two-minute full-battery baseline and its
+uncalibrated measurement limits.
 
 Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)

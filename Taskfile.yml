@@ -18,6 +18,7 @@ env:
   NEO_IDLE_SECONDS: '{{.SECONDS | default "600"}}'
   NEO_IDLE_BACKLIGHT: '{{.BACKLIGHT | default "keep"}}'
   NEO_PROFILE_SECONDS: '{{.SECONDS | default "120"}}'
+  NEO_CHARGE_SECONDS: '{{.SECONDS | default "120"}}'
   NEO_GOVERNOR_RATE_US: '{{.RATE_US | default "10000"}}'
   NEO_PERF_SECONDS: '{{.SECONDS | default "30"}}'
   NEO_USB_POLL_MODE: '{{.MODE | default "status"}}'
@@ -398,6 +399,10 @@ tasks:
   device:charge-inspect:
     desc: Read documented AXP223 charge/gauge inventory over USB; no control writes or sleep
     cmds: [python3 tools/check-charge-inventory.py]
+
+  device:charge-baseline:
+    desc: Read awake charging telemetry over USB for SECONDS=120; no control changes
+    cmds: [python3 tools/check-charge-baseline.py]
 
   device:wifi-config:
     desc: Apply Wi-Fi credentials from .env over USB, verify Wi-Fi SSH, then update GAMESHELL_IP

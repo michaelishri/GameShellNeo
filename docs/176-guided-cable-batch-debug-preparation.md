@@ -107,3 +107,9 @@ Do not insert an extra awake reconnect between steps or reuse consumed older
 baselines. No card swap is needed. Charging during sleep, standby energy,
 CPU retention and production power-key behavior remain separate work;
 ordinary automatic/button sleep remains disabled.
+
+The first subsequent guided session passed its awake rehearsal but stopped on
+a Wi-Fi transport timeout before submitting sleep. [Report 177](177-cable-batch-preflight-timeout.md)
+preserves that failed batch, the untouched baseline and the read-only link/
+restoration investigation. This preparation remains historical evidence;
+it does not turn that failed session into a passing cable test.

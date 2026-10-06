@@ -1171,6 +1171,8 @@ tailnet endpoint plus `GAMESHELL_WIFI_VIA_MAC=1`. Run `task device:wifi-config`.
 The task always uses USB for the change, refreshes private build provisioning,
 and verifies Wi-Fi SSH against the provisioned host key, same boot and new
 Wi-Fi address before committing. It updates only `GAMESHELL_IP` in `.env`.
+If a worktree's `.env` links to the shared file, the update preserves that link
+and atomically replaces its target; later credential edits remain shared.
 No image rebuild or reboot is needed; the Wi-Fi service restarts.
 
 Credentials travel by SFTP in a private directory, not in command arguments or

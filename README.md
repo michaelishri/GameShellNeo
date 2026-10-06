@@ -2247,10 +2247,14 @@ before creating a run ID, do not invent one or submit another attempt through
 that session. The old one-shot tasks retain their original admission rules.
 
 This tooling change needs no image build or card swap. The previous consumed
-baselines and rehearsals cannot admit it; a new baseline is required. Hardware
-batch qualification remains pending, and no live tests were started while the
-owner disconnected the device. [Report 174](docs/174-guided-cable-sleep-batch.md)
-records the implementation, offline tests and remaining limits.
+baselines and rehearsals cannot admit it; a new baseline is required.
+[Report 174](docs/174-guided-cable-sleep-batch.md) records the implementation and
+offline tests. The first full attended four-cycle batch now passes on
+diagnostic.20, with both insertions staying dark until RTC wake, correct cable
+endpoints and all owner observations accepted
+([report 178](docs/178-guided-cable-batch-hardware-validation.md)). This is bounded
+coverage on one boot; charging during sleep, energy, Mac sleep and power-button
+wake remain separate qualifications. Normal product sleep stays disabled.
 
 Diagnostic inspections send their Python helper source over SSH standard input.
 Only the short interpreter command and its arguments enter the usual sudo command

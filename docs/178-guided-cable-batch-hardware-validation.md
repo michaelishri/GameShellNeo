@@ -3,10 +3,11 @@
 6 October 2026; capture timestamps are UTC. NEO-118, supporting NEO-110/117.
 
 After the [hotspot recovery](177-cable-batch-preflight-timeout.md), a new guided
-session has passed its first removal and attachment cases, including both owner
-observations. Cycle 3 removal passes its automated checks and awaits the owner's
-observation. The four-cycle workflow is not yet fully qualified. USB is unplugged at this
-checkpoint; no extra awake reconnect belongs between these alternating cases.
+session has passed all four alternating removal/attachment cases, including
+the owner's observations. Both insertions stayed dark until the later RTC wake.
+The saved four-cycle workflow is qualified for this observed diagnostic.20
+session. USB ends connected, PM is 11/0 and SDIO usage is 2. No extra awake
+reconnect or repeated debug baseline was needed between steps.
 
 The original session that stopped before sleep remains failed and unchanged.
 The new session uses its own awake rehearsal and the unconsumed, observed
@@ -104,7 +105,7 @@ it does not measure charge acceptance while the CPU is asleep.
 | `cycle-2/sleep/result.json` | `949f8b215c70ba7b8cce547c2e54550e66da0217e38ff3894f39db01853007e0` |
 | `cycle-2/endpoint/connection-inspection.json` | `12c12f6dc53af16091764b1bf1e91bd3e8b042fdade3a6d4c310f7381333c338` |
 
-## Cycle 3: automated removal pass; observation pending
+## Accepted cycle 3: removal
 
 After fresh readiness, awake rehearsal `36d194f75af74816a5acc99f5991a759`
 passes with PM9/0 unchanged, RTC count 6 to 7 and alarm delivery after 30.080
@@ -116,8 +117,9 @@ Original input, memory, long warning, console, RTC, traces and policy restoratio
 pass. USB ends absent, carrier0, PHY USB=0/HOST=0, with both supplies offline;
 Wi-Fi and the independent endpoint inspection pass. Cable-handler deltas remain
 zero. One channel-open timeout and two connect failures are retained during
-collection of the same original. No sleep was resubmitted. The controller is
-stopped in `awaiting-observation`; the owner's first report remains pending.
+collection of the same original. No sleep was resubmitted. The owner confirmed
+**“Yes—unplugged during darkness; console normal.”** Its separate immutable
+observer report was accepted before requesting readiness for cycle 4.
 
 | File | SHA-256 |
 | --- | --- |
@@ -125,6 +127,68 @@ stopped in `awaiting-observation`; the owner's first report remains pending.
 | `cycle-3/sleep/result.json` | `108d7c4afede474e9b0e0ef958a29abc32a74ed992592f6ac67a913254a0f464` |
 | `cycle-3/endpoint/connection-inspection.json` | `0877a479cb2bc4af3d949e2a5e81e6b016bb3ef1e55052fd4647f1683e37774f` |
 
-The final attachment has not run. Charging during sleep,
+## Accepted cycle 4: attachment
+
+After its own readiness response, awake rehearsal
+`d4ca653c6e234dd68ca9c23be329e7c8` passes with PM10/0 unchanged, RTC count
+8 to 9 and delivery after 30.250 seconds. Actual sleep
+`dcfb87d05c8046de8b70704414cdca82` passes with PM10 to 11, zero failures,
+RTC count 9 to 10 and wake IRQ31. Alarm delivery is 32.334 seconds, with a
+29.182-second s2idle trace interval. SDIO usage remains 2. Original keypad,
+memory, long warning, console, alarm, traces and power-key policy restore;
+no diagnostic owners remain.
+
+USB ends configured/carrier1, PHY USB=1/HOST=0 and both supplies present/online.
+Both SSH routes and the independent endpoint inspection pass. All cable-handler
+deltas remain zero under the declared masked-insertion criteria. No collection
+error is recorded for this cycle. The owner confirmed **“Yes—stayed dark after
+USB; then console returned.”** The observer task marks the batch `complete`,
+`passed=true`, with four accepted cycles and no pending observation. No fifth
+cycle is started or authorized by that completion.
+
+| File | SHA-256 |
+| --- | --- |
+| `cycle-4/awake/result.json` | `063dc248162b42f0149b294ed0b1906ae02599286e6ccca9a13846783db5bf94` |
+| `cycle-4/sleep/result.json` | `ee1d9ecb6f4cb5c778514e043a65ea9747aa9676ed1bf897bda7ea9aef0d3beb` |
+| `cycle-4/endpoint/connection-inspection.json` | `22cc4d656c4583bc0614760c665051eb2dd9ea6f449d3b0bbcc34f1f001ab826` |
+
+## Final review and completion boundary
+
+Existing validators independently rechecked all four original awake/sleep pairs,
+the baseline and each ancestor receipt, matching rehearsals and RTC continuity,
+parent claims, original hashes, observer attestations, endpoint continuity and
+required route proofs. Host/device diagnostic sources remain unchanged.
+The final read-only PM snapshot follows the last original without additional
+PM activity or kernel-journal loss. It passes health validation at PM11/0,
+SDIO2, brightness1/backlight power0. Independent policy inspection equals the
+last original restored policy, with no owner or drop-in.
+
+Final captures beneath `.local/diagnostics/`:
+
+| Evidence | SHA-256 |
+| --- | --- |
+| Batch `20261006T093507.694630Z/batch.json` | `702061bb255e65667a0a14b0f83673872eb66e6609394c7403638a6dc0866893` |
+| PM `20261006T095515.429351Z/inspection.json` | `32b67afa7be00f2f7d6fafd0433949dc819a10ab6bdb70c255ebb3f64d9c78f2` |
+| Policy `20261006T095515.425166Z/before.json` | `6289495073af7662e4bfd0023a911e7f6eef5ccf2fabf5f56f68152091af605a` |
+
+The four `cycle-N/sleep/result-cable-observation.json` hashes, in cycle order:
+
+```text
+1a367eb0d0dc95b78dc573b8cf0749d6166d806d4a2098bae1d3a9102a04c8c0
+8856fc126b6a5e513336d4a775095b94f9d82bb60dbf75740e54ce3c455ef2e5
+87f5e6b960f702657135d9c4df492fbca127f4c51cf3793e807118de08464b53
+ba9dde004917f557b6c7110ee2fa62b8c4a72c8559f7bf830c7f89d3af135d8e
+```
+
+NEO-118's saved guided workflow now has its hardware qualification alongside
+the 118 focused sleep regressions and 595-tool/13-runtime validation recorded
+in [report 174](174-guided-cable-sleep-batch.md). No source change required
+repeating those host tests in this hardware session. The earlier Wi-Fi preflight
+failure remains failed; it was never resumed or relabeled. The now-consumed
+debug anchor and completed batch cannot admit a new sleep through this session.
+
+This is two observed repetitions in each direction on one boot, not general
+reliability, precise electrical-edge timing or subsecond wake qualification.
+Charging during sleep,
 standby energy, CPU retention, Mac sleep, power-button wake and production policy
 remain separate qualification work. Ordinary automatic/button sleep is disabled.

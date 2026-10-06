@@ -121,11 +121,19 @@ new commands, and `git diff --check` passes. Private logs are
 `.local/neo118-sleep-tests.log` and `.local/neo118-check.log` in the candidate
 worktree. No hardware outcome is inferred from these host tests.
 
-The hardware workflow remains unqualified. When the owner reconnects the board,
+At this implementation checkpoint the hardware workflow remained unqualified.
+When the owner reconnects the board,
 read-only access/health checks come first, then a freshly observed seven-debug
 baseline and the described four-step session. No card swap is needed because
 only uploaded diagnostic tools and documentation changed. Historical original
 results, consumed baselines and failed runs remain intact.
+
+The later [hardware qualification](178-guided-cable-batch-hardware-validation.md)
+passes all four alternating cases on diagnostic.20, with separate owner
+observations, RTC wakes, restored policies and correct endpoint/route proofs.
+The prior pre-sleep Wi-Fi failure remains preserved in
+[report 177](177-cable-batch-preflight-timeout.md). No fifth cycle is admitted by
+the completed session.
 
 This batch addresses repeat coverage. It does not measure charging current
 during sleep, standby energy, deep CPU retention, Mac-host sleep or power-button

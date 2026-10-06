@@ -88,6 +88,11 @@ No screen test starts before that response. The four alternating removal/
 attachment steps follow separately, with each owner observation saved before
 the next step. No card swap is needed.
 
+The later readied preparation passes all seven automated debug checks;
+[report 176](176-guided-cable-batch-debug-preparation.md) records the originals,
+fresh PM7/0 admission and pending final owner observation. No actual cable sleep
+has run in this new session at that checkpoint.
+
 This is a new boot. Old PM24/0 evidence, consumed one-shot baselines and earlier
 rehearsals remain historical and cannot admit the new run. Awake access and
 alarm delivery do not establish sleep recovery, charging during sleep, energy

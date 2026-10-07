@@ -9,10 +9,13 @@ board. Normal sleep, a launcher, OTA and other board revisions are later work.
 Diagnostic.21 is installed with the AXP223 gauge-status cache correction.
 Full card readback, startup, both network routes and the live volatile-B8
 inspection pass. Seven attended suspend-debug checks and the awake RTC rehearsal
-also pass, followed by one actual connected-USB RTC sleep/wake with both routes
-restored and owner-confirmed normal display. Fresh B8 reads survive resume.
-[Report 190](docs/190-diagnostic21-pm-qualification.md) records these checks;
-repeatability, other power/cable profiles and energy savings remain open.
+also pass, followed by five actual connected-USB RTC sleeps, including a
+four-cycle batch. Both routes recover every time, and the owner confirms clear
+warnings and normal display returns without intervention. Fresh B8 reads survive
+resume. [Report 190](docs/190-diagnostic21-pm-qualification.md) records the initial
+checks; [report 191](docs/191-diagnostic21-connected-sleep-repeatability.md)
+records bounded repeatability. Other power/cable profiles, broader reliability
+and energy savings remain open.
 [Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md) records
 the hardware results and continuing voltage/capacity uncertainty.
 [Report 187](docs/187-diagnostic21-gauge-integration.md) records its build,

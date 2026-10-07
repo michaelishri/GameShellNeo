@@ -14,15 +14,18 @@ Record deferred questions and activities here as they arise.
   infer a safe setting or change unrelated build/cache identities merely to
   accelerate diagnostic.21 assembly.
 
-- [ ] Diagnostic.21 PM repeatability and other profiles: NEO-125/126's build, checked card
+- [ ] Diagnostic.21 other PM profiles and broader qualification: NEO-125/126's build, checked card
   installation, owner-confirmed login, awake startup and fresh volatile-B8
   inspection now pass. [Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md)
   records matching reported control values, healthy final USB/Wi-Fi and PM0/0.
   NEO-128's seven attended debug checks, awake RTC rehearsal and one actual
   connected-USB RTC sleep/wake now pass at PM8/0, with both routes restored,
   owner-confirmed warnings/normal returns and SDIO usage 2
-  ([report 190](docs/190-diagnostic21-pm-qualification.md)). Use the saved
-  continuation for repeat connected-USB cycles; the first baseline is consumed.
+  ([report 190](docs/190-diagnostic21-pm-qualification.md)). NEO-129's four-cycle
+  connected-USB batch also passes, with owner-confirmed untouched returns,
+  both SSH routes each time and final PM12/0, SDIO2
+  ([report 191](docs/191-diagnostic21-connected-sleep-repeatability.md)).
+  Its cycle-4 continuation is current; earlier baselines/continuations are consumed.
   Battery/cable/POWER cases and energy still need separate qualification.
   B8=`c0` remains fresh after resume; E0/E1 remain potentially cached, with no
   configured capacity. The later 100%/2 mA/4.158 V awake sample does not resolve
@@ -135,6 +138,14 @@ Agreed scope and policies are recorded in [the initial base requirements](docs/0
 The feasibility investigation, supplied Allwinner-document review and focused firmware/PMIC trace are complete. **Start with [the implementation plan](docs/20-base-implementation-plan.md)** and its supporting reports 17–19. The first [read-only device baseline](docs/21-installed-hardware-baseline.md) is now captured. Unchecked items below require implementation, a design decision or hardware validation. At baseline capture, no image build, suspend experiment or battery-endurance test had been performed; the later build workflow is in [report 24](docs/24-building-and-testing.md).
 
 ## Diagnostic implementation follow-up
+
+- [ ] Investigate the recurring post-sleep SSH collection delays. Diagnostic.21's
+  four-cycle batch retains channel-opening timeouts and connection failures in
+  every cycle, followed by successful collection of each original and independent
+  USB/Wi-Fi recovery. Preserve these timings separately from PM/RTC intervals and
+  instrument the host/route/device stages before assigning a cause or adding
+  retries. The current evidence does not isolate Mac, tailnet or GameShell
+  behavior. [Report 191](docs/191-diagnostic21-connected-sleep-repeatability.md).
 
 - [ ] Identify the source of the charging recorder's 7 October SSH connection
   reset if it recurs. The original trace retains only inventory and sample zero;

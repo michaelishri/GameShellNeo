@@ -17,11 +17,15 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.21.
+[191 — Connected sleep repeatability](191-diagnostic21-connected-sleep-repeatability.md)
+records four consecutive actual RTC-wake passes, both routes recovering each
+time, owner-confirmed warnings/display and final PM12/0 with fresh B8 reads.
+Other profiles, broader reliability and energy remain unqualified.
 [190 — Suspend/resume qualification](190-diagnostic21-pm-qualification.md)
 records seven passing attended debug stages, confirmed warnings/display returns
 and the awake RTC rehearsal, followed by one actual connected-USB RTC wake.
 Both routes recover, the owner confirms normal display, and fresh B8 reads
-survive resume. Repeatability, other profiles and energy remain unqualified.
+survive resume. Its connected-USB repeatability continuation is in report 191.
 [189 — Installation and gauge validation](189-diagnostic21-installation-and-gauge-validation.md)
 records full card readback, owner-confirmed login, passing awake startup checks
 and fresh B8 reads. Voltage/capacity uncertainty and broader PM qualification

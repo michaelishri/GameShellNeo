@@ -196,6 +196,22 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   sleep intervals and this observation time from genuinely late network recovery;
   existing error strings alone cannot make that distinction.
   [Report 191](docs/191-diagnostic21-connected-sleep-repeatability.md).
+  NEO-135 adds timestamped host spans and device BOOTTIME brackets without
+  changing the five-second collection interval or resubmitting PM. Three awake
+  route batches pass with PM13/0 unchanged. Use the new timing on the next
+  attended sleep, preserving the existing continuation; historical failures
+  still cannot be classified. [Report 197](docs/197-ssh-collection-timing.md).
+
+- [ ] Profile and reduce user-manager unit-loading cost on the diagnostic image.
+  Three awake probes each show a 4.677–4.792-second first USB SSH command-channel
+  opening, versus roughly 0.2 seconds subsequently. Journal startup reports are
+  about 3.9 seconds; separate manager timestamps put 3.426 seconds in unit loading
+  within 3.925 seconds total, while generators take 0.120 seconds. This is a
+  plausible contributor to session latency and repeated diagnostic CPU work,
+  not proof of the historical post-sleep failures. Inspect unit search paths,
+  parser/filesystem cost and session lifecycle before choosing a fix; preserve
+  PAM/session behavior and future UI needs. No linger, PAM, SSH, user-service or
+  driver setting was changed. [Report 197](docs/197-ssh-collection-timing.md).
 
 - [ ] Identify the source of the charging recorder's 7 October SSH connection
   reset if it recurs. The original trace retains only inventory and sample zero;

@@ -299,10 +299,23 @@ task check                 # Host tests and shell lint
 task build:image           # Rebuild userspace/image using the completed kernel
 task device:status         # Capture the running board's status over Wi-Fi
 task device:status ROUTE=usb # Connect through the Mac's USB link
+task device:ssh-timing CYCLES=3 # Fresh USB/Wi-Fi timing pairs while awake
+task device:ssh-timing-report CAPTURE=.local/diagnostics/<capture> # Offline summary
 ```
 
 Both humans and coding agents should use these commands. When another routine
 operation is needed, extend the Taskfile and its checked-in `tools/` helpers.
+
+The SSH timing probe leaves the screen and power policy unchanged. It discovers
+the current Wi-Fi address through USB, requires the same boot and unchanged PM
+counters across both routes, and stops on failure. Credentials remain in `.env`.
+It saves private `awake-ssh.json`, `host-timing.jsonl` and a timing summary.
+Each PM debug cycle, RTC rehearsal/sleep attempt and explicit sleep collection
+also records host timing automatically. The offline report accepts a capture
+directory, including a batch's individual `cycle-N` directory. Nested durations
+overlap; do not add them together or treat SSH command latency as wake latency.
+[Report 197](docs/197-ssh-collection-timing.md) describes the clock brackets,
+the awake session-startup delay and the remaining recovery investigation.
 
 ### Prerequisites
 

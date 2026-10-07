@@ -18,6 +18,7 @@ import uuid
 
 import paramiko
 from private_config import load_env
+from host_timing import phase
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / '.local'
@@ -54,11 +55,13 @@ def connect_mac(config):
         # Use the existing Mac identity for host-key verification even when
         # reaching that same host through its explicitly configured tailnet IP.
         if endpoint != identity:
-            sock = socket.create_connection((endpoint, 22), timeout=10)
-        client.connect(identity, username=config['M2_MACBOOK_AIR_USERNAME'],
-                       password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
-                       key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
-                       sock=sock, timeout=10, auth_timeout=10, banner_timeout=10)
+            with phase('mac.tcp'):
+                sock = socket.create_connection((endpoint, 22), timeout=10)
+        with phase('mac.ssh'):
+            client.connect(identity, username=config['M2_MACBOOK_AIR_USERNAME'],
+                           password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
+                           key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
+                           sock=sock, timeout=10, auth_timeout=10, banner_timeout=10)
     except BaseException:
         client.close()
         if sock is not None:
@@ -72,12 +75,14 @@ def device(config, route):
     via_mac = config.get('GAMESHELL_WIFI_VIA_MAC') or '0'
     if route not in ('usb', 'wifi') or via_mac not in ('0', '1'):
         raise ValueError('Use ROUTE=usb/wifi and GAMESHELL_WIFI_VIA_MAC=0/1')
-    with ExitStack() as stack:
+    with phase('route.'+route), ExitStack() as stack:
         address = config.get('GAMESHELL_USB_IP', '192.168.10.1') if route == 'usb' else config['GAMESHELL_IP']
         sock = None
         if route == 'usb' or via_mac == '1':
-            mac = stack.enter_context(connect_mac(config))
-            sock = mac.get_transport().open_channel('direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10)
+            with phase('mac.connect'):
+                mac = stack.enter_context(connect_mac(config))
+            with phase('device.tunnel'):
+                sock = mac.get_transport().open_channel('direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10)
             stack.callback(sock.close)
         public = private_path(config.get('NEO_HOST_PUBLIC_KEY'), LOCAL / 'provisioning/device/ssh_host_ed25519_key.pub')
         fields = public.read_text().split()
@@ -87,9 +92,10 @@ def device(config, route):
         client.get_host_keys().add(address, fields[0], paramiko.Ed25519Key(data=base64.b64decode(fields[1])))
         client.set_missing_host_key_policy(paramiko.RejectPolicy())
         key = private_path(config.get('NEO_SSH_KEY'), LOCAL / 'ssh/id_ed25519')
-        client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
-                       sock=sock, look_for_keys=False, allow_agent=False,
-                       timeout=10, auth_timeout=10, banner_timeout=10)
+        with phase('device.ssh'):
+            client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
+                           sock=sock, look_for_keys=False, allow_agent=False,
+                           timeout=10, auth_timeout=10, banner_timeout=10)
         yield client
 
 
@@ -100,32 +106,35 @@ def run(client, command, password=None, output=None, display=True, timeout=300, 
     if input_data is not None and (not isinstance(input_data, bytes) or
             len(input_data) > 1024 * 1024 or password is not None):
         raise ValueError('Command input requires at most 1 MiB of bytes and no password')
-    channel = client.get_transport().open_session(timeout=10)
-    channel.settimeout(timeout)
-    channel.set_combine_stderr(True)
+    with phase('command.channel'):
+        channel = client.get_transport().open_session(timeout=10)
     try:
-        channel.exec_command(command)
-        if password is not None:
-            channel.sendall((password + '\n').encode())
-        if input_data is not None:
-            channel.sendall(input_data)
-        channel.shutdown_write()
-        data = bytearray()
-        while True:
-            chunk = channel.recv(65536)
-            if not chunk:
-                break
-            data.extend(chunk)
-            if output:
-                output.write(chunk)
-                output.flush()
-            if display:
-                sys.stdout.buffer.write(chunk)
-                sys.stdout.buffer.flush()
-        code = channel.recv_exit_status()
-        if code:
-            raise RuntimeError('Remote command failed (exit {})'.format(code))
-        return bytes(data)
+        with phase('command.request'):
+            channel.settimeout(timeout)
+            channel.set_combine_stderr(True)
+            channel.exec_command(command)
+            if password is not None:
+                channel.sendall((password + '\n').encode())
+            if input_data is not None:
+                channel.sendall(input_data)
+            channel.shutdown_write()
+        with phase('command.response'):
+            data = bytearray()
+            while True:
+                chunk = channel.recv(65536)
+                if not chunk:
+                    break
+                data.extend(chunk)
+                if output:
+                    output.write(chunk)
+                    output.flush()
+                if display:
+                    sys.stdout.buffer.write(chunk)
+                    sys.stdout.buffer.flush()
+            code = channel.recv_exit_status()
+            if code:
+                raise RuntimeError('Remote command failed (exit {})'.format(code))
+            return bytes(data)
     finally:
         channel.close()
 

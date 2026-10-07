@@ -28,6 +28,8 @@ env:
   NEO_RSB_DELAY_MS: '{{.DELAY_MS | default "100"}}'
   NEO_PM_STAGE: '{{.STAGE | default ""}}'
   NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
+  NEO_SSH_CYCLES: '{{.CYCLES | default "3"}}'
+  NEO_SSH_CAPTURE: '{{.CAPTURE | default ""}}'
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
@@ -684,6 +686,14 @@ tasks:
   device:check:
     desc: Check running image, services, journal ACLs, country and temporary BPF loopback policies
     cmds: [python3 tools/remote.py device check]
+
+  device:ssh-timing:
+    desc: Measure CYCLES=3 fresh USB/Wi-Fi SSH pairs while awake; no sleep or policy change
+    cmds: [python3 tools/check-ssh-timing.py]
+
+  device:ssh-timing-report:
+    desc: Summarize host timing in CAPTURE=private/diagnostics/directory; no device access
+    cmds: [python3 tools/check-ssh-timing.py --report]
 
   device:exec:
     desc: Run an explicit device command, e.g. task device:exec -- uname -r

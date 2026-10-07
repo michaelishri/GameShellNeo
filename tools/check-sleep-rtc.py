@@ -14,6 +14,7 @@ import uuid
 
 import paramiko
 from private_config import load_env
+from host_timing import phase, timed_capture, collection_state, clock_sample, CLOCK_SOURCE, capture_timing
 from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
 import sleep_rtc as diagnostic
 
@@ -114,10 +115,14 @@ def collect(config, token, route='usb'):
     # Read saved evidence without uploading/replacing the original helper.
     base = '/var/lib/gameshellneo/sleep-tests/'+token
     command = python_command(
-        'from pathlib import Path; import sys; p=Path(sys.argv[1]); '
-        'f=p/"result.json"; f=f if f.exists() else p/"started.json"; print(f.read_text())', base)
+        'from pathlib import Path; import sys, json; p=Path(sys.argv[1]); '
+        'f=p/"result.json"; f=f if f.exists() else p/"started.json"; value=json.loads(f.read_text())\n'
+        + CLOCK_SOURCE + '\nprint(json.dumps(dict(result=value, clock=clock)))', base)
     with device(config, route) as client:
-        result = json.loads(run(client, **command, display=False))
+        with phase('clock.sample'):
+            envelope = json.loads(run(client, **command, display=False))
+            clock_sample(envelope['clock'])
+        result = envelope['result']
     if result.get('run_id') != token:
         raise ValueError('Collected another run')
     return result
@@ -162,6 +167,7 @@ def usb_proof(config, expected_boot):
         raise ValueError('Independent USB proof reached another boot')
 
 
+@timed_capture('sleep.experiment')
 def experiment(config, capture, qualification, mode, rehearsal, connection='usb'):
     diagnostic.sleep_connection.profile(connection)
     route = 'usb' if connection == 'usb' else 'wifi'
@@ -194,15 +200,19 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
             if mode == 'rehearse':
                 print('Awake rehearsal: keep the starting cable state unchanged.', flush=True)
         try:
-            run(client, shlex.join(command), display=False, timeout=20)
+            with phase('pm.submit'):
+                run(client, shlex.join(command), display=False, timeout=20)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             (capture/'submission-error.txt').write_text(type(error).__name__+': '+str(error)+'\n')
             # Submission can have succeeded before transport loss. Collect this ID only.
     timeout = time.monotonic()+210
     while time.monotonic() < timeout:
-        time.sleep(5)
+        with phase('collection.wait'):
+            time.sleep(5)
         try:
-            value = collect(config, token, route)
+            with phase('collection.attempt'):
+                value = collect(config, token, route)
+                collection_state(value)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             with (capture/'collection-errors.txt').open('a') as output:
                 output.write(type(error).__name__+': '+str(error)+'\n')
@@ -213,11 +223,13 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
         if diagnostic.sleep_connection.transition(connection):
             print('Original cable wake observation:', json.dumps(value.get('wake_observation')), flush=True)
         validate_result(value, token, before, mode, connection)
-        helper.wifi_proof(config, value['after'])
-        with device(config, route) as client:
-            boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
-        if boot != before['boot_id']:
-            raise ValueError('Boot changed after collection')
+        with phase('proof.wifi'):
+            helper.wifi_proof(config, value['after'])
+        with phase('proof.final'):
+            with device(config, route) as client:
+                boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
+            if boot != before['boot_id']:
+                raise ValueError('Boot changed after collection')
         final_usb = diagnostic.sleep_connection.endpoint(connection, mode, 'after') == 'usb'
         if final_usb and route != 'usb':
             usb_proof(config, before['boot_id'])
@@ -300,21 +312,22 @@ def main():
                          os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb'))
             return
         if args.collect:
-            token = os.environ.get('NEO_PM_RUN', '')
-            route = os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb')
-            value = collect(config, token, route)
-            (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
-            # Read-only postmortem, with no upload, policy cleanup or PM submission.
-            # Keep the original result even if the separate live snapshot fails.
-            with device(config, route) as client:
-                snapshot = json.loads(run(client, **python_command(
-                    (ROOT/'tools/sleep_recovery.py').read_text(), token), display=False))
-            (capture/'recovery-snapshot.json').write_text(json.dumps(snapshot, indent=2)+'\n')
-            (capture/'collection.json').write_text(json.dumps(dict(route=route,
-                run_id=token, original_event=value.get('event'),
-                same_boot=snapshot['boot_id'] == value.get('before', {}).get('boot_id')))+'\n')
-            print('Original evidence recovered via '+route+'; this does not qualify recovery or retry sleep.')
-            return
+            with capture_timing(capture):
+                token = os.environ.get('NEO_PM_RUN', '')
+                route = os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb')
+                value = collect(config, token, route)
+                (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
+                # Read-only postmortem, with no upload, policy cleanup or PM submission.
+                # Keep the original result even if the separate live snapshot fails.
+                with device(config, route) as client:
+                    snapshot = json.loads(run(client, **python_command(
+                        (ROOT/'tools/sleep_recovery.py').read_text(), token), display=False))
+                (capture/'recovery-snapshot.json').write_text(json.dumps(snapshot, indent=2)+'\n')
+                (capture/'collection.json').write_text(json.dumps(dict(route=route,
+                    run_id=token, original_event=value.get('event'),
+                    same_boot=snapshot['boot_id'] == value.get('before', {}).get('boot_id')))+'\n')
+                print('Original evidence recovered via '+route+'; this does not qualify recovery or retry sleep.')
+                return
         qualification = os.environ.get('NEO_SLEEP_QUALIFICATION', '')
         if not qualification:
             raise ValueError('Supply QUALIFICATION=path/to/strict-reference-history.json')

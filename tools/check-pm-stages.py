@@ -14,6 +14,7 @@ import uuid
 
 import paramiko
 from private_config import load_env
+from host_timing import phase, timed_capture, collection_state
 from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
 
 
@@ -87,6 +88,7 @@ def collect(config, run_id):
         return json.loads(inline(client, '--collect', run_id))
 
 
+@timed_capture('pm.cycle')
 def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
           keypad_quirk=None, wifi_trace=False, power_key=False, power_key_input=False):
     with device(config, 'usb') as client:
@@ -124,14 +126,18 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
         # Submission may itself lose SSH after systemd accepted it. Never retry
         # submission: recover this exact ID and fail incomplete evidence.
         try:
-            run(client, shlex.join(command), display=False, timeout=20)
+            with phase('pm.submit'):
+                run(client, shlex.join(command), display=False, timeout=20)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             (capture / 'submission-error.txt').write_text(type(error).__name__ + '\n')
     deadline = time.monotonic() + (480 if keypad_input or power_key_input else 180)
     while time.monotonic() < deadline:
-        time.sleep(5)
+        with phase('collection.wait'):
+            time.sleep(5)
         try:
-            result = collect(config, run_id)
+            with phase('collection.attempt'):
+                result = collect(config, run_id)
+                collection_state(result)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             with (capture / 'collection-errors.txt').open('a') as output:
                 output.write(type(error).__name__ + ': ' + str(error) + '\n')
@@ -159,13 +165,15 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
         if power_key_input:
             from power_key_pm import validate_result
             validate_result(result)
-        wifi_proof(config, result['after'])
+        with phase('proof.wifi'):
+            wifi_proof(config, result['after'])
         # A fresh USB SSH collection above and independent Wi-Fi proof below
         # are required; kernel return alone is insufficient.
-        with device(config, 'usb') as client:
-            boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
-        if boot != before['boot_id']:
-            raise ValueError('USB SSH reached a different boot after the PM test')
+        with phase('proof.final'):
+            with device(config, 'usb') as client:
+                boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
+            if boot != before['boot_id']:
+                raise ValueError('USB SSH reached a different boot after the PM test')
         result.update(usb_ssh_verified=True, wifi_ssh_verified=True)
         (capture / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
         print(stage, 'debug stage passed; both SSH routes verified.', flush=True)

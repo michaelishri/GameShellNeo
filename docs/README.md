@@ -17,6 +17,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.22.
+[197 — SSH collection timing](197-ssh-collection-timing.md) records host-only
+instrumentation, three passing awake route batches, unchanged original sleep
+evidence and a reproducible first-session delay with a user-manager unit-loading
+lead. Actual post-sleep failure attribution remains open; no new sleep ran.
 [196 — Connected sleep repeatability](196-diagnostic22-connected-sleep-repeatability.md)
 records four consecutive actual RTC-wake passes, each with both routes, retained
 keypad and restored policy. The owner confirms clear warnings and untouched

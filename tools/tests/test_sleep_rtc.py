@@ -101,12 +101,15 @@ class Collection(unittest.TestCase):
     def test_explicit_wifi_preserves_failed_original_and_rejects_wrong_run(self):
         value = dict(run_id=TOKEN, event='failed', passed=False,
                      error='USB did not return', policy_owner_retained=True)
+        def envelope():
+            return json.dumps(dict(result=value, clock=dict(
+                boot_id='12345678-1234-1234-1234-123456789abc', boottime_ns=100))).encode()
         with patch.object(host, 'device', return_value=nullcontext('client')) as device, \
-                patch.object(host, 'run', return_value=json.dumps(value).encode()):
+                patch.object(host, 'run', return_value=envelope()):
             self.assertEqual(host.collect({}, TOKEN, 'wifi'), value)
             device.assert_called_once_with({}, 'wifi')
             value['run_id'] = 'b'*32
-            with patch.object(host, 'run', return_value=json.dumps(value).encode()), \
+            with patch.object(host, 'run', return_value=envelope()), \
                     self.assertRaisesRegex(ValueError, 'another run'):
                 host.collect({}, TOKEN, 'wifi')
 

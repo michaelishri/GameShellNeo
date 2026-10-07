@@ -433,10 +433,12 @@ class Transport(unittest.TestCase):
             value=host.experiment({},self.root,self.root/'q','rtc-wake',chain.REHEARSAL,'usb-attach')
         usb.assert_called_once_with({},'boot');self.assertTrue(value['usb_ssh_verified'])
         self.complete.pop('usb_ssh_verified');self.complete.pop('wifi_ssh_verified')
+        # A distinct attempt keeps separate evidence, as the real workflows do.
+        second=self.root/'second';second.mkdir()
         with patch.object(host,'collect',return_value=self.complete), \
              patch.object(host,'usb_proof',side_effect=ValueError('USB missing')),self.assertRaises(ValueError):
-            host.experiment({},self.root,self.root/'q','rtc-wake',chain.REHEARSAL,'usb-attach')
-        saved=json.loads((self.root/'result.json').read_text())
+            host.experiment({},second,self.root/'q','rtc-wake',chain.REHEARSAL,'usb-attach')
+        saved=json.loads((second/'result.json').read_text())
         self.assertNotIn('usb_ssh_verified',saved)
 
 

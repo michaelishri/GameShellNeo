@@ -14,18 +14,19 @@ Record deferred questions and activities here as they arise.
   infer a safe setting or change unrelated build/cache identities merely to
   accelerate diagnostic.21 assembly.
 
-- [ ] Diagnostic.21 fresh PM qualification: NEO-125/126's build, checked card
+- [ ] Diagnostic.21 PM repeatability and other profiles: NEO-125/126's build, checked card
   installation, owner-confirmed login, awake startup and fresh volatile-B8
   inspection now pass. [Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md)
   records matching reported control values, healthy final USB/Wi-Fi and PM0/0.
-  NEO-128's seven attended debug checks and awake RTC rehearsal now pass at
-  PM7/0, with owner-confirmed warnings/normal returns and SDIO usage 2
-  ([report 190](docs/190-diagnostic21-pm-qualification.md)). Actual connected-USB
-  RTC wake awaits separate readiness; no actual sleep has run on this image.
-  Use the saved baseline/rehearsal and long warning before that one-shot test.
-  B8=`c0` is now
-  a fresh read; E0/E1 remain potentially cached, with no configured capacity.
-  Voltage telemetry again reports 4.2559 V against the unchanged 4.2 V target.
+  NEO-128's seven attended debug checks, awake RTC rehearsal and one actual
+  connected-USB RTC sleep/wake now pass at PM8/0, with both routes restored,
+  owner-confirmed warnings/normal returns and SDIO usage 2
+  ([report 190](docs/190-diagnostic21-pm-qualification.md)). Use the saved
+  continuation for repeat connected-USB cycles; the first baseline is consumed.
+  Battery/cable/POWER cases and energy still need separate qualification.
+  B8=`c0` remains fresh after resume; E0/E1 remain potentially cached, with no
+  configured capacity. The later 100%/2 mA/4.158 V awake sample does not resolve
+  the earlier 4.2559 V against the unchanged 4.2 V target.
   No calibration transition or physical accuracy is established, and no
   calibration will be forced just to test a status bit. NEO-10 and NEO-117
   retain electrical and direct sleep-charge qualification.

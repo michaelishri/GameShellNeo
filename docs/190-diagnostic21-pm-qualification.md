@@ -1,6 +1,10 @@
 # Diagnostic.21 suspend/resume qualification
 
-7 October 2026; capture timestamps are UTC. NEO-128, in progress.
+7 October 2026; capture timestamps are UTC. NEO-128 complete for seven attended
+debug checks, the awake RTC rehearsal and one connected-USB actual sleep/wake.
+The owner confirmed the warning and normal dim console return without touching
+the cable or controls. Repeatability and the other power/cable profiles remain
+separate qualification work.
 
 [Report 189](189-diagnostic21-installation-and-gauge-validation.md) records the
 installation and awake validation. This slice requalifies the changed kernel
@@ -108,5 +112,97 @@ One RTC event arrived with flags `0xa0`; IRQ31 count advanced 1 to 2, with
 the original alarm restored. Original power policy and input ownership were
 restored. PM remains 7/0. This is alarm delivery while awake, not wake from sleep.
 
-The owner has been asked for separate readiness for one actual connected-USB
-RTC sleep/wake test. No actual sleep has run in this slice yet.
+## Actual connected-USB RTC wake
+
+The owner replied “ready for the next thing” to the pending actual-sleep
+readiness request. Fresh read-only inspection
+`20261007T031608.093239Z/inspection.json` passed on the same boot, at PM7/0 with
+normal dim console settings. Source checkpoint at submission was `36644c3`;
+only the preceding documentation checkpoint changed after the debug sequence.
+
+The following historical command was submitted exactly once:
+
+```sh
+task device:sleep-rtc QUALIFICATION=.local/neo128-debug-history.json \
+  REHEARSAL=b5fb1d15febe4f8c9a888f74662dd2b1 ATTENDED=1
+```
+
+The original result is
+`20261007T031630.769742Z/result.json`, run
+`41462052473d43a0b91b481c9815a630`, SHA-256
+`29feef331628c442cb7fc821c8465f76cad0ab9b3e3631b92aac6f389ac6b063`.
+The controller verifies functional RTC wake, restored policy and independent
+USB/Wi-Fi SSH recovery on the original boot.
+
+| Check | Observation |
+| --- | --- |
+| Actual sleep | One s2idle boundary; `freeze`, `pm_test=none` |
+| Submitted interval | 31.063 seconds BOOTTIME |
+| In-loop s2idle trace | 28.438 seconds MONOTONIC |
+| Alarm interval | 31.711 seconds from arming to userspace return; entry margin 29 seconds |
+| Wake source | IRQ31, count 2 → 3; one RTC event with flags `0xa0` |
+| PM counters | Success 7 → 8; fail and all stage-failure counters zero |
+| USB / Wi-Fi | Independent SSH recovery to the original boot |
+| Wi-Fi SDIO | Usage 2, active/forbidden with control `on`, unchanged |
+| Keypad | Original handle connected; no hangup, poll/ioctl error or held key |
+| Trace integrity | Keypad, Wi-Fi and USB complete, no recorded loss, settings restored |
+| Wake policy | MUSB, USB supply and AC supply remain disabled |
+| Cleanup | Original alarm/power policy restored; no retained policy, drop-in, control, RTC or console owner |
+| Console | Brightness 1, backlight power 0 |
+
+The warning was one level-5, 1,000 ms `screen-blank` cue, with successful
+playback and mixer restoration before entry; both amplifiers were off. The
+owner confirmed “Yes—warning clear; dim console returned untouched.” No
+gadget restart, network repair or cable action was used to obtain recovery.
+
+The collector retained three transient errors: a channel connection failure,
+a channel-opening timeout and `No existing session` (with the SSH banner
+traceback in the controller log). These delayed result collection, which
+ultimately recovered the same original and independently verified both routes.
+They do not establish a driver/host cause or measure device wake latency.
+The test was not resubmitted.
+
+## Post-resume checks and continuation
+
+`task device:pm-inspect` capture `20261007T031835.364247Z/inspection.json`
+passes the existing image/health validator and the saved continuation validator
+against all seven debug originals plus this actual sleep. PM remains 8/0 and
+SDIO usage 2; normal dim console settings and disabled wake controls remain.
+
+The saved read-only `task device:charge-inspect` capture
+`20261007T031843.369920Z/inventory.json` still admits schema 3's
+`axp223-volatile-b8` profile. B8 returns fresh `c0` after PM, with calibration
+disabled/not in progress. REG33/34, B8, E0/E1 and E6 match the initial
+diagnostic.21 inventory, as do reported 4.2 V/1.2 A charger and 900 mA input
+limits. Nonvolatile controls retain their possible-cache limitation.
+
+This later awake sample reports 100%, Charging, 2 mA and 4.158 V (`ec/04`).
+It does not resolve the earlier 4.2559 V discrepancy, prove calibrated voltage
+or demonstrate charging during sleep. No charger/gauge programming or forced
+calibration occurred. Final saved status checks pass on both routes:
+`20261007T031930.559700Z` (USB), `20261007T031931.714732Z` (Wi-Fi).
+
+The original first-sleep baseline is consumed. The saved continuation is
+`20261007T031630.769742Z/qualification-next.json`; use its admitted history for
+later connected-USB cycles, not the already-consumed baseline/rehearsal.
+Other cable profiles need their own qualifying sequence.
+
+The saved offline assessment also passes:
+
+```sh
+task report:sleep-evidence RESULT=.local/diagnostics/20261007T031630.769742Z/result.json
+```
+
+| Evidence | SHA-256 |
+| --- | --- |
+| Continuation | `2c8fb67805783b0ceca619de1f09ccf3abff7d44d39a6c551b98b0bcddfd4ddf` |
+| Final PM inspection | `a0b3abe635e41cb21f6f590b294e991a11f09c7c24ffb20d780ca7d0117a9882` |
+| Post-PM gauge inventory | `8a969868ea76f90f88913a35f07a569ef5bc6f5a22a92fc07a0624094608601c` |
+| `20261007T031835.389756Z/sleep-evidence.json` | `3ec931a67c7dc77259ebade090c5dd9c03601c49e1da9f83cd5f7c51a2a6b37a` |
+
+There are no observed timekeeping-freeze pairs, and the BOOTTIME/MONOTONIC gap
+is below sampling uncertainty. This qualifies functional s2idle/RTC wake for
+this one connected-USB attempt, not CPU retention, standby energy, product
+resume latency or repeatability. Normal button/automatic sleep remains
+disabled. NEO-10/NEO-117 retain the measurement and direct sleep-charge gaps.
+The GameShell is awake, USB remains connected and no test is running.

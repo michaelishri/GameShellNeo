@@ -2,6 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
+- [ ] NEO-124 integration: the AXP223 B8 live-status caching correction is
+  source-tested and pushed as `ec6f286` on
+  [work/axp223-gauge-status](https://github.com/michaelishri/GameShellNeo/tree/work/axp223-gauge-status).
+  [Report 186](https://github.com/michaelishri/GameShellNeo/blob/work/axp223-gauge-status/docs/186-axp223-gauge-status-candidate.md)
+  records native/ARM32 source regressions, six expected negative controls and
+  the passing complete ARM MFD object build. Assign a new image identity and
+  update strict inventory metadata/cache labeling before hardware qualification.
+  No image was built or installed. NEO-10 electrical/gauge and NEO-117 direct
+  sleep-charge acceptance remain open; no physical voltage fix is claimed.
+
 - [ ] NEO-10/NEO-117 measurement follow-through: [report 184](docs/184-axp223-measurement-source-audit.md)
   finds contradictory REG34[2] polarity, no ADC absolute-accuracy/latch contract,
   and approximately 30-second percentage steps without a capacity denominator.

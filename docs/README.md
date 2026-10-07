@@ -42,6 +42,10 @@ status caching issue and unqualified ADC coherence/accuracy.
 [185 — Extended voltage inventory](185-axp223-voltage-inventory.md) records the
 schema-2 read-only helper and passing hardware capture, preserving raw REG34
 and ADC-byte evidence without interpreting disputed controls or changing settings.
+The separate [AXP223 gauge-status candidate and report 186](https://github.com/michaelishri/GameShellNeo/blob/work/axp223-gauge-status/docs/186-axp223-gauge-status-candidate.md)
+are on `work/axp223-gauge-status`, commit `ec6f286`. Native/ARM32 source checks
+and the complete ARM MFD object pass. Image integration and hardware
+qualification remain pending; diagnostic.20 is unchanged.
 
 Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)

@@ -21,6 +21,10 @@ Diagnostic.21 integration is in progress in
 It includes patch 0035 and schema-3 inventory admission. Installation and
 hardware qualification remain pending.
 
+[188 — Historical source compaction](188-historical-driver-source-compaction.md)
+records verified replay of saved patch exports, preserved compiler evidence
+and disk-space recovery for the image build.
+
 Current installed image: diagnostic.20.
 [178 — Guided cable batch](178-guided-cable-batch-hardware-validation.md)
 records four observed alternating USB removal/attachment sleeps, RTC wakes,

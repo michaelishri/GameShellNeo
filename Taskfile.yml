@@ -50,6 +50,7 @@ env:
   NEO_SCRATCH_SUITE: '{{.SUITE | default ""}}'
   NEO_SCRATCH_APPLY: '{{.APPLY | default "0"}}'
   NEO_SCRATCH_TARGET: '{{.TARGET | default ""}}'
+  NEO_SCRATCH_RECORDED_PATCHES: '{{.RECORDED_PATCHES | default "0"}}'
   NEO_RETENTION_KEEP: '{{.KEEP | default "3"}}'
   NEO_RETENTION_APPLY: '{{.APPLY | default "0"}}'
   NEO_RECOVERY_UPLOAD: '{{.UPLOAD | default "0"}}'
@@ -149,7 +150,7 @@ tasks:
     cmds: [python3 tools/prune-driver-scratch.py]
 
   build:compact-driver-sources:
-    desc: Verify and share duplicate driver sources for SUITE; optional TARGET worktree, APPLY=1 replaces copies
+    desc: Verify/share driver sources; SUITE, optional TARGET and RECORDED_PATCHES=1 for historical exports; APPLY=1 replaces copies
     cmds: [python3 tools/compact-driver-sources.py]
 
   check:kernel-source-reuse:

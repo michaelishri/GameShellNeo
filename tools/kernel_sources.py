@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -108,9 +109,14 @@ def source_spec(lock, manifest):
                                 ('tag', 'tarball_sha256', 'defconfig_sha256')}, patches=manifest)
 
 
-def ensure_source(root, work, archive, lock, manifest):
+def ensure_source(root, work, archive, lock, manifest, *, recorded_patches=None):
     """Call under work/.source-lock. Never trust a patch stamp alone."""
     real_directory(work)
+    if recorded_patches is not None:
+        observed = [dict(name=name, sha256=hashlib.sha256(data).hexdigest())
+                    for name, data in recorded_patches]
+        if observed != manifest:
+            raise ValueError('Recorded patch bytes do not match their manifest')
     spec = source_spec(lock, manifest)
     identity = digest(spec)
     store = work / '.sources'
@@ -127,8 +133,18 @@ def ensure_source(root, work, archive, lock, manifest):
             source = stage / 'source'
             source.mkdir()
             subprocess.run(['tar', '-xJf', str(archive), '--strip-components=1', '-C', str(source)], check=True)
-            subprocess.run(['python3', str(root / 'tools/kernel-inputs.py'), '--apply', str(source)],
-                           check=True, stdout=subprocess.DEVNULL)
+            if recorded_patches is None:
+                subprocess.run(['python3', str(root / 'tools/kernel-inputs.py'), '--apply', str(source)],
+                               check=True, stdout=subprocess.DEVNULL)
+            else:
+                # Use this checkout's trusted patch applicator, not executable
+                # content from the historical export. Replay with fuzz disabled.
+                helper = importlib.util.spec_from_file_location(
+                    'recorded_kernel_inputs', Path(__file__).with_name('kernel-inputs.py'))
+                module = importlib.util.module_from_spec(helper)
+                helper.loader.exec_module(module)
+                module.apply_queue(source, recorded_patches)
+                (source / '.gameshellneo-patches.json').write_text(json.dumps(manifest, indent=2) + '\n')
             if json.loads((source / '.gameshellneo-patches.json').read_text()) != manifest:
                 raise ValueError('Patch queue changed during source preparation')
             entries = inventory(source)

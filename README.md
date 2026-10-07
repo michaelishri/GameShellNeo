@@ -517,7 +517,21 @@ an idle suite, completed compiler evidence and matching object/configuration
 hashes. Every selected source must match the freshly patched source, including
 files left by `patch`; all selected trees are checked before any replacement.
 The worktree's current archive and patch queue must still reproduce those
-sources. Unreferenced compiler trees are left alone.
+sources. If the checkout has advanced but the suite retains its original
+`patches/manifest.json` and patch files, add `RECORDED_PATCHES=1` to both preview
+and application. This explicitly replays that historical export against the
+locked archive; it verifies every patch hash and still requires an exact match
+to every selected source and the recorded compiled outputs. It does not apply
+the old patches to the checkout or change its kernel build. For example:
+
+```sh
+task build:compact-driver-sources SUITE=brcmfmac-pm-tests RECORDED_PATCHES=1
+task build:compact-driver-sources SUITE=brcmfmac-pm-tests RECORDED_PATCHES=1 APPLY=1
+```
+
+Unreferenced compiler trees are left alone. Historical compaction and the
+diagnostic.21 disk-space recovery are recorded in
+[report 188](docs/188-historical-driver-source-compaction.md).
 
 `APPLY=1` replaces each matching source directory with a relative cache link.
 It preserves outputs, configurations, logs and original evidence, and writes an

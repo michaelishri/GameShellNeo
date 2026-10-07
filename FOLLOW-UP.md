@@ -2,6 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
+- [ ] Build resource preflight: check Armbian's 10 GiB free-space requirement
+  before a long kernel build, allowing for kernel outputs and assembly
+  headroom. Diagnostic.21 reached the image stage before this gate rejected
+  the available space; verified retention/compaction is recorded in
+  [report 188](docs/188-historical-driver-source-compaction.md). Keep the gate;
+  avoid spending the kernel build time before discovering insufficient space.
+- [ ] Bounded kernel build parallelism: `build-kernel.sh` currently uses one
+  job. Evaluate configurable jobs against the Intel host's CPU/memory limits,
+  recording the compiler/job identity and measured time/memory cost. Do not
+  infer a safe setting or change unrelated build/cache identities merely to
+  accelerate diagnostic.21 assembly.
+
 - [ ] NEO-125 diagnostic.21 integration/qualification (in progress):
   [report 187](docs/187-diagnostic21-gauge-integration.md) records the new image
   and strict dual-profile inventory with explicit B8 provenance. Complete the

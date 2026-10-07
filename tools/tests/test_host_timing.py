@@ -3,10 +3,13 @@ from contextlib import nullcontext
 import importlib.util
 import io
 import json
+import logging
 from pathlib import Path
+import socket
 import stat
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -155,6 +158,151 @@ class Timing(unittest.TestCase):
         (self.root/'host-timing.jsonl').write_text('\n'.join(json.dumps(r) for r in records)+'\n')
         with self.assertRaises(ValueError):
             timing.summarize(self.root)
+
+
+class SSHState(unittest.TestCase):
+    setUp = Timing.setUp
+    records = Timing.records
+
+    def test_unknown_state_and_inspection_error_preserve_original_exception(self):
+        client = MagicMock()
+        client.get_transport.side_effect = RuntimeError(SECRET)
+        original = remote.paramiko.SSHException('original')
+        with self.assertRaises(remote.paramiko.SSHException) as caught, timing.capture_timing(self.root):
+            with timing.phase('device.ssh'):
+                try:
+                    raise original
+                finally:
+                    timing.ssh_state(client)
+        self.assertIs(caught.exception, original)
+        state = timing.summarize(self.root)['ssh_states'][0]
+        self.assertFalse(state['observed'])
+        self.assertTrue(all(state[name] is None for name in timing.SSH_STATE_FIELDS))
+        self.assertNotIn(SECRET, (self.root/'host-timing.jsonl').read_text())
+
+    def test_device_failure_observed_before_cleanup_without_retry(self):
+        client = MagicMock()
+        client.__enter__.return_value = client
+        transport = client.get_transport.return_value
+        transport.remote_version = 'SSH-2.0-'+SECRET
+        transport.initial_kex_done = False
+        transport.is_active.return_value = True
+        transport.is_authenticated.return_value = False
+        original = remote.paramiko.SSHException(SECRET)
+        client.connect.side_effect = original
+        client.__exit__.side_effect = lambda *args: setattr(transport, 'remote_version', '') or False
+        with timing.capture_timing(self.root), \
+                patch.object(remote.paramiko, 'SSHClient') as factory, \
+                patch.object(remote, 'private_path') as path, \
+                patch.object(remote.paramiko, 'Ed25519Key'), \
+                self.assertRaises(remote.paramiko.SSHException) as caught:
+            factory.return_value = client
+            path.return_value.read_text.return_value = 'ssh-ed25519 AA=='
+            with remote.device({'GAMESHELL_IP':'192.0.2.20'}, 'wifi'):
+                self.fail('Failed connection must not yield')
+        self.assertIs(caught.exception, original)
+        client.connect.assert_called_once()
+        self.assertEqual(client.connect.call_args.kwargs['timeout'], 10)
+        client.__exit__.assert_called_once()
+        state = timing.summarize(self.root)['ssh_states'][0]
+        self.assertEqual(state['route'], 'wifi')
+        self.assertTrue(state['banner_received'])
+        self.assertFalse(state['initial_kex_complete'])
+        transport.get_exception.assert_not_called()
+        self.assertNotIn(SECRET, (self.root/'host-timing.jsonl').read_text())
+
+    def test_state_validation_and_legacy_capture_compatibility(self):
+        with timing.capture_timing(self.root), timing.phase('device.ssh'):
+            client = MagicMock(); client.get_transport.return_value = None
+            timing.ssh_state(client)
+        original = self.records()
+        state = next(r for r in original if r['event']=='ssh_state')
+        self.assertFalse(timing.summarize(self.root)['ssh_states'][0]['observed'])
+        for field, value in [('active', SECRET), ('observed', True)]:
+            altered = [dict(r) for r in original]
+            next(r for r in altered if r['event']=='ssh_state')[field] = value
+            (self.root/'host-timing.jsonl').write_text('\n'.join(json.dumps(r) for r in altered)+'\n')
+            with self.assertRaises(ValueError):
+                timing.summarize(self.root)
+        legacy = [r for r in original if r is not state]
+        (self.root/'host-timing.jsonl').write_text('\n'.join(json.dumps(r) for r in legacy)+'\n')
+        self.assertEqual(timing.summarize(self.root)['ssh_states'], [])
+
+    def stalled_peer(self, banner):
+        local, peer = socket.socketpair()
+        release = threading.Event()
+        def serve():
+            with peer:
+                if banner:
+                    peer.sendall(b'SSH-2.0-fixture\r\n')
+                release.wait(3)
+        thread = threading.Thread(target=serve, daemon=True); thread.start()
+        client = remote.paramiko.SSHClient()
+        client.set_log_channel('gameshellneo-test-ssh')
+        self.enterContext(patch.object(logging.getLogger('gameshellneo-test-ssh'), 'disabled', True))
+        try:
+            with self.assertRaises(remote.paramiko.SSHException), timing.capture_timing(self.root):
+                with timing.phase('device.ssh'):
+                    try:
+                        client.connect('fixture', sock=local, username='fixture',
+                                       allow_agent=False, look_for_keys=False,
+                                       timeout=0.3, banner_timeout=1, auth_timeout=0.3)
+                    finally:
+                        timing.ssh_state(client)
+        finally:
+            transport = client.get_transport()
+            client.close(); local.close(); release.set(); thread.join(4)
+            if transport is not None:
+                transport.join(2)
+                self.assertFalse(transport.is_alive())
+        self.assertFalse(thread.is_alive())
+        return timing.summarize(self.root)['ssh_states'][0]
+
+    def test_real_transport_without_server_banner(self):
+        state = self.stalled_peer(False)
+        self.assertTrue(state['observed'])
+        self.assertFalse(state['banner_received'])
+        self.assertFalse(state['initial_kex_complete'])
+        self.assertFalse(state['authenticated'])
+
+    def test_real_transport_with_banner_but_no_key_exchange(self):
+        state = self.stalled_peer(True)
+        self.assertTrue(state['banner_received'])
+        self.assertFalse(state['initial_kex_complete'])
+        self.assertFalse(state['authenticated'])
+
+    def test_real_authenticated_transport_and_pinned_host_key(self):
+        class Server(remote.paramiko.ServerInterface):
+            def check_auth_password(self, username, password):
+                return remote.paramiko.AUTH_SUCCESSFUL
+        local, peer = socket.socketpair()
+        server = remote.paramiko.Transport(peer)
+        key = remote.paramiko.RSAKey.generate(1024)
+        server.add_server_key(key)
+        failures, release = [], threading.Event()
+        def serve():
+            try:
+                server.start_server(server=Server()); release.wait(5)
+            except Exception as error:
+                failures.append(error)
+        thread = threading.Thread(target=serve, daemon=True); thread.start()
+        client = remote.paramiko.SSHClient()
+        client.get_host_keys().add('fixture', key.get_name(), key)
+        try:
+            with timing.capture_timing(self.root), timing.phase('device.ssh'):
+                try:
+                    client.connect('fixture', sock=local, username='fixture', password=SECRET,
+                                   allow_agent=False, look_for_keys=False,
+                                   timeout=2, banner_timeout=2, auth_timeout=2)
+                finally:
+                    timing.ssh_state(client)
+        finally:
+            client.close(); server.close(); local.close(); peer.close(); release.set(); thread.join(6)
+        self.assertFalse(failures)
+        self.assertFalse(thread.is_alive())
+        state = timing.summarize(self.root)['ssh_states'][0]
+        self.assertTrue(all(state[name] for name in timing.SSH_STATE_FIELDS))
+        self.assertNotIn(SECRET, (self.root/'host-timing.jsonl').read_text())
 
 
 class AwakeProbe(unittest.TestCase):

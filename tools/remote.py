@@ -18,7 +18,7 @@ import uuid
 
 import paramiko
 from private_config import load_env
-from host_timing import phase
+from host_timing import phase, ssh_state
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / '.local'
@@ -58,10 +58,13 @@ def connect_mac(config):
             with phase('mac.tcp'):
                 sock = socket.create_connection((endpoint, 22), timeout=10)
         with phase('mac.ssh'):
-            client.connect(identity, username=config['M2_MACBOOK_AIR_USERNAME'],
-                           password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
-                           key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
-                           sock=sock, timeout=10, auth_timeout=10, banner_timeout=10)
+            try:
+                client.connect(identity, username=config['M2_MACBOOK_AIR_USERNAME'],
+                               password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
+                               key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
+                               sock=sock, timeout=10, auth_timeout=10, banner_timeout=10)
+            finally:
+                ssh_state(client)
     except BaseException:
         client.close()
         if sock is not None:
@@ -93,9 +96,12 @@ def device(config, route):
         client.set_missing_host_key_policy(paramiko.RejectPolicy())
         key = private_path(config.get('NEO_SSH_KEY'), LOCAL / 'ssh/id_ed25519')
         with phase('device.ssh'):
-            client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
-                           sock=sock, look_for_keys=False, allow_agent=False,
-                           timeout=10, auth_timeout=10, banner_timeout=10)
+            try:
+                client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
+                               sock=sock, look_for_keys=False, allow_agent=False,
+                               timeout=10, auth_timeout=10, banner_timeout=10)
+            finally:
+                ssh_state(client)
         yield client
 
 

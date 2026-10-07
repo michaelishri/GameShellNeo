@@ -17,6 +17,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.23; awake qualification and bounded connected-USB sleep pass.
+[202 — Post-return SSH investigation](202-post-return-ssh-investigation.md)
+correlates the failed setup with a preauthentication closure, distinguishes it
+from user-manager startup and adds Boolean protocol-state observations before
+cleanup. Real local SSH tests and awake USB/Wi-Fi probes pass at unchanged
+PM12/0. The underlying intermittent cause remains open; no new sleep or image
+change was needed.
 [201 — Diagnostic.23 connected sleep repeatability](201-diagnostic23-connected-sleep-repeatability.md)
 records four further actual RTC-wake passes, both routes recovering each time,
 retained keypad and restored policy. The owner confirms clear warnings and

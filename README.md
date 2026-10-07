@@ -338,6 +338,12 @@ directory, including a batch's individual `cycle-N` directory. Nested durations
 overlap; do not add them together or treat SSH command latency as wake latency.
 [Report 197](docs/197-ssh-collection-timing.md) describes the clock brackets,
 the awake session-startup delay and the remaining recovery investigation.
+The report also lists Boolean SSH state observations captured before connection
+cleanup: server greeting received, initial key exchange complete, authenticated
+and active. Unknown state stays unknown; these are observations, not exact
+milestone timestamps. [Report 202](docs/202-post-return-ssh-investigation.md)
+explains the post-return setup failure, privacy limits and passing awake checks.
+This host-only addition needs no image rebuild or card swap.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

@@ -223,6 +223,17 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   not isolate network-ready time or cause. Investigate the retained host/device
   evidence without adding retries or conflating this with pre-wake failures.
   [Report 201](docs/201-diagnostic23-connected-sleep-repeatability.md).
+  NEO-140 finds a device preauthentication closure within the cycle-4 failure-end
+  bracket, with user-manager startup only on the following successful connection.
+  Existing logs lack a forwarded source-port identity and cannot prove whether
+  the stall awaited a greeting or key exchange. Host-only Boolean SSH observations
+  now preserve greeting/key-exchange/authenticated/active state before cleanup,
+  without changing timeouts, retry policy or host-key validation. Local real-SSH
+  failure/success cases and awake USB/Wi-Fi probes pass with unchanged PM12/0.
+  Use these observations on the next separately attended, currently admitted
+  sleep; if insufficient, add bounded TCP metadata with matching connection
+  identities at both ends. Cause remains open; no image rebuild is needed.
+  [Report 202](docs/202-post-return-ssh-investigation.md).
   Earlier untimestamped failures still cannot be classified.
   [Report 197](docs/197-ssh-collection-timing.md).
 

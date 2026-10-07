@@ -147,6 +147,35 @@ def clock_sample(value):
         recorder.emit(event='device_clock', span=recorder.parent, **value)
 
 
+SSH_STATE_FIELDS = ('banner_received', 'initial_kex_complete', 'authenticated', 'active')
+
+
+def ssh_state(client):
+    """Observe connect completion/failure before cleanup; never alter SSH state.
+
+    These are non-atomic observations, not protocol milestone timestamps. Never
+    read/clear get_exception(), log a banner/key, or let inspection mask connect's
+    result. Missing/unsupported state is unknown, not a failed protocol stage.
+    """
+    recorder = _active.get()
+    if recorder is None:
+        return
+    values = dict.fromkeys(SSH_STATE_FIELDS)
+    observed = False
+    try:
+        transport = client.get_transport()
+        if transport is not None:
+            banner = transport.remote_version
+            raw = dict(banner_received=banner.startswith('SSH-') if type(banner) is str else None,
+                       initial_kex_complete=transport.initial_kex_done,
+                       authenticated=transport.is_authenticated(), active=transport.is_active())
+            values = {name: value if type(value) is bool else None for name, value in raw.items()}
+            observed = all(value is not None for value in values.values())
+    except Exception:
+        pass  # Inspection is best-effort and must preserve the original error.
+    recorder.emit(event='ssh_state', span=recorder.parent, observed=observed, **values)
+
+
 def summarize(directory):
     """Reject truncated traces; report only fixed labels and measured durations."""
     with (directory/'host-timing.jsonl').open('rb') as source:
@@ -155,6 +184,7 @@ def summarize(directory):
         raise ValueError('Timing capture exceeds size limit')
     records = [json.loads(line) for line in raw.splitlines()]
     stack, groups, previous, seen = [], {}, -1, set()
+    ssh_states, ssh_spans = [], set()
     if not records or len(records) > MAX_EVENTS:
         raise ValueError('Empty or oversized timing capture')
     for index, row in enumerate(records):
@@ -180,11 +210,23 @@ def summarize(directory):
             group = groups.setdefault((row['phase'], route), [])
             group.append((elapsed/1e6, outcome == 'error'))
             stack.pop()
+        elif event == 'ssh_state':
+            if (not stack or row.get('span') != stack[-1]['span'] or
+                    stack[-1]['phase'] not in ('mac.ssh', 'device.ssh') or
+                    row['span'] in ssh_spans or type(row.get('observed')) is not bool or
+                    any(name not in row or (row[name] is not None and type(row[name]) is not bool)
+                        for name in SSH_STATE_FIELDS) or
+                    (row['observed'] and any(row[name] is None for name in SSH_STATE_FIELDS))):
+                raise ValueError('Invalid SSH state observation')
+            ssh_spans.add(row['span'])
+            route = next((r['phase'][6:] for r in reversed(stack) if r['phase'].startswith('route.')), 'none')
+            ssh_states.append(dict(span=row['span'], phase=stack[-1]['phase'], route=route,
+                                   observed=row['observed'], **{name: row[name] for name in SSH_STATE_FIELDS}))
         elif event not in ('failure', 'device_clock', 'collection_state') or not stack or row.get('span') != stack[-1]['span']:
             raise ValueError('Invalid timing event')
     if stack or records[-1].get('event') != 'end' or records[-1].get('phase') != 'capture':
         raise ValueError('Incomplete timing capture')
-    return dict(schema=1, capture_outcome=records[-1]['outcome'], phases=[dict(
+    return dict(schema=1, capture_outcome=records[-1]['outcome'], ssh_states=ssh_states, phases=[dict(
         phase=name, route=route, count=len(values), errors=sum(error for _, error in values),
         min_ms=round(min(v for v, _ in values), 3),
         median_ms=round(statistics.median(v for v, _ in values), 3),

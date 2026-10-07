@@ -212,10 +212,19 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   assuming negligible short-term relative clock drift. Investigate that tail
   separately from the expected sleep wait; no exact network-ready time or cause
   is established. Retained timing permits further analysis without physical input.
-  [Report 200](docs/200-diagnostic23-pm-qualification.md). Use the new timing on the next
-  attended sleep after fresh qualification of the now-installed diagnostic.23;
-  diagnostic.22's continuation is historical. Earlier untimestamped failures
-  still cannot be classified. [Report 197](docs/197-ssh-collection-timing.md).
+  [Report 200](docs/200-diagnostic23-pm-qualification.md).
+  NEO-139's four actual sleeps now pass with owner-confirmed returns and both
+  routes recovered. Of 13 failed collection attempts, bounded clock alignment
+  places ten wholly before PM return, two across return and one wholly after.
+  Cycle 4's latter attempt starts 1.111–1.732 seconds after return: Mac connection
+  and the device tunnel succeed, then device SSH setup fails after 10.018 seconds.
+  The first successful post-return clock command completes 21.883–22.505 seconds
+  after return. These bounds assume negligible short-term clock drift and do
+  not isolate network-ready time or cause. Investigate the retained host/device
+  evidence without adding retries or conflating this with pre-wake failures.
+  [Report 201](docs/201-diagnostic23-connected-sleep-repeatability.md).
+  Earlier untimestamped failures still cannot be classified.
+  [Report 197](docs/197-ssh-collection-timing.md).
 
 - [x] Profile and reduce user-manager unit-loading cost on the diagnostic image.
   Three awake probes each show a 4.677–4.792-second first USB SSH command-channel
@@ -253,13 +262,19 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   [Report 200](docs/200-diagnostic23-pm-qualification.md).
   Broader power/cable profiles, CPU retention and energy remain separate.
 
-- [ ] Repeat diagnostic.23 connected-USB actual sleep in a bounded four-cycle
-  batch with fresh observer readiness. Use the unused continuation
-  `.local/diagnostics/20261007T100552.286876Z/qualification-next.json` and original
-  rehearsal `6dac26e6365247dea7ceeeb0d2664c7b`; review each result before advancing
-  and retain host timing. This extends the single qualified sleep in
-  [report 200](docs/200-diagnostic23-pm-qualification.md), not a claim of long-term
-  reliability, energy savings or another connection profile.
+- [x] Repeat diagnostic.23 connected-USB actual sleep in a bounded four-cycle
+  batch with fresh observer readiness. NEO-139 passes all four original results
+  and both routes, with retained keypad/memory, restored policy and SDIO usage 2.
+  The owner confirms clear warnings and untouched normal console returns.
+  Final read-only inspection and history recomputation pass at PM12/0: seven
+  debug cycles and five actual sleeps. The sole unused continuation is
+  `.local/diagnostics/20261007T101111.308402Z/cycle-4/qualification-next.json`;
+  earlier receipts are consumed. Original rehearsal remains
+  `6dac26e6365247dea7ceeeb0d2664c7b`; fresh readiness and current-state/age admission
+  are required before another sleep. Host timing, including the distinct
+  post-return SSH failure, remains preserved.
+  [Report 201](docs/201-diagnostic23-connected-sleep-repeatability.md).
+  Long-term reliability, energy and other connection profiles remain open.
 
 - [ ] Identify the source of the charging recorder's 7 October SSH connection
   reset if it recurs. The original trace retains only inventory and sample zero;

@@ -11,14 +11,18 @@ login, both SSH routes and awake startup checks. Removing unused legacy PTYs
 eliminates 512 user-manager device-unit records while modern terminals and
 console support remain intact. Four manager starts load units in 0.59–0.61 s,
 down from 3.44 s; three first USB SSH channel openings take 1.91–1.96 s,
-down from 4.68–4.79 s. PM qualification of this new kernel is next; these
-measurements do not establish wake latency or battery savings. Seven PM debug
+down from 4.68–4.79 s. These measurements do not establish wake latency or
+battery savings. Seven PM debug
 checks also pass, with both routes recovered, original keypad retention and
 stable SDIO usage. The owner confirms clear warnings and normal dim-console
 returns. [Report 200](docs/200-diagnostic23-pm-qualification.md) records PM7/0 and
 the retained collection errors. The awake RTC rehearsal and first actual
 connected-USB RTC sleep also pass, with an owner-confirmed warning and normal
-untouched display return. Final PM is 8/0; repeated sleep and energy remain open.
+untouched display return. Four further actual sleep/wake cycles pass with both
+routes recovered and owner-confirmed warnings/untouched normal returns.
+[Report 201](docs/201-diagnostic23-connected-sleep-repeatability.md) records
+bounded connected-USB repeatability at PM12/0 and the remaining post-return
+SSH collection failure. CPU retention, energy and broader profiles remain open.
 [Report 198](docs/198-legacy-pty-startup-candidate.md) records the source rationale,
 terminal checks and artifact hashes; [report 199](docs/199-diagnostic23-installation-and-pty-validation.md)
 records installation, terminal compatibility and repeated timings.

@@ -234,13 +234,14 @@ Offline timing summary: `.local/neo138-first-sleep-timing.json`, from
 Original timing SHA-256:
 `eb746be671b22c926f812e6af60d6b2564a17f35aa10fd3b7410b336a61cec24`.
 
-## Next qualification
+## Continuation at this checkpoint
 
-The unused continuation is
+The continuation produced by this first sleep is
 `.local/diagnostics/20261007T100552.286876Z/qualification-next.json`, SHA-256
 `89a9e9a983b1533a065218decf2ad6f141f2ae10a873dc837f0603ffecb80c06`.
 It contains seven debug references and this one actual sleep. The original awake
 rehearsal is `6dac26e6365247dea7ceeeb0d2664c7b`.
-Next, obtain readiness for a bounded four-cycle connected-USB actual-sleep batch,
-reviewing each original result and preserving the continuation lineage. No
-further sleep test is running at this completed checkpoint.
+It was subsequently consumed by NEO-139's four-cycle connected-USB batch.
+[Report 201](201-diagnostic23-connected-sleep-repeatability.md) records all four
+passes, owner confirmation and the successor continuation. Do not reuse the
+first-sleep continuation above.

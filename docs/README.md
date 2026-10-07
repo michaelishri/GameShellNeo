@@ -16,20 +16,27 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current installed image: diagnostic.23; awake qualification and initial PM checks pass.
+Current installed image: diagnostic.23; awake qualification and bounded connected-USB sleep pass.
+[201 — Diagnostic.23 connected sleep repeatability](201-diagnostic23-connected-sleep-repeatability.md)
+records four further actual RTC-wake passes, both routes recovering each time,
+retained keypad and restored policy. The owner confirms clear warnings and
+untouched normal returns. Final PM12/0 covers seven debug cycles and five actual
+sleeps. Timestamp alignment separates collection failures before return from
+one fresh post-return SSH setup failure; cause, CPU retention and energy remain open.
 [200 — Diagnostic.23 PM qualification](200-diagnostic23-pm-qualification.md)
 records seven passing debug checks, both-route recovery, retained keypad and
 stable SDIO usage at PM7/0. All warnings/display returns are owner-confirmed;
 collection failures retain timestamped evidence. Awake rehearsal and the first
 actual connected-USB RTC sleep also pass, with owner-confirmed warning and
 untouched display return at PM8/0. The actual sleep's successful SSH response
-spans sleep; its duration is not wake latency. Repeatability and energy remain open.
+spans sleep; its duration is not wake latency. Report 201 adds bounded
+repeatability; energy remains open.
 [199 — Diagnostic.23 installation](199-diagnostic23-installation-and-pty-validation.md)
 records verified flashing, owner-confirmed login, passing awake checks and
 modern terminal compatibility. Legacy device-unit records fall by 512,
 unit loading drops to 0.59–0.61 seconds and first USB SSH channels to
-1.91–1.96 seconds in repeated samples. New-kernel PM and energy qualification
-remain separate.
+1.91–1.96 seconds in repeated samples. Reports 200–201 add PM qualification;
+energy remains separate.
 [198 — Legacy PTY startup candidate](198-legacy-pty-startup-candidate.md)
 identifies 512 legacy-terminal device-unit records, removes their kernel
 preallocation in diagnostic.23 and saves ordinary-user Unix98/SSH terminal

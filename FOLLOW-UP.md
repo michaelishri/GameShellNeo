@@ -62,8 +62,14 @@ Record deferred questions and activities here as they arise.
   Raw `ec/03`, corrected/legacy formula and separate sysfs all report 4.1569 V;
   unused bits are zero and controls match diagnostic.21. This does not resolve
   the earlier discrepancy. NEO-133's seven PM debug checks and awake RTC
-  rehearsal now pass with owner-confirmed warnings/display; actual sleep on
-  diagnostic.22 remains pending ([report 195](docs/195-diagnostic22-pm-qualification.md)).
+  rehearsal now pass with owner-confirmed warnings/display. Two actual
+  connected-USB RTC sleeps also pass automated checks at PM9/0; the first
+  warning was missed and the requested repeat's clear warning/untouched normal
+  display return is now owner-confirmed
+  ([report 195](docs/195-diagnostic22-pm-qualification.md)). Both network routes
+  recover and policy/ownership restore. Post-first-wake ADC inspection passes
+  at 4.1558 V with raw `ec/02`, no unused bits and unchanged sampled controls.
+  Energy, retention and physical voltage accuracy remain unqualified.
   Fresh
   configuration and independent terminal-voltage evidence
   remain needed before resolving the voltage discrepancy. No charger/gauge

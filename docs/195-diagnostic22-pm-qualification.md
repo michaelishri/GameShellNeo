@@ -1,12 +1,16 @@
 # Diagnostic.22 suspend/resume qualification
 
-7 October 2026; capture timestamps are UTC. NEO-133 is in progress. The initial
+7 October 2026; capture timestamps are UTC. NEO-133 is complete. The initial
 freezer, driver and first late/noirq debug checks pass. The owner confirmed
 the initial warning and normal dim-console return, then gave readiness for the
 late/noirq check. Its warning/display were also confirmed, and the owner
 authorized four repeats, which pass all automated checks. The owner confirmed
 “Yep, all clear and back to normal” for the final warnings/display. The awake
-RTC rehearsal also passes; no actual sleep has run on this image.
+RTC rehearsal also passes. Two actual connected-USB RTC sleeps pass the
+automated checks. The owner did not hear the first warning and explicitly
+requested the second. Its clear warning and normal dim-console return are
+owner-confirmed without touching the cable or controls. The owner then noted
+that the first warning may have been missed through inattention.
 [Report 194](194-diagnostic22-installation-and-adc-validation.md) records the
 verified installation and awake checks.
 
@@ -144,11 +148,93 @@ retained policy, PM, RTC or console owner. Both independent SSH routes pass.
 PM remains 7/0, SDIO usage 2 and brightness/backlight power 1/0 on the same boot.
 This establishes awake alarm delivery and restoration, not wake from sleep.
 
+## First actual connected-USB RTC wake
+
+The owner gave fresh “Ready” for one actual sleep. At source checkpoint
+`a765415`, the saved task was submitted once:
+
+```sh
+task device:sleep-rtc QUALIFICATION=.local/neo133-reference-history.json \
+  REHEARSAL=b1fef2d2d5cf4a149c39e496ee9c38ba ATTENDED=1
+```
+
+Original capture: `.local/diagnostics/20261007T082122.368046Z/result.json`;
+run `f616892ce72a42799c1a1ad11c85e403`, SHA-256:
+`66c16dd7339b632208df154901f00e3703a650e76e64612f663c04f910182b57`.
+The task log is `.local/neo133-first-sleep.log`.
+
+The saved result passes functional RTC wake, both independent SSH routes,
+process memory, original keypad retention and complete USB/Wi-Fi trace
+restoration. POWER input and original logind policy return, with no retained
+policy, RTC, PM or console owner. The long warning's playback/control-restoration
+checks pass. These software checks do not prove the speaker was heard.
+
+RTC IRQ31 advanced 2 to 3 and is the recorded wake IRQ. The alarm-to-return
+interval is 31.925 seconds; the bracketed entry-to-return interval is 31.309
+seconds. The trace supports a 28.877-second s2idle interval, with all four
+late/noirq phases and RSB noirq suspend/resume present. No timekeeping freeze
+pair was observed; the clock gap is within sampling uncertainty. CPU retention
+and energy remain unqualified. These durations do not measure normal wake
+latency.
+
+PM is 8/0 with all failure counters zero, SDIO usage remains 2 and brightness/
+backlight power is 1/0 on the original boot. The separate read-only ADC capture
+`.local/diagnostics/20261007T082339.545899Z/inventory.json` passes:
+raw `ec/02`, corrected/legacy/sysfs 4.1558 V, 100%/Charging/2 mA, fresh B8=`c0`
+and unchanged sampled controls/limits. Its SHA-256 is
+`7dc120740a204d4afbb0d807a522f89a83a322209293d4d80d9b92bd303f514a`.
+This remains an uncalibrated sequential measurement, not charge-during-sleep
+or voltage-accuracy evidence.
+
+The owner reported “I didn't hear the tone” and explicitly requested another
+test. Preserve this first result as an automated pass with the warning unheard;
+its display/untouched-return confirmation was not separately supplied. Do not
+replace that observation with a later successful attempt.
+
+## Requested second actual sleep
+
+The owner explicitly requested a repeat. The completed first result permits
+one new submission using its continuation and the original awake rehearsal:
+
+```sh
+task device:sleep-rtc \
+  QUALIFICATION=.local/diagnostics/20261007T082122.368046Z/qualification-next.json \
+  REHEARSAL=b1fef2d2d5cf4a149c39e496ee9c38ba ATTENDED=1
+```
+
+The second result passes automated checks. Capture:
+`.local/diagnostics/20261007T082435.420412Z/result.json`; run
+`5c2a86dc09df4687afbe2c84948f304f`, SHA-256:
+`715152d5d3bd15b41084576ee8e0bb3f76aa5625e725467cef660453a43ec175`.
+The original output is `.local/neo133-second-sleep.log`. One initial collection
+`No route to host` is preserved; the original completed result and both route
+proofs subsequently passed without another PM submission.
+
+Functional RTC wake, both independent SSH routes, original keypad retention,
+memory and trace/policy restoration pass. The long warning's software checks
+pass with unchanged volume/duration. No policy, RTC, PM or console owner remains.
+PM is 9/0, every failure counter remains zero, SDIO usage is 2 and brightness/
+backlight power is 1/0. The alarm-to-return interval is 31.936 seconds and the
+trace supports 28.693 seconds inside s2idle. CPU retention, energy and ordinary
+wake latency remain unqualified.
+
+The owner confirmed “Yes—warning clear; dim console returned untouched” for
+the second test and then noted possible inattention during the first warning.
+No audio settings changed between the two tests. This establishes audibility
+and normal display return for the repeat while preserving the first observation.
+No further screen test is running. The current continuation is
+`.local/diagnostics/20261007T082435.420412Z/qualification-next.json`; the initial
+baseline and first continuation are consumed and must not be reused for a new
+sleep. The original awake rehearsal remains
+`b1fef2d2d5cf4a149c39e496ee9c38ba`.
+
 ## Remaining qualification
 
-Actual RTC sleep remains separately attended and requires fresh readiness.
-All seven debug checks, owner warning/display confirmations and the awake
-RTC rehearsal now pass. The owner has been asked to watch the first actual
-connected-USB RTC sleep; no sleep has been submitted yet.
+Both actual sleeps pass automated checks, and the second has the owner's clear
+warning, normal display and untouched-return confirmation. The first warning
+remains recorded as unheard, subsequently attributed by the owner to possible
+inattention. The next slice is bounded connected-USB repeatability using the
+second continuation, with fresh readiness for the batch. The seven debug
+checks and awake rehearsal remain qualified as recorded above.
 Battery/cable/POWER wake profiles, energy and physical battery accuracy remain
 separate; these debug checks do not establish real sleep or charging in sleep.

@@ -12,7 +12,9 @@ read-only schema-4 inventory pass. The first sample reports about 4.157 V with
 no unused ADC bits set; this does not resolve the earlier voltage discrepancy
 or establish physical accuracy. Seven staged PM debug checks and the awake RTC
 rehearsal also pass, with owner-confirmed warnings/normal display returns;
-actual sleep on diagnostic.22 remains pending
+two actual connected-USB RTC sleeps pass automated recovery checks. The first
+warning was missed; the owner confirms the requested repeat's clear warning
+and untouched normal display return
 ([report 195](docs/195-diagnostic22-pm-qualification.md)).
 [Report 194](docs/194-diagnostic22-installation-and-adc-validation.md) records
 the hardware checks; [report 193](docs/193-diagnostic22-adc-integration.md)

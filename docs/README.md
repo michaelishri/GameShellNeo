@@ -16,16 +16,18 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Diagnostic.21 is built, verified offline and staged on the Mac:
-[187 — Gauge-status image integration](187-diagnostic21-gauge-integration.md).
-It includes patch 0035 and schema-3 inventory admission. Installation and
-hardware qualification remain pending.
+Current installed image: diagnostic.21.
+[189 — Installation and gauge validation](189-diagnostic21-installation-and-gauge-validation.md)
+records full card readback, owner-confirmed login, passing awake startup checks
+and fresh B8 reads. Voltage/capacity uncertainty and fresh PM qualification
+remain open. [187 — Gauge-status image integration](187-diagnostic21-gauge-integration.md)
+records patch 0035, schema-3 inventory admission and verified build/transfer.
 
 [188 — Historical source compaction](188-historical-driver-source-compaction.md)
 records verified replay of saved patch exports, preserved compiler evidence
 and disk-space recovery for the image build.
 
-Current installed image: diagnostic.20.
+The previous diagnostic.20 qualification is preserved below.
 [178 — Guided cable batch](178-guided-cable-batch-hardware-validation.md)
 records four observed alternating USB removal/attachment sleeps, RTC wakes,
 restored endpoints and normal display returns, followed by return to home Wi-Fi.

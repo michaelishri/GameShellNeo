@@ -1,9 +1,11 @@
 # Diagnostic.21 gauge-status integration
 
 7 October 2026. NEO-125. Integration, offline verification and checked transfer
-to the Mac are complete; diagnostic.20 remains installed. NEO-126 tracks the
-physical installation and hardware checks. No charging/gauge settings, ADC
-scale or battery calibration policy changes are included.
+to the Mac are complete. Diagnostic.20 remained installed at this build
+checkpoint; subsequent diagnostic.21 installation and awake validation are
+recorded under NEO-126 in [report 189](189-diagnostic21-installation-and-gauge-validation.md).
+No charging/gauge settings, ADC scale or battery calibration policy changes
+are included.
 
 ## Scope and identity
 
@@ -107,6 +109,8 @@ The matching recovery checkpoint is
 `diagnostic21-gauge-status-candidate`, made with `task image:checkpoint`.
 Diagnostic.20's earlier checkpoint remains available separately.
 
-Hardware startup, fresh gauge inspection, unchanged charger limits, normal
-display and PM checks remain pending under NEO-126. No real calibration
-transition will be provoked by programming B8 merely to test its status bit.
+At the build checkpoint, hardware checks remained pending. NEO-126 subsequently
+qualified startup, owner-confirmed login, fresh B8 inspection and unchanged
+reported charger limits (report 189); fresh suspend/resume qualification remains
+open. No real calibration transition will be provoked by programming B8 merely
+to test its status bit.

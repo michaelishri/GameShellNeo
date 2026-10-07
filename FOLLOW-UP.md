@@ -14,24 +14,26 @@ Record deferred questions and activities here as they arise.
   infer a safe setting or change unrelated build/cache identities merely to
   accelerate diagnostic.21 assembly.
 
-- [ ] NEO-126 diagnostic.21 installation/qualification: NEO-125's image build,
-  offline verification and checked Mac transfer are complete.
-  [Report 187](docs/187-diagnostic21-gauge-integration.md) records the new image
-  and strict dual-profile inventory with explicit B8 provenance. Arrange the
-  DEV-card installation and awake hardware checks before fresh PM qualification.
-  Diagnostic.20 remains installed. Qualify fresh B8 reads, unchanged charger/
-  gauge controls, normal boot and PM behavior. The source/ARM32 checks and
-  complete kernel build do not prove a real calibration transition or physical
-  ADC accuracy. No calibration will be forced just to test a status bit. NEO-10
-  and NEO-117 retain electrical and direct sleep-charge qualification.
+- [ ] Diagnostic.21 fresh PM qualification: NEO-125/126's build, checked card
+  installation, owner-confirmed login, awake startup and fresh volatile-B8
+  inspection now pass. [Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md)
+  records matching reported control values, healthy final USB/Wi-Fi and PM0/0.
+  Run a freshly readied debug sequence and actual RTC-wake checks with long
+  warnings before claiming this image's suspend/resume behavior. B8=`c0` is now
+  a fresh read; E0/E1 remain potentially cached, with no configured capacity.
+  Voltage telemetry again reports 4.2559 V against the unchanged 4.2 V target.
+  No calibration transition or physical accuracy is established, and no
+  calibration will be forced just to test a status bit. NEO-10 and NEO-117
+  retain electrical and direct sleep-charge qualification.
 
 - [ ] NEO-10/NEO-117 measurement follow-through: [report 184](docs/184-axp223-measurement-source-audit.md)
   finds contradictory REG34[2] polarity, no ADC absolute-accuracy/latch contract,
   and approximately 30-second percentage steps without a capacity denominator.
   Preserve raw evidence; do not infer a compensation formula, OCV-only mode or
-  calibrated capacity. Correct AXP223's dynamic B8 status caching in the owning
-  driver with variant-scoped tests; audit the shared variable-width ADC helper
-  separately. Fresh configuration and independent terminal-voltage evidence
+  calibrated capacity. AXP223's dynamic B8 status caching is now corrected in
+  the owning driver and passes variant-scoped tests plus diagnostic.21 awake
+  inspection. Audit the shared variable-width ADC helper separately. Fresh
+  configuration and independent terminal-voltage evidence
   remain needed before resolving the voltage discrepancy. No charger/gauge
   write or longer charging experiment is justified by these source findings.
 

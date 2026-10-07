@@ -6,11 +6,13 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.21 is built, verified offline and staged on the Mac with the AXP223
-gauge-status cache correction; installation and hardware qualification remain
-pending. Diagnostic.20 remains installed.
-[Report 187](docs/187-diagnostic21-gauge-integration.md) records the image
-identity, inspection contract, checksums and passing build/transfer checks.
+Diagnostic.21 is installed with the AXP223 gauge-status cache correction.
+Full card readback, startup, both network routes and the live volatile-B8
+inspection pass; fresh suspend/resume qualification remains pending.
+[Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md) records
+the hardware results and continuing voltage/capacity uncertainty.
+[Report 187](docs/187-diagnostic21-gauge-integration.md) records its build,
+inspection contract and checksums.
 
 Diagnostic.20 has booted after verified full 4 GiB card readback. Both SSH
 routes, integration and awake journal/POWER/RTC checks pass. The MUSB and both

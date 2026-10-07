@@ -1,0 +1,24 @@
+From: GameShellNeo contributors
+Subject: [PATCH] mfd: axp20x: mask the low byte of variable-width readings
+
+The helper combines a high byte with width - 8 low bits, but currently
+ORs in the entire low register. Unused bits can therefore contaminate the
+high portion of a 9-15 bit reading. Mask them before combining the bytes.
+For 16-bit callers the mask retains the whole low byte.
+
+Keep the existing 9-16 bit caller contract, register order and error
+propagation. This does not establish an atomic ADC snapshot or change
+scaling, calibration or charger controls.
+
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -986,7 +986,7 @@
+ 	if (err)
+ 		return err;
+ 
+-	result |= reg_val;
++	result |= reg_val & (BIT(width - 8) - 1);
+ 
+ 	return result;
+ }

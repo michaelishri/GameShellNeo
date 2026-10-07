@@ -40,7 +40,9 @@ Record deferred questions and activities here as they arise.
   Preserve raw evidence; do not infer a compensation formula, OCV-only mode or
   calibrated capacity. AXP223's dynamic B8 status caching is now corrected in
   the owning driver and passes variant-scoped tests plus diagnostic.21 awake
-  inspection. Audit the shared variable-width ADC helper separately. Fresh
+  inspection. NEO-130 audits and tests the shared variable-width ADC helper
+  separately ([report 192](docs/192-axp-adc-width-correction.md)); its low-byte
+  mask candidate is not yet installed. Fresh
   configuration and independent terminal-voltage evidence
   remain needed before resolving the voltage discrepancy. No charger/gauge
   write or longer charging experiment is justified by these source findings.
@@ -138,6 +140,15 @@ Agreed scope and policies are recorded in [the initial base requirements](docs/0
 The feasibility investigation, supplied Allwinner-document review and focused firmware/PMIC trace are complete. **Start with [the implementation plan](docs/20-base-implementation-plan.md)** and its supporting reports 17–19. The first [read-only device baseline](docs/21-installed-hardware-baseline.md) is now captured. Unchecked items below require implementation, a design decision or hardware validation. At baseline capture, no image build, suspend experiment or battery-endurance test had been performed; the later build workflow is in [report 24](docs/24-building-and-testing.md).
 
 ## Diagnostic implementation follow-up
+
+- [ ] AXP717-only USB voltage fallback: the locked no-IIO path uses
+  `(ret % AXP717_ADC_DATA_MASK) * 1000`, where the mask is `GENMASK(13, 0)`.
+  Modulo is not field masking (for example, raw `0x3fff` produces zero).
+  This separate caller issue was found during NEO-130's complete helper audit;
+  CPI v3.1 uses AXP223 and does not enter this path. Review the AXP717 register
+  contract and test a separate correction before claiming AXP717 voltage
+  correctness. Patch 0036 preserves all existing 16-bit helper results and
+  deliberately leaves the downstream conversion unchanged.
 
 - [ ] Investigate the recurring post-sleep SSH collection delays. Diagnostic.21's
   four-cycle batch retains channel-opening timeouts and connection failures in

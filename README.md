@@ -664,6 +664,20 @@ updated inventory admission; build and installation progress are recorded in
 [report 187](docs/187-diagnostic21-gauge-integration.md). This is not an ADC or
 battery-calibration fix.
 
+The candidate ADC width correction has its own saved checks:
+
+```sh
+task test:axp-adc-width     # Actual helper/callers, exhaustive bytes, native + ARM32
+task check:axp-adc-drivers # Also compile ARM ADC/USB users and no-IIO USB fallback
+```
+
+These preserve valid 9–16-bit readings and test unused low-byte bits, register
+order and read failures. `task build` includes the regression task. Evidence
+is saved under `.local/build/axp-adc-width-tests/`;
+[report 192](docs/192-axp-adc-width-correction.md) records patch 0036's scope.
+It is not installed in diagnostic.21 and does not establish ADC coherence,
+calibration or a cause for the earlier voltage discrepancy.
+
 For the separate deferred-registration/unregister lifetime audit, use
 `task test:power-supply-lifetime`. It reproduces the original cancellation
 order and a test-only reordered comparison using actual core functions on

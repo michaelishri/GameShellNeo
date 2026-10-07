@@ -99,6 +99,7 @@ tasks:
       - task: test:usb-phy-suspend
       - task: test:power-supply-suspend
       - task: test:axp223-gauge-status
+      - task: test:axp-adc-width
       - task: test:brcmfmac-sleep
       - task: test:brcmfmac-freezer
       - task: test:brcmfmac-pm
@@ -261,6 +262,14 @@ tasks:
   check:axp223-gauge-driver:
     desc: Run gauge-status regressions and compile the complete ARM MFD driver
     cmds: [bash tools/run-logged.sh axp223-gauge-driver python3 tools/check-axp223-gauge-status.py --compile-driver]
+
+  test:axp-adc-width:
+    desc: Exhaustively check actual AXP ADC width decoding and IIO callers, native and ARM32
+    cmds: [bash tools/run-logged.sh axp-adc-width python3 tools/check-axp-adc-width.py]
+
+  check:axp-adc-drivers:
+    desc: Run ADC width regressions and compile ARM ADC/USB users including the no-IIO fallback
+    cmds: [bash tools/run-logged.sh axp-adc-drivers python3 tools/check-axp-adc-width.py --compile-driver]
 
   test:power-supply-lifetime:
     desc: Reproduce deferred notification teardown with original and test-only reordered core functions; native and ARM32

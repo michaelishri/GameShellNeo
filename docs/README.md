@@ -17,6 +17,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.21.
+[192 — ADC width correction](192-axp-adc-width-correction.md) records the
+shared helper audit, candidate low-byte mask, exhaustive native/ARM32 checks
+and read-only comparison. This candidate is not in the installed image and
+does not resolve the physical voltage discrepancy.
 [191 — Connected sleep repeatability](191-diagnostic21-connected-sleep-repeatability.md)
 records four consecutive actual RTC-wake passes, both routes recovering each
 time, owner-confirmed warnings/display and final PM12/0 with fresh B8 reads.

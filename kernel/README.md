@@ -9,6 +9,14 @@ files and bindings live in `overlay/` and become the third generated patch.
 The same queue is applied by `--apply SOURCE` for local compilation. Input
 changes require a fresh source extraction; do not silently reuse a patched tree.
 
+Patch 0036 is a candidate for the next image, absent from diagnostic.21. It
+masks unused low-register bits in the shared 9–16-bit ADC helper while retaining
+16-bit values, read order and error propagation. The saved
+`test:axp-adc-width` / `check:axp-adc-drivers` tasks exercise actual source and
+its callers; [report 192](../docs/192-axp-adc-width-correction.md) records the
+evidence and remaining hardware/coherence/accuracy limits. Remove it when an
+equivalent correction is verified in the selected upstream source.
+
 | Patch | Purpose | Qualification and removal condition |
 | --- | --- | --- |
 | 0001 | Fix AXP finite input-current selection before any register side effect | Host test compiles the actual driver helper; replace with a verified equivalent upstream fix |

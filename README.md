@@ -6,6 +6,14 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+Diagnostic.23 is built and offline-verified, awaiting installation. It disables
+unused legacy PTY allocation while retaining Unix98 terminals and the existing
+console support. The diagnostic.22 baseline has 512 legacy-terminal device-unit
+records among 588 user-manager units. The candidate's effect on startup time
+and memory remains to be measured after a card swap; the installed image has
+not changed. [Report 198](docs/198-legacy-pty-startup-candidate.md) records the
+source rationale, terminal checks, artifact hashes and qualification steps.
+
 Diagnostic.22 is installed with the shared ADC width correction. Full card
 readback, owner-confirmed login, both network routes, startup checks and the
 read-only schema-4 inventory pass. The first sample reports about 4.157 V with

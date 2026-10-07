@@ -71,6 +71,9 @@ device units fails. Unknown expectations, absent required console/Unix98
 support, invalid manager timestamps, failed transfers/resize or failed SSH
 terminal allocation are rejected. Opened PTYs and SSH channels are closed on
 failure. `ROUTE=usb` is the default; `ROUTE=wifi` uses the configured Wi-Fi path.
+The saved result is complete only when both its on-device `passed` field and
+the separate `ssh_pty_verified` field are true; a partial capture is not SSH
+terminal qualification.
 
 The existing manager can be reused if another session is still active. These
 timestamps describe its recorded startup, not the entire inspection duration.
@@ -81,6 +84,15 @@ Other private inspection evidence is `.local/neo136-user-dump.txt`,
 `neo136-systemd-version.txt`, `neo136-systemd-udev-rules.txt` and
 `neo136-tty-drivers.txt`. The repeatable task sends only parsed inventory and
 timings back from the manager dump, excluding its environment strings.
+
+A separate ordinary-user `systemctl show user@1000.service -p MainPID
+-p MemoryCurrent -p MemoryPeak -p CPUUsageNSec` capture, using `device:exec`,
+records 4,317,184 current cgroup memory bytes, 6,860,800 peak bytes and
+4,121,870,000 CPU nanoseconds. These describe that particular user-manager
+instance, including its group accounting, not whole-device RAM or idle power.
+The raw capture is `.local/neo136-user-resources.txt`; repeat the same task
+after installation if comparing memory, alongside the more reproducible unit
+counts and startup timestamps.
 
 ## Candidate implementation
 
@@ -135,7 +147,56 @@ These are file-size observations, not a measurement of runtime RAM saved.
 `.local/neo136-kernel-comparison.json` retains both artifact hashes and the
 resolved configuration comparison. Kernel build logs are
 `.local/neo136-kernel.log` and `.local/build/kernel.log`.
-Image build results will be recorded after verification finishes.
+The compiled PTY object retains `ptm_unix98_ops`/`pty_unix98_ops` and contains no
+legacy initializer, count or BSD operation tables. The symbol inventory is
+`.local/neo136-pty-symbols.txt`. Device-tree validation and the unchanged PM,
+speaker and keypad board contracts pass. The USB board policy suite passes
+4,665 gate/state/race cases, 160 lifecycle cases and 96 diagnostic scenarios.
+Logs are `.local/neo136-dt.log` and `.local/neo136-usb-board.log`.
+
+Source implementation commit: `c155496`. The saved image build uses the nested
+worktree's explicit original bootloader and private radio-reference paths:
+
+```sh
+task build:kernel
+task check:kernel
+task check:dt
+task test:usb-policy-board
+task build:image \
+  BOOTLOADER=/home/mishri/workspace/clockworkpi/GameShell/Code/Kernel/v0.2/u-boot-sunxi-with-spl.bin \
+  RADIO_DIR=/home/mishri/workspace/clockworkpi/GameShellNeo/.local/hardware-baseline/2026-09-27/radio-reference
+task image:pack
+task image:checkpoint NAME=diagnostic23-no-legacy-pty-candidate
+```
+
+Offline verification passes MBR bounds, bootloader readback, filesystem checks,
+U-Boot CRCs/addresses, kernel/DTB/modules/radio hashes, private identity permissions
+and service policy. All 298 recorded project input hashes match this source
+checkpoint. The completed kernel manifest SHA-256 is
+`474f30de8774406f238e081d8a783da29f6916cde72f5a83c44e13cd0e8267b2`;
+the image manifest SHA-256 is
+`f82d8dce7b40d0d31c057b0d723c5d97cea2488c6458a1e56c4a3d381506b3d3`.
+The package inventory hash remains
+`66dc03283bb690e55ab2b2540b0ffe43310dfb39f872672c4d6b3884ecc3358b`,
+matching diagnostic.22. Validation targets the configuration/integration change:
+host regressions, the complete compiled kernel and resolved configuration,
+device-tree contracts, the USB board policy suite and offline image checks.
+
+| Artifact | Value |
+| --- | --- |
+| Image | `GameShellNeo-0.1.0-diagnostic.23-cpi31-bf64ca854137.img` |
+| Raw bytes | 4,294,967,296 |
+| Raw SHA-256 | `bf64ca85413711b991cfaafbe7d8c7dabcf4355fe1bb8590085850f68b13d726` |
+| Gzip bytes | 269,588,963 |
+| Gzip SHA-256 | `f62aced17fbce378e371f7337533f89d5b3799070fe3072a6c0380f3eed8c404` |
+
+Build/pack logs are `.local/neo136-image.log` and `.local/neo136-pack.log`.
+The raw image is under `.local/artifacts/`, and its compressed transfer and
+manifest are under `.local/flash/`. They contain private provisioning and must
+remain private. The verified candidate checkpoint is
+`.local/recovery/diagnostic23-no-legacy-pty-candidate`; the previous diagnostic.22
+checkpoint and image remain available. The candidate is prepared locally;
+transfer to the Mac awaits confirmation of regular Wi-Fi. No card was written.
 
 ## Installation acceptance and limits
 

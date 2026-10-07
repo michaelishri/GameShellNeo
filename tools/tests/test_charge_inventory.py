@@ -15,7 +15,7 @@ import charge_inventory as charge
 
 
 def metadata():
-    volatile = {0, 1, 0xb9}
+    volatile = {0, 1, 0x78, 0x79, 0xb9}
     rows = [f'{n:02x}: y n {"y" if n in volatile else "n"} n' for n in range(0xe7)]
     return dict(name='axp20x-rsb', range='0-e6', access='\n'.join(rows),
                 cache_only='N', cache_bypass='N')
@@ -46,8 +46,11 @@ class RegisterReads(unittest.TestCase):
                 result = charge.read_registers(metadata())
             opened.assert_called_once_with(directory/'registers', os.O_RDONLY | os.O_CLOEXEC)
             self.assertEqual([(c.args[1], c.args[2]) for c in reads.call_args_list],
-                [(7, a*7) for a in (0, 1, 0x33, 0xb8, 0xb9, 0xe0, 0xe1, 0xe6)])
+                [(7, a*7) for a in (0, 1, 0x33, 0x34, 0x78, 0x79, 0xb8, 0xb9, 0xe0, 0xe1, 0xe6)])
             self.assertEqual(result['b8']['source'], 'regmap-cache-possible')
+            self.assertEqual(result['34']['source'], 'regmap-cache-possible')
+            self.assertEqual(result['78']['source'], 'volatile-regmap-read')
+            self.assertEqual(result['79']['source'], 'volatile-regmap-read')
             self.assertEqual(result['b9']['source'], 'volatile-regmap-read')
             self.assertTrue(all(r['value'] == 0x42 for r in result.values()))
 
@@ -56,6 +59,9 @@ class RegisterReads(unittest.TestCase):
         changes = [dict(name='other'), dict(range='0-ff'), dict(range='0-47\n50-e6'),
                    dict(cache_only='Y'), dict(cache_bypass='Y'),
                    dict(access=good['access'].replace('b8: y n n n', 'b8: y n y n')),
+                   dict(access=good['access'].replace('34: y n n n', '34: y n y n')),
+                   dict(access=good['access'].replace('78: y n y n', '78: y n n n')),
+                   dict(access=good['access'].replace('79: y n y n', '79: y n n n')),
                    dict(access=good['access'].replace('e2: y n n n', 'e2: y n n y')),
                    dict(access=good['access'].replace('e2: y n n n', 'e1: y n n n')),
                    dict(access=good['access'].replace('00: y n y n\n', ''))]
@@ -77,6 +83,29 @@ class RegisterReads(unittest.TestCase):
 
 
 class Meaning(unittest.TestCase):
+    def test_disputed_control_polarity_remains_raw_and_possibly_cached(self):
+        for raw in (0, 4, 0xfb, 0xff):
+            result = charge.decode(register_data(**{'34': raw}))['charger_control2']
+            self.assertEqual(result['raw'], raw)
+            self.assertEqual(result['bit2'], (raw >> 2) & 1)
+            self.assertEqual(result['source'], 'regmap-cache-possible')
+            self.assertIn('unresolved', result['bit2_interpretation'])
+            self.assertNotIn('enabled', result)
+
+    def test_voltage_byte_formulas_preserve_unused_bits_without_coherence_claim(self):
+        for high, low, masked, linux in ((0xf1, 0x0d, 4255900, 4255900),
+                                        (0xf0, 0x1d, 4238300, 4255900),
+                                        (0xff, 0xff, 4504500, 4504500)):
+            result = charge.decode(register_data(**{'78': high, '79': low}))['battery_voltage_bytes']
+            self.assertEqual(result['high'], high)
+            self.assertEqual(result['low'], low)
+            self.assertEqual(result['unused_low_bits'], low & 0xf0)
+            self.assertEqual(result['masked_12bit_formula_uv'], masked)
+            self.assertEqual(result['linux_helper_formula_uv'], linux)
+            self.assertEqual(result['unused_bits_change_formula'], masked != linux)
+            self.assertFalse(result['coherent_sample_established'])
+            self.assertFalse(result['physical_accuracy_qualified'])
+
     def test_cache_is_not_live_charge_calibration_or_remaining_capacity(self):
         report = charge.decode(register_data())
         self.assertEqual(report['cached_configuration']['configured_capacity_uah'], 824*1456)

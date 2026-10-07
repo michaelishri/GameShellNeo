@@ -16,14 +16,18 @@ STATS = Path('/sys/power/suspend_stats')
 IMAGE = Path('/etc/gameshellneo/image.json')
 BOARD = Path('/sys/firmware/devicetree/base/compatible')
 # Deliberately exclude IRQ status, undocumented E2/E3 and out-of-range E8/EC.
-REGISTERS = (0x00, 0x01, 0x33, 0xb8, 0xb9, 0xe0, 0xe1, 0xe6)
-VOLATILE = frozenset((0x00, 0x01, 0xb9))
+REGISTERS = (0x00, 0x01, 0x33, 0x34, 0x78, 0x79, 0xb8, 0xb9, 0xe0, 0xe1, 0xe6)
+VOLATILE = frozenset((0x00, 0x01, 0x78, 0x79, 0xb9))
 LIMITS = [
     'One awake, sequential inventory; not an atomic electrical snapshot.',
     'Nonvolatile register values may come from the kernel cache, including '
     'B8 calibration status and E0/E1 capacity. No cache bypass is performed.',
     'Current is instantaneous; percentage and configured capacity are not '
     'integrated charge or calibrated battery capacity.',
+    'REG34 bit 2 has contradictory polarity descriptions in the AXP223 '
+    'manuals; its raw value is not interpreted as an enabled setting.',
+    'Voltage bytes are separate volatile reads with no established latch '
+    'contract. Formula results are not a coherent or calibrated voltage sample.',
     'No accumulated-charge measurement or charging-through-sleep conclusion.',
 ]
 
@@ -106,6 +110,9 @@ def decode(registers):
     gauge, high = values['b8'], values['e0']
     capacity_raw = ((high & 0x7f) << 8) | values['e1']
     gauge_percent = values['b9'] & 0x7f
+    voltage_high, voltage_low = values['78'], values['79']
+    masked_voltage = (voltage_high << 4) | (voltage_low & 0x0f)
+    linux_voltage = (voltage_high << 4) | voltage_low
     return dict(
         cached_configuration=dict(
             charger_enabled=bool(values['33'] & 0x80),
@@ -115,6 +122,16 @@ def decode(registers):
             capacity_configured=bool(high & 0x80), capacity_raw=capacity_raw,
             configured_capacity_uah=capacity_raw*1456 if high & 0x80 else None,
             warning1_percent=(values['e6'] >> 4)+5, warning2_percent=values['e6'] & 0xf),
+        charger_control2=dict(raw=values['34'], bit2=(values['34'] >> 2) & 1,
+            source='regmap-cache-possible',
+            bit2_interpretation='unresolved: Chinese v1.1 says 1 follows charging '
+                'current; English v1.0 says 1 disables this behavior'),
+        battery_voltage_bytes=dict(high=voltage_high, low=voltage_low,
+            unused_low_bits=voltage_low & 0xf0,
+            masked_12bit_formula_uv=masked_voltage*1100,
+            linux_helper_formula_uv=linux_voltage*1100,
+            unused_bits_change_formula=masked_voltage != linux_voltage,
+            coherent_sample_established=False, physical_accuracy_qualified=False),
         gauge_result=dict(valid=bool(values['b9'] & 0x80) and gauge_percent <= 100,
                           percent=gauge_percent),
         accumulated_charge_available=False,
@@ -136,7 +153,7 @@ def supply_inventory():
 def inspect(kernel, version, result=None):
     if result is None:
         result = {}
-    result.update(schema_version=1, kind='axp223-charge-inventory', completed=False,
+    result.update(schema_version=2, kind='axp223-charge-inventory', completed=False,
                   limits=LIMITS)
     if not re.fullmatch(r'6\.18\.54-gameshellneo[0-9]+', kernel):
         raise ValueError('Re-audit regmap source before using another kernel series')
@@ -167,7 +184,7 @@ def main():
     parser.add_argument('--kernel', required=True)
     parser.add_argument('--image', required=True)
     args = parser.parse_args()
-    result = dict(schema_version=1, kind='axp223-charge-inventory', completed=False,
+    result = dict(schema_version=2, kind='axp223-charge-inventory', completed=False,
                   limits=LIMITS)
     try:
         inspect(args.kernel, args.image, result)

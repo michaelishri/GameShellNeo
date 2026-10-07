@@ -1611,7 +1611,7 @@ shutdown reserve, percentage accuracy or charging limits. It needs no image rebu
 
 `device:charge-inspect` captures one awake charger/gauge inventory over USB.
 Keep USB connected. It checks the matching image/kernel and AXP223 identity,
-reads existing battery/input sysfs telemetry and eight documented registers,
+reads existing battery/input sysfs telemetry and eleven documented registers,
 and saves the original JSON plus helper/source-lock hashes under
 `.local/diagnostics/`. No charger, gauge, cache, screen or sleep setting is written.
 The local PM lock prevents overlap with another saved PM workflow.
@@ -1623,7 +1623,13 @@ status and configured capacity, are explicitly labeled as possibly cached.
 Changing kernel series or map layout requires a new source audit. A completed
 inventory is not a charging test: instantaneous current and percentage do not
 measure charge gained while asleep. See [measurement design](docs/180-sleep-charge-measurement-design.md)
-and [inventory validation](docs/181-charge-inventory-validation.md).
+and [inventory validation](docs/181-charge-inventory-validation.md). Schema 2
+adds raw REG34 and battery-voltage bytes 78/79. REG34 bit 2 is preserved without
+an enabled/disabled interpretation because the manuals disagree. The voltage
+bytes are separate reads: masked and existing Linux formula results are
+diagnostic comparisons, not coherent or calibrated samples. The
+[extended inventory report](docs/185-axp223-voltage-inventory.md) records the
+source limits, tests and hardware observation.
 
 `device:charge-baseline SECONDS=120` records a connected, awake baseline with
 one sample every ten seconds. `SECONDS` must be a multiple of ten from 60 to

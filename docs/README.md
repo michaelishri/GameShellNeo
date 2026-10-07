@@ -39,6 +39,9 @@ voltage/gauge uncertainty. Direct sleep-charge evidence remains open.
 cross-checks the manuals, vendor code and locked Linux paths. It records the
 conflicting charger-control descriptions, observed percentage cadence, live
 status caching issue and unqualified ADC coherence/accuracy.
+[185 — Extended voltage inventory](185-axp223-voltage-inventory.md) records the
+schema-2 read-only helper and passing hardware capture, preserving raw REG34
+and ADC-byte evidence without interpreting disputed controls or changing settings.
 
 Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)

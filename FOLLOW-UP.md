@@ -206,6 +206,12 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   PM results and both route proofs pass. This locates host failures but does
   not establish their cause or device availability then. Faster awake manager
   startup has not eliminated these errors.
+  Diagnostic.23's first actual RTC sleep has no timing errors: a successful
+  35.403-second collection span overlaps sleep. A 0.637-second post-return clock
+  bracket places its end approximately 3.80–4.44 seconds after the recorded PM return,
+  assuming negligible short-term relative clock drift. Investigate that tail
+  separately from the expected sleep wait; no exact network-ready time or cause
+  is established. Retained timing permits further analysis without physical input.
   [Report 200](docs/200-diagnostic23-pm-qualification.md). Use the new timing on the next
   attended sleep after fresh qualification of the now-installed diagnostic.23;
   diagnostic.22's continuation is historical. Earlier untimestamped failures
@@ -234,17 +240,26 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   RAM/CPU or battery saving is claimed.
   [Report 199](docs/199-diagnostic23-installation-and-pty-validation.md).
 
-- [ ] Qualify diagnostic.23 suspend/debug and actual sleep on its new boot.
+- [x] Qualify diagnostic.23 initial suspend/debug and actual sleep on its new boot.
   Its installed kernel removes legacy PTY allocation and passes awake checks;
   all seven debug checks also pass with the owner's warning/display confirmation
   at PM7/0 and stable SDIO usage. The awake RTC rehearsal passes with restored
-  alarm and original power policy; actual RTC sleep is next.
-  Earlier diagnostic.22 sleep evidence cannot
-  qualify this image. [Report 200](docs/200-diagnostic23-pm-qualification.md).
-  Obtain fresh observer readiness, then run freezer, driver and late/noirq checks
-  before an awake rehearsal and actual RTC sleep. Keep long speaker warnings
-  and retain the host timing spans for the remaining collection-delay question.
+  alarm and original power policy. The first connected-USB actual RTC sleep passes
+  at PM8/0 with both routes, retained keypad and complete restoration; the owner
+  confirms the long warning and normal untouched display return.
+  The sequence used fresh observer readiness and this boot's freezer, driver and
+  late/noirq evidence; diagnostic.22's continuation was not reused. Long warnings
+  and host timing were retained for the collection-delay investigation.
+  [Report 200](docs/200-diagnostic23-pm-qualification.md).
   Broader power/cable profiles, CPU retention and energy remain separate.
+
+- [ ] Repeat diagnostic.23 connected-USB actual sleep in a bounded four-cycle
+  batch with fresh observer readiness. Use the unused continuation
+  `.local/diagnostics/20261007T100552.286876Z/qualification-next.json` and original
+  rehearsal `6dac26e6365247dea7ceeeb0d2664c7b`; review each result before advancing
+  and retain host timing. This extends the single qualified sleep in
+  [report 200](docs/200-diagnostic23-pm-qualification.md), not a claim of long-term
+  reliability, energy savings or another connection profile.
 
 - [ ] Identify the source of the charging recorder's 7 October SSH connection
   reset if it recurs. The original trace retains only inventory and sample zero;

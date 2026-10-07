@@ -20,8 +20,10 @@ Current installed image: diagnostic.23; awake qualification and initial PM check
 [200 — Diagnostic.23 PM qualification](200-diagnostic23-pm-qualification.md)
 records seven passing debug checks, both-route recovery, retained keypad and
 stable SDIO usage at PM7/0. All warnings/display returns are owner-confirmed;
-collection failures retain timestamped evidence. The awake RTC rehearsal also
-passes; actual sleep remains pending.
+collection failures retain timestamped evidence. Awake rehearsal and the first
+actual connected-USB RTC sleep also pass, with owner-confirmed warning and
+untouched display return at PM8/0. The actual sleep's successful SSH response
+spans sleep; its duration is not wake latency. Repeatability and energy remain open.
 [199 — Diagnostic.23 installation](199-diagnostic23-installation-and-pty-validation.md)
 records verified flashing, owner-confirmed login, passing awake checks and
 modern terminal compatibility. Legacy device-unit records fall by 512,

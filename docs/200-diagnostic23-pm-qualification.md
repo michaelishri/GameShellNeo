@@ -1,11 +1,14 @@
 # Diagnostic.23 suspend/resume qualification
 
-7 October 2026; capture timestamps are UTC. NEO-138 is in progress.
+7 October 2026; capture timestamps are UTC. NEO-138 is complete.
 The initial freezer, driver and first late/noirq debug checks pass on diagnostic.23/kernel
 `6.18.54-gameshellneo22`, boot `7cc788ef-2070-4ab9-887a-1af70c074713`.
 The owner confirms the clear warnings and normal dim-console returns for the
 initial stages and four late/noirq repeats. All seven debug checks pass at PM7/0.
-The awake RTC rehearsal also passes; actual sleep remains unqualified.
+The awake RTC rehearsal and first actual connected-USB RTC sleep also pass.
+The owner confirms the actual sleep's clear warning and normal untouched
+dim-console return. Final PM is 8/0. CPU retention, energy and broader
+repeatability remain unqualified.
 [Report 199](199-diagnostic23-installation-and-pty-validation.md) records the
 verified installation, awake checks and measured terminal-startup improvement.
 
@@ -143,7 +146,7 @@ Original logs and offline timing summaries are
 `.local/neo138-platform-repeat-{1,2,3,4}.log` and the matching `-timing.json`
 files. No source, driver, charging or audio-level change was made during the batch.
 
-## Remaining qualification
+## Awake RTC rehearsal
 
 The owner confirmed the complete batch and was informed that the next awake RTC
 rehearsal keeps the screen on. It ran using the fresh seven-check history:
@@ -162,7 +165,82 @@ input and the original logind policy are handed back, with no retained policy,
 PM controls, RTC or console owner. Tracing restores. The same boot remains at
 PM7/0, SDIO usage 2 and brightness/backlight power 1/0.
 
-This validates awake alarm delivery and cleanup, not waking from sleep. The
-owner has been asked for separate watching/listening readiness before one actual
-connected-USB RTC-wake attempt. No real sleep has run on this kernel at this
-checkpoint.
+This validates awake alarm delivery and cleanup, not waking from sleep.
+The validated host timing contains no errors; its SHA-256 is
+`09fe6356bfd14d5183c4d1cfd2f3bfa4875098abb42c472b2ec22d5b175a9fd8`.
+The owner then separately confirmed watching/listening readiness for actual sleep.
+
+## First actual connected-USB RTC sleep
+
+At source checkpoint `4186995`, the saved task was submitted once:
+
+```sh
+task device:sleep-rtc QUALIFICATION=.local/neo138-reference-history.json \
+  REHEARSAL=6dac26e6365247dea7ceeeb0d2664c7b ATTENDED=1
+```
+
+Capture: `.local/diagnostics/20261007T100552.286876Z/result.json`, run
+`17538b4f0c3a4d158beb9e2b3cc38088`, SHA-256
+`8ccfbb6483f4c0895c161486c40f6044ca9ccb89b65873f94d53a8551810520a`.
+The original log is `.local/neo138-first-sleep.log`.
+
+Functional RTC wake, both independent SSH routes, process memory and original
+keypad retention pass. Keypad, USB and Wi-Fi traces restore without loss.
+The one-second level-5 warning passes playback/restoration checks; the owner
+confirms hearing it and seeing the normal dim console return without touching
+the cable or controls. POWER input and the original logind policy return, with
+no retained policy, drop-in, PM controls, RTC or console owner.
+
+RTC IRQ31 advances 2 → 3 with one alarm event (`0xa0`). The alarm-to-return
+interval is 31.768 seconds; entry-to-return is 31.160 seconds. The complete
+trace supports 28.748 seconds inside the actual s2idle boundary, with all four
+late/noirq phases and RSB noirq suspend/resume present. No timekeeping freeze
+pair is observed; the clock gap is within sampling uncertainty. These are
+sleep/diagnostic intervals, not normal wake latency or CPU-residency evidence.
+
+Final PM is 8/0, every failure counter is zero, SDIO usage stays 2 with unchanged
+runtime policy, and brightness/backlight power is 1/0 on the original boot.
+This first connected-USB sleep is functionally qualified; repeated sleeps,
+other power/cable profiles, CPU retention and energy remain separate work.
+
+## Sleep collection timing and its limits
+
+The actual sleep's host timing capture validates with no errors and one PM
+submission. Seven collection clock samples were recorded. One successful
+`clock.sample` span lasts 35.403 seconds, mainly a 35.232-second command-response
+wait. The sampled device BOOTTIME is 1739.085768 seconds, near the recorded
+entry at 1738.937384 seconds; the result was delivered after the sleep interval.
+Do not treat this whole command duration as a delay after resume.
+
+For an explicit bounded comparison, the shortest post-return sample brackets
+device BOOTTIME 1799.339492 seconds within a 0.637073-second host span. If
+`Hbegin` and `Hend` are that host span's monotonic endpoints and `C` is the
+sampled device BOOTTIME, the clock-offset interval is `[Hbegin-C, Hend-C]`.
+Mapping the recorded return at 1770.096935 seconds through that interval puts
+the long collection span's end approximately 3.80–4.44 seconds after return.
+Its start lies about 0.45 seconds before to 0.19 seconds after the entry sample.
+These bounds assume negligible relative clock drift over this short capture;
+they are transport/sample brackets, not exact network-ready times.
+
+The evidence shows a successful response spanning sleep and a remaining
+post-return tail. It does not attribute that tail to kernel resume, SSH
+scheduling, TCP retransmission or host USB handling. Nor does a successful
+command prove the cause of the separate late/noirq collection failures.
+Their timestamped evidence remains available for analysis without another
+physical test.
+
+Offline timing summary: `.local/neo138-first-sleep-timing.json`, from
+`task device:ssh-timing-report CAPTURE=.local/diagnostics/20261007T100552.286876Z`.
+Original timing SHA-256:
+`eb746be671b22c926f812e6af60d6b2564a17f35aa10fd3b7410b336a61cec24`.
+
+## Next qualification
+
+The unused continuation is
+`.local/diagnostics/20261007T100552.286876Z/qualification-next.json`, SHA-256
+`89a9e9a983b1533a065218decf2ad6f141f2ae10a873dc837f0603ffecb80c06`.
+It contains seven debug references and this one actual sleep. The original awake
+rehearsal is `6dac26e6365247dea7ceeeb0d2664c7b`.
+Next, obtain readiness for a bounded four-cycle connected-USB actual-sleep batch,
+reviewing each original result and preserving the continuation lineage. No
+further sleep test is running at this completed checkpoint.

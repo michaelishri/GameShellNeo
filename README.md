@@ -16,8 +16,9 @@ measurements do not establish wake latency or battery savings. Seven PM debug
 checks also pass, with both routes recovered, original keypad retention and
 stable SDIO usage. The owner confirms clear warnings and normal dim-console
 returns. [Report 200](docs/200-diagnostic23-pm-qualification.md) records PM7/0 and
-the retained collection errors. The awake RTC rehearsal also passes; actual
-sleep qualification is next.
+the retained collection errors. The awake RTC rehearsal and first actual
+connected-USB RTC sleep also pass, with an owner-confirmed warning and normal
+untouched display return. Final PM is 8/0; repeated sleep and energy remain open.
 [Report 198](docs/198-legacy-pty-startup-candidate.md) records the source rationale,
 terminal checks and artifact hashes; [report 199](docs/199-diagnostic23-installation-and-pty-validation.md)
 records installation, terminal compatibility and repeated timings.

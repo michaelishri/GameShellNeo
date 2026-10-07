@@ -1642,7 +1642,10 @@ includes a trapezoidal **uncalibrated sampled charge estimate** for the awake
 interval only; it does not account for unseen current variation between samples
 and is not a sleep-charge measurement. A full-battery plateau is not evidence
 that charging during sleep is broken. [Baseline validation](docs/182-awake-charging-baseline.md)
-records the initial result and remaining physical work.
+records the initial full-battery result. The subsequent
+[partial-discharge and charging session](docs/183-partial-discharge-charging-validation.md)
+passed an awake baseline below 100%, while preserving an earlier transport
+failure and the unresolved voltage/gauge and sleep-charge qualifications.
 
 `device:idle-sample ROUTE=wifi SECONDS=600` records a repeatable awake-idle
 scenario after one minute of settling. Unplug USB, keep Wi-Fi associated and

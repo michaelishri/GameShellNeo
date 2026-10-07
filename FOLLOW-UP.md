@@ -2,15 +2,22 @@
 
 Record deferred questions and activities here as they arise.
 
-**Partial-discharge checkpoint, 7 October 2026:** fresh USB/Wi-Fi and PM-health
+**Partial-discharge/charging checkpoint, 7 October 2026:** fresh USB/Wi-Fi and PM-health
 checks passed on a new diagnostic.20 boot. After the owner unplugged USB, the
 saved eleven-minute awake protocol completed: 61 measured samples, reported
 97% → 77%, average 254.89 mA and an uncalibrated 42.48 mAh estimate. Separate
 Wi-Fi inspection confirmed the disconnected state before requesting reconnect.
-No sleep, screen blanking or charging-setting change occurred. The recorder is
-finished; USB reconnection and the corresponding awake charging baseline are
-pending owner confirmation. [Report 183](docs/183-partial-discharge-charging-validation.md).
-NEO-117's direct sleep-charge criterion remains open.
+After owner-confirmed reconnect, the first charging attempt lost SSH after one
+sample and remains incomplete. Both routes and PM health recovered; the original
+process had exited and Mac history showed no intervening sleep. A distinct
+two-minute trace then passed 13 samples, 182–195 mA and 82% → 86%, with an
+uncalibrated sampled estimate of 6.28 mAh. Its voltage telemetry was 4.2559 V
+against the unchanged 4.2 V configured target: NEO-10 remains unresolved.
+Final USB/Wi-Fi health passes on the same boot at PM0/0; no sleep, screen
+blanking or charging-setting change occurred. USB is connected and no test is
+running. [Report 183](docs/183-partial-discharge-charging-validation.md).
+NEO-117's direct sleep-charge criterion remains open; defer extended charging
+experiments while the voltage discrepancy is unresolved.
 
 **Unattended awake preparation, 6 October 2026:** NEO-120 and NEO-121 add saved
 read-only charging inventory and a bounded awake baseline. Both pass host and
@@ -88,6 +95,15 @@ Agreed scope and policies are recorded in [the initial base requirements](docs/0
 The feasibility investigation, supplied Allwinner-document review and focused firmware/PMIC trace are complete. **Start with [the implementation plan](docs/20-base-implementation-plan.md)** and its supporting reports 17–19. The first [read-only device baseline](docs/21-installed-hardware-baseline.md) is now captured. Unchecked items below require implementation, a design decision or hardware validation. At baseline capture, no image build, suspend experiment or battery-endurance test had been performed; the later build workflow is in [report 24](docs/24-building-and-testing.md).
 
 ## Diagnostic implementation follow-up
+
+- [ ] Identify the source of the charging recorder's 7 October SSH connection
+  reset if it recurs. The original trace retains only inventory and sample zero;
+  the command failed, its process exited, both routes returned, the same boot
+  passed health checks, and no new kernel or intervening Mac sleep event was
+  found. A distinct bounded repeat passed. These facts do not attribute the
+  reset to the GameShell USB driver, Mac or tailnet. Preserve separate original
+  and repeat evidence; never treat an incomplete trace as a measurement pass.
+  [Report 183](docs/183-partial-discharge-charging-validation.md).
 
 - [x] NEO-121: `device:charge-baseline SECONDS=120` records bounded awake,
   USB-connected telemetry with timestamp/boot/PM and state checks, private

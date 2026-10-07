@@ -32,8 +32,9 @@ read-only task and its passing awake hardware inspection.
 bounded telemetry task, passing two-minute full-battery baseline and its
 uncalibrated measurement limits.
 [183 — Partial discharge and charging validation](183-partial-discharge-charging-validation.md)
-records the completed awake discharge on a new boot; physical reconnection and
-the corresponding awake charging baseline remain pending.
+records the completed awake discharge and partial-charge baseline on a new
+boot, the preserved first attempt's transport failure, and the recurring
+voltage/gauge uncertainty. Direct sleep-charge evidence remains open.
 
 Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)

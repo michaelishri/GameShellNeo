@@ -17,10 +17,14 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.22.
+[199 — Diagnostic.23 installation](199-diagnostic23-installation-and-pty-validation.md)
+records verified Mac staging and the attended warning/shutdown; card writing
+and new-boot terminal/startup qualification remain pending.
 [198 — Legacy PTY startup candidate](198-legacy-pty-startup-candidate.md)
 identifies 512 legacy-terminal device-unit records, removes their kernel
 preallocation in diagnostic.23 and saves ordinary-user Unix98/SSH terminal
-checks. Installed-image startup improvements remain to be measured.
+checks. The candidate is checksum-verified on the Mac, awaiting the DEV-card
+swap. Installed-image startup improvements remain to be measured.
 [197 — SSH collection timing](197-ssh-collection-timing.md) records host-only
 instrumentation, three passing awake route batches, unchanged original sleep
 evidence and a reproducible first-session delay with a user-manager unit-loading

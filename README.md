@@ -6,7 +6,8 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.23 is built and offline-verified, awaiting installation. It disables
+Diagnostic.23 is built, offline-verified and checksum-verified on the Mac,
+awaiting the DEV-card swap. It disables
 unused legacy PTY allocation while retaining Unix98 terminals and the existing
 console support. The diagnostic.22 baseline has 512 legacy-terminal device-unit
 records among 588 user-manager units. The candidate's effect on startup time

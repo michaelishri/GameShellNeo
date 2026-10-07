@@ -195,8 +195,24 @@ The raw image is under `.local/artifacts/`, and its compressed transfer and
 manifest are under `.local/flash/`. They contain private provisioning and must
 remain private. The verified candidate checkpoint is
 `.local/recovery/diagnostic23-no-legacy-pty-candidate`; the previous diagnostic.22
-checkpoint and image remain available. The candidate is prepared locally;
-transfer to the Mac awaits confirmation of regular Wi-Fi. No card was written.
+checkpoint and image remain available.
+
+## Mac staging checkpoint
+
+NEO-137, 7 October 2026, approximately 09:30 UTC. The owner confirmed regular
+Wi-Fi, and `task mac:stage` completed successfully. It repacked the verified
+source, transferred the 269,588,963-byte private archive to the owner's Mac,
+and verified both compressed and full 4 GiB image checksums there. They match
+the artifact table above. The saved flash helper and transfer manifest select
+diagnostic.23; no card was written and diagnostic.22 remains installed.
+
+Private log: `.local/neo137-stage.log`, SHA-256
+`e9fdbf211fab153b45c85c65e3177a91b2c6544cccfccb8f59dcdebc831df6ff`.
+Transfer manifest: `.local/flash/transfer.json`, SHA-256
+`1211164e23ca7200495dc2f85f0c03f7ad85e117d8dcabd4f9c43996b5e1b681`.
+[Report 199](199-diagnostic23-installation-and-pty-validation.md) continues
+with the owner's readiness, warning and shutdown. Card inspection, flash/readback
+and new-boot qualification follow as separate evidence.
 
 ## Installation acceptance and limits
 

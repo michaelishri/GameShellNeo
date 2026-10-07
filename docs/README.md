@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+Diagnostic.21 integration is in progress in
+[187 — Gauge-status image integration](187-diagnostic21-gauge-integration.md).
+It includes patch 0035 and schema-3 inventory admission. Installation and
+hardware qualification remain pending.
+
 Current installed image: diagnostic.20.
 [178 — Guided cable batch](178-guided-cable-batch-hardware-validation.md)
 records four observed alternating USB removal/attachment sleeps, RTC wakes,
@@ -42,10 +47,9 @@ status caching issue and unqualified ADC coherence/accuracy.
 [185 — Extended voltage inventory](185-axp223-voltage-inventory.md) records the
 schema-2 read-only helper and passing hardware capture, preserving raw REG34
 and ADC-byte evidence without interpreting disputed controls or changing settings.
-The separate [AXP223 gauge-status candidate and report 186](https://github.com/michaelishri/GameShellNeo/blob/work/axp223-gauge-status/docs/186-axp223-gauge-status-candidate.md)
-are on `work/axp223-gauge-status`, commit `ec6f286`. Native/ARM32 source checks
-and the complete ARM MFD object pass. Image integration and hardware
-qualification remain pending; diagnostic.20 is unchanged.
+[186 — AXP223 gauge-status candidate](186-axp223-gauge-status-candidate.md)
+corrects B8 status caching only for AXP223. Native/ARM32 source tests and the
+complete ARM MFD object pass; no new image has been built or installed.
 
 Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)

@@ -6,6 +6,10 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+Diagnostic.21 is being prepared with the AXP223 gauge-status cache correction;
+diagnostic.20 remains installed. [Report 187](docs/187-diagnostic21-gauge-integration.md)
+records the image identity, inspection contract and validation progress.
+
 Diagnostic.20 has booted after verified full 4 GiB card readback. Both SSH
 routes, integration and awake journal/POWER/RTC checks pass. The MUSB and both
 supply wake controls are disabled as intended
@@ -620,6 +624,20 @@ concurrent changes, wake holds, abort/thaw replay and repeated cycles.
 [Report 71](docs/71-power-supply-notification-freeze.md) explains patch 0013's
 use of the kernel freezer and the remaining hardware/wake-policy qualification.
 Both freezer options are required by the diagnostic configuration checks.
+
+The integrated AXP223 gauge-status correction has saved host-only checks:
+
+```sh
+task test:axp223-gauge-status   # Actual MFD/regmap paths, native and ARM32
+task check:axp223-gauge-driver  # Also compile the complete ARM MFD driver
+```
+
+They exercise live status, cache behavior and read failures without connecting
+to a device. [Report 186](docs/186-axp223-gauge-status-candidate.md) records the
+AXP223-only correction and validation limits. Diagnostic.21 includes it with
+updated inventory admission; build and installation progress are recorded in
+[report 187](docs/187-diagnostic21-gauge-integration.md). This is not an ADC or
+battery-calibration fix.
 
 For the separate deferred-registration/unregister lifetime audit, use
 `task test:power-supply-lifetime`. It reproduces the original cancellation
@@ -1619,17 +1637,24 @@ The local PM lock prevents overlap with another saved PM workflow.
 The targeted regmap reads verify the Linux 6.18.54 map layout and use exact
 seven-byte reads without buffered read-ahead. Undocumented charge registers
 E2/E3 and IRQ status are excluded. Nonvolatile fields, including calibration
-status and configured capacity, are explicitly labeled as possibly cached.
-Changing kernel series or map layout requires a new source audit. A completed
+status on diagnostic.20 and configured capacity on both supported images, are
+explicitly labeled as possibly cached. Schema 3 accepts only the audited pairs
+diagnostic.20/kernel `6.18.54-gameshellneo19` and diagnostic.21/kernel
+`6.18.54-gameshellneo20`, requiring cached and volatile B8 respectively.
+Unexpected pairings or observed cache metadata are rejected before register reads.
+A completed
 inventory is not a charging test: instantaneous current and percentage do not
 measure charge gained while asleep. See [measurement design](docs/180-sleep-charge-measurement-design.md)
-and [inventory validation](docs/181-charge-inventory-validation.md). Schema 2
-adds raw REG34 and battery-voltage bytes 78/79. REG34 bit 2 is preserved without
+and [inventory validation](docs/181-charge-inventory-validation.md). The inventory
+preserves raw REG34 and battery-voltage bytes 78/79. REG34 bit 2 is recorded without
 an enabled/disabled interpretation because the manuals disagree. The voltage
 bytes are separate reads: masked and existing Linux formula results are
 diagnostic comparisons, not coherent or calibrated samples. The
 [extended inventory report](docs/185-axp223-voltage-inventory.md) records the
-source limits, tests and hardware observation.
+source limits, tests and historical hardware observation. Schema 3 moves B8's
+decoded controls/status into `assessment.gauge_control` with its explicit source
+label; E0/E1 capacity stays under `cached_configuration`. The embedded inventory
+in `device:charge-baseline` uses the same schema; previous captures stay unchanged.
 
 `device:charge-baseline SECONDS=120` records a connected, awake baseline with
 one sample every ten seconds. `SECONDS` must be a multiple of ten from 60 to

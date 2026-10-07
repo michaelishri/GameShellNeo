@@ -2,15 +2,20 @@
 
 Record deferred questions and activities here as they arise.
 
-- [ ] NEO-124 integration: the AXP223 B8 live-status caching correction is
-  source-tested and pushed as `ec6f286` on
+- [ ] NEO-125 diagnostic.21 integration/qualification (in progress):
+  [report 187](docs/187-diagnostic21-gauge-integration.md) records the new image
+  and strict dual-profile inventory with explicit B8 provenance. Complete the
+  full build/offline verification and then arrange installation and awake
+  hardware checks before fresh PM qualification. Diagnostic.20 remains installed.
+  Source candidate: [report 186](docs/186-axp223-gauge-status-candidate.md)
+  records the source-tested AXP223 B8 volatility correction on
   [work/axp223-gauge-status](https://github.com/michaelishri/GameShellNeo/tree/work/axp223-gauge-status).
-  [Report 186](https://github.com/michaelishri/GameShellNeo/blob/work/axp223-gauge-status/docs/186-axp223-gauge-status-candidate.md)
-  records native/ARM32 source regressions, six expected negative controls and
-  the passing complete ARM MFD object build. Assign a new image identity and
-  update strict inventory metadata/cache labeling before hardware qualification.
-  No image was built or installed. NEO-10 electrical/gauge and NEO-117 direct
-  sleep-charge acceptance remain open; no physical voltage fix is claimed.
+  Assign a new image identity, update the strict inventory cache-metadata
+  admission and cache labels, then qualify fresh B8 reads, unchanged charger/
+  gauge controls, normal boot and PM behavior. The native/ARM32 and MFD object
+  checks do not prove a real calibration transition or physical ADC accuracy.
+  No image was built or installed; diagnostic.20 remains unchanged. NEO-10 and
+  NEO-117 retain electrical and direct sleep-charge qualification.
 
 - [ ] NEO-10/NEO-117 measurement follow-through: [report 184](docs/184-axp223-measurement-source-audit.md)
   finds contradictory REG34[2] polarity, no ADC absolute-accuracy/latch contract,

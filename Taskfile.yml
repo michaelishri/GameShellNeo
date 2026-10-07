@@ -97,6 +97,7 @@ tasks:
       - task: test:usb-suspend
       - task: test:usb-phy-suspend
       - task: test:power-supply-suspend
+      - task: test:axp223-gauge-status
       - task: test:brcmfmac-sleep
       - task: test:brcmfmac-freezer
       - task: test:brcmfmac-pm
@@ -251,6 +252,14 @@ tasks:
   test:power-supply-suspend:
     desc: Check actual power-supply notification functions across freeze and thaw, native and ARM32
     cmds: [bash tools/run-logged.sh power-supply-suspend python3 tools/check-power-supply-suspend.py]
+
+  test:axp223-gauge-status:
+    desc: Check actual AXP223 volatility and regmap cache read decisions, native and ARM32
+    cmds: [bash tools/run-logged.sh axp223-gauge-status python3 tools/check-axp223-gauge-status.py]
+
+  check:axp223-gauge-driver:
+    desc: Run gauge-status regressions and compile the complete ARM MFD driver
+    cmds: [bash tools/run-logged.sh axp223-gauge-driver python3 tools/check-axp223-gauge-status.py --compile-driver]
 
   test:power-supply-lifetime:
     desc: Reproduce deferred notification teardown with original and test-only reordered core functions; native and ARM32

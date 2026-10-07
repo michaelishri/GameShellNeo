@@ -17,11 +17,18 @@ IMAGE = Path('/etc/gameshellneo/image.json')
 BOARD = Path('/sys/firmware/devicetree/base/compatible')
 # Deliberately exclude IRQ status, undocumented E2/E3 and out-of-range E8/EC.
 REGISTERS = (0x00, 0x01, 0x33, 0x34, 0x78, 0x79, 0xb8, 0xb9, 0xe0, 0xe1, 0xe6)
-VOLATILE = frozenset((0x00, 0x01, 0x78, 0x79, 0xb9))
+SCHEMA_VERSION = 3
+PROFILES = {
+    ('0.1.0-diagnostic.20', '6.18.54-gameshellneo19'):
+        ('axp22x-cached-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb9))),
+    ('0.1.0-diagnostic.21', '6.18.54-gameshellneo20'):
+        ('axp223-volatile-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb8, 0xb9))),
+}
 LIMITS = [
     'One awake, sequential inventory; not an atomic electrical snapshot.',
     'Nonvolatile register values may come from the kernel cache, including '
-    'B8 calibration status and E0/E1 capacity. No cache bypass is performed.',
+    'E0/E1 capacity. B8 provenance follows the admitted image/kernel profile '
+    'and observed metadata. No cache bypass is performed.',
     'Current is instantaneous; percentage and configured capacity are not '
     'integrated charge or calibrated battery capacity.',
     'REG34 bit 2 has contradictory polarity descriptions in the AXP223 '
@@ -65,7 +72,14 @@ def metadata():
             for name in ('name', 'range', 'access', 'cache_only', 'cache_bypass')}
 
 
-def validate_metadata(meta):
+def profile_for(kernel, version):
+    try:
+        return PROFILES[(version, kernel)]
+    except KeyError:
+        raise ValueError('Re-audit the exact image/kernel register contract') from None
+
+
+def validate_metadata(meta, volatile):
     # Pinned AXP22x 8-bit regmap, stride 1, no hidden registers. Its debugfs
     # output is exactly seven bytes per register ("00: ff\n"). Reject any
     # changed layout BEFORE opening/reading the register file.
@@ -80,12 +94,12 @@ def validate_metadata(meta):
         if (not match or int(match[1], 16) != address or
                 match[2] != 'y' or match[5] != 'n'):
             raise ValueError('Unexpected register visibility or ordering')
-        if address in REGISTERS and (match[4] == 'y') != (address in VOLATILE):
+        if address in REGISTERS and (match[4] == 'y') != (address in volatile):
             raise ValueError('Changed cache policy for an observed register')
 
 
-def read_registers(meta):
-    validate_metadata(meta)
+def read_registers(meta, volatile):
+    validate_metadata(meta, volatile)
     output = {}
     # os.pread avoids Python buffered read-ahead into other PMIC registers.
     fd = os.open(REGMAP/'registers', os.O_RDONLY | os.O_CLOEXEC)
@@ -98,7 +112,7 @@ def read_registers(meta):
             if not match:
                 raise ValueError(f'Register {address:02x} read failed or layout changed')
             output[f'{address:02x}'] = dict(value=int(match[1], 16),
-                source='volatile-regmap-read' if address in VOLATILE else 'regmap-cache-possible',
+                source='volatile-regmap-read' if address in volatile else 'regmap-cache-possible',
                 before=start, after=end)
     finally:
         os.close(fd)
@@ -116,12 +130,13 @@ def decode(registers):
     return dict(
         cached_configuration=dict(
             charger_enabled=bool(values['33'] & 0x80),
-            gauge_enabled=bool(gauge & 0x80), coulomb_counter_enabled=bool(gauge & 0x40),
-            capacity_calibration_enabled=bool(gauge & 0x20),
-            calibration_in_progress_bit=bool(gauge & 0x10),
             capacity_configured=bool(high & 0x80), capacity_raw=capacity_raw,
             configured_capacity_uah=capacity_raw*1456 if high & 0x80 else None,
             warning1_percent=(values['e6'] >> 4)+5, warning2_percent=values['e6'] & 0xf),
+        gauge_control=dict(raw=gauge, source=registers['b8']['source'],
+            gauge_enabled=bool(gauge & 0x80), coulomb_counter_enabled=bool(gauge & 0x40),
+            capacity_calibration_enabled=bool(gauge & 0x20),
+            calibration_in_progress_bit=bool(gauge & 0x10)),
         charger_control2=dict(raw=values['34'], bit2=(values['34'] >> 2) & 1,
             source='regmap-cache-possible',
             bit2_interpretation='unresolved: Chinese v1.1 says 1 follows charging '
@@ -153,22 +168,21 @@ def supply_inventory():
 def inspect(kernel, version, result=None):
     if result is None:
         result = {}
-    result.update(schema_version=2, kind='axp223-charge-inventory', completed=False,
+    result.update(schema_version=SCHEMA_VERSION, kind='axp223-charge-inventory', completed=False,
                   limits=LIMITS)
-    if not re.fullmatch(r'6\.18\.54-gameshellneo[0-9]+', kernel):
-        raise ValueError('Re-audit regmap source before using another kernel series')
+    profile, volatile = profile_for(kernel, version)
     image = json.loads(read(IMAGE))
     compatibles = BOARD.read_bytes().rstrip(b'\0').split(b'\0')
-    if (os.uname().release != kernel or image['version'] != version or
+    if (os.uname().release != kernel or image['version'] != version or image['kernel'] != kernel or
             image['board'] != 'gameshellneo-cpi31' or
             b'clockwork,clockworkpi-cpi3' not in compatibles or
             (PMIC/'of_node/compatible').read_bytes() != b'x-powers,axp223\0'):
         raise ValueError('Expected matching CPI3 image, kernel and AXP223 identity')
     before = checkpoint()
-    result.update(kernel=kernel, image=image, before=before)
+    result.update(kernel=kernel, image=image, before=before, cache_profile=profile)
     meta = metadata()
     result['metadata'] = meta
-    result['registers'] = read_registers(meta)
+    result['registers'] = read_registers(meta, volatile)
     result['supplies'] = supply_inventory()
     if metadata() != meta:
         raise ValueError('Regmap metadata/cache mode changed during inventory')
@@ -184,7 +198,7 @@ def main():
     parser.add_argument('--kernel', required=True)
     parser.add_argument('--image', required=True)
     args = parser.parse_args()
-    result = dict(schema_version=2, kind='axp223-charge-inventory', completed=False,
+    result = dict(schema_version=SCHEMA_VERSION, kind='axp223-charge-inventory', completed=False,
                   limits=LIMITS)
     try:
         inspect(args.kernel, args.image, result)

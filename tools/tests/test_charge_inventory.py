@@ -14,8 +14,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import charge_inventory as charge
 
 
-def metadata():
+LEGACY = charge.PROFILES[('0.1.0-diagnostic.20', '6.18.54-gameshellneo19')][1]
+CURRENT = charge.PROFILES[('0.1.0-diagnostic.21', '6.18.54-gameshellneo20')][1]
+
+
+def metadata(volatile_b8=False):
     volatile = {0, 1, 0x78, 0x79, 0xb9}
+    if volatile_b8:
+        volatile.add(0xb8)
     rows = [f'{n:02x}: y n {"y" if n in volatile else "n"} n' for n in range(0xe7)]
     return dict(name='axp20x-rsb', range='0-e6', access='\n'.join(rows),
                 cache_only='N', cache_bypass='N')
@@ -25,7 +31,8 @@ def register_data(**changes):
     values = {f'{n:02x}': 0 for n in charge.REGISTERS}
     values.update({'33': 0xc6, 'b8': 0xc0, 'b9': 0xe4, 'e0': 0x83, 'e1': 0x38, 'e6': 0xa0})
     values.update(changes)
-    return {k: dict(value=v) for k, v in values.items()}
+    return {k: dict(value=v, source='volatile-regmap-read' if int(k, 16) in LEGACY
+                   else 'regmap-cache-possible') for k, v in values.items()}
 
 
 def checkpoint(now=100, offset=50):
@@ -36,6 +43,24 @@ def checkpoint(now=100, offset=50):
 
 
 class RegisterReads(unittest.TestCase):
+    def test_changed_b8_policy_is_required_only_on_the_new_profile(self):
+        for expected, observed in ((LEGACY, True), (CURRENT, False)):
+            with self.subTest(expected=expected), patch.object(charge.os, 'open') as opened:
+                with self.assertRaisesRegex(ValueError, 'cache policy'):
+                    charge.read_registers(metadata(observed), expected)
+                opened.assert_not_called()
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory/'registers').write_bytes(b''.join(f'{n:02x}: d0\n'.encode() for n in range(0xe7)))
+            with patch.object(charge, 'REGMAP', directory):
+                result = charge.read_registers(metadata(True), CURRENT)
+            self.assertEqual(result['b8']['source'], 'volatile-regmap-read')
+            self.assertEqual(result['e0']['source'], 'regmap-cache-possible')
+            report = charge.decode(result)
+            self.assertEqual(report['gauge_control']['source'], 'volatile-regmap-read')
+            self.assertTrue(report['gauge_control']['calibration_in_progress_bit'])
+            self.assertNotIn('calibration_in_progress_bit', report['cached_configuration'])
+
     def test_only_documented_addresses_read_without_buffered_read_ahead(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
@@ -43,7 +68,7 @@ class RegisterReads(unittest.TestCase):
             with patch.object(charge, 'REGMAP', directory), \
                     patch.object(charge.os, 'open', wraps=os.open) as opened, \
                     patch.object(charge.os, 'pread', wraps=os.pread) as reads:
-                result = charge.read_registers(metadata())
+                result = charge.read_registers(metadata(), LEGACY)
             opened.assert_called_once_with(directory/'registers', os.O_RDONLY | os.O_CLOEXEC)
             self.assertEqual([(c.args[1], c.args[2]) for c in reads.call_args_list],
                 [(7, a*7) for a in (0, 1, 0x33, 0x34, 0x78, 0x79, 0xb8, 0xb9, 0xe0, 0xe1, 0xe6)])
@@ -68,7 +93,7 @@ class RegisterReads(unittest.TestCase):
         for change in changes:
             with self.subTest(change=change), patch.object(charge.os, 'open') as opened:
                 with self.assertRaises(ValueError):
-                    charge.read_registers(good | change)
+                    charge.read_registers(good | change, LEGACY)
                 opened.assert_not_called()
 
     def test_error_short_and_wrong_address_reads_fail_and_close(self):
@@ -77,12 +102,27 @@ class RegisterReads(unittest.TestCase):
                     patch.object(charge.os, 'pread', return_value=line) as read, \
                     patch.object(charge.os, 'close') as close:
                 with self.assertRaises(ValueError):
-                    charge.read_registers(metadata())
+                    charge.read_registers(metadata(), LEGACY)
                 read.assert_called_once_with(42, 7, 0)
                 close.assert_called_once_with(42)
 
 
 class Meaning(unittest.TestCase):
+    def test_gauge_provenance_does_not_relabel_cached_registers(self):
+        for source in ('volatile-regmap-read', 'regmap-cache-possible'):
+            registers = register_data(b8=0xd0)
+            registers['b8']['source'] = source
+            report = charge.decode(registers)
+            gauge = report['gauge_control']
+            self.assertEqual(gauge['source'], source)
+            self.assertEqual(gauge['raw'], 0xd0)
+            self.assertTrue(gauge['gauge_enabled'])
+            self.assertTrue(gauge['coulomb_counter_enabled'])
+            self.assertFalse(gauge['capacity_calibration_enabled'])
+            self.assertTrue(gauge['calibration_in_progress_bit'])
+            self.assertNotIn('gauge_enabled', report['cached_configuration'])
+            self.assertEqual(report['charger_control2']['source'], 'regmap-cache-possible')
+
     def test_disputed_control_polarity_remains_raw_and_possibly_cached(self):
         for raw in (0, 4, 0xfb, 0xff):
             result = charge.decode(register_data(**{'34': raw}))['charger_control2']
@@ -121,7 +161,7 @@ class Meaning(unittest.TestCase):
         self.assertIsNone(report['cached_configuration']['configured_capacity_uah'])
         self.assertFalse(report['cached_configuration']['capacity_configured'])
         self.assertFalse(report['gauge_result']['valid'])
-        self.assertTrue(report['cached_configuration']['calibration_in_progress_bit'])
+        self.assertTrue(report['gauge_control']['calibration_in_progress_bit'])
         self.assertFalse(charge.decode(register_data(b9=0xff))['gauge_result']['valid'])
 
     def test_awake_clock_uncertainty_allowed_but_sleep_and_boot_changes_rejected(self):
@@ -136,13 +176,55 @@ class Meaning(unittest.TestCase):
 
 
 class Collection(unittest.TestCase):
+    def test_only_audited_image_kernel_pairs_are_admitted(self):
+        for version, kernel in (('0.1.0-diagnostic.20', '6.18.54-gameshellneo20'),
+                                ('0.1.0-diagnostic.21', '6.18.54-gameshellneo19'),
+                                ('0.1.0-diagnostic.22', '6.18.54-gameshellneo21'),
+                                ('0.1.0-diagnostic.20', '6.18.55-gameshellneo19')):
+            with self.subTest(version=version, kernel=kernel), \
+                    patch.object(charge, 'read') as reads, patch.object(charge.os, 'open') as opened:
+                with self.assertRaisesRegex(ValueError, 'exact image/kernel'):
+                    charge.inspect(kernel, version)
+                reads.assert_not_called()
+                opened.assert_not_called()
+
+    def test_complete_inventory_retains_both_profile_contracts(self):
+        for version, kernel, current in (('0.1.0-diagnostic.20', '6.18.54-gameshellneo19', False),
+                                         ('0.1.0-diagnostic.21', '6.18.54-gameshellneo20', True)):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                image = directory/'image'; board = directory/'board'; pmic = directory/'pmic'
+                (pmic/'of_node').mkdir(parents=True)
+                (pmic/'of_node/compatible').write_bytes(b'x-powers,axp223\0')
+                image_record = dict(version=version, kernel=kernel, board='gameshellneo-cpi31')
+                image.write_text(json.dumps(image_record))
+                board.write_bytes(b'clockwork,clockworkpi-cpi3\0allwinner,sun8i-a33\0')
+                (directory/'registers').write_bytes(b''.join(f'{n:02x}: c0\n'.encode() for n in range(0xe7)))
+                with patch.object(charge, 'IMAGE', image), patch.object(charge, 'BOARD', board), \
+                        patch.object(charge, 'PMIC', pmic), patch.object(charge, 'REGMAP', directory), \
+                        patch.object(charge.os, 'uname', return_value=SimpleNamespace(release=kernel)), \
+                        patch.object(charge, 'metadata', return_value=metadata(current)), \
+                        patch.object(charge, 'checkpoint', side_effect=[checkpoint(), checkpoint(now=200)]), \
+                        patch.object(charge, 'supply_inventory', return_value={}):
+                    result = charge.inspect(kernel, version)
+                    self.assertTrue(result['completed'])
+                    self.assertEqual(result['schema_version'], 3)
+                    self.assertEqual(result['cache_profile'], charge.profile_for(kernel, version)[0])
+                    self.assertEqual(result['assessment']['gauge_control']['source'],
+                        'volatile-regmap-read' if current else 'regmap-cache-possible')
+                    image_record['kernel'] = '6.18.54-gameshellneo99'
+                    image.write_text(json.dumps(image_record))
+                    with patch.object(charge.os, 'open') as opened, self.assertRaises(ValueError):
+                        charge.inspect(kernel, version)
+                    opened.assert_not_called()
+
     def test_kernel_image_and_board_identity_required_before_register_access(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             image = directory/'image'; board = directory/'board'; pmic = directory/'pmic'
             (pmic/'of_node').mkdir(parents=True)
             (pmic/'of_node/compatible').write_bytes(b'x-powers,axp223\0')
-            image.write_text(json.dumps({'version': 'test', 'board': 'gameshellneo-cpi31'}))
+            image.write_text(json.dumps({'version': '0.1.0-diagnostic.20', 'kernel': '6.18.54-gameshellneo19', 'board': 'gameshellneo-cpi31'}))
             board.write_bytes(b'clockwork,clockworkpi-cpi3\0allwinner,sun8i-a33\0')
             with patch.object(charge, 'IMAGE', image), patch.object(charge, 'BOARD', board), \
                     patch.object(charge, 'PMIC', pmic), \
@@ -152,7 +234,7 @@ class Collection(unittest.TestCase):
                     patch.object(charge, 'checkpoint', return_value=checkpoint()), \
                     patch.object(charge, 'validate_continuity'), \
                     patch.object(charge, 'supply_inventory', return_value={}):
-                self.assertTrue(charge.inspect('6.18.54-gameshellneo19', 'test')['completed'])
+                self.assertTrue(charge.inspect('6.18.54-gameshellneo19', '0.1.0-diagnostic.20')['completed'])
                 reads.reset_mock()
                 for kernel, version in [('6.19.0-gameshellneo19', 'test'),
                                         ('6.18.54-gameshellneo20', 'test'),
@@ -161,7 +243,7 @@ class Collection(unittest.TestCase):
                         charge.inspect(kernel, version)
                 board.write_bytes(b'some,other-board\0')
                 with self.assertRaises(ValueError):
-                    charge.inspect('6.18.54-gameshellneo19', 'test')
+                    charge.inspect('6.18.54-gameshellneo19', '0.1.0-diagnostic.20')
                 reads.assert_not_called()
 
     def test_failure_emits_partial_result_without_success(self):

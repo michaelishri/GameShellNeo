@@ -12,7 +12,12 @@ eliminates 512 user-manager device-unit records while modern terminals and
 console support remain intact. Four manager starts load units in 0.59–0.61 s,
 down from 3.44 s; three first USB SSH channel openings take 1.91–1.96 s,
 down from 4.68–4.79 s. PM qualification of this new kernel is next; these
-measurements do not establish wake latency or battery savings.
+measurements do not establish wake latency or battery savings. Its first freezer
+and driver debug checks now pass, with both routes recovered and the original
+keypad connection retained. The owner confirms a clear warning and normal dim
+console. [Report 200](docs/200-diagnostic23-pm-qualification.md) tracks the staged
+PM qualification. Its first late/noirq check also passes; one collection SSH
+failure is retained for investigation. Repeats and actual sleep remain pending.
 [Report 198](docs/198-legacy-pty-startup-candidate.md) records the source rationale,
 terminal checks and artifact hashes; [report 199](docs/199-diagnostic23-installation-and-pty-validation.md)
 records installation, terminal compatibility and repeated timings.

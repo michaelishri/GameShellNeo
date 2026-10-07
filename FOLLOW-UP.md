@@ -198,7 +198,12 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   [Report 191](docs/191-diagnostic21-connected-sleep-repeatability.md).
   NEO-135 adds timestamped host spans and device BOOTTIME brackets without
   changing the five-second collection interval or resubmitting PM. Three awake
-  route batches pass with PM13/0 unchanged. Use the new timing on the next
+  route batches pass with PM13/0 unchanged. NEO-138 captures one failed SSH
+  collection attempt during diagnostic.23's first late/noirq test, followed by
+  successful original-result collection and both route proofs. The failed SSH
+  phase lasts 10.016 seconds inside a 19.920-second attempt; this locates the
+  host failure but does not establish its cause or device availability then.
+  [Report 200](docs/200-diagnostic23-pm-qualification.md). Use the new timing on the next
   attended sleep after fresh qualification of the now-installed diagnostic.23;
   diagnostic.22's continuation is historical. Earlier untimestamped failures
   still cannot be classified. [Report 197](docs/197-ssh-collection-timing.md).
@@ -227,8 +232,11 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   [Report 199](docs/199-diagnostic23-installation-and-pty-validation.md).
 
 - [ ] Qualify diagnostic.23 suspend/debug and actual sleep on its new boot.
-  Its installed kernel removes legacy PTY allocation and passes awake checks
-  with PM0/0, but earlier diagnostic.22 sleep evidence cannot qualify this image.
+  Its installed kernel removes legacy PTY allocation and passes awake checks;
+  the first freezer and driver debug checks also pass with the owner's
+  warning/display confirmation. The first late/noirq check passes at PM3/0,
+  awaiting its observation and four repeats. Earlier diagnostic.22 sleep evidence cannot
+  qualify this image. [Report 200](docs/200-diagnostic23-pm-qualification.md).
   Obtain fresh observer readiness, then run freezer, driver and late/noirq checks
   before an awake rehearsal and actual RTC sleep. Keep long speaker warnings
   and retain the host timing spans for the remaining collection-delay question.

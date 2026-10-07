@@ -621,6 +621,20 @@ concurrent changes, wake holds, abort/thaw replay and repeated cycles.
 use of the kernel freezer and the remaining hardware/wake-policy qualification.
 Both freezer options are required by the diagnostic configuration checks.
 
+The isolated AXP223 gauge-status candidate has saved host-only checks:
+
+```sh
+task test:axp223-gauge-status   # Actual MFD/regmap paths, native and ARM32
+task check:axp223-gauge-driver  # Also compile the complete ARM MFD driver
+```
+
+They exercise live status, cache behavior and read failures without connecting
+to a device. [Report 186](docs/186-axp223-gauge-status-candidate.md) records the
+AXP223-only correction and validation limits. It is not installed: integration
+needs a new image identity and updated inventory metadata admission. Do not
+build it under the existing diagnostic.20 identity or treat it as an ADC or
+battery-calibration fix.
+
 For the separate deferred-registration/unregister lifetime audit, use
 `task test:power-supply-lifetime`. It reproduces the original cancellation
 order and a test-only reordered comparison using actual core functions on

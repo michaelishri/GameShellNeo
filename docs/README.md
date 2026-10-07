@@ -17,9 +17,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.21.
+[190 — Suspend/resume qualification](190-diagnostic21-pm-qualification.md)
+records seven passing attended debug stages, confirmed warnings/display returns
+and the awake RTC rehearsal. Actual sleep is awaiting separate readiness.
 [189 — Installation and gauge validation](189-diagnostic21-installation-and-gauge-validation.md)
 records full card readback, owner-confirmed login, passing awake startup checks
-and fresh B8 reads. Voltage/capacity uncertainty and fresh PM qualification
+and fresh B8 reads. Voltage/capacity uncertainty and actual PM qualification
 remain open. [187 — Gauge-status image integration](187-diagnostic21-gauge-integration.md)
 records patch 0035, schema-3 inventory admission and verified build/transfer.
 

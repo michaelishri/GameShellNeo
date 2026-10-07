@@ -8,7 +8,9 @@ board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
 Diagnostic.21 is installed with the AXP223 gauge-status cache correction.
 Full card readback, startup, both network routes and the live volatile-B8
-inspection pass; fresh suspend/resume qualification remains pending.
+inspection pass. Seven attended suspend-debug checks and the awake RTC rehearsal
+also pass; actual sleep qualification on this image remains pending.
+[Report 190](docs/190-diagnostic21-pm-qualification.md) records these checks.
 [Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md) records
 the hardware results and continuing voltage/capacity uncertainty.
 [Report 187](docs/187-diagnostic21-gauge-integration.md) records its build,

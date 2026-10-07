@@ -18,8 +18,12 @@ Record deferred questions and activities here as they arise.
   installation, owner-confirmed login, awake startup and fresh volatile-B8
   inspection now pass. [Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md)
   records matching reported control values, healthy final USB/Wi-Fi and PM0/0.
-  Run a freshly readied debug sequence and actual RTC-wake checks with long
-  warnings before claiming this image's suspend/resume behavior. B8=`c0` is now
+  NEO-128's seven attended debug checks and awake RTC rehearsal now pass at
+  PM7/0, with owner-confirmed warnings/normal returns and SDIO usage 2
+  ([report 190](docs/190-diagnostic21-pm-qualification.md)). Actual connected-USB
+  RTC wake awaits separate readiness; no actual sleep has run on this image.
+  Use the saved baseline/rehearsal and long warning before that one-shot test.
+  B8=`c0` is now
   a fresh read; E0/E1 remain potentially cached, with no configured capacity.
   Voltage telemetry again reports 4.2559 V against the unchanged 4.2 V target.
   No calibration transition or physical accuracy is established, and no

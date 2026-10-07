@@ -222,19 +222,22 @@ The owner confirmed “Yes—warning clear; dim console returned untouched” fo
 the second test and then noted possible inattention during the first warning.
 No audio settings changed between the two tests. This establishes audibility
 and normal display return for the repeat while preserving the first observation.
-No further screen test is running. The current continuation is
+At this checkpoint no further screen test was running. Its continuation was
 `.local/diagnostics/20261007T082435.420412Z/qualification-next.json`; the initial
 baseline and first continuation are consumed and must not be reused for a new
 sleep. The original awake rehearsal remains
 `b1fef2d2d5cf4a149c39e496ee9c38ba`.
+NEO-134 subsequently consumed this continuation in the four-cycle batch;
+[report 196](196-diagnostic22-connected-sleep-repeatability.md) records its
+successful results and the new current continuation.
 
 ## Remaining qualification
 
 Both actual sleeps pass automated checks, and the second has the owner's clear
 warning, normal display and untouched-return confirmation. The first warning
 remains recorded as unheard, subsequently attributed by the owner to possible
-inattention. The next slice is bounded connected-USB repeatability using the
-second continuation, with fresh readiness for the batch. The seven debug
+inattention. The subsequently completed bounded connected-USB repeatability
+batch is recorded in report 196. The seven debug
 checks and awake rehearsal remain qualified as recorded above.
 Battery/cable/POWER wake profiles, energy and physical battery accuracy remain
 separate; these debug checks do not establish real sleep or charging in sleep.

@@ -67,7 +67,12 @@ Record deferred questions and activities here as they arise.
   warning was missed and the requested repeat's clear warning/untouched normal
   display return is now owner-confirmed
   ([report 195](docs/195-diagnostic22-pm-qualification.md)). Both network routes
-  recover and policy/ownership restore. Post-first-wake ADC inspection passes
+  recover and policy/ownership restore. NEO-134 adds four consecutive actual
+  connected-USB RTC-wake passes with owner-confirmed clear warnings and
+  untouched normal returns; final PM13/0, SDIO2
+  ([report 196](docs/196-diagnostic22-connected-sleep-repeatability.md)). The
+  current continuation is the batch's cycle-4 receipt; earlier receipts are
+  consumed. Other connection/wake profiles remain separate. Post-first-wake ADC inspection passes
   at 4.1558 V with raw `ec/02`, no unused bits and unchanged sampled controls.
   Energy, retention and physical voltage accuracy remain unqualified.
   Fresh

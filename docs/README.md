@@ -17,6 +17,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.22.
+[196 — Connected sleep repeatability](196-diagnostic22-connected-sleep-repeatability.md)
+records four consecutive actual RTC-wake passes, each with both routes, retained
+keypad and restored policy. The owner confirms clear warnings and untouched
+normal returns. Final PM13/0 and stable SDIO usage qualify this bounded USB
+profile; CPU retention and energy remain unqualified.
 [195 — PM qualification](195-diagnostic22-pm-qualification.md) records passing
 freezer, driver and five late/noirq checks with both routes, retained keypad
 and the passing awake RTC rehearsal. Two actual connected-USB RTC sleeps pass

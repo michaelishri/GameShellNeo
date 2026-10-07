@@ -12,10 +12,13 @@ read-only schema-4 inventory pass. The first sample reports about 4.157 V with
 no unused ADC bits set; this does not resolve the earlier voltage discrepancy
 or establish physical accuracy. Seven staged PM debug checks and the awake RTC
 rehearsal also pass, with owner-confirmed warnings/normal display returns;
-two actual connected-USB RTC sleeps pass automated recovery checks. The first
-warning was missed; the owner confirms the requested repeat's clear warning
-and untouched normal display return
-([report 195](docs/195-diagnostic22-pm-qualification.md)).
+six actual connected-USB RTC sleeps pass automated recovery checks, including
+a four-cycle batch. The owner confirms the batch's clear warnings and untouched
+normal display returns. Both routes recover each time, with final PM13/0 and
+stable SDIO usage. [Report 195](docs/195-diagnostic22-pm-qualification.md)
+preserves the initial tests and first missed warning;
+[report 196](docs/196-diagnostic22-connected-sleep-repeatability.md) records the
+completed batch. CPU retention, energy and other power/cable profiles remain open.
 [Report 194](docs/194-diagnostic22-installation-and-adc-validation.md) records
 the hardware checks; [report 193](docs/193-diagnostic22-adc-integration.md)
 records the build, checksums and recovery checkpoint.

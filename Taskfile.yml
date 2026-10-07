@@ -691,6 +691,13 @@ tasks:
     desc: Measure CYCLES=3 fresh USB/Wi-Fi SSH pairs while awake; no sleep or policy change
     cmds: [python3 tools/check-ssh-timing.py]
 
+  device:user-startup:
+    desc: Inspect user-manager startup and test Unix98/SSH terminals awake; LEGACY=either/enabled/disabled
+    env:
+      NEO_ROUTE: '{{.ROUTE | default "usb"}}'
+      NEO_LEGACY_PTYS: '{{.LEGACY | default "either"}}'
+    cmds: [python3 tools/check-user-startup.py]
+
   device:ssh-timing-report:
     desc: Summarize host timing in CAPTURE=private/diagnostics/directory; no device access
     cmds: [python3 tools/check-ssh-timing.py --report]

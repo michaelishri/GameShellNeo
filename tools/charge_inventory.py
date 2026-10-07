@@ -19,12 +19,15 @@ BOARD = Path('/sys/firmware/devicetree/base/compatible')
 REGISTERS = (0x00, 0x01, 0x33, 0x34, 0x78, 0x79, 0xb8, 0xb9, 0xe0, 0xe1, 0xe6)
 SCHEMA_VERSION = 4
 MASKED_ADC_PROFILE = ('0.1.0-diagnostic.22', '6.18.54-gameshellneo21')
+NO_LEGACY_PTY_PROFILE = ('0.1.0-diagnostic.23', '6.18.54-gameshellneo22')
 PROFILES = {
     ('0.1.0-diagnostic.20', '6.18.54-gameshellneo19'):
         ('axp22x-cached-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb9))),
     ('0.1.0-diagnostic.21', '6.18.54-gameshellneo20'):
         ('axp223-volatile-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb8, 0xb9))),
     MASKED_ADC_PROFILE:
+        ('axp223-volatile-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb8, 0xb9))),
+    NO_LEGACY_PTY_PROFILE:
         ('axp223-volatile-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb8, 0xb9))),
 }
 LIMITS = [
@@ -178,7 +181,7 @@ def inspect(kernel, version, result=None):
     result.update(schema_version=SCHEMA_VERSION, kind='axp223-charge-inventory', completed=False,
                   limits=LIMITS)
     profile, volatile = profile_for(kernel, version)
-    adc_width_masked = (version, kernel) == MASKED_ADC_PROFILE
+    adc_width_masked = (version, kernel) in (MASKED_ADC_PROFILE, NO_LEGACY_PTY_PROFILE)
     image = json.loads(read(IMAGE))
     compatibles = BOARD.read_bytes().rstrip(b'\0').split(b'\0')
     if (os.uname().release != kernel or image['version'] != version or image['kernel'] != kernel or

@@ -9,13 +9,21 @@ files and bindings live in `overlay/` and become the third generated patch.
 The same queue is applied by `--apply SOURCE` for local compilation. Input
 changes require a fresh source extraction; do not silently reuse a patched tree.
 
-Patch 0036 is a candidate for the next image, absent from diagnostic.21. It
+Patch 0036 is installed in diagnostic.22 and retained in diagnostic.23. It
 masks unused low-register bits in the shared 9–16-bit ADC helper while retaining
 16-bit values, read order and error propagation. The saved
 `test:axp-adc-width` / `check:axp-adc-drivers` tasks exercise actual source and
 its callers; [report 192](../docs/192-axp-adc-width-correction.md) records the
 evidence and remaining hardware/coherence/accuracy limits. Remove it when an
 equivalent correction is verified in the selected upstream source.
+
+The diagnostic.23 configuration disables `CONFIG_LEGACY_PTYS`, retaining
+`CONFIG_UNIX98_PTYS`, virtual/framebuffer and serial-console support. On
+diagnostic.22, 256 legacy slave devices account for 512 of the user manager's
+588 unit records. This removes their allocation at the kernel source rather
+than filtering udev events or changing SSH/PAM behavior. There is no additional
+kernel patch. [Report 198](../docs/198-legacy-pty-startup-candidate.md) records
+the baseline, build checks and pending installed-image startup comparison.
 
 | Patch | Purpose | Qualification and removal condition |
 | --- | --- | --- |

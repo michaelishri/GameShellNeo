@@ -197,7 +197,9 @@ class Collection(unittest.TestCase):
                                 ('0.1.0-diagnostic.21', '6.18.54-gameshellneo19'),
                                 ('0.1.0-diagnostic.22', '6.18.54-gameshellneo20'),
                                 ('0.1.0-diagnostic.21', '6.18.54-gameshellneo21'),
-                                ('0.1.0-diagnostic.23', '6.18.54-gameshellneo22'),
+                                ('0.1.0-diagnostic.23', '6.18.54-gameshellneo21'),
+                                ('0.1.0-diagnostic.22', '6.18.54-gameshellneo22'),
+                                ('0.1.0-diagnostic.24', '6.18.54-gameshellneo23'),
                                 ('0.1.0-diagnostic.20', '6.18.55-gameshellneo19')):
             with self.subTest(version=version, kernel=kernel), \
                     patch.object(charge, 'read') as reads, patch.object(charge.os, 'open') as opened:
@@ -210,7 +212,8 @@ class Collection(unittest.TestCase):
         for version, kernel, current, masked in (
                 ('0.1.0-diagnostic.20', '6.18.54-gameshellneo19', False, False),
                 ('0.1.0-diagnostic.21', '6.18.54-gameshellneo20', True, False),
-                ('0.1.0-diagnostic.22', '6.18.54-gameshellneo21', True, True)):
+                ('0.1.0-diagnostic.22', '6.18.54-gameshellneo21', True, True),
+                ('0.1.0-diagnostic.23', '6.18.54-gameshellneo22', True, True)):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
                 image = directory/'image'; board = directory/'board'; pmic = directory/'pmic'

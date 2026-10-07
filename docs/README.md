@@ -17,6 +17,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.22.
+[198 — Legacy PTY startup candidate](198-legacy-pty-startup-candidate.md)
+identifies 512 legacy-terminal device-unit records, removes their kernel
+preallocation in diagnostic.23 and saves ordinary-user Unix98/SSH terminal
+checks. Installed-image startup improvements remain to be measured.
 [197 — SSH collection timing](197-ssh-collection-timing.md) records host-only
 instrumentation, three passing awake route batches, unchanged original sleep
 evidence and a reproducible first-session delay with a user-manager unit-loading

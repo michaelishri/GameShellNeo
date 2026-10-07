@@ -212,6 +212,15 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   parser/filesystem cost and session lifecycle before choosing a fix; preserve
   PAM/session behavior and future UI needs. No linger, PAM, SSH, user-service or
   driver setting was changed. [Report 197](docs/197-ssh-collection-timing.md).
+  NEO-136 identifies 256 legacy slave devices and their 512 systemd device-unit
+  records (of 588 total). The diagnostic.23 candidate disables legacy PTY
+  allocation in Kconfig while retaining Unix98/console support. After flash,
+  run `task device:user-startup LEGACY=disabled`, both route timing checks and
+  ordinary startup/PM qualification; compare fresh-session unit-loading time,
+  unit counts and memory separately. The unchanged diagnostic.22 baseline passes
+  both Unix98 data/resize checks and actual SSH terminal allocation, with a fresh
+  3.440-second unit-load measurement. No installed performance improvement is
+  claimed yet. [Report 198](docs/198-legacy-pty-startup-candidate.md).
 
 - [ ] Identify the source of the charging recorder's 7 October SSH connection
   reset if it recurs. The original trace retains only inventory and sample zero;

@@ -301,6 +301,7 @@ task device:status         # Capture the running board's status over Wi-Fi
 task device:status ROUTE=usb # Connect through the Mac's USB link
 task device:ssh-timing CYCLES=3 # Fresh USB/Wi-Fi timing pairs while awake
 task device:ssh-timing-report CAPTURE=.local/diagnostics/<capture> # Offline summary
+task device:user-startup LEGACY=either # User-manager inventory and Unix98/SSH terminal checks
 ```
 
 Both humans and coding agents should use these commands. When another routine
@@ -316,6 +317,19 @@ directory, including a batch's individual `cycle-N` directory. Nested durations
 overlap; do not add them together or treat SSH command latency as wake latency.
 [Report 197](docs/197-ssh-collection-timing.md) describes the clock brackets,
 the awake session-startup delay and the remaining recovery investigation.
+
+`device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
+diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;
+`ROUTE=wifi` selects the configured Wi-Fi route. The task records manager startup
+phases and device-unit counts, tests data transfer and resizing on its own
+temporary Unix98 terminal, and requests a real SSH terminal as the ordinary
+login user. It preserves the screen and checks unchanged boot/PM/display state.
+It neither restarts the user manager nor changes session/SSH policy. The startup
+times describe the manager serving that login, which may already have been
+running. Allow ordinary session cleanup before comparing fresh logins; keep
+unit counts, startup phases and host SSH timings as separate measurements.
+[Report 198](docs/198-legacy-pty-startup-candidate.md) records the candidate and
+the measurements required after installation.
 
 ### Prerequisites
 

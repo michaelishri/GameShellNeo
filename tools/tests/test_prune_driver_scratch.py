@@ -3,9 +3,12 @@ import fcntl
 import importlib.util
 import json
 import shutil
+import sys
 from pathlib import Path
 import tempfile
 import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 spec = importlib.util.spec_from_file_location(
     'prune_driver', Path(__file__).resolve().parents[1] / 'prune-driver-scratch.py')
@@ -109,6 +112,56 @@ class PruneTests(unittest.TestCase):
     def test_invalid_suite_is_rejected(self):
         with self.assertRaises(ValueError):
             prune.prune(self.root, '../../recovery', apply=True)
+
+    def usb_fixture(self):
+        work = self.work.with_name('usb-policy-tests')
+        self.work.rename(work)
+        self.work = work
+        self.suite = work.name
+        self.trees = [work / p.name for p in self.trees]
+        obj = self.trees[0] / 'output/drivers/power/supply/axp20x_usb_power.o'
+        obj.parent.mkdir(parents=True)
+        obj.write_bytes(b'qualified object')
+        record = dict(scratch=str(self.trees[0].relative_to(self.root)),
+                      config_sha256=prune.sha256(self.trees[0] / 'output/.config'),
+                      objects={'drivers/power/supply/axp20x_usb_power.o': prune.sha256(obj)})
+        self.evidence = {'arm_build': record}
+        self.save_evidence()
+        (work / 'evidence.json').write_text('{}')
+        return record, obj
+
+    def test_usb_policy_preserves_qualified_output_and_removes_two_superseded_trees(self):
+        record, obj = self.usb_fixture()
+        result = prune.prune(self.root, self.suite, apply=True)
+        self.assertEqual(len(result['removed']), 2)
+        self.assertTrue(self.trees[0].exists())
+        self.assertEqual(prune.sha256(obj), record['objects']['drivers/power/supply/axp20x_usb_power.o'])
+        self.assertFalse(any(p.exists() for p in self.trees[1:]))
+
+    def test_usb_policy_extra_evidence_reference_is_retained(self):
+        record, obj = self.usb_fixture()
+        extra = self.trees[1] / 'output/drivers/power/supply/axp20x_usb_power.o'
+        extra.parent.mkdir(parents=True)
+        extra.write_bytes(obj.read_bytes())
+        other = dict(record, scratch=str(self.trees[1].relative_to(self.root)))
+        (self.work / 'board-evidence.json').write_text(json.dumps({'nested': [other]}))
+        result = prune.prune(self.root, self.suite, apply=True)
+        self.assertEqual(result['removed'], [str(self.trees[2].relative_to(self.root))])
+        self.assertTrue(self.trees[1].exists())
+
+    def test_usb_policy_output_mismatch_stops_before_any_deletion(self):
+        _record, obj = self.usb_fixture()
+        obj.write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError, 'differs from evidence'):
+            prune.prune(self.root, self.suite, apply=True)
+        self.assertTrue(all(p.exists() for p in self.trees))
+
+    def test_usb_policy_evidence_symlink_stops_before_any_deletion(self):
+        self.usb_fixture()
+        (self.work / 'board-evidence.json').symlink_to(self.work / 'compile-evidence.json')
+        with self.assertRaisesRegex(ValueError, 'regular evidence'):
+            prune.prune(self.root, self.suite, apply=True)
+        self.assertTrue(all(p.exists() for p in self.trees))
 
 
 if __name__ == '__main__':

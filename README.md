@@ -484,7 +484,7 @@ Older logs are retained under `.local/build/logs/`. A failed stage returns a
 failure and prints the log tail. The wrappers reject overlapping build stages;
 run build tasks sequentially on this memory-constrained host.
 
-To reclaim superseded Wi-Fi driver compiler trees, first preview the named
+To reclaim superseded driver compiler trees, first preview the named
 suite, then apply the reviewed selection:
 
 ```sh
@@ -502,6 +502,13 @@ active tests, symlinks or unexpected scratch contents stop cleanup. Only older
 removed; recovery images, archived full kernels, downloads, provisioning and
 diagnostic captures remain outside its scope. Each application saves an
 incremental `prune-*.json` record alongside the retained suite evidence.
+
+`usb-policy-tests` is also supported. Its single ARM build and any additional
+references in saved `*evidence.json` files are retained; their object and
+configuration hashes must verify before any deletion. Use `TARGET=/absolute/path`
+to inspect a different checkout, applying the same target after reviewing its
+preview. This lets the current saved tool maintain older compiler artifacts
+without changing that checkout's source files.
 
 Driver object checks now share one verified kernel source per patch queue within
 each suite. Each configuration retains its own `kernel-<16 hex digits>/output`;

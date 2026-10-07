@@ -147,7 +147,7 @@ tasks:
     cmds: [bash tools/run-logged.sh kernel-reset bash tools/reset-kernel.sh]
 
   build:prune-driver-scratch:
-    desc: Preview superseded brcmfmac compiler trees for SUITE; APPLY=1 removes them under the suite lock
+    desc: Preview superseded driver compiler trees for SUITE and optional TARGET; APPLY=1 removes them under the suite lock
     cmds: [python3 tools/prune-driver-scratch.py]
 
   build:compact-driver-sources:

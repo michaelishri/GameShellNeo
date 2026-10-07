@@ -3,9 +3,9 @@
 7 October 2026; capture timestamps are UTC. NEO-138 is in progress.
 The initial freezer, driver and first late/noirq debug checks pass on diagnostic.23/kernel
 `6.18.54-gameshellneo22`, boot `7cc788ef-2070-4ab9-887a-1af70c074713`.
-The owner confirms the clear warning and normal dim-console return, and gave
-readiness for the first late/noirq check. Its separate display observation and
-readiness for repeats are pending. Rehearsal and actual sleep remain unqualified.
+The owner confirms the clear warnings and normal dim-console returns for the
+initial stages and four late/noirq repeats. All seven debug checks pass at PM7/0.
+The awake RTC rehearsal also passes; actual sleep remains unqualified.
 [Report 199](199-diagnostic23-installation-and-pty-validation.md) records the
 verified installation, awake checks and measured terminal-startup improvement.
 
@@ -92,12 +92,77 @@ availability remain to be established.
 The original task log is `.local/neo138-platform-initial.log`. Offline timing
 summary: `.local/neo138-platform-initial-timing.json`. Timing SHA-256:
 `a1cb206d1bf2787964b4c58a861b7e4b7b49dd1a81f546eff0cb765e408c3578`.
-The owner has been asked to confirm this stage's warning/display and readiness
-for four repeats. No further screen test is running at this checkpoint.
+The owner confirmed “All normal; ready for four cycles,” authorizing the repeat
+batch below.
+
+## Four late/noirq repeats
+
+Each repeat used `task device:pm-platform WIFI_TRACE=1`. Its original completed
+result was reviewed before the next was submitted. The owner confirms clear
+warnings and normal dim-console returns after the full batch.
+
+| Repeat | Capture beneath `.local/diagnostics/` | Run ID | Stage seconds | PM afterward | Result SHA-256 |
+| --- | --- | --- | ---: | --- | --- |
+| 1 | `20261007T095643.813925Z/cycle-1` | `bae498deb91f48e79ec962184ecb0a5f` | 7.889 | 4/0 | `d76b2c83567c9b598815430d59b37847ee1ccdfc87530433dfb0bd39d8cc5910` |
+| 2 | `20261007T095821.527320Z/cycle-1` | `56a879ed0fac49b09754f9b9d9d1b9b9` | 8.044 | 5/0 | `597a175959666eb7e4d54e1567807918221e67d55dd06c6e603b25f0c1ac607f` |
+| 3 | `20261007T095943.936001Z/cycle-1` | `733d808a3e3a413dbff56e8546bba2c4` | 7.843 | 6/0 | `691af820264b9d9123e43397facc06553266b2be0e0114c30ce7a6c3c4a0ca01` |
+| 4 | `20261007T100116.061889Z/cycle-1` | `69816c6780c34bb694f720f87602ca5d` | 7.912 | 7/0 | `7a99a50fb7a61ef037f8aa2423c28654953633bfbaf7bb4a2ec8cdb112705c71` |
+
+All four verify both independent SSH routes, original keypad retention, process
+memory, POWER handback, long-warning playback/restoration and loss-free traces.
+Every PM failure counter remains zero. SDIO usage stays 2 with unchanged runtime
+policy, and brightness/backlight power remains 1/0. Stage durations include the
+five-second debug delay and are not wake latency.
+
+The saved offline `task check:sdio-ref-history -- --require-stable` accepts all
+seven explicit result paths in chronological order. Its output is
+`.local/neo138-reference-history.json`, SHA-256
+`90b0858ca53cf8afe691203927be08d653916266d613a6cedd6703a6bc45c33d`.
+Adjacent full PM counter snapshots match exactly, with successes progressing
+0 → 7 and no intervening cycle. This file is the fresh qualification input for
+the awake rehearsal; diagnostic.22's continuation is not reused.
+
+Repeats 1, 2 and 4 each have one failed collection attempt followed by retrieval
+of the original result and successful route proofs. Repeat 1 fails at the USB
+tunnel with `No route to host`; repeats 2 and 4 fail in device SSH with
+`No existing session` (repeat 4 also logs the banner-read error). Repeat 3's
+complete timing capture has no errors. The PM tests were not resubmitted.
+The saved trace identifies the affected host phase; it still does not establish
+whether device/network unavailability extended beyond the expected debug
+transition. The faster awake manager startup has not eliminated these collection
+errors, so their investigation remains open.
+
+The validated `host-timing.jsonl` hashes for repeats 1–4 are:
+
+- `f0fec8af7c92cdc00678ad3f84415fd7ba0673dbcc3a24826ca950f5dc1e8b3f`.
+- `9518972bbd220c0388a6cf4bfca13072c1fba5507a7d3e77f5c5c85430346647`.
+- `95a553dbd34ad0c359eb9e1f972ba562c1ee159a476f45d6232379d1fe109f59`.
+- `3b467c2281c1eddc8c81ea04eeb2509a2e220658388c32fc2be2e15d847c0bd6`.
+
+Original logs and offline timing summaries are
+`.local/neo138-platform-repeat-{1,2,3,4}.log` and the matching `-timing.json`
+files. No source, driver, charging or audio-level change was made during the batch.
 
 ## Remaining qualification
 
-After the owner's observation/readiness response, review each of four repeats
-before advancing. A complete same-boot debug history is required before the
-awake RTC rehearsal and an actual RTC-wake attempt. No real sleep has run on
-this kernel at this checkpoint.
+The owner confirmed the complete batch and was informed that the next awake RTC
+rehearsal keeps the screen on. It ran using the fresh seven-check history:
+
+```sh
+task device:sleep-rehearse QUALIFICATION=.local/neo138-reference-history.json
+```
+
+Capture: `.local/diagnostics/20261007T100317.640716Z/result.json`, run
+`6dac26e6365247dea7ceeeb0d2664c7b`, SHA-256
+`e4a7941e60067c904ba4aa79438d0cf5a047dc453a3bee2830e5107a1ec7c1fa`.
+The original log is `.local/neo138-rehearsal.log`.
+One RTC event arrives with flags `0xa0`; IRQ31 advances 1 → 2, and the original
+disabled alarm is restored. Process memory and both SSH routes pass. POWER
+input and the original logind policy are handed back, with no retained policy,
+PM controls, RTC or console owner. Tracing restores. The same boot remains at
+PM7/0, SDIO usage 2 and brightness/backlight power 1/0.
+
+This validates awake alarm delivery and cleanup, not waking from sleep. The
+owner has been asked for separate watching/listening readiness before one actual
+connected-USB RTC-wake attempt. No real sleep has run on this kernel at this
+checkpoint.

@@ -18,10 +18,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 Current installed image: diagnostic.23; awake qualification and initial PM checks pass.
 [200 — Diagnostic.23 PM qualification](200-diagnostic23-pm-qualification.md)
-records passing freezer/driver and first late/noirq checks, both-route recovery
-and retained keypad. Initial warning/display is owner-confirmed; one late/noirq
-collection SSH failure has timestamped evidence. Repeats and actual sleep remain
-pending.
+records seven passing debug checks, both-route recovery, retained keypad and
+stable SDIO usage at PM7/0. All warnings/display returns are owner-confirmed;
+collection failures retain timestamped evidence. The awake RTC rehearsal also
+passes; actual sleep remains pending.
 [199 — Diagnostic.23 installation](199-diagnostic23-installation-and-pty-validation.md)
 records verified flashing, owner-confirmed login, passing awake checks and
 modern terminal compatibility. Legacy device-unit records fall by 512,

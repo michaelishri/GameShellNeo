@@ -201,8 +201,11 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   route batches pass with PM13/0 unchanged. NEO-138 captures one failed SSH
   collection attempt during diagnostic.23's first late/noirq test, followed by
   successful original-result collection and both route proofs. The failed SSH
-  phase lasts 10.016 seconds inside a 19.920-second attempt; this locates the
-  host failure but does not establish its cause or device availability then.
+  phase lasts 10.016 seconds inside a 19.920-second attempt. Repeats 1, 2 and 4
+  also have a failed collection attempt, while repeat 3 has none; all completed
+  PM results and both route proofs pass. This locates host failures but does
+  not establish their cause or device availability then. Faster awake manager
+  startup has not eliminated these errors.
   [Report 200](docs/200-diagnostic23-pm-qualification.md). Use the new timing on the next
   attended sleep after fresh qualification of the now-installed diagnostic.23;
   diagnostic.22's continuation is historical. Earlier untimestamped failures
@@ -233,9 +236,10 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 - [ ] Qualify diagnostic.23 suspend/debug and actual sleep on its new boot.
   Its installed kernel removes legacy PTY allocation and passes awake checks;
-  the first freezer and driver debug checks also pass with the owner's
-  warning/display confirmation. The first late/noirq check passes at PM3/0,
-  awaiting its observation and four repeats. Earlier diagnostic.22 sleep evidence cannot
+  all seven debug checks also pass with the owner's warning/display confirmation
+  at PM7/0 and stable SDIO usage. The awake RTC rehearsal passes with restored
+  alarm and original power policy; actual RTC sleep is next.
+  Earlier diagnostic.22 sleep evidence cannot
   qualify this image. [Report 200](docs/200-diagnostic23-pm-qualification.md).
   Obtain fresh observer readiness, then run freezer, driver and late/noirq checks
   before an awake rehearsal and actual RTC sleep. Keep long speaker warnings

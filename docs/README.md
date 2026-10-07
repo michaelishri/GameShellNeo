@@ -35,6 +35,10 @@ uncalibrated measurement limits.
 records the completed awake discharge and partial-charge baseline on a new
 boot, the preserved first attempt's transport failure, and the recurring
 voltage/gauge uncertainty. Direct sleep-charge evidence remains open.
+[184 — AXP223 measurement audit](184-axp223-measurement-source-audit.md)
+cross-checks the manuals, vendor code and locked Linux paths. It records the
+conflicting charger-control descriptions, observed percentage cadence, live
+status caching issue and unqualified ADC coherence/accuracy.
 
 Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)

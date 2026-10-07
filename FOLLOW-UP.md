@@ -2,6 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
+- [ ] NEO-10/NEO-117 measurement follow-through: [report 184](docs/184-axp223-measurement-source-audit.md)
+  finds contradictory REG34[2] polarity, no ADC absolute-accuracy/latch contract,
+  and approximately 30-second percentage steps without a capacity denominator.
+  Preserve raw evidence; do not infer a compensation formula, OCV-only mode or
+  calibrated capacity. Correct AXP223's dynamic B8 status caching in the owning
+  driver with variant-scoped tests; audit the shared variable-width ADC helper
+  separately. Fresh configuration and independent terminal-voltage evidence
+  remain needed before resolving the voltage discrepancy. No charger/gauge
+  write or longer charging experiment is justified by these source findings.
+
 **Partial-discharge/charging checkpoint, 7 October 2026:** fresh USB/Wi-Fi and PM-health
 checks passed on a new diagnostic.20 boot. After the owner unplugged USB, the
 saved eleven-minute awake protocol completed: 61 measured samples, reported

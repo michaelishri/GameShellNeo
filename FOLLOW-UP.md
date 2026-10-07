@@ -199,10 +199,11 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   NEO-135 adds timestamped host spans and device BOOTTIME brackets without
   changing the five-second collection interval or resubmitting PM. Three awake
   route batches pass with PM13/0 unchanged. Use the new timing on the next
-  attended sleep, preserving the existing continuation; historical failures
+  attended sleep after fresh qualification of the now-installed diagnostic.23;
+  diagnostic.22's continuation is historical. Earlier untimestamped failures
   still cannot be classified. [Report 197](docs/197-ssh-collection-timing.md).
 
-- [ ] Profile and reduce user-manager unit-loading cost on the diagnostic image.
+- [x] Profile and reduce user-manager unit-loading cost on the diagnostic image.
   Three awake probes each show a 4.677–4.792-second first USB SSH command-channel
   opening, versus roughly 0.2 seconds subsequently. Journal startup reports are
   about 3.9 seconds; separate manager timestamps put 3.426 seconds in unit loading
@@ -214,13 +215,24 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   driver setting was changed. [Report 197](docs/197-ssh-collection-timing.md).
   NEO-136 identifies 256 legacy slave devices and their 512 systemd device-unit
   records (of 588 total). The diagnostic.23 candidate disables legacy PTY
-  allocation in Kconfig while retaining Unix98/console support. After flash,
-  run `task device:user-startup LEGACY=disabled`, both route timing checks and
-  ordinary startup/PM qualification; compare fresh-session unit-loading time,
-  unit counts and memory separately. The unchanged diagnostic.22 baseline passes
-  both Unix98 data/resize checks and actual SSH terminal allocation, with a fresh
-  3.440-second unit-load measurement. No installed performance improvement is
-  claimed yet. [Report 198](docs/198-legacy-pty-startup-candidate.md).
+  allocation in Kconfig while retaining Unix98/console support.
+  [Report 198](docs/198-legacy-pty-startup-candidate.md).
+  NEO-137 installs diagnostic.23 and passes awake startup checks, four modern
+  terminal/SSH PTY checks and three isolated route timing batches. Legacy sysfs
+  slaves/device-unit records are zero, with all user-manager units reduced from
+  588 to 76. Unit loading is 0.591–0.610 seconds versus 3.440 seconds; first USB
+  command channels are 1.909–1.959 seconds versus 4.677–4.792 seconds. Resource
+  observations are lower but have different instance histories, so no precise
+  RAM/CPU or battery saving is claimed.
+  [Report 199](docs/199-diagnostic23-installation-and-pty-validation.md).
+
+- [ ] Qualify diagnostic.23 suspend/debug and actual sleep on its new boot.
+  Its installed kernel removes legacy PTY allocation and passes awake checks
+  with PM0/0, but earlier diagnostic.22 sleep evidence cannot qualify this image.
+  Obtain fresh observer readiness, then run freezer, driver and late/noirq checks
+  before an awake rehearsal and actual RTC sleep. Keep long speaker warnings
+  and retain the host timing spans for the remaining collection-delay question.
+  Broader power/cable profiles, CPU retention and energy remain separate.
 
 - [ ] Identify the source of the charging recorder's 7 October SSH connection
   reset if it recurs. The original trace retains only inventory and sample zero;

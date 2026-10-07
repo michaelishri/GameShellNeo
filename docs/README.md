@@ -16,14 +16,17 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current DEV-card image: diagnostic.23, awaiting new-boot qualification.
+Current installed image: diagnostic.23; awake qualification passed, PM checks next.
 [199 — Diagnostic.23 installation](199-diagnostic23-installation-and-pty-validation.md)
-records verified Mac staging, attended warning/shutdown and passing full card
-readback; new-boot terminal/startup qualification remains pending.
+records verified flashing, owner-confirmed login, passing awake checks and
+modern terminal compatibility. Legacy device-unit records fall by 512,
+unit loading drops to 0.59–0.61 seconds and first USB SSH channels to
+1.91–1.96 seconds in repeated samples. New-kernel PM and energy qualification
+remain separate.
 [198 — Legacy PTY startup candidate](198-legacy-pty-startup-candidate.md)
 identifies 512 legacy-terminal device-unit records, removes their kernel
 preallocation in diagnostic.23 and saves ordinary-user Unix98/SSH terminal
-checks. Installed-image startup improvements remain to be measured.
+checks. Report 199 adds the installed-image startup measurements.
 [197 — SSH collection timing](197-ssh-collection-timing.md) records host-only
 instrumentation, three passing awake route batches, unchanged original sleep
 evidence and a reproducible first-session delay with a user-manager unit-loading

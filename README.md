@@ -6,15 +6,16 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.23 has passed flashing and full card readback, with new-boot
-qualification pending. It disables
-unused legacy PTY allocation while retaining Unix98 terminals and the existing
-console support. The diagnostic.22 baseline has 512 legacy-terminal device-unit
-records among 588 user-manager units. The candidate's effect on startup time
-and memory remains to be measured on the new boot.
+Diagnostic.23 is installed with passing full card readback, owner-confirmed
+login, both SSH routes and awake startup checks. Removing unused legacy PTYs
+eliminates 512 user-manager device-unit records while modern terminals and
+console support remain intact. Four manager starts load units in 0.59–0.61 s,
+down from 3.44 s; three first USB SSH channel openings take 1.91–1.96 s,
+down from 4.68–4.79 s. PM qualification of this new kernel is next; these
+measurements do not establish wake latency or battery savings.
 [Report 198](docs/198-legacy-pty-startup-candidate.md) records the source rationale,
 terminal checks and artifact hashes; [report 199](docs/199-diagnostic23-installation-and-pty-validation.md)
-records installation progress.
+records installation, terminal compatibility and repeated timings.
 
 Diagnostic.22 previously qualified the shared ADC width correction. Full card
 readback, owner-confirmed login, both network routes, startup checks and the

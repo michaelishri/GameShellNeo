@@ -4,6 +4,8 @@
 is diagnostic.23, kernel `6.18.54-gameshellneo22`. It removes legacy BSD PTY
 preallocation, retaining Unix98 PTYs and the existing console support. The
 live board has not been rebooted or changed to the candidate during this work.
+Subsequent [report 199](199-diagnostic23-installation-and-pty-validation.md)
+records its installation and measured awake startup improvement.
 
 ## Evidence and mechanism
 

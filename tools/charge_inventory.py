@@ -17,11 +17,14 @@ IMAGE = Path('/etc/gameshellneo/image.json')
 BOARD = Path('/sys/firmware/devicetree/base/compatible')
 # Deliberately exclude IRQ status, undocumented E2/E3 and out-of-range E8/EC.
 REGISTERS = (0x00, 0x01, 0x33, 0x34, 0x78, 0x79, 0xb8, 0xb9, 0xe0, 0xe1, 0xe6)
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+MASKED_ADC_PROFILE = ('0.1.0-diagnostic.22', '6.18.54-gameshellneo21')
 PROFILES = {
     ('0.1.0-diagnostic.20', '6.18.54-gameshellneo19'):
         ('axp22x-cached-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb9))),
     ('0.1.0-diagnostic.21', '6.18.54-gameshellneo20'):
+        ('axp223-volatile-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb8, 0xb9))),
+    MASKED_ADC_PROFILE:
         ('axp223-volatile-b8', frozenset((0x00, 0x01, 0x78, 0x79, 0xb8, 0xb9))),
 }
 LIMITS = [
@@ -34,7 +37,8 @@ LIMITS = [
     'REG34 bit 2 has contradictory polarity descriptions in the AXP223 '
     'manuals; its raw value is not interpreted as an enabled setting.',
     'Voltage bytes are separate volatile reads with no established latch '
-    'contract. Formula results are not a coherent or calibrated voltage sample.',
+    'contract. Formula results are not a coherent or calibrated voltage sample; '
+    'the Linux formula follows the admitted image/kernel ADC-width profile.',
     'No accumulated-charge measurement or charging-through-sleep conclusion.',
 ]
 
@@ -119,14 +123,15 @@ def read_registers(meta, volatile):
     return output
 
 
-def decode(registers):
+def decode(registers, *, adc_width_masked=False):
     values = {key: entry['value'] for key, entry in registers.items()}
     gauge, high = values['b8'], values['e0']
     capacity_raw = ((high & 0x7f) << 8) | values['e1']
     gauge_percent = values['b9'] & 0x7f
     voltage_high, voltage_low = values['78'], values['79']
     masked_voltage = (voltage_high << 4) | (voltage_low & 0x0f)
-    linux_voltage = (voltage_high << 4) | voltage_low
+    legacy_voltage = (voltage_high << 4) | voltage_low
+    linux_voltage = masked_voltage if adc_width_masked else legacy_voltage
     return dict(
         cached_configuration=dict(
             charger_enabled=bool(values['33'] & 0x80),
@@ -144,8 +149,10 @@ def decode(registers):
         battery_voltage_bytes=dict(high=voltage_high, low=voltage_low,
             unused_low_bits=voltage_low & 0xf0,
             masked_12bit_formula_uv=masked_voltage*1100,
+            unmasked_legacy_formula_uv=legacy_voltage*1100,
+            linux_helper_width_masked=adc_width_masked,
             linux_helper_formula_uv=linux_voltage*1100,
-            unused_bits_change_formula=masked_voltage != linux_voltage,
+            unused_bits_change_formula=masked_voltage != legacy_voltage,
             coherent_sample_established=False, physical_accuracy_qualified=False),
         gauge_result=dict(valid=bool(values['b9'] & 0x80) and gauge_percent <= 100,
                           percent=gauge_percent),
@@ -171,6 +178,7 @@ def inspect(kernel, version, result=None):
     result.update(schema_version=SCHEMA_VERSION, kind='axp223-charge-inventory', completed=False,
                   limits=LIMITS)
     profile, volatile = profile_for(kernel, version)
+    adc_width_masked = (version, kernel) == MASKED_ADC_PROFILE
     image = json.loads(read(IMAGE))
     compatibles = BOARD.read_bytes().rstrip(b'\0').split(b'\0')
     if (os.uname().release != kernel or image['version'] != version or image['kernel'] != kernel or
@@ -179,7 +187,8 @@ def inspect(kernel, version, result=None):
             (PMIC/'of_node/compatible').read_bytes() != b'x-powers,axp223\0'):
         raise ValueError('Expected matching CPI3 image, kernel and AXP223 identity')
     before = checkpoint()
-    result.update(kernel=kernel, image=image, before=before, cache_profile=profile)
+    result.update(kernel=kernel, image=image, before=before, cache_profile=profile,
+                  adc_width_masked=adc_width_masked)
     meta = metadata()
     result['metadata'] = meta
     result['registers'] = read_registers(meta, volatile)
@@ -189,7 +198,8 @@ def inspect(kernel, version, result=None):
     after = checkpoint()
     result['after'] = after
     validate_continuity(before, after)
-    result.update(completed=True, assessment=decode(result['registers']))
+    result.update(completed=True, assessment=decode(result['registers'],
+                  adc_width_masked=adc_width_masked))
     return result
 
 

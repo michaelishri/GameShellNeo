@@ -1676,10 +1676,13 @@ The local PM lock prevents overlap with another saved PM workflow.
 The targeted regmap reads verify the Linux 6.18.54 map layout and use exact
 seven-byte reads without buffered read-ahead. Undocumented charge registers
 E2/E3 and IRQ status are excluded. Nonvolatile fields, including calibration
-status on diagnostic.20 and configured capacity on both supported images, are
-explicitly labeled as possibly cached. Schema 3 accepts only the audited pairs
+status on diagnostic.20 and configured capacity on all supported images, are
+explicitly labeled as possibly cached. Schema 4 accepts only the audited pairs
 diagnostic.20/kernel `6.18.54-gameshellneo19` and diagnostic.21/kernel
-`6.18.54-gameshellneo20`, requiring cached and volatile B8 respectively.
+`6.18.54-gameshellneo20`, requiring cached and volatile B8 respectively,
+plus diagnostic.22/kernel `6.18.54-gameshellneo21` with volatile B8 and the
+corrected ADC width mask. The report preserves both masked and legacy unmasked
+formulas and selects `linux_helper_formula_uv` from the admitted image's behavior.
 Unexpected pairings or observed cache metadata are rejected before register reads.
 A completed
 inventory is not a charging test: instantaneous current and percentage do not

@@ -156,6 +156,22 @@ class Meaning(unittest.TestCase):
         for missing in ('charge_now', 'charge_counter', 'charge_gained_uah', 'passed'):
             self.assertNotIn(missing, report)
 
+    def test_masked_profile_preserves_raw_and_legacy_formula_without_accuracy_claim(self):
+        registers = register_data(**{'78': 0x02, '79': 0xf3})
+        for masked, expected in ((False, 267300), (True, 38500)):
+            with self.subTest(masked=masked):
+                result = charge.decode(registers, adc_width_masked=masked)['battery_voltage_bytes']
+                self.assertEqual(result['high'], 0x02)
+                self.assertEqual(result['low'], 0xf3)
+                self.assertEqual(result['unused_low_bits'], 0xf0)
+                self.assertEqual(result['unmasked_legacy_formula_uv'], 267300)
+                self.assertEqual(result['masked_12bit_formula_uv'], 38500)
+                self.assertEqual(result['linux_helper_formula_uv'], expected)
+                self.assertEqual(result['linux_helper_width_masked'], masked)
+                self.assertTrue(result['unused_bits_change_formula'])
+                self.assertFalse(result['coherent_sample_established'])
+                self.assertFalse(result['physical_accuracy_qualified'])
+
     def test_unconfigured_and_invalid_values_do_not_become_valid_measurements(self):
         report = charge.decode(register_data(e0=0x03, b9=0x7f, b8=0x30))
         self.assertIsNone(report['cached_configuration']['configured_capacity_uah'])
@@ -179,7 +195,9 @@ class Collection(unittest.TestCase):
     def test_only_audited_image_kernel_pairs_are_admitted(self):
         for version, kernel in (('0.1.0-diagnostic.20', '6.18.54-gameshellneo20'),
                                 ('0.1.0-diagnostic.21', '6.18.54-gameshellneo19'),
-                                ('0.1.0-diagnostic.22', '6.18.54-gameshellneo21'),
+                                ('0.1.0-diagnostic.22', '6.18.54-gameshellneo20'),
+                                ('0.1.0-diagnostic.21', '6.18.54-gameshellneo21'),
+                                ('0.1.0-diagnostic.23', '6.18.54-gameshellneo22'),
                                 ('0.1.0-diagnostic.20', '6.18.55-gameshellneo19')):
             with self.subTest(version=version, kernel=kernel), \
                     patch.object(charge, 'read') as reads, patch.object(charge.os, 'open') as opened:
@@ -188,9 +206,11 @@ class Collection(unittest.TestCase):
                 reads.assert_not_called()
                 opened.assert_not_called()
 
-    def test_complete_inventory_retains_both_profile_contracts(self):
-        for version, kernel, current in (('0.1.0-diagnostic.20', '6.18.54-gameshellneo19', False),
-                                         ('0.1.0-diagnostic.21', '6.18.54-gameshellneo20', True)):
+    def test_complete_inventory_retains_all_profile_contracts(self):
+        for version, kernel, current, masked in (
+                ('0.1.0-diagnostic.20', '6.18.54-gameshellneo19', False, False),
+                ('0.1.0-diagnostic.21', '6.18.54-gameshellneo20', True, False),
+                ('0.1.0-diagnostic.22', '6.18.54-gameshellneo21', True, True)):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
                 image = directory/'image'; board = directory/'board'; pmic = directory/'pmic'
@@ -208,7 +228,12 @@ class Collection(unittest.TestCase):
                         patch.object(charge, 'supply_inventory', return_value={}):
                     result = charge.inspect(kernel, version)
                     self.assertTrue(result['completed'])
-                    self.assertEqual(result['schema_version'], 3)
+                    self.assertEqual(result['schema_version'], 4)
+                    self.assertEqual(result['adc_width_masked'], masked)
+                    voltage = result['assessment']['battery_voltage_bytes']
+                    self.assertEqual(voltage['linux_helper_width_masked'], masked)
+                    self.assertEqual(voltage['linux_helper_formula_uv'],
+                                     3379200 if masked else 3590400)
                     self.assertEqual(result['cache_profile'], charge.profile_for(kernel, version)[0])
                     self.assertEqual(result['assessment']['gauge_control']['source'],
                         'volatile-regmap-read' if current else 'regmap-cache-possible')

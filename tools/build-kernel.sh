@@ -2,6 +2,7 @@
 # Run on the Intel Docker host. All build products remain under ignored .local.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+python3 tools/build_preflight.py --scope kernel
 readarray -t locked < <(python3 - <<'PY'
 import json
 p=json.load(open('build/sources.lock.json'))

@@ -2,18 +2,32 @@
 
 Record deferred questions and activities here as they arise.
 
-- [ ] Build resource preflight: check Armbian's 10 GiB free-space requirement
+**Unattended work, 8 October 2026:** the owner is asleep. Defer all new sleep,
+reboot, screen, button and cable tests until fresh readiness tomorrow. Preserve
+diagnostic.23 and its completed evidence. Host-side preparation and source audits
+can continue; an audible warning does not replace observer readiness.
+
+- [x] Build resource preflight: check Armbian's 10 GiB free-space requirement
   before a long kernel build, allowing for kernel outputs and assembly
   headroom. Diagnostic.21 reached the image stage before this gate rejected
   the available space; verified retention/compaction is recorded in
   [report 188](docs/188-historical-driver-source-compaction.md). Keep the gate;
   avoid spending the kernel build time before discovering insufficient space.
-- [ ] Build input preflight for nested worktrees: the documented `BOOTLOADER`
+  NEO-141 adds read-only filesystem checks, a 6 GiB kernel planning allowance
+  and stage rechecks. Full build requires 16 GiB on shared storage before
+  preparation/regressions/compilation. No reservation or peak guarantee is claimed.
+  [Report 203](docs/203-build-preflight.md).
+- [x] Build input preflight for nested worktrees: the documented `BOOTLOADER`
   and `RADIO_DIR` overrides are required when sibling/default paths do not
   exist. Diagnostic.22 completed its kernel before `prepare` discovered the
   missing default bootloader. Check input existence and locked hashes before
   long compilation; retain explicit overrides and do not silently select other
   bootloader or radio inputs. [Report 193](docs/193-diagnostic22-adc-integration.md).
+  NEO-141 verifies explicit local inputs and cached public blobs before cloning;
+  full builds now prepare public sources/downloads before compilation. Missing
+  public caches are reported honestly by the offline preflight and resolved by
+  preparation, not silently skipped. Twelve focused regressions and the actual
+  explicit-path preflight pass. [Report 203](docs/203-build-preflight.md).
 - [ ] Bounded kernel build parallelism: `build-kernel.sh` currently uses one
   job. Evaluate configurable jobs against the Intel host's CPU/memory limits,
   recording the compiler/job identity and measured time/memory cost. Do not

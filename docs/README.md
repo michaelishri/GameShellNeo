@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[203 — Build preflight](203-build-preflight.md) moves locked-input/resource checks
+and public-source preparation ahead of long compilation. Missing explicit inputs
+and low disk headroom fail early; final build checks remain required. This is
+host-only work and does not change the installed image.
+
 Current installed image: diagnostic.23; awake qualification and bounded connected-USB sleep pass.
 [202 — Post-return SSH investigation](202-post-return-ssh-investigation.md)
 correlates the failed setup with a preauthentication closure, distinguishes it

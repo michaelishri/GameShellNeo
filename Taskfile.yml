@@ -30,6 +30,7 @@ env:
   NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
   NEO_SSH_CYCLES: '{{.CYCLES | default "3"}}'
   NEO_SSH_CAPTURE: '{{.CAPTURE | default ""}}'
+  NEO_PREFLIGHT_SCOPE: '{{.SCOPE | default "full"}}'
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
@@ -95,6 +96,8 @@ tasks:
     desc: Run kernel regressions, build kernel, validate device tree, assemble and verify image (sequential)
     cmds:
       - task: doctor
+      - python3 tools/build_preflight.py --scope full
+      - task: prepare
       - task: test:nkmp
       - task: test:usb-lifecycle
       - task: test:usb-suspend
@@ -124,6 +127,10 @@ tasks:
       - task: check:dt
       - task: build:image
 
+  build:preflight:
+    desc: Read-only locked-input and disk-headroom checks; SCOPE=full/kernel/image/inputs
+    cmds: [python3 tools/build_preflight.py]
+
   build:kernel:
     desc: Compile the locked kernel and modules; preserve incremental build outputs
     cmds: [bash tools/run-logged.sh kernel tools/build-kernel.sh]
@@ -135,12 +142,14 @@ tasks:
   build:image:
     desc: Rebuild and verify userspace/image using the completed kernel stage
     cmds:
+      - python3 tools/build_preflight.py --scope image
       - task: prepare
       - bash tools/run-logged.sh image tools/build-image.sh
 
   build:rootfs:
     desc: Bootstrap the signed Debian rootfs separately
     cmds:
+      - python3 tools/build_preflight.py --scope image
       - task: prepare
       - bash tools/run-logged.sh rootfs tools/build-image.sh rootfs
 

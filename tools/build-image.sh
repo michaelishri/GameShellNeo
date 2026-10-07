@@ -4,6 +4,8 @@ cd "$(dirname "$0")/.."
 [[ -f .local/provisioning/device/identity.json ]] || { echo 'Prepare private provisioning first.' >&2; exit 1; }
 action=${1:-build}
 [[ $action == build || $action == rootfs ]] || { echo 'Usage: build-image.sh [build|rootfs]' >&2; exit 2; }
+# Recheck storage after preparation; final Armbian/image checks remain in place.
+python3 tools/build_preflight.py --scope image
 if [[ $action == build ]]; then
     [[ -f .local/build/kernel/arch/arm/boot/zImage ]] || { echo 'Build the kernel first.' >&2; exit 1; }
     python3 tools/kernel-artifacts.py check

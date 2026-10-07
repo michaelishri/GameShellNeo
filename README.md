@@ -476,8 +476,10 @@ task provision
 task build
 ```
 
-`task build` runs the kernel regressions, compiles the kernel, validates the device tree, then builds and
-verifies the image **in sequence**. It does not provision credentials implicitly.
+`task build` first checks locked local inputs and disk headroom, then prepares
+public sources/downloads before running kernel regressions, compiling the kernel,
+validating the device tree and building/verifying the image **in sequence**.
+It does not provision credentials implicitly.
 Run `task provision` again after editing Wi-Fi settings, country or the authorized key,
 then rebuild. This changes the next image, not the running board.
 Country is explicit and is never inferred from timezone. A future launcher
@@ -489,15 +491,34 @@ radio baseline recorded on 2026-09-27. Override paths when needed; pass the same
 overrides to `build`/`build:image`, which refresh preparation automatically:
 
 ```sh
+task build:preflight BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/radio-reference'
 task prepare BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/radio-reference'
 task provision AUTHORIZED_KEY='/path/to/development-key.pub'
 task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/radio-reference'
 ```
 
+`build:preflight` is read-only. Its default `SCOPE=full` verifies the selected
+bootloader/private radio inputs and any cached public radio assets, and requires
+16 GiB free when kernel and image storage share a filesystem: a 6 GiB kernel
+planning allowance plus Armbian's 10 GiB image minimum. `SCOPE=kernel` checks
+kernel storage only, `SCOPE=image` checks image inputs/storage, and `SCOPE=inputs`
+checks only inputs. Separate filesystems are checked independently, with each
+role counted once per filesystem. A missing public blob is reported as needing
+download; full-build preparation must fetch and verify it before compilation.
+There is no fallback to another bootloader or staged private input when a
+selected path is missing. Nested worktrees therefore need explicit paths.
+
+These are conservative planning checks, not a disk reservation or measured peak
+guarantee. They do not check Docker's separate storage or prevent concurrent disk
+use. Kernel/image wrappers recheck their stage's space, and the existing artifact,
+Armbian, signature and final image checks remain mandatory.
+[Report 203](docs/203-build-preflight.md) records the workflow and validation.
+
 | Task | When to use it |
 | --- | --- |
 | `task setup` | New checkout or changed builder lock; prepare and verify the build environment |
 | `task setup:host` | Install missing native prerequisites on Debian/Ubuntu |
+| `task build:preflight` | Check selected locked inputs and build headroom without downloading, compiling or contacting hardware |
 | `task build:image` | Runtime/image changes; reuses the completed, verified kernel stage |
 | `task build:kernel` | Kernel source/configuration work; preserves incremental build outputs |
 | `task kernel:reset` | After changing the patch queue; archives old kernel source/output and artifact metadata/logs under `.local/previous-kernels/`, then run `task build`. Recovery images stay in `.local/artifacts/` |

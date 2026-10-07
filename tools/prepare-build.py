@@ -8,6 +8,8 @@ import shutil
 import subprocess
 import urllib.request
 
+from build_preflight import check_inputs
+
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / '.local'
 LOCK = json.loads((ROOT / 'build/sources.lock.json').read_text())
@@ -57,6 +59,8 @@ def main():
     parser.add_argument('--bootloader', type=Path, required=True)
     parser.add_argument('--radio-directory', type=Path, required=True)
     args = parser.parse_args()
+    # Fail before cloning/staging if explicit local inputs or cached blobs are bad.
+    check_inputs(LOCK, args.bootloader, args.radio_directory, LOCAL)
     LOCAL.mkdir(exist_ok=True, mode=0o700)
     LOCAL.chmod(0o700)
     for name in ('sources', 'inputs', 'build', 'artifacts', 'downloads'):

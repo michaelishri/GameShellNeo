@@ -2,6 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
+**Partial-discharge checkpoint, 7 October 2026:** fresh USB/Wi-Fi and PM-health
+checks passed on a new diagnostic.20 boot. After the owner unplugged USB, the
+saved eleven-minute awake protocol completed: 61 measured samples, reported
+97% → 77%, average 254.89 mA and an uncalibrated 42.48 mAh estimate. Separate
+Wi-Fi inspection confirmed the disconnected state before requesting reconnect.
+No sleep, screen blanking or charging-setting change occurred. The recorder is
+finished; USB reconnection and the corresponding awake charging baseline are
+pending owner confirmation. [Report 183](docs/183-partial-discharge-charging-validation.md).
+NEO-117's direct sleep-charge criterion remains open.
+
 **Unattended awake preparation, 6 October 2026:** NEO-120 and NEO-121 add saved
 read-only charging inventory and a bounded awake baseline. Both pass host and
 awake hardware checks ([reports 180](docs/180-sleep-charge-measurement-design.md)–[182](docs/182-awake-charging-baseline.md)).
@@ -293,7 +303,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [x] Record the replacement battery's owner-supplied identification and purchase listing: BL-5C, advertised Li-ion, nominal 3.7 V, 1020 mAh, [AliExpress item 1005001822206061](https://www.aliexpress.com/item/1005001822206061.html). The listing could not be independently retrieved; these are supplied seller claims, not measured capacity or verified manufacturer specifications. [Report 30](docs/30-bl5c-battery-identification.md) distinguishes historical BL-5C examples from this pack.
 - [x] Ask whether a manufacturer/brand is printed on the replacement pack. The owner confirmed there is none: it is an unbranded generic BL-5C. Do not repeat the label question without new information.
 - [ ] Establish permissible charge voltage/current if matching specifications can be obtained for the unbranded pack; otherwise keep these explicitly unknown. Validate its advertised 1020 mAh capacity and benchmark usable endurance separately. BL-5C compatibility, nominal voltage and a CE marketing claim do not provide the missing numerical charging limits. It was replaced approximately 18 months ago; present condition remains unqualified. Do not transfer another maker's limits or infer a permitted rate from capacity alone. Software-only policy tests can continue over battery-powered Wi-Fi while electrical qualification remains open.
-- [ ] Establish a baseline using software readings and timed battery tests. External power-measurement equipment is unavailable, so document measurement uncertainty.
+- [ ] Establish a baseline using software readings and timed battery tests. External power-measurement equipment is unavailable, so document measurement uncertainty. The 7 October partial-discharge window reported 97% → 77% over ten minutes while sampled current integrated to an uncalibrated 42.48 mAh ([report 183](docs/183-partial-discharge-charging-validation.md)). Investigate percentage calibration and repeatable usable endurance separately; do not infer full capacity from this short post-charge trace or silently program the battery label into the gauge.
 - [x] Exercise the installed awake battery guard with isolated simulated readings. `task device:battery-check ROUTE=wifi` passed nine tests, including fifteen main-loop scenarios, without stopping the live guard or delivering a real shutdown. Report 29 records source identity, evidence and limitations; physical reserve and percentage accuracy remain unqualified.
 - [x] Capture the first real automatic low-battery shutdown. The recovered previous-boot system journal records three low Discharging samples and the guard's poweroff request at 2026-09-27 08:12:36 UTC, followed by orderly shutdown/filesystem syncing. After USB reconnection, a new boot reported 10% and Charging with healthy services and both access routes. See report 29; exact triggering percentages/voltage were not retained, and repeatable physical reserve, gauge accuracy and battery capacity remain unqualified.
 - [x] Capture the first awake-idle baseline using `task device:idle-sample ROUTE=wifi SECONDS=600`. With brightness 1/31, Wi-Fi associated and USB unplugged, 61 samples over ten minutes estimated 263.52 mA / 1.042 W; gauge 92% → 90%, peak sampled temperature 39.852 °C. Monitoring and postcheck remained healthy. Report 29 records the uncalibrated estimates, observer effects and evidence; this does not establish pack capacity or endurance.

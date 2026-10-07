@@ -30,7 +30,10 @@ One attended removal-during-sleep case then passed: RTC wake, Wi-Fi recovery,
 correct absent USB state and normal dim-console return. The separately requested
 awake reconnect restored both SSH routes and external-power detection, with
 PM24/0 and SDIO usage 2 unchanged ([report 173](docs/173-diagnostic20-usb-removal-sleep-validation.md)).
-Repeated cases and charging during sleep remain open.
+The subsequent four-cycle removal/attachment batch passed all RTC wakes,
+endpoint checks and owner observations, including staying asleep after both
+insertions ([report 178](docs/178-guided-cable-batch-hardware-validation.md)).
+Direct charging evidence during sleep and standby-energy qualification remain open.
 
 The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and

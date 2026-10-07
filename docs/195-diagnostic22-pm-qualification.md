@@ -3,8 +3,9 @@
 7 October 2026; capture timestamps are UTC. NEO-133 is in progress. The initial
 freezer, driver and first late/noirq debug checks pass. The owner confirmed
 the initial warning and normal dim-console return, then gave readiness for the
-late/noirq check. Its display confirmation and four-repeat readiness are now
-pending. No actual sleep has run on this image.
+late/noirq check. Its warning/display were also confirmed, and the owner
+authorized four repeats, which pass all automated checks. Final owner
+warning/display confirmation is pending. No actual sleep has run on this image.
 [Report 194](194-diagnostic22-installation-and-adc-validation.md) records the
 verified installation and awake checks.
 
@@ -69,12 +70,61 @@ Final PM is 3/0 with every failure counter zero. SDIO usage stays 2 with unchang
 active/on/forbidden runtime policy. Brightness returns to 1 and backlight power
 0. The boot is unchanged. An initial collection `No route to host` is retained;
 subsequent retrieval of the original result and both route proofs passed.
-No further screen test is running while awaiting the owner's observation.
+The owner then confirmed the warning/normal display and gave readiness for
+four repeats. Each original result is reviewed before the next submission.
+
+## Four-repeat batch
+
+The owner confirmed the first late/noirq warning/normal console and readiness
+for four repeats. Each used `task device:pm-platform WIFI_TRACE=1`; every
+original result was reviewed before starting the next. Private originals are
+`cycle-1/result.json` beneath the listed `.local/diagnostics/` capture:
+
+| Repeat | Capture | Run ID | Stage seconds | PM successes afterward | Result SHA-256 |
+| --- | --- | --- | ---: | ---: | --- |
+| 1 | `20261007T054545.269969Z` | `096fc70a39c847ee81ffb900453fd120` | 7.938 | 4 | `4bfc2f5ed2a1dee1b8fb357d89da7ad5eedebbc7daae19bcecad98f21db9fdc6` |
+| 2 | `20261007T054719.987800Z` | `e82f7bef0711425cbbd6cf7ca6764b45` | 8.006 | 5 | `4957b981a2d37bdb9b5fbbee76cb4858e0f1c8fa579a874efab088ab70f6c0dc` |
+| 3 | `20261007T054853.760933Z` | `4ca7678832184133b978486679d1b106` | 8.045 | 6 | `3cb4665d5791a82a2bc29bbd75a67a3a7aa7e9940da04fc0020cadf21915c87c` |
+| 4 | `20261007T055016.800012Z` | `4e50cd0e59784ad3af3955a5c63db8e8` | 7.849 | 7 | `07330be5ab982b1ad9f5e7aa3d7b9320153af6dc3b7402cfd5d3f9c81fe2450c` |
+
+All four results pass both independent SSH routes, original keypad retention,
+process memory, POWER handback, the long warning/restoration and loss-free
+Wi-Fi trace restoration. Final PM is 7/0 with all failure counters zero.
+Brightness/backlight power is 1/0. SDIO usage remains 2 throughout.
+The timing column includes the five-second debug delay and is not wake latency.
+
+The saved offline comparison `task check:sdio-ref-history -- --require-stable`
+accepts all seven explicit result paths in chronological order. Its output is
+`.local/neo133-reference-history.json`, SHA-256
+`edbbfb78f627fe3b7afd680ccaf5418f5cf2f82870b1311bb52b6d51238f0426`.
+All adjacent PM counters also match exactly, with no intervening PM cycle.
+This baseline can be admitted by the awake rehearsal after observer confirmation.
+
+Task logs `.local/neo133-platform-repeat-1.log` through `-4.log` preserve all
+collection output. Repeats 1, 3 and 4 each logged an initial `No route to host`;
+repeat 2 did not. All original completed results and independent route proofs
+were obtained without retrying PM or requesting a cable action. This does not
+assign a cause or establish the duration of any post-resume transport delay.
+No further screen test is running while awaiting final owner confirmation.
+
+## Read-only ADC check after debug resume
+
+`task device:charge-inspect` passes on the same boot at PM7/0, using the admitted
+schema-4 masked-helper and volatile-B8 contracts. Capture:
+`.local/diagnostics/20261007T055220.388633Z/inventory.json`; SHA-256:
+`a6eb1d703283ee4e95824deca09ff60640e2879bd0737df2ff7bb46ee5d2a971`.
+Raw `ec/03`, masked/legacy formulas and the separate sysfs voltage sample agree
+at 4.1569 V, with zero unused bits. The gauge reports 100%/Charging/2 mA.
+REG33/34/B8/E0/E1/E6 match the initial awake inventory, and reported limits
+remain 4.2 V/1.2 A/900 mA. No charger/gauge setting was changed.
+This shows a compatible read after debug resume; it does not resolve absolute
+accuracy, coherence, capacity or the earlier voltage discrepancy.
 
 ## Remaining qualification
 
-Await the first late/noirq warning/display confirmation and readiness for four
-repeats. The automated checks pass; owner observation remains separate. A completed seven-stage baseline is required
-before the awake RTC rehearsal and a separately attended actual RTC sleep.
+Obtain the owner's final warning/display confirmation, then run the awake RTC
+rehearsal. Actual RTC sleep remains separately attended and requires fresh
+readiness. The seven-stage baseline is automated-pass; observer confirmation
+remains separate.
 Battery/cable/POWER wake profiles, energy and physical battery accuracy remain
 separate; these debug checks do not establish real sleep or charging in sleep.

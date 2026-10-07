@@ -18,9 +18,9 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 Current installed image: diagnostic.22.
 [195 — PM qualification](195-diagnostic22-pm-qualification.md) records passing
-initial freezer, driver and late/noirq checks with both routes, retained keypad
-and PM3/0. Owner confirmation of the last display return and repeats remain
-pending; actual sleep has not run on this image.
+freezer, driver and five late/noirq checks with both routes, retained keypad
+and PM7/0. Final owner warning/display confirmation and the awake RTC rehearsal
+remain pending; actual sleep has not run on this image.
 [194 — Installation and ADC validation](194-diagnostic22-installation-and-adc-validation.md)
 records full card readback, owner-confirmed login, healthy startup/both routes
 and a passing read-only masked-helper inventory. Physical measurement accuracy

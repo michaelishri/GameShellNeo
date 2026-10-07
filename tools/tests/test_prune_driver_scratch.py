@@ -156,6 +156,16 @@ class PruneTests(unittest.TestCase):
             prune.prune(self.root, self.suite, apply=True)
         self.assertTrue(all(p.exists() for p in self.trees))
 
+    def test_usb_policy_object_paths_cannot_override_config_or_escape(self):
+        record, _obj = self.usb_fixture()
+        for name in ('.config', 'drivers/../../.config', '/etc/passwd'):
+            with self.subTest(name=name):
+                record['objects'] = {name: record['config_sha256']}
+                self.save_evidence()
+                with self.assertRaisesRegex(ValueError, 'object path'):
+                    prune.prune(self.root, self.suite, apply=True)
+                self.assertTrue(all(p.exists() for p in self.trees))
+
     def test_usb_policy_evidence_symlink_stops_before_any_deletion(self):
         self.usb_fixture()
         (self.work / 'board-evidence.json').symlink_to(self.work / 'compile-evidence.json')

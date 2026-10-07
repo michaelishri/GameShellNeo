@@ -63,6 +63,9 @@ def plan(root, suite):
         if suite == 'usb-policy-tests':
             if not isinstance(record.get('objects'), dict) or not record['objects']:
                 raise ValueError('Missing retained object evidence')
+            if any(not re.fullmatch(r'(?:drivers/|kernel/|arch/arm/)[A-Za-z0-9_./-]+[.]o', name)
+                   or '..' in Path(name).parts for name in record['objects']):
+                raise ValueError('Unexpected retained object path')
             files = {'.config': record['config_sha256'], **record['objects']}
             for name, expected in files.items():
                 if not isinstance(expected, str) or not re.fullmatch('[0-9a-f]{64}', expected):

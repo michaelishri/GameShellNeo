@@ -17,6 +17,9 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 Current installed image: diagnostic.21.
+[193 — Diagnostic.22 integration](193-diagnostic22-adc-integration.md) records
+passing host/kernel/image checks, verified Mac staging and the recovery
+checkpoint. Card installation and hardware qualification remain pending.
 [192 — ADC width correction](192-axp-adc-width-correction.md) records the
 shared helper audit, candidate low-byte mask, exhaustive native/ARM32 checks
 and read-only comparison. This candidate is not in the installed image and

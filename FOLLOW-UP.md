@@ -8,11 +8,23 @@ Record deferred questions and activities here as they arise.
   the available space; verified retention/compaction is recorded in
   [report 188](docs/188-historical-driver-source-compaction.md). Keep the gate;
   avoid spending the kernel build time before discovering insufficient space.
+- [ ] Build input preflight for nested worktrees: the documented `BOOTLOADER`
+  and `RADIO_DIR` overrides are required when sibling/default paths do not
+  exist. Diagnostic.22 completed its kernel before `prepare` discovered the
+  missing default bootloader. Check input existence and locked hashes before
+  long compilation; retain explicit overrides and do not silently select other
+  bootloader or radio inputs. [Report 193](docs/193-diagnostic22-adc-integration.md).
 - [ ] Bounded kernel build parallelism: `build-kernel.sh` currently uses one
   job. Evaluate configurable jobs against the Intel host's CPU/memory limits,
   recording the compiler/job identity and measured time/memory cost. Do not
   infer a safe setting or change unrelated build/cache identities merely to
   accelerate diagnostic.21 assembly.
+- [ ] Evaluate verified incremental kernel-output seeding for small patch
+  changes. `kernel:reset` currently archives both source and output, so a
+  one-line header correction starts a full rebuild. Any reuse must bind the
+  prior source/configuration/toolchain, preserve recovery outputs, honor changed
+  dependencies and prove equivalence against a clean build. Do not reuse a
+  patch stamp alone or mutate archived outputs through hard links.
 
 - [ ] Diagnostic.21 other PM profiles and broader qualification: NEO-125/126's build, checked card
   installation, owner-confirmed login, awake startup and fresh volatile-B8
@@ -42,7 +54,9 @@ Record deferred questions and activities here as they arise.
   the owning driver and passes variant-scoped tests plus diagnostic.21 awake
   inspection. NEO-130 audits and tests the shared variable-width ADC helper
   separately ([report 192](docs/192-axp-adc-width-correction.md)); its low-byte
-  mask candidate is not yet installed. Fresh
+  mask is now built and offline-verified in diagnostic.22, with verified Mac
+  staging and a recovery checkpoint ([report 193](docs/193-diagnostic22-adc-integration.md)).
+  Installation and awake/PM hardware qualification remain pending. Fresh
   configuration and independent terminal-voltage evidence
   remain needed before resolving the voltage discrepancy. No charger/gauge
   write or longer charging experiment is justified by these source findings.
@@ -156,7 +170,13 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   USB/Wi-Fi recovery. Preserve these timings separately from PM/RTC intervals and
   instrument the host/route/device stages before assigning a cause or adding
   retries. The current evidence does not isolate Mac, tailnet or GameShell
-  behavior. [Report 191](docs/191-diagnostic21-connected-sleep-repeatability.md).
+  behavior. The collector starts while sleep may still be active, retries
+  collection after five seconds, and records errors without attempt timestamps.
+  The device also deliberately observes recovery for 30 seconds after keypad
+  readiness before finalizing the result. Distinguish expected unavailable
+  sleep intervals and this observation time from genuinely late network recovery;
+  existing error strings alone cannot make that distinction.
+  [Report 191](docs/191-diagnostic21-connected-sleep-repeatability.md).
 
 - [ ] Identify the source of the charging recorder's 7 October SSH connection
   reset if it recurs. The original trace retains only inventory and sample zero;

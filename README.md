@@ -6,6 +6,13 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+Diagnostic.22 is built, offline-verified and staged on the Mac for installation.
+It adds the shared ADC width correction, with exhaustive native/ARM32 tests and
+a reporting contract that preserves both corrected and legacy formulas.
+[Report 193](docs/193-diagnostic22-adc-integration.md) records the build,
+checksums and pending hardware qualification. The earlier voltage discrepancy
+and physical measurement accuracy remain unresolved.
+
 Diagnostic.21 is installed with the AXP223 gauge-status cache correction.
 Full card readback, startup, both network routes and the live volatile-B8
 inspection pass. Seven attended suspend-debug checks and the awake RTC rehearsal

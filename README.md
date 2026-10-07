@@ -530,6 +530,7 @@ Armbian, signature and final image checks remain mandatory.
 | `task check` | Python and C regressions, Bash syntax and ShellCheck |
 | `task test:nkmp` | Compare original/patched clock searches natively and under ARM32 emulation; also runs before the kernel in `task build` |
 | `task check:kernel` | Resolved Kconfig assertions and kernel artifact manifest |
+| `task check:ethernet-config` | Compare isolated baseline/candidate ARM kernels with unused platform Ethernet controllers removed; does not change the image or device |
 | `task check:dt` | Binding and compiled device-tree validation in the pinned container |
 | `task image:verify` | Repeat filesystem/content checks on the current bundled image |
 | `task image:pack` | Compress the verified image and record raw/transfer checksums |

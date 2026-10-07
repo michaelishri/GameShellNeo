@@ -16,6 +16,14 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[204 — Unused Ethernet build candidate](204-unused-ethernet-build-candidate.md)
+audits platform MAC support inherited from the generic Sunxi configuration and
+adds a separate paired-kernel comparison. The compressed kernel shrinks by
+103,648 bytes (1.575%), while all ten modules and the DTB stay identical. The
+linked address span is unchanged; reclaimed RAM is not demonstrated. The
+installed image is unchanged; hardware qualification and any energy/boot-time
+effect remain separate.
+
 [203 — Build preflight](203-build-preflight.md) moves locked-input/resource checks
 and public-source preparation ahead of long compilation. Missing explicit inputs
 and low disk headroom fail early; final build checks remain required. This is

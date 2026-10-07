@@ -7,6 +7,26 @@ reboot, screen, button and cable tests until fresh readiness tomorrow. Preserve
 diagnostic.23 and its completed evidence. Host-side preparation and source audits
 can continue; an audible warning does not replace observer readiness.
 
+- [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
+  nine audited configuration removals, identical ten modules/DTB and a 103,648-byte
+  (1.575%) smaller `zImage`. All 24 compiled-DTB negative controls pass for both
+  outputs. Layout inspection finds an unchanged kernel address span; ELF totals
+  do not establish reclaimed RAM. Host checks and the completed-stage manifest
+  pass. The saved `check:ethernet-config` task and
+  [report 204](docs/204-unused-ethernet-build-candidate.md) preserve the evidence.
+- [ ] Qualify the CPI-only unused Ethernet candidate: `SUN4I_EMAC=n` and
+  `STMMAC_ETH=n` remove platform controller
+  support while retaining SDIO Wi-Fi and USB gadget ECM. The active image
+  fragment is unchanged. Require a new image/recovery checkpoint and attended
+  boot, both network routes and PM checks before integration is accepted.
+  Do not infer idle-energy or boot-time savings from linked bytes alone.
+  [Report 204](docs/204-unused-ethernet-build-candidate.md).
+- [ ] Audit remaining unused Ethernet PHY/PCS options separately. The two
+  NEO-142 controller overrides leave prompted `PHYLIB`/`PCS_XPCS` and related
+  support enabled. Check actual board bindings, dependency changes and both
+  recovery networks before broadening the candidate; do not assume every option
+  containing "PHY" belongs to Ethernet, since the USB PHY is required.
+
 - [x] Build resource preflight: check Armbian's 10 GiB free-space requirement
   before a long kernel build, allowing for kernel outputs and assembly
   headroom. Diagnostic.21 reached the image stage before this gate rejected

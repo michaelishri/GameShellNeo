@@ -410,6 +410,10 @@ tasks:
       - python3 tools/check-kernel-config.py .local/build/kernel/.config
       - python3 tools/kernel-artifacts.py check
 
+  check:ethernet-config:
+    desc: Build two isolated ARM kernels to measure unused Ethernet removal; no image/device change
+    cmds: [bash tools/run-logged.sh ethernet-config python3 tools/check-ethernet-config.py]
+
   check:dt:
     desc: Validate the project's bindings and built DTB in the pinned container
     cmds: [bash tools/run-logged.sh devicetree tools/check-devicetree.sh]

@@ -16,7 +16,7 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Diagnostic.21 integration is in progress in
+Diagnostic.21 is built, verified offline and staged on the Mac:
 [187 — Gauge-status image integration](187-diagnostic21-gauge-integration.md).
 It includes patch 0035 and schema-3 inventory admission. Installation and
 hardware qualification remain pending.

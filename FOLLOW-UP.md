@@ -14,20 +14,16 @@ Record deferred questions and activities here as they arise.
   infer a safe setting or change unrelated build/cache identities merely to
   accelerate diagnostic.21 assembly.
 
-- [ ] NEO-125 diagnostic.21 integration/qualification (in progress):
-  [report 187](docs/187-diagnostic21-gauge-integration.md) records the new image
-  and strict dual-profile inventory with explicit B8 provenance. Complete the
-  full build/offline verification and then arrange installation and awake
-  hardware checks before fresh PM qualification. Diagnostic.20 remains installed.
-  Source candidate: [report 186](docs/186-axp223-gauge-status-candidate.md)
-  records the source-tested AXP223 B8 volatility correction on
-  [work/axp223-gauge-status](https://github.com/michaelishri/GameShellNeo/tree/work/axp223-gauge-status).
-  Assign a new image identity, update the strict inventory cache-metadata
-  admission and cache labels, then qualify fresh B8 reads, unchanged charger/
-  gauge controls, normal boot and PM behavior. The native/ARM32 and MFD object
-  checks do not prove a real calibration transition or physical ADC accuracy.
-  No image was built or installed; diagnostic.20 remains unchanged. NEO-10 and
-  NEO-117 retain electrical and direct sleep-charge qualification.
+- [ ] NEO-126 diagnostic.21 installation/qualification: NEO-125's image build,
+  offline verification and checked Mac transfer are complete.
+  [Report 187](docs/187-diagnostic21-gauge-integration.md) records the new image
+  and strict dual-profile inventory with explicit B8 provenance. Arrange the
+  DEV-card installation and awake hardware checks before fresh PM qualification.
+  Diagnostic.20 remains installed. Qualify fresh B8 reads, unchanged charger/
+  gauge controls, normal boot and PM behavior. The source/ARM32 checks and
+  complete kernel build do not prove a real calibration transition or physical
+  ADC accuracy. No calibration will be forced just to test a status bit. NEO-10
+  and NEO-117 retain electrical and direct sleep-charge qualification.
 
 - [ ] NEO-10/NEO-117 measurement follow-through: [report 184](docs/184-axp223-measurement-source-audit.md)
   finds contradictory REG34[2] polarity, no ADC absolute-accuracy/latch contract,

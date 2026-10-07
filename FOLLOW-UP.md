@@ -56,7 +56,12 @@ Record deferred questions and activities here as they arise.
   separately ([report 192](docs/192-axp-adc-width-correction.md)); its low-byte
   mask is now built and offline-verified in diagnostic.22, with verified Mac
   staging and a recovery checkpoint ([report 193](docs/193-diagnostic22-adc-integration.md)).
-  Installation and awake/PM hardware qualification remain pending. Fresh
+  NEO-132's installation and awake validation now pass: full card readback,
+  owner-confirmed login, both routes, startup/RTC/POWER checks and the schema-4
+  inventory ([report 194](docs/194-diagnostic22-installation-and-adc-validation.md)).
+  Raw `ec/03`, corrected/legacy formula and separate sysfs all report 4.1569 V;
+  unused bits are zero and controls match diagnostic.21. This does not resolve
+  the earlier discrepancy. NEO-133's fresh PM qualification is separate. Fresh
   configuration and independent terminal-voltage evidence
   remain needed before resolving the voltage discrepancy. No charger/gauge
   write or longer charging experiment is justified by these source findings.

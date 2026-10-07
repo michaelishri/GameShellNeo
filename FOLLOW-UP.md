@@ -61,7 +61,10 @@ Record deferred questions and activities here as they arise.
   inventory ([report 194](docs/194-diagnostic22-installation-and-adc-validation.md)).
   Raw `ec/03`, corrected/legacy formula and separate sysfs all report 4.1569 V;
   unused bits are zero and controls match diagnostic.21. This does not resolve
-  the earlier discrepancy. NEO-133's fresh PM qualification is separate. Fresh
+  the earlier discrepancy. NEO-133's seven PM debug checks and awake RTC
+  rehearsal now pass with owner-confirmed warnings/display; actual sleep on
+  diagnostic.22 remains pending ([report 195](docs/195-diagnostic22-pm-qualification.md)).
+  Fresh
   configuration and independent terminal-voltage evidence
   remain needed before resolving the voltage discrepancy. No charger/gauge
   write or longer charging experiment is justified by these source findings.

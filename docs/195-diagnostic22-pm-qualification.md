@@ -4,8 +4,9 @@
 freezer, driver and first late/noirq debug checks pass. The owner confirmed
 the initial warning and normal dim-console return, then gave readiness for the
 late/noirq check. Its warning/display were also confirmed, and the owner
-authorized four repeats, which pass all automated checks. Final owner
-warning/display confirmation is pending. No actual sleep has run on this image.
+authorized four repeats, which pass all automated checks. The owner confirmed
+“Yep, all clear and back to normal” for the final warnings/display. The awake
+RTC rehearsal also passes; no actual sleep has run on this image.
 [Report 194](194-diagnostic22-installation-and-adc-validation.md) records the
 verified installation and awake checks.
 
@@ -98,14 +99,16 @@ accepts all seven explicit result paths in chronological order. Its output is
 `.local/neo133-reference-history.json`, SHA-256
 `edbbfb78f627fe3b7afd680ccaf5418f5cf2f82870b1311bb52b6d51238f0426`.
 All adjacent PM counters also match exactly, with no intervening PM cycle.
-This baseline can be admitted by the awake rehearsal after observer confirmation.
+The owner confirmed the warnings and normal returns for the complete batch;
+this baseline is supplied to the subsequent awake rehearsal.
 
 Task logs `.local/neo133-platform-repeat-1.log` through `-4.log` preserve all
 collection output. Repeats 1, 3 and 4 each logged an initial `No route to host`;
 repeat 2 did not. All original completed results and independent route proofs
 were obtained without retrying PM or requesting a cable action. This does not
 assign a cause or establish the duration of any post-resume transport delay.
-No further screen test is running while awaiting final owner confirmation.
+The owner confirmed all warnings/returns were normal. No cable or button action
+was requested during this sequence.
 
 ## Read-only ADC check after debug resume
 
@@ -120,11 +123,32 @@ remain 4.2 V/1.2 A/900 mA. No charger/gauge setting was changed.
 This shows a compatible read after debug resume; it does not resolve absolute
 accuracy, coherence, capacity or the earlier voltage discrepancy.
 
+## Awake RTC rehearsal
+
+Following the owner's final confirmation, the saved task ran while the screen
+stayed on:
+
+```sh
+task device:sleep-rehearse QUALIFICATION=.local/neo133-reference-history.json
+```
+
+Capture: `.local/diagnostics/20261007T055731.923737Z/result.json`;
+run `b1fef2d2d5cf4a149c39e496ee9c38ba`. Result SHA-256:
+`05f1ad3b274b580dd58a18e3b659a9bde90ba1b93a55f7e07ee367f6ec621137`.
+The original task log is `.local/neo133-rehearsal.log`.
+
+One RTC event arrived with flags `0xa0`; IRQ31 advanced 1 to 2. The 30-second
+alarm deadline was exercised while awake and the original alarm restored.
+Power policy and input ownership returned to their original state, with no
+retained policy, PM, RTC or console owner. Both independent SSH routes pass.
+PM remains 7/0, SDIO usage 2 and brightness/backlight power 1/0 on the same boot.
+This establishes awake alarm delivery and restoration, not wake from sleep.
+
 ## Remaining qualification
 
-Obtain the owner's final warning/display confirmation, then run the awake RTC
-rehearsal. Actual RTC sleep remains separately attended and requires fresh
-readiness. The seven-stage baseline is automated-pass; observer confirmation
-remains separate.
+Actual RTC sleep remains separately attended and requires fresh readiness.
+All seven debug checks, owner warning/display confirmations and the awake
+RTC rehearsal now pass. The owner has been asked to watch the first actual
+connected-USB RTC sleep; no sleep has been submitted yet.
 Battery/cable/POWER wake profiles, energy and physical battery accuracy remain
 separate; these debug checks do not establish real sleep or charging in sleep.

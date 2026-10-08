@@ -1,0 +1,108 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: unwind registered roles after mode setup fails
+
+Host or gadget registration can succeed before set_mode returns an error.
+The existing fail3 path frees controller resources without removing those
+registrations. Centralize role setup and unwind completed registrations in
+reverse order before entering the common resource cleanup. Do not remove a
+role whose setup failed or change successful registration ownership.
+
+Reject an unsupported mode before publication. This is a probe-unwind fix;
+IRQ, timer, runtime-PM and backend producer retirement remain separate work.
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2315,6 +2315,55 @@
+ 	spin_unlock_irqrestore(&musb->lock, flags);
+ }
+ 
++/* Unwind only roles whose registration completed successfully. */
++static int musb_init_roles(struct musb *musb, int power)
++{
++	bool host_registered = false;
++	bool gadget_registered = false;
++	int status;
++
++	switch (musb->port_mode) {
++	case MUSB_HOST:
++		status = musb_host_setup(musb, power);
++		if (status < 0)
++			return status;
++		host_registered = true;
++		break;
++	case MUSB_PERIPHERAL:
++		status = musb_gadget_setup(musb);
++		if (status)
++			return status;
++		gadget_registered = true;
++		break;
++	case MUSB_OTG:
++		status = musb_host_setup(musb, power);
++		if (status < 0)
++			return status;
++		host_registered = true;
++		status = musb_gadget_setup(musb);
++		if (status)
++			goto cleanup;
++		gadget_registered = true;
++		break;
++	default:
++		dev_err(musb->controller, "unsupported port mode %d\n",
++			musb->port_mode);
++		return -EINVAL;
++	}
++
++	status = musb_platform_set_mode(musb, musb->port_mode);
++	if (status >= 0)
++		return status;
++
++cleanup:
++	/* Keep core IRQ, DMA and platform resources alive for client cleanup. */
++	if (gadget_registered)
++		musb_gadget_cleanup(musb);
++	if (host_registered)
++		musb_host_cleanup(musb);
++	return status;
++}
++
+ /*
+  * Perform generic per-controller initialization.
+  *
+@@ -2546,35 +2595,7 @@
+ 	MUSB_DEV_MODE(musb);
+ 	musb_set_state(musb, OTG_STATE_B_IDLE);
+ 
+-	switch (musb->port_mode) {
+-	case MUSB_HOST:
+-		status = musb_host_setup(musb, plat->power);
+-		if (status < 0)
+-			goto fail3;
+-		status = musb_platform_set_mode(musb, MUSB_HOST);
+-		break;
+-	case MUSB_PERIPHERAL:
+-		status = musb_gadget_setup(musb);
+-		if (status < 0)
+-			goto fail3;
+-		status = musb_platform_set_mode(musb, MUSB_PERIPHERAL);
+-		break;
+-	case MUSB_OTG:
+-		status = musb_host_setup(musb, plat->power);
+-		if (status < 0)
+-			goto fail3;
+-		status = musb_gadget_setup(musb);
+-		if (status) {
+-			musb_host_cleanup(musb);
+-			goto fail3;
+-		}
+-		status = musb_platform_set_mode(musb, MUSB_OTG);
+-		break;
+-	default:
+-		dev_err(dev, "unsupported port mode %d\n", musb->port_mode);
+-		break;
+-	}
+-
++	status = musb_init_roles(musb, plat->power);
+ 	if (status < 0)
+ 		goto fail3;
+ 

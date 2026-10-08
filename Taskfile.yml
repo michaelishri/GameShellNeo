@@ -121,6 +121,7 @@ tasks:
       - task: test:musb-context
       - task: test:musb-sleep
       - task: test:musb-request-resume
+      - task: test:musb-probe-roles
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -256,6 +257,14 @@ tasks:
   test:musb-restart-kunit:
     desc: Execute actual MUSB restart/giveback paths in an isolated UML kernel with KASAN and lockdep
     cmds: [bash tools/run-logged.sh musb-restart-kunit python3 tools/check-musb-restart-kunit.py]
+
+  test:musb-probe-roles:
+    desc: Test MUSB registration failure cleanup on native and ARM32 with negative controls
+    cmds: [bash tools/run-logged.sh musb-probe-roles python3 tools/check-musb-probe-roles.py]
+
+  check:musb-probe-drivers:
+    desc: Test MUSB probe roles and compile gadget, host, dual-role and module ARM configurations
+    cmds: [bash tools/run-logged.sh musb-probe-drivers python3 tools/check-musb-probe-roles.py --compile-drivers]
 
   test:cpuidle-s2idle:
     desc: Test actual CPU-idle entry, scheduler, registration and tick-freeze functions on native and ARM32

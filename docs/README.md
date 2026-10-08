@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[226 — MUSB probe role cleanup](226-musb-probe-role-unwind.md)
+records the NEO-164 fix for successful host/gadget registrations left behind
+after a later mode-selection failure, with source fault tests and ARM builds.
+It is a bounded NEO-106 prerequisite, not complete controller teardown.
+
 [225 — MUSB deferred restart ownership](225-musb-resume-request-ownership.md)
 records the NEO-108 candidate and NEO-163 review corrections: retaining restart
 ownership across a busy giveback, balancing its temporary PM reference, and

@@ -1171,6 +1171,19 @@ receipt is `.local/build/musb-sleep-tests/matrix-evidence.json`. These checks
 do not install an image or qualify physical USB or system sleep. See
 [report 225](docs/225-musb-resume-request-ownership.md) for results and limits.
 
+The NEO-106 probe-unwind follow-up has two host-only tasks, run sequentially:
+
+```sh
+task test:musb-probe-roles       # Actual role helper with registration and mode failures, native/ARM32
+task check:musb-probe-drivers    # The same tests plus gadget, host, dual-role and module ARM builds
+```
+
+Receipts are under `.local/build/musb-probe-roles/`. The helper tests replace
+registration and hardware calls with controlled boundaries; they do not perform
+physical USB registration or controller removal. See
+[report 226](docs/226-musb-probe-role-unwind.md). The native/ARM32 check is also
+part of `task build`.
+
 For the CPI WFI s2idle candidate in diagnostic.24, use:
 
 ```sh

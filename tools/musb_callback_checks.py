@@ -92,4 +92,6 @@ def callback_checks(work, source, udc_source, wait_source, builder, function):
     print(arm, end='', flush=True)
     return dict(native=results, arm32=arm.strip(), harness_sha256=sha256(harness),
                 limits='Actual callbacks, UDC unbind and lock-wait macros with pthread primitives and controlled boundary APIs. '
-                       'Not a Linux waitqueue, IRQ/timer scheduler, or electrical USB qualification.')
+                       'No deferred endpoint restart in this fixture (asserted boundary, covered by '
+                       'the request-progress/KUnit suites). Not a Linux waitqueue, IRQ/timer '
+                       'scheduler, or electrical USB qualification.')

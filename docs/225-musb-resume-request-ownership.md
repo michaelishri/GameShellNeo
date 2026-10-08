@@ -84,7 +84,44 @@ project gadget, host-only, dual-role, module, no-system-sleep and no-PM ARM
 alternatives. The host suite additionally checks KUnit receipt rejection,
 scenario totals, forward-declaration extraction and hook-anchor uniqueness.
 
-Validation receipts and final results are recorded below once all checks finish.
+## Completed validation
+
+The revised production patch has SHA256
+`1f43648b48c14bd29a6aff68bdeb26077bf8d4888f174afb2b24fbf3396e8137`.
+The following checks passed against that patch:
+
+| Check | Result |
+| --- | --- |
+| Request progress | 48 scenarios per execution (24 per direction), native, native real-free and ARM32; all ten native negative controls failed as expected |
+| Linux UML KUnit | Seven cases passed with KASAN and lockdep enabled; no sanitizer or locking diagnostics |
+| Existing sleep fixture | 68 scenarios, native and ARM32; all 11 native negative controls failed as expected |
+| Existing callback fixture | 134 scenarios, native and ARM32; all ten native negative controls failed as expected |
+| ARM compilation | Project gadget, host, dual-role, module, no-system-sleep and no-PM configurations passed; saved object and configuration hashes verified |
+| Host checks | 16 runtime tests and 814 tooling tests passed, with two optional tooling skips; compiled helper checks, Bash syntax and ShellCheck passed |
+
+The callback fixture explicitly asserts its no-deferred-restart boundary;
+the dedicated request-progress and KUnit suites exercise the actual deferred
+handoff. The module build also checks the linked callback helper definitions.
+Standards and specification reviews found no further actionable issues in
+the implementation. Strict checkpatch on the production patch body reported
+zero errors, warnings or checks; its mail-style description retains one
+line-length warning.
+
+Local receipts beneath `.local/build/` are:
+
+| Receipt | SHA256 |
+| --- | --- |
+| `musb-request-resume-tests/evidence.json` | `43a8fe04308a1f41e5cb7cbf777ac6159ce6de1f1ec473a0e3c5723a9bb88d54` |
+| `musb-restart-kunit/evidence.json` | `0c0908c93e608f8e33c9c56b493ef58645a1c9ea58b534f6ea211a34a968b2ee` |
+| `musb-sleep-tests/matrix-evidence.json` | `f3d49e6cd978b19a21536f4b8677a4e06afe8f8310cba136fe9d754a32b30a25` |
+
+The accepted UML binary, configuration, results and log are retained under
+`.local/build/musb-restart-kunit/kernel-04c847c5b0b3e895/accepted-runs/110765490fbe47388a2455eff61c2092/`.
+The binary SHA256 is
+`ea4d9962649ea983be615ce575dfd7e9358accdcdb9324c80228d720bfc5b98a`.
+Receipt inputs and retained artifact hashes were checked against their saved
+files. The older standalone request compile receipt belongs to `ad5becd`;
+the matrix receipt above records the revised patch's ARM compilation.
 
 ## Limits and remaining work
 

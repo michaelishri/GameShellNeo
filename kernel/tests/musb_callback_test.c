@@ -101,7 +101,21 @@ struct musb {
 };
 struct usb_ep { int dummy; };
 struct usb_request { int status, dma; };
-struct musb_ep { struct musb *musb; struct usb_ep end_point; int busy; };
+struct musb_ep {
+	struct musb *musb;
+	struct usb_ep end_point;
+	int busy;
+	struct { int *next; } req_list;
+	bool restart_pending, restart_again, restart_deferred;
+};
+/* This suite has no deferred restart. Its ownership is exercised separately
+ * by the request-progress and real-kernel KUnit suites. Fail if that boundary
+ * changes instead of silently swallowing an obligation here.
+ */
+static void musb_ep_finish_restart(struct musb_ep *ep, bool restart)
+{
+	assert(restart && !ep->restart_pending && !ep->restart_deferred);
+}
 struct musb_request { struct usb_request request; struct musb *musb; struct musb_ep *ep; int list; };
 static struct musb instance;
 static struct usb_udc udc;

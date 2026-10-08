@@ -87,6 +87,15 @@ not produce a bootable image.
 Validation is in progress; final receipts and review results will be recorded
 after the checks finish.
 
+The first UML execution correctly rejected the original fixture: its peer
+`dev_id` aliased the controller because `musb` was the fixture's first member.
+The peer now uses its own counter's address consistently for request, callback
+and release. Follow-up specification review also found that fixture init
+manually cleaned up failed setup even though KUnit invokes exit after failed
+init. Init now leaves cleanup to KUnit, and exit accepts a null fixture after
+allocation failure. The reviewer confirmed both corrections. The production
+patch was unchanged; the initial failed run is not accepted evidence.
+
 ## Remaining NEO-106 obligations
 
 Removing this action is one necessary lifetime boundary. Existing platform

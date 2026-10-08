@@ -41,7 +41,7 @@ static irqreturn_t musb_irq_test_thread(int irq, void *data)
 
 static irqreturn_t musb_irq_test_peer(int irq, void *data)
 {
-	struct musb_irq_fixture *f = data;
+	struct musb_irq_fixture *f = container_of(data, struct musb_irq_fixture, peer_calls);
 
 	atomic_inc(&f->peer_calls);
 	complete(&f->peer_seen);
@@ -92,12 +92,14 @@ static void musb_irq_test_exit(struct kunit *test)
 {
 	struct musb_irq_fixture *f = test->priv;
 
+	if (!f)
+		return;
 	complete_all(&f->handler_release);
 	if (f->free_thread)
 		kthread_stop(f->free_thread);
 	musb_free_irq(&f->musb);
 	if (f->peer_registered)
-		free_irq(f->irq, f);
+		free_irq(f->irq, &f->peer_calls);
 	if (f->irq)
 		irq_dispose_mapping(f->irq);
 	if (!IS_ERR_OR_NULL(f->domain))
@@ -123,19 +125,14 @@ static int musb_irq_test_init(struct kunit *test)
 	if (IS_ERR(f->domain))
 		return PTR_ERR(f->domain);
 	f->irq = irq_create_mapping(f->domain, 0);
-	if (!f->irq) {
-		ret = -EINVAL;
-		goto fail;
-	}
+	if (!f->irq)
+		return -EINVAL;
 	ret = request_irq(f->irq, musb_irq_test_peer, IRQF_SHARED | IRQF_ONESHOT,
-			  "musb-peer", f);
+			  "musb-peer", &f->peer_calls);
 	if (ret)
-		goto fail;
+		return ret;
 	f->peer_registered = true;
 	return 0;
-fail:
-	musb_irq_test_exit(test);
-	return ret;
 }
 
 static void musb_irq_expect_peer(struct kunit *test)

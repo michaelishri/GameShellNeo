@@ -2,10 +2,23 @@
 
 Record deferred questions and activities here as they arise.
 
-**Unattended work, 8 October 2026:** the owner is asleep. Defer all new sleep,
-reboot, screen, button and cable tests until fresh readiness tomorrow. Preserve
-diagnostic.23 and its completed evidence. Host-side preparation and source audits
-can continue; an audible warning does not replace observer readiness.
+**Attended work, 8 October 2026:** the owner has returned and network access is
+restored. NEO-143 completes fresh diagnostic.23 qualification on new boot
+`cc26703f-d9ef-4d71-8da1-9d766f3efdbe`; the previous boot's sleep continuation
+cannot authorize this boot. Both SSH routes, awake terminal, power-key ownership
+and RTC checks pass. All seven debug checks now pass at PM7/0, with both routes
+recovering, stable SDIO usage and owner-confirmed clear warnings/normal returns.
+The fresh receipt passes full admission against the post-debug inspection.
+The awake rehearsal and one separately attended actual RTC sleep now pass,
+with controls restored, both routes healthy and final PM8/0. The owner confirms
+the clear warning and normal untouched sleep return. Actual-sleep SSH has no
+errors this time; one debug-cycle timeout was captured before the server
+greeting was observed. This narrows that failure but does not resolve its cause.
+No further display or sleep test is running. The current unused continuation is
+`.local/diagnostics/20261008T010429.034673Z/qualification-next.json`, with
+rehearsal `e1afea155b864a79b04bb133496e4e26`; validate current state before reuse.
+An audible warning does not replace readiness.
+[Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md).
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte
@@ -268,6 +281,15 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   sleep; if insufficient, add bounded TCP metadata with matching connection
   identities at both ends. Cause remains open; no image rebuild is needed.
   [Report 202](docs/202-post-return-ssh-investigation.md).
+  NEO-143 requalifies a fresh diagnostic.23 boot and captures a debug-cycle
+  device SSH timeout before a server greeting is observed (key exchange and
+  authentication also incomplete). Four other debug collection failures are
+  forwarded TCP-channel failures. All original results and both routes recover.
+  One actual RTC sleep passes without any SSH errors; its first post-return
+  clock command completes 3.611–4.267 seconds after PM return. These different
+  observations must not be conflated with report 201's confirmed post-return
+  failure. Bounded socket-correlated metadata remains the next diagnostic step.
+  [Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md).
   Earlier untimestamped failures still cannot be classified.
   [Report 197](docs/197-ssh-collection-timing.md).
 

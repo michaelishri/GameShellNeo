@@ -392,6 +392,8 @@ Helpers and metadata remain in their recorded private temporary directories
 for diagnosis. [Report 206](docs/206-two-ended-ssh-tcp-metadata.md) records
 the recorder design; [report 207](docs/207-ssh-observer-sleep-unit-integration.md)
 records the pre-sleep integration failure, correction and validation.
+[Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md) records the
+subsequent RTC sleep pass and independently rejected incomplete packet capture.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

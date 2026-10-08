@@ -3,9 +3,13 @@
 8 October 2026. NEO-145's first instrumented attempt stops before sleep:
 the existing admission guard correctly rejects the independent TCP recorder
 service. The integration is corrected and passes awake hardware validation.
-The separately attended actual-sleep check is pending. Diagnostic.23/kernel
+The actual-sleep check was pending at this checkpoint. Diagnostic.23/kernel
 `6.18.54-gameshellneo22` remains on boot
 `cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, PM8/0.
+
+Subsequent [report 208](208-instrumented-rtc-sleep-and-recorder-limits.md) records
+the attended RTC pass at PM9/0 and separate capture failures. Its continuation
+supersedes the unused receipt recorded at the end of this report.
 
 ## Original rejection
 

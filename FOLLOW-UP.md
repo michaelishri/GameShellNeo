@@ -2,23 +2,22 @@
 
 Record deferred questions and activities here as they arise.
 
-**Attended work, 8 October 2026:** the owner has returned and network access is
-restored. NEO-143 completes fresh diagnostic.23 qualification on new boot
-`cc26703f-d9ef-4d71-8da1-9d766f3efdbe`; the previous boot's sleep continuation
-cannot authorize this boot. Both SSH routes, awake terminal, power-key ownership
-and RTC checks pass. All seven debug checks now pass at PM7/0, with both routes
-recovering, stable SDIO usage and owner-confirmed clear warnings/normal returns.
-The fresh receipt passes full admission against the post-debug inspection.
-The awake rehearsal and one separately attended actual RTC sleep now pass,
-with controls restored, both routes healthy and final PM8/0. The owner confirms
-the clear warning and normal untouched sleep return. Actual-sleep SSH has no
-errors this time; one debug-cycle timeout was captured before the server
-greeting was observed. This narrows that failure but does not resolve its cause.
+**Attended work, 8 October 2026:** diagnostic.23 remains on boot
+`cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM9/0: seven qualified debug checks
+and two actual RTC sleeps. The latest sleep passes, with controls restored,
+original keypad retained, stable SDIO usage and both SSH routes healthy. The
+owner confirms the clear warning and normal untouched dim-console return.
+Its three TCP-channel failures all precede PM return; no greeting timeout is
+observed. The two-ended recorder is separately unqualified: the Mac capture
+ends during sleep entry and the GameShell capture reports 538 socket drops.
+Original evidence is retained without loosening acceptance or repeating PM.
 No further display or sleep test is running. The current unused continuation is
-`.local/diagnostics/20261008T010429.034673Z/qualification-next.json`, with
-rehearsal `e1afea155b864a79b04bb133496e4e26`; validate current state before reuse.
-An audible warning does not replace readiness.
-[Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md).
+`.local/diagnostics/20261008T054356.540135Z/qualification-next.json`, with
+rehearsal `e1afea155b864a79b04bb133496e4e26`; the former 010429 continuation was
+consumed. Final health and full continuation validation pass. Validate current
+state before reuse; an audible warning does not replace fresh readiness.
+[Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md),
+[report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
 
 - [x] NEO-144 bounded two-ended SSH metadata recorder: saved awake/sleep/collect
   tasks and offline flow report, with payload-free output, source/identity/hash
@@ -35,14 +34,22 @@ An audible warning does not replace readiness.
   route probes, verified cgroup/unit ownership, both children exit zero and no
   cleanup errors. Full host checks pass; boot/PM8/0 unchanged.
   [Report 207](docs/207-ssh-observer-sleep-unit-integration.md).
-- [ ] Complete NEO-145's separately attended actual RTC sleep with the corrected
-  observer integration, then inspect any greeting stall against matching
-  endpoint/sequence identities and host timing. Final health and receipt validation
-  still accept report 205's unused continuation; no source-qualified device helper
-  changed and no debug repeat or image swap is needed while that state holds.
-  Fresh owner readiness has been requested after the pre-entry rejection.
-  No further sleep or display test is running. Metadata success alone cannot
-  resolve the historical SSH fault or establish wire delivery, energy or wake latency.
+- [x] Run and assess NEO-145's separately attended actual RTC sleep with the
+  corrected observer integration. Functional sleep/recovery and both routes
+  pass at PM9/0, with owner confirmation. Independent TCP capture validation
+  rejects the Mac error and Linux socket drops; no complete flow claim is made.
+  Both transient services are inactive/not-found. Final health/receipt checks
+  pass, and all original files remain retained.
+  [Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
+- [ ] NEO-146: repair recorder coverage before further instrumented sleep:
+  preserve the Mac backend/error phase and explicit interface-loss gaps;
+  investigate bounded reopening without claiming continuous coverage. Reproduce
+  Linux capture pressure with awake bulk-transfer tests, measure effective
+  per-socket buffering and filtering, and consider handshake-focused recording.
+  The 538 diagnostic socket drops do not establish USB/TCP network loss. Keep
+  strict failure reporting, original PM verdicts, SSH policy and fresh attended
+  readiness. Initial investigation and awake tests require no physical interaction.
+  [Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte
@@ -323,8 +330,16 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   NEO-145 corrects its first sleep-integration failure: the separate recorder
   service was rejected before PM entry. The recorder is now owned by the
   existing sleep service, with awake lifecycle/probe validation and the original
-  admission guard unchanged. The actual instrumented sleep is still pending.
+  admission guard unchanged.
   [Report 207](docs/207-ssh-observer-sleep-unit-integration.md).
+  The actual instrumented sleep now passes, with all three connection failures
+  bounded before PM return and no observed greeting timeout. The first successful
+  post-return clock completion is 9.427–10.064 seconds after return; this includes
+  connection/command work and instrumentation, not exact network-ready time.
+  Mac capture stops during entry; Linux reports 538 diagnostic socket drops.
+  Repair recorder coverage/pressure while awake before another attended test;
+  neither incomplete capture resolves the original post-return cause.
+  [Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
   Earlier untimestamped failures still cannot be classified.
   [Report 197](docs/197-ssh-collection-timing.md).
 

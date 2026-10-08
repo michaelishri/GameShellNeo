@@ -18,8 +18,12 @@ recovered and the original keypad retained. [Report 219](docs/219-diagnostic24-p
 records the passing awake RTC rehearsal and first actual connected-USB RTC
 sleep at PM8/0. All four CPU sleep callbacks run, with independent timekeeping
 freeze and a 28.87-second BOOTTIME–MONOTONIC gap. Both routes recover, and the
-owner confirms the warning and normal untouched display return. Repeated-cycle
-reliability, other power/cable profiles and energy savings remain unqualified.
+owner confirms the warning and normal untouched display return. Four further
+connected-USB sleep/wake repeats also pass, with all-CPU callback participation,
+timekeeping freeze, both routes recovered and owner-confirmed normal returns.
+[Report 220](docs/220-diagnostic24-connected-sleep-repeatability.md) records
+PM12/0 and the retained collection errors. Other power/cable profiles, broader
+reliability and energy savings remain unqualified.
 [Report 217](docs/217-wfi-s2idle-image-integration.md)
 records the changes and first-install sequence.
 

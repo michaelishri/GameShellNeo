@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[220 — Diagnostic.24 connected sleep repeatability](220-diagnostic24-connected-sleep-repeatability.md)
+records four further actual RTC sleep/wake passes, all-CPU participation and
+timekeeping freeze each time, both-route recovery and owner-confirmed untouched
+normal returns. Final PM12/0 and full health pass; collection errors are retained.
+Battery/cable profiles, broader reliability and energy comparisons remain open.
+
 [219 — Diagnostic.24 PM qualification](219-diagnostic24-pm-qualification.md)
 records all seven debug passes, the awake RTC rehearsal and the first actual
 connected-USB RTC sleep at PM8/0. All four CPU callbacks advance, independent

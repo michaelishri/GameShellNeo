@@ -2,6 +2,24 @@
 
 Record deferred questions and activities here as they arise.
 
+**Connected sleep repeats qualified, 9 October 2026:** NEO-159 completes four
+further actual RTC sleep/wake cycles on diagnostic.24, same boot
+`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM12/0. All four CPU callbacks advance
+once per cycle, with independent timekeeping freeze and clock gaps of
+28.708–29.075 seconds. Both SSH routes, original keypad, dim backlight and
+temporary-control restoration pass. The owner confirms clear long warnings
+and all four normal returns without intervention. Batch capture:
+`20261008T114344.024513Z`; fresh full health and seven-debug/five-sleep admission
+pass at `20261008T115117.076929Z`. All four WFI s2idle counts are now 5.
+The unused continuation is the batch's `cycle-4/qualification-next.json`.
+Eight retained USB forwarding timeouts all began before recorded PM return;
+seven ended before it and one end overlaps the alignment uncertainty. This
+does not close NEO-154's earlier post-return inner-SSH investigation.
+Next: independently qualify battery-only and cable-change profiles, exercise
+awake-measurement interruption rejection, then measure energy/awake overhead.
+No new sleep test is running; keep physical steps coordinated.
+[Report 220](docs/220-diagnostic24-connected-sleep-repeatability.md).
+
 **First coordinated sleep qualified, 9 October 2026:** NEO-158 completes seven
 freezer/driver/late-noirq debug checks, the awake RTC rehearsal and one actual
 connected-USB RTC sleep on diagnostic.24, boot

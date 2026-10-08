@@ -66,7 +66,8 @@ def main():
             raise ValueError('Missing locked UDC/wait source')
         patches = [ROOT / 'kernel/patches' / name for name in (
             '0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
-            '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch')]
+            '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch',
+            '0037-musb-resume-request-ownership.patch')]
         for patch in patches:
             run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=WORK / 'patched')
         core = (target / 'musb_core.c').read_text()
@@ -107,7 +108,7 @@ def main():
             ungated_work=functions.replace('\tif (!musb->gadget_suspended)\n\t\tmusb_pullup', '\tmusb_pullup', 1),
             early_restore=functions.replace('\tif (musb->gadget_suspended)\n\t\tpower &= ~MUSB_POWER_SOFTCONN;\n', ''),
             failed_resume_connects=functions.replace('musb->gadget_suspended && !error', 'musb->gadget_suspended'),
-            loses_first_error=functions.replace('\t\t\t\tif (!error)\n\t\t\t\t\terror = ret;', '\t\t\t\terror = ret;'),
+            loses_first_error=functions.replace('\t\t\tif (!error)\n\t\t\t\terror = ret;', '\t\t\terror = ret;'),
             enqueue_during_sleep=functions.replace('\t\tif (!musb->gadget_suspended)\n\t\t\tschedule', '\t\tschedule'),
             stop_keeps_pullup=functions.rsplit('\tmusb_pullup(musb, 0);', 1)[0] +
                 functions.rsplit('\tmusb_pullup(musb, 0);', 1)[1],

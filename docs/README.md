@@ -17,11 +17,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 [225 — MUSB deferred restart ownership](225-musb-resume-request-ownership.md)
-makes the endpoint, not the freed request, own its deferred runtime-resume
-restart, coalesces repeated head queues behind a per-endpoint flag, and runs
-resume callbacks without `list_lock`. 72 native/ARM32 scenarios with six
-negative controls, a real-free lifetime pass and ARM driver builds pass;
-completion re-queues landing in the busy window stay a separate item.
+records the NEO-108 candidate and NEO-163 review corrections: retaining restart
+ownership across a busy giveback, balancing its temporary PM reference, and
+checking completion requeues and error propagation. It corrects the original
+scenario count and distinguishes host fixtures, Linux UML integration, ARM
+compilation and pending hardware qualification.
 
 [221 — Diagnostic.24 SSH stall awake investigation](221-diagnostic24-ssh-stall-awake-investigation.md)
 narrows two original failures to accepted client greeting bytes with no reply,

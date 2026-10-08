@@ -23,14 +23,24 @@ PRIOR_PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup
                   '0030-musb-gadget-callback-lifetime.patch',
                   '0033-musb-sleep-session-retirement.patch')
 CORE_FUNCTIONS = ('musb_queue_resume_work', 'musb_run_resume_work')
-GADGET_FUNCTIONS = ('musb_ep_restart_resume_work', 'musb_free_request',
-                    'musb_g_giveback', 'musb_gadget_dequeue', 'musb_gadget_queue')
+GADGET_FUNCTIONS = ('musb_ep_restart_resume_work', 'musb_ep_finish_restart',
+                    'musb_free_request', 'musb_g_giveback',
+                    'musb_gadget_dequeue', 'musb_gadget_queue')
 PATCH = ROOT / 'kernel/patches/0037-musb-resume-request-ownership.patch'
 HARNESS = ROOT / 'kernel/tests/musb_request_resume_test.c'
 
 
+def scenario_count(output):
+    match = re.fullmatch(r'MUSB deferred-request audit: (\d+) source scenarios pass '
+                         r'\((\d+) per direction\)\n?', output)
+    if not match or (int(match[1]), int(match[2])) != (48, 24):
+        raise ValueError('Expected the complete 48-scenario suite (24 per direction)')
+    return dict(total=int(match[1]), per_direction=int(match[2]))
+
+
 def function(text, name):
-    match = re.search(r'^(?:static\s+)?[A-Za-z_][\w \t\*]*\b' + name + r'\s*\(', text, re.M)
+    match = re.search(r'^(?:static\s+)?[A-Za-z_][\w \t\*]*\b' + name +
+                      r'\s*\([^;{]*\)[^;{]*\{', text, re.M)
     if not match:
         raise ValueError('Missing function: ' + name)
     body = text.index('{', match.start())
@@ -47,8 +57,7 @@ def function(text, name):
 
 def header_functions(core, gadget):
     parts = [function(core, name) for name in CORE_FUNCTIONS]
-    parts += [function(gadget, name) for name in GADGET_FUNCTIONS[:3]]
-    parts += [function(gadget, name) for name in GADGET_FUNCTIONS[3:]]
+    parts += [function(gadget, name) for name in GADGET_FUNCTIONS]
     return ''.join(parts)
 
 
@@ -59,21 +68,15 @@ def splice(source, name, body):
     return source.replace(original, body)
 
 
-def mutate(queue, callback, resume):
-    gadget = callback
+def mutate(gadget, resume):
     def queue_body():
-        return function(queue, 'musb_gadget_queue')
+        return function(gadget, 'musb_gadget_queue')
 
     def callback_body():
-        return function(callback, 'musb_ep_restart_resume_work')
+        return function(gadget, 'musb_ep_restart_resume_work')
 
     def resume_body():
         return function(resume, 'musb_run_resume_work')
-
-    def splice(source, name, body):
-        original = function(source, name)
-        assert source.count(original) == 1 and body != original
-        return source.replace(original, body)
 
     ignore = queue_body().replace(
         '\t\tif (!musb_ep->restart_pending) {\n\t\t\tmusb_ep->restart_pending = true;\n',
@@ -92,24 +95,37 @@ def mutate(queue, callback, resume):
         '\t\tspin_lock_irqsave(&musb->list_lock, flags);\n\t}\n',
         '\t}\n')
     assert holds != resume_body()
-    busy = callback_body().replace(
-        '\tif (musb_ep->busy || !musb_ep->desc)\n\t\treturn 0;',
-        '\tif (!musb_ep->desc)\n\t\treturn 0;')
+    busy = callback_body().replace('\t\tif (ep->busy) {', '\t\tif (false) {')
     assert busy != callback_body()
     flag = callback_body().replace(
-        '\n\tmusb_ep->restart_pending = false;\n\n\t/*',
-        '\n\n\t/*')
+        '\n\tep->restart_pending = false;', '')
     assert flag != callback_body()
     failed = queue_body().replace(
         '\t\t\t\tmusb_ep->restart_pending = false;\n', '')
     assert failed != queue_body()
-    return dict(ignores_coalescing=(resume, splice(queue, 'musb_gadget_queue', ignore)),
+    lost = callback_body().replace(
+        '\t\t\tep->restart_deferred = true;\n\t\t\tpm_runtime_get_noresume(musb->controller);',
+        '\t\t\tep->restart_pending = false;')
+    assert lost != callback_body()
+    giveback = function(gadget, 'musb_g_giveback')
+    no_handoff = giveback.replace('\tif (!busy)\n\t\tmusb_ep_finish_restart(ep, true);', '')
+    assert no_handoff != giveback
+    no_repeat = callback_body().replace('} while (ep->restart_again);', '} while (false);')
+    assert no_repeat != callback_body()
+    first_error = resume_body().replace('\t\t\tif (!error)\n\t\t\t\terror = ret;',
+                                        '\t\t\terror = ret;')
+    assert first_error != resume_body()
+    return dict(ignores_coalescing=(resume, splice(gadget, 'musb_gadget_queue', ignore)),
                 drops_pending_work=(splice(resume, 'musb_run_resume_work', drop), gadget),
                 holds_list_lock_through_callbacks=(
                     splice(resume, 'musb_run_resume_work', holds), gadget),
-                restarts_while_busy=(resume, splice(queue, 'musb_ep_restart_resume_work', busy)),
-                skips_flag_reset=(resume, splice(queue, 'musb_ep_restart_resume_work', flag)),
-                queue_failure_keeps_flag=(resume, splice(queue, 'musb_gadget_queue', failed)))
+                restarts_while_busy=(resume, splice(gadget, 'musb_ep_restart_resume_work', busy)),
+                skips_flag_reset=(resume, splice(gadget, 'musb_ep_restart_resume_work', flag)),
+                queue_failure_keeps_flag=(resume, splice(gadget, 'musb_gadget_queue', failed)),
+                loses_busy_restart=(resume, splice(gadget, 'musb_ep_restart_resume_work', lost)),
+                skips_giveback_handoff=(resume, splice(gadget, 'musb_g_giveback', no_handoff)),
+                skips_completed_head=(resume, splice(gadget, 'musb_ep_restart_resume_work', no_repeat)),
+                loses_first_error=(splice(resume, 'musb_run_resume_work', first_error), gadget))
 
 
 def main():
@@ -156,17 +172,16 @@ def main():
         # The candidate must change exactly the audited ownership functions.
         assert function(locked_core, 'musb_run_resume_work') != function(patched_core, 'musb_run_resume_work')
         assert function(locked_core, 'musb_queue_resume_work') == function(patched_core, 'musb_queue_resume_work')
-        for name in ('musb_ep_restart_resume_work', 'musb_gadget_queue'):
+        for name in ('musb_ep_restart_resume_work', 'musb_gadget_queue', 'musb_g_giveback'):
             assert function(locked_gadget, name) != function(patched_gadget, name), name
-        for name in ('musb_free_request', 'musb_g_giveback', 'musb_gadget_dequeue'):
+        for name in ('musb_free_request', 'musb_gadget_dequeue'):
             assert function(locked_gadget, name) == function(patched_gadget, name), name
 
         good = header_functions(patched_core, patched_gadget)
-        original = header_functions(locked_core, locked_gadget)
-        cases = {'candidate': good, 'unfixed': original}
+        cases = {'candidate': good}
         cases.update({name: header_functions(core, gadget)
                       for name, (core, gadget)
-                      in mutate(patched_gadget, patched_gadget, patched_core).items()})
+                      in mutate(patched_gadget, patched_core).items()})
         for name, value in cases.items():
             if name != 'candidate' and value == good:
                 raise RuntimeError('Negative control did not mutate: ' + name)
@@ -184,6 +199,7 @@ def main():
                 (WORK / (name + '.txt')).write_text(result.stdout + result.stderr)
                 if name == 'candidate':
                     result.check_returncode()
+                    scenario_count(result.stdout)
                 elif result.returncode == 0 or 'Assertion' not in result.stderr:
                     raise RuntimeError('Expected assertion failure: ' + name)
                 results[name] = dict(returncode=result.returncode,
@@ -199,6 +215,7 @@ def main():
             real = subprocess.run([str(binary)], capture_output=True, text=True, timeout=40)
             (WORK / 'candidate-real-free.txt').write_text(real.stdout + real.stderr)
             real.check_returncode()
+            scenario_count(real.stdout)
             results['candidate_real_free'] = dict(returncode=real.returncode,
                                                   output=real.stdout.strip())
             print('candidate-real-free: ' + real.stdout.strip(), flush=True)
@@ -216,20 +233,22 @@ def main():
             '-o .local/build/musb-request-resume-tests/arm\n'
             'qemu-arm .local/build/musb-request-resume-tests/arm'], text=True)
         print(arm, end='', flush=True)
-        inputs = (PATCH, HARNESS, Path(__file__), ROOT / 'tools/kernel_checks.py',
+        counts = scenario_count(arm)
+        inputs = (PATCH, HARNESS, *(ROOT / 'kernel/patches' / p for p in PRIOR_PATCHES),
+                  Path(__file__), ROOT / 'tools/kernel_checks.py',
                   ROOT / 'tools/kernel_sources.py', ROOT / 'tools/kernel-inputs.py',
                   ROOT / 'build/sources.lock.json')
         evidence = dict(linux=lock['linux']['tag'], archive_sha256=sha256(archive),
             inputs={str(path.relative_to(ROOT)): sha256(path) for path in inputs},
             extracted={name: sha256(WORK / 'patched' / PREFIX / name) for name in FILES},
             generated={'musb_request_resume_functions.h': sha256(header)},
-            native=results, arm32=arm.strip(), builder=builder,
+            native=results, arm32=arm.strip(), scenarios_per_execution=counts, builder=builder,
             limits='Actual queue/dequeue/giveback/queue-resume-work/resume-run functions with '
                 'modeled DMA, MMIO, completion-callback and PM boundaries under one fixture '
                 'thread. Not SMP, hard-IRQ, ARM driver concurrency or hardware USB '
-                'qualification. A completion re-queued from inside a deferred restart still '
-                'lands in the busy window and waits for the next queue event, like the pinned '
-                'dequeue path; tracked separately in FOLLOW-UP.md.')
+                'qualification. Kernel integration and ARM configuration coverage have '
+                'separate tasks. General dequeue progress outside an owned deferred restart '
+                'and failed-queue DMA mapping remain outside this change.')
         if args.compile_drivers:
             evidence['arm_build'] = compile_objects(archive, lock, WORK,
                 ['drivers/usb/musb/musb_core.o', 'drivers/usb/musb/musb_gadget.o'])

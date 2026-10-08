@@ -63,7 +63,7 @@ struct musb_ep {
  const void *desc;
  void *dma;
  unsigned busy, current_epnum, is_in;
- bool restart_pending;
+ bool restart_pending, restart_deferred, restart_again;
 };
 struct musb_request {
  struct usb_request request;
@@ -104,6 +104,8 @@ static unsigned scenarios, mappings, unmaps;
 static int pm_result;
 static bool fail_work_alloc, free_on_complete, requeue_on_complete, resume_on_complete;
 static unsigned companion_calls, reentrant_count;
+static unsigned complete_on_restart;
+static struct musb_request *completion_target;
 
 static struct allocation *allocation(struct musb_request *r)
 {
@@ -138,6 +140,8 @@ static int pm_runtime_get(struct device *dev)
 static void pm_runtime_put_noidle(struct device *dev)
 { assert(dev == &controller && dev->refs > 0); dev->refs--; }
 static void pm_runtime_put_autosuspend(struct device *dev) { pm_runtime_put_noidle(dev); }
+static void __attribute__((unused)) pm_runtime_get_noresume(struct device *dev)
+{ assert(dev == &controller && instance.lock); dev->refs++; }
 static void pm_runtime_mark_last_busy(struct device *dev) { assert(dev == &controller); }
 static void map_dma_buffer(struct musb_request *r, struct musb *m, struct musb_ep *ep)
 { assert(m == &instance && r->ep == ep && !r->mapped); r->mapped = true; mappings++; }
@@ -151,6 +155,7 @@ static void musb_ep_select(void *p, unsigned n)
 static int musb_gadget_queue(struct usb_ep *, struct usb_request *, gfp_t);
 static int musb_run_resume_work(struct musb *);
 void musb_free_request(struct usb_ep *, struct usb_request *);
+void musb_g_giveback(struct musb_ep *, struct usb_request *, int);
 
 static void usb_gadget_giveback_request(struct usb_ep *ep, struct usb_request *req)
 {
@@ -166,10 +171,16 @@ static void usb_gadget_giveback_request(struct usb_ep *ep, struct usb_request *r
  }
  if (requeue_on_complete)
   assert(!musb_gadget_queue(ep, req, 0));
+ if (completion_target) {
+  struct musb_request *target = completion_target;
+  completion_target = NULL;
+  assert(!musb_gadget_queue(&target->ep->end_point, &target->request, 0));
+ }
 }
 static void musb_ep_restart(struct musb *m, struct musb_request *r)
 {
  assert(m == &instance && m->lock);
+ assert(!r->ep->busy);
 #ifdef REAL_FREE
  /* The production restart first dereferences req->ep to find hardware regs. */
  volatile struct musb_ep *ep = r->ep;
@@ -179,6 +190,10 @@ static void musb_ep_restart(struct musb *m, struct musb_request *r)
  if (!a->alive) { stale++; return; }
  if (r->ep->req_list.next != &r->list) { detached++; return; }
  a->starts++; started++;
+ if (complete_on_restart) {
+  complete_on_restart--;
+  musb_g_giveback(r->ep, &r->request, 0);
+ }
 }
 
 #include "musb_request_resume_functions.h"
@@ -201,6 +216,7 @@ static void setup(bool suspended, unsigned tx)
  companion_calls = 0; reentrant_count = 0;
  fail_work_alloc = free_on_complete = requeue_on_complete = false;
  resume_on_complete = false; pm_result = suspended ? -EINPROGRESS : 0;
+ complete_on_restart = 0; completion_target = NULL;
  instance.controller = &controller; instance.is_runtime_suspended = suspended;
  INIT_LIST_HEAD(&instance.pending_list);
  for (unsigned i = 0; i < 2; i++) {
@@ -222,6 +238,7 @@ static void resume_work(void)
 static void finish(void)
 {
  assert(!instance.lock && !instance.list_lock && !controller.refs && !pending_allocs);
+ assert(!endpoints[0].restart_deferred && !endpoints[1].restart_deferred);
  for (unsigned i = 0; i < allocated; i++) {
 #ifdef REAL_FREE
   if (allocations[i].alive)
@@ -232,6 +249,9 @@ static void finish(void)
 }
 static int companion_callback(struct musb *m, void *data)
 { assert(m == &instance && m->lock && data == &companion_calls); companion_calls++; return 0; }
+
+static int error_callback(struct musb *m, void *data)
+{ assert(m == &instance && m->lock); companion_calls++; return *(int *)data; }
 
 static int companion_reentrant(struct musb *m, void *data)
 {
@@ -353,12 +373,52 @@ int main(void)
   assert(musb_gadget_queue(&a->ep->end_point, &a->request, 0) == -EIO);
   assert(!mappings && !pending_allocs); finish();
 
-  /* A busy endpoint must not have its queue head advanced at resume. */
+  /* Resume inside non-head giveback: the surviving head must progress. */
+  setup(true, tx); a = new_request(0); b = new_request(0); enqueue(a); enqueue(b);
+  resume_on_complete = true; cancel(b); resume_on_complete = false;
+  assert(started == 1 && allocation(a)->starts == 1 && !pending_allocs);
+  assert(!endpoints[0].restart_pending && !controller.refs); finish();
+
+  /* Resume with an empty queue, then requeue from that completion. */
   setup(true, tx); a = new_request(0); enqueue(a);
-  endpoints[0].busy = 1; resume_work();
-  assert(!started && !stale && !detached);
-  endpoints[0].busy = 0; cancel(a); assert(completed == 1); finish();
+  resume_on_complete = requeue_on_complete = true; cancel(a);
+  resume_on_complete = requeue_on_complete = false;
+  assert(started == 1 && !pending_allocs && !endpoints[0].restart_pending); finish();
+
+  /* Completion inside the restart can requeue the same endpoint. */
+  setup(true, tx); a = new_request(0); enqueue(a);
+  complete_on_restart = 1; requeue_on_complete = true; resume_work();
+  requeue_on_complete = false;
+  assert(started == 2 && completed == 1 && allocation(a)->starts == 2); finish();
+
+  /* Completion inside restart can queue a different endpoint. */
+  setup(true, tx); a = new_request(0); b = new_request(1); enqueue(a);
+  complete_on_restart = 1; completion_target = b; resume_work();
+  assert(started == 2 && completed == 1 && allocation(b)->starts == 1); finish();
+
+  /* A completed head hands progress to the already queued follower. */
+  setup(true, tx); a = new_request(0); b = new_request(0); enqueue(a); enqueue(b);
+  complete_on_restart = 1; free_on_complete = true; resume_work();
+  assert(started == 2 && freed == 1 && allocation(b)->starts == 1); finish();
+
+  /* Stop retires a giveback-owned restart and its PM reference. */
+  setup(true, tx); a = new_request(0); enqueue(a); endpoints[0].busy = 1;
+  resume_work(); assert(!started && endpoints[0].restart_deferred && controller.refs == 1);
+  spin_lock(&instance.lock); musb_g_giveback(&endpoints[0], &a->request, -ESHUTDOWN);
+  musb_ep_finish_restart(&endpoints[0], false); spin_unlock(&instance.lock);
+  assert(!endpoints[0].restart_pending && !controller.refs); finish();
+
+  /* First error survives a later error and successful companion work. */
+  setup(true, tx);
+  int first = -EIO, second = -EINVAL;
+  spin_lock(&instance.lock);
+  assert(!musb_queue_resume_work(&instance, error_callback, &first));
+  assert(!musb_queue_resume_work(&instance, error_callback, &second));
+  assert(!musb_queue_resume_work(&instance, companion_callback, &companion_calls));
+  assert(musb_run_resume_work(&instance) == first);
+  spin_unlock(&instance.lock);
+  assert(companion_calls == 3 && !pending_allocs); finish();
  }
- printf("MUSB deferred-request audit: %u source scenarios pass; no stale, detached, duplicate, stranded-head or self-deadlocking restart remains\n", scenarios);
+ printf("MUSB deferred-request audit: %u source scenarios pass (%u per direction)\n", scenarios, scenarios / 2);
  return 0;
 }

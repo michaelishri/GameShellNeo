@@ -1151,6 +1151,26 @@ qualify safe removal. The task introduces no driver patch and is not an image
 build gate. [Report 139](docs/139-musb-teardown-power-audit.md) documents the
 coverage, modeled boundaries and follow-on implementation requirements.
 
+On `work/musb-request-resume`, the NEO-108 restart candidate has these
+repeatable host-only checks (run the build tasks sequentially):
+
+```sh
+task test:musb-request-resume          # Native/ARM32 request-progress scenarios and failure controls
+task test:musb-restart-kunit           # Actual driver in Linux UML, KASAN and lockdep; no USB hardware
+task check:musb-sleep-configs          # Updated PM/callback regressions plus six ARM configurations
+task check                           # Runtime/tool unit tests, compiled helpers and shell lint
+```
+
+The KUnit task builds the full MUSB driver with test-only hooks kept out of
+the production patch queue. It uses real USB giveback, locking and runtime-PM
+accounting; the hardware restart is intercepted and controller resume state
+is staged. Its retained kernel, configuration, log and test report are recorded
+in `.local/build/musb-restart-kunit/evidence.json`. The native/ARM32 receipt
+is `.local/build/musb-request-resume-tests/evidence.json`; the ARM configuration
+receipt is `.local/build/musb-sleep-tests/matrix-evidence.json`. These checks
+do not install an image or qualify physical USB or system sleep. See
+[report 225](docs/225-musb-resume-request-ownership.md) for results and limits.
+
 For the CPI WFI s2idle candidate in diagnostic.24, use:
 
 ```sh

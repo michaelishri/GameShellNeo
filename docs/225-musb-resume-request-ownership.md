@@ -1,81 +1,102 @@
 # Owning deferred MUSB endpoint restarts
 
-9 October 2026. NEO-108; host-source candidate on `work/musb-request-resume`,
-based on the diagnostic.24 integration branch. No image, board or hardware
-change is included or claimed.
+9 October 2026. NEO-108 and review follow-up NEO-163, on
+`work/musb-request-resume`, based on diagnostic.24 integration. No image,
+board or hardware change is included or claimed.
 
-## Finding
+## Original candidate and review
 
-`musb_gadget_queue()` passed a raw `struct musb_request *` as the deferred
-data of `musb_queue_resume_work()` while runtime-suspended. Between queuing
-and runtime resume that request can be dequeued, given back to its
-completion callback and freed, but the pending entry still held the raw
-pointer. `musb_ep_restart_resume_work()` then restarted freed or detached
-memory, missed the queue head that actually needed starting, and
-double-restarted requests re-queued while suspended. `musb_run_resume_work()`
-also held `list_lock` across every callback, so a callback that re-entered
-`musb_gadget_queue()` for a suspended endpoint deadlocked on the very list
-it iterated. This was a pinned Linux 6.18.54 source finding, recorded in
-[FOLLOW-UP.md](../FOLLOW-UP.md); no CPI fault is attributed to it.
+Commit `ad5becd` changed deferred restart data from a raw request pointer to
+its endpoint, coalesced work with `restart_pending`, and removed pending work
+before invoking callbacks without `list_lock`. This addressed the previously
+recorded source finding without attributing a fault to CPI hardware.
 
-## Driver changes
+The review found a progress regression: if resume ran while giveback had
+set the endpoint busy and dropped the controller lock, the callback cleared
+`restart_pending` and returned. The original queue head could remain queued
+with neither a hardware start nor another pending restart. The old busy test
+cancelled that head afterward, so it did not require eventual progress.
 
-[Patch 0037](../kernel/patches/0037-musb-resume-request-ownership.patch) makes
-the endpoint, not the request, own its deferred restart. The pending entry now
-carries the `struct musb_ep`, embedded in the controller with the same lifetime,
-and the restart callback restarts whatever request heads `req_list` at resume
-time, checking `busy` and `desc` first. A per-endpoint `restart_pending` flag
-coalesces repeated head queues into one deferred restart; it is cleared when
-the work runs and when queuing fails so a later queue can retry.
+The original evidence also needs correction: **36 scenarios total per binary,
+18 per endpoint direction**, repeated on ARM32, were recorded. They were not
+36 per direction or 72 per binary. The earlier first-error sleep tests used
+pre-0037 sources, and the standalone fixture did not complete requests from
+inside its restart boundary. The previous blanket “no stranded-head” claim
+is withdrawn. Original native and compile receipts/logs are preserved locally
+under `.local/review-evidence/ad5becd/`.
 
-`musb_run_resume_work()` removes each entry and frees it before invoking its
-callback, releases `list_lock` around callbacks, and re-acquires it before the
-next entry. First-error reporting from the preceding callback-lifetime patch
-(0030) is preserved. A callback may now queue further pending work — for
-example a completed request re-queued from its completion callback — without
-self-deadlocking.
+## Revised ownership
 
-Endpoint restart ownership is all that changes: request completion,
-DMA mapping on failed queues, runtime-PM policy and system-sleep paths are
-untouched. The known failed-queue DMA mapping issue remains a separate
-recorded item.
+[Patch 0037](../kernel/patches/0037-musb-resume-request-ownership.patch) keeps
+`restart_pending` true until its obligation is discharged. If resume meets a
+busy endpoint, it hands the obligation to the outermost giveback through
+`restart_deferred` and takes one controller runtime-PM reference. This keeps
+the hardware available until giveback restores the endpoint's prior busy
+state. The giveback tail restarts the current head, then releases the reference.
+If the endpoint is being disabled, `nuke()` retires the deferred obligation
+and releases its reference instead. Ordinary completions do not take this
+extra runtime-PM reference.
 
-## Evidence
+The handoff also covers an empty queue that is refilled by its still-running
+completion callback. During an owned restart, completing the current head
+sets `restart_again`; the outer restart loop then inspects the current queue
+again. This permits same-endpoint requeue and already-queued follower progress
+without recursively starting the endpoint from inside its busy callback.
+Other-endpoint requeues use the normal pending-work list. List entries remain
+removed before their callbacks, and the first callback error is preserved
+while later work is drained.
 
-`tools/check-musb-request-resume.py` extracts the actual
-`musb_queue_resume_work`/`musb_run_resume_work` and gadget
-restart/queue/dequeue/giveback/free functions from the locked Linux 6.18.54
-archive, first applies the prior MUSB queue patches (0011, 0025, 0030, 0033)
-so the audit baseline is the real pre-patch state 0037 applies to, then
-applies 0037. `kernel/tests/musb_request_resume_test.c` models DMA mapping,
-MMIO, completion callbacks, allocation failure and runtime-PM boundaries
-under one fixture thread.
+The duplicate Python `splice()` helper has been removed. The extractor now
+skips forward declarations, and evidence validation rejects incorrect or
+incomplete scenario counts.
 
-* The candidate passes 36 native scenarios per endpoint direction (72 total),
-  repeated on ARM32 under qemu, covering suspended and awake restarts,
-  cancel-free restart, direct restart after resume, dequeued-but-not-freed
-  heads, stale heads not blocking followers, non-head cancels, cross-endpoint
-  isolation, caller re-queues, completion-callback re-queues, completion
-  callbacks that run resume work themselves, disabled-endpoint drains,
-  companion work, re-entrant callback queueing, failed-work retry,
-  `-ESHUTDOWN`/`-EIO` completions and busy-endpoint resumes.
-* The candidate also passes with real request lifetimes (`REAL_FREE`): no
-  stale, detached, duplicate, stranded-head or self-deadlocking restart remains.
-* The unpatched baseline and six negative controls each fail an assertion on
-  their discriminating scenario: ignoring the coalescing flag, dropping
-  pending work, holding `list_lock` through callbacks, restarting while
-  busy, skipping the flag reset and keeping the flag after a failed queue.
-* `check:musb-request-resume-drivers` compiles `musb_core.o` and
-  `musb_gadget.o` from the full patched queue for ARM with the recorded
-  builder.
-* Kernel `checkpatch.pl --no-tree --no-signoff --strict` reports zero errors,
-  zero warnings and zero checks for patch 0037.
+## Repeatable validation
 
-## Limits
+Run these tasks sequentially on the build host:
 
-One fixture thread; not SMP, hard-IRQ, ARM driver concurrency or hardware
-qualification. A completion re-queued from inside a deferred restart lands in
-the endpoint's busy window and waits for the next queue event — the same
-stranding class as the pinned dequeue path; both are recorded separately in
-FOLLOW-UP.md rather than fixed here. NEO-106 remains blocked on the ownership
-decision this patch records, not on this code.
+```sh
+task test:musb-request-resume
+task test:musb-restart-kunit
+task check:musb-sleep-configs
+task check
+```
+
+The request fixture extracts the patched queue, dequeue, giveback, free,
+restart, handoff and pending-work functions. It requires **48 scenarios per
+execution, 24 per direction** and runs natively, with real request frees, and
+under ARM32 qemu. Ten deliberately defective variants check coalescing,
+dropped work, callback locking, busy restart, flag restoration, failed queue,
+lost busy handoff, missing giveback handoff, missed follower and first-error
+retention. These are modeled boundaries, not hardware or concurrency results.
+
+The KUnit task compiles the full MUSB driver in Linux UML with KASAN and
+lockdep. It uses real spinlocks, device-managed pending allocations, USB
+completion calls and runtime-PM reference accounting. Seven cases cover
+busy giveback, empty-queue requeue, same/other-endpoint completion requeue,
+follower progress, endpoint shutdown and first-error retention. A test-only
+hook replaces the hardware restart; production ownership functions are not
+reimplemented in the fixture. Hooks are generated only into an isolated
+kernel queue, never `kernel/patches` or an image.
+
+The existing sleep/callback fixture now applies 0037. Its first-error control
+therefore checks the changed work drainer. Its configuration task compiles
+project gadget, host-only, dual-role, module, no-system-sleep and no-PM ARM
+alternatives. The host suite additionally checks KUnit receipt rejection,
+scenario totals, forward-declaration extraction and hook-anchor uniqueness.
+
+Validation receipts and final results are recorded below once all checks finish.
+
+## Limits and remaining work
+
+UML uses one virtual CPU with deterministic synchronous interleavings. The
+controller's runtime-resume state is staged; a baseline PM reference prevents
+real power transitions. Neither this nor ARM object compilation establishes
+SMP, DMA, physical USB timing, system sleep or board reliability. Native
+completion-inside-restart cases intentionally inject a boundary event; they
+are not evidence that the PIO hardware normally completes synchronously there.
+
+General dequeue progress outside an owned deferred restart, failed-queue DMA
+mapping, and complete controller removal remain separate work. NEO-106's
+integration dependency must not be declared resolved from source or fixture
+results alone. This candidate still needs a separately identified image and
+appropriate hardware qualification before integration into the device baseline.

@@ -2,32 +2,33 @@
 
 Record deferred questions and activities here as they arise.
 
-**Attended work, 8 October 2026:** diagnostic.23 remains on boot
-`cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM9/0: seven qualified debug checks
-and two actual RTC sleeps. The latest sleep passes, with controls restored,
+**Latest attended work, 8 October 2026:** diagnostic.23 remains on boot
+`cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM10/0: seven qualified debug checks
+and three actual RTC sleeps. The latest sleep passes, with controls restored,
 original keypad retained, stable SDIO usage and both SSH routes healthy. The
 owner confirms the clear warning and normal untouched dim-console return.
-Its three TCP-channel failures all precede PM return; no greeting timeout is
-observed. The two-ended recorder is separately unqualified: the Mac capture
-ends during sleep entry and the GameShell capture reports 538 socket drops.
-Original evidence is retained without loosening acceptance or repeating PM.
+The revised Mac observer records a real interface disappearance and recovers in
+29 attempts, retaining an explicit 29.907-second gap. Both recorders report zero
+drops; five later handshakes match within clean segments. Continuous coverage
+remains rejected. One post-return SSH setup fails without an observed greeting;
+its incomplete handshake does not establish the cause. NEO-148 investigates it.
 No further display or sleep test is running. The current unused continuation is
-`.local/diagnostics/20261008T054356.540135Z/qualification-next.json`, with
-rehearsal `e1afea155b864a79b04bb133496e4e26`; the former 010429 continuation was
+`.local/diagnostics/20261008T062557.111288Z/qualification-next.json`, with
+rehearsal `e1afea155b864a79b04bb133496e4e26`; the former 054356 continuation was
 consumed. Final health and full continuation validation pass. Validate current
 state before reuse; an audible warning does not replace fresh readiness.
-[Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md),
-[report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
+[Report 210](docs/210-rtc-wake-segmented-observer-validation.md).
 
-**Awake recorder work completed, 8 October:** NEO-146 reproduces capture pressure
+**Earlier awake recorder work, 8 October:** NEO-146 reproduces capture pressure
 with three checked 2 MiB transfers, then passes the same workload with zero
 reported drops and four matched handshakes after recorder changes. A deliberate
 Mac capture-handle interruption also recovers with an explicit gap and four
 matched flows in the clean reopened segment; continuous coverage remains rejected.
 No sleep, reboot, cable action or display change occurred. Final health and the
-unused continuation above validate at unchanged PM9/0; both transient services
-are inactive/not-found. Actual USB-transition recovery still needs separately
-attended qualification. [Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md).
+then-unused continuation validate at unchanged PM9/0; both transient services
+are inactive/not-found. At that checkpoint, actual USB-transition recovery still
+required separately attended qualification; NEO-147 below records its result.
+[Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md).
 
 - [x] NEO-144 bounded two-ended SSH metadata recorder: saved awake/sleep/collect
   tasks and offline flow report, with payload-free output, source/identity/hash
@@ -61,14 +62,22 @@ attended qualification. [Report 209](docs/209-ssh-recorder-burst-and-gap-recover
   reproduced drops do not establish USB/TCP network loss. No driver or SSH-policy
   change, measured energy saving or resolved greeting cause is claimed.
   [Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md).
-- [ ] NEO-147: qualify the revised observer across one separately attended actual RTC
-  sleep. Validate current state/receipt first, require fresh readiness and the
-  long warning, and preserve the first PM and recorder outcomes independently.
-  A recognized disappearance must create an explicit gap and bounded reopening;
-  only clean later segments can establish positive handshake observations.
-  The strict report must still reject any gapped window. Do not repeat PM just
-  to obtain a passing capture. Resolve the historical post-return SSH greeting
-  failure only from sufficient evidence; its underlying cause remains open.
+- [x] NEO-147: qualify the revised observer across one separately attended RTC
+  sleep. Functional sleep/recovery and final health pass at PM10/0 with owner
+  confirmation. Mac read error `interface-disappeared`, status −1/errno 6, closes
+  segment 0; bounded reopening succeeds and segment 1 matches five later flows
+  with the clean Linux capture. Both report zero drops. The strict command exits
+  nonzero for the real gap and saves its separate positive-only report. No PM
+  repeat, altered acceptance or SSH-policy change is used.
+  [Report 210](docs/210-rtc-wake-segmented-observer-validation.md).
+- [ ] NEO-148: investigate the post-return SSH setup failure captured in report
+  210. The forwarded-channel operation completes, but the associated flow has
+  only two SYN observations at each endpoint and no established handshake in
+  the report; the SSH state has no greeting/key exchange/authentication before
+  its ten-second failure. Audit forwarding and capture semantics, correlate
+  saved server logs privately, and design minimal socket/forwarding observations
+  with awake controls. Do not infer a USB/TCP/SSH-server cause or add retries
+  without evidence. Any subsequent PM test needs fresh observer readiness.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

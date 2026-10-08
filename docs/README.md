@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[210 — RTC wake with a recovered segmented observer](210-rtc-wake-segmented-observer-validation.md)
+records one attended sleep pass, a real Mac interface-disappearance error,
+bounded recorder recovery, zero reported drops and five matched later flows.
+The gap remains unqualified as continuous coverage, and a post-return SSH setup
+failure supplies evidence for the next investigation.
+
 [209 — SSH recorder burst and gap recovery](209-ssh-recorder-burst-and-gap-recovery.md)
 records an awake reproduction of capture drops, reduced metadata volume with
 zero reported drops on the repeated workload, and bounded Mac handle recovery

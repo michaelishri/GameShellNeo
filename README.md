@@ -418,6 +418,11 @@ records the pre-sleep integration failure, correction and validation.
 subsequent RTC sleep pass and independently rejected incomplete packet capture.
 [Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md) records the awake
 burst comparison, bounded handle-recovery test and remaining attended validation.
+[Report 210](docs/210-rtc-wake-segmented-observer-validation.md) qualifies recovery
+across one real suspend transition: an explicit Mac capture gap, zero reported
+drops and five later matched handshakes. A post-return SSH setup failure is also
+preserved; its cause remains open. The strict task correctly exits nonzero for
+the gap even though the independent sleep/recovery result passes.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

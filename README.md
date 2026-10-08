@@ -9,12 +9,14 @@ board. Normal sleep, a launcher, OTA and other board revisions are later work.
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
 and guards against sleep interrupting awake measurements. It requires all four
 CPUs to participate and independent timekeeping-freeze evidence. This candidate
-has passed offline build validation and transfer verification on the Mac;
-installation, sleep recovery and energy qualification remain pending.
+has passed offline build validation, transfer verification and full DEV-card
+readback. Owner-confirmed boot, awake checks, sleep recovery and energy
+qualification remain pending. [Report 218](docs/218-diagnostic24-installation.md)
+records installation progress.
 [Report 217](docs/217-wfi-s2idle-image-integration.md)
-records the changes and first-install sequence. Diagnostic.23 remains installed.
+records the changes and first-install sequence.
 
-Diagnostic.23 is installed with passing full card readback, owner-confirmed
+Diagnostic.23 previously qualified full card readback, owner-confirmed
 login, both SSH routes and awake startup checks. Removing unused legacy PTYs
 eliminates 512 user-manager device-unit records while modern terminals and
 console support remain intact. Four manager starts load units in 0.59–0.61 s,

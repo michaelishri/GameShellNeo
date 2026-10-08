@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[218 — Diagnostic.24 installation](218-diagnostic24-installation.md) records
+the coordinated shutdown, fresh card identity, full image readback and safe
+ejection. Boot and awake qualification remain pending.
+
 [217 — WFI s2idle image integration](217-wfi-s2idle-image-integration.md) combines
 the one-state CPU-idle candidate, BOOTTIME battery samples and awake measurement
 guards in diagnostic.24, with strict all-CPU/timer and clock-freeze evidence gates.

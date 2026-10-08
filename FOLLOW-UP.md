@@ -2,6 +2,14 @@
 
 Record deferred questions and activities here as they arise.
 
+**Installation in progress, 8 October 2026:** NEO-157 shut down diagnostic.23
+after the long warning sequence and owner-confirmed card-swap readiness.
+The Samsung DEV card now contains diagnostic.24; all 4 GiB passed readback,
+the mount guard passed and the card was safely ejected. Owner-confirmed boot
+and awake prerequisites remain pending. No PM test has run on diagnostic.24.
+[Report 218](docs/218-diagnostic24-installation.md) retains the evidence and
+next gates. Use `work/cpi-wfi-integration` tools for the new image.
+
 **Latest integration, 8 October 2026:** NEO-155 produced verified diagnostic.24 in
 `work/cpi-wfi-integration`, combining NEO-96 WFI s2idle with NEO-100 BOOTTIME
 battery readings and NEO-101 awake measurement guards. Host checks pass and
@@ -10,15 +18,15 @@ full new kernel, ARM matrix, DT and image checks pass. The 4 GiB image and 269 M
 transfer archive are retained on the Intel host, with recovery checkpoint
 `diagnostic24-wfi-s2idle`. NEO-156 transferred the archive after the owner
 confirmed home regular Wi-Fi; compressed and full decompressed hashes and sizes
-pass verification on the Mac. The image is ready for the coordinated card swap.
-No card write, live PM, display or policy change has occurred.
+pass verification on the Mac. The subsequent card write is recorded above;
+the integration and transfer themselves made no live PM or policy change.
 [Report 217](docs/217-wfi-s2idle-image-integration.md)
 records the reproducible tasks and first-install gates. Keep NEO-96/100/101
 open for matching-image hardware qualification; all-CPU callbacks and frozen
 timekeeping are required before claiming this path works. Energy, CPU/DRAM
 power-off and sleeping battery protection remain unqualified. Preserve the
-diagnostic.23 worktree/tools and its original evidence. Next: coordinated
-DEV-card installation, awake admission and attended PM/RTC qualification using
+diagnostic.23 worktree/tools and its original evidence. Next: confirmed boot,
+awake admission and attended PM/RTC qualification using
 the new worktree. The image remains explicitly hardware-unqualified.
 
 - [ ] Build host: inspect ownership and active users of stale `/tmp` content

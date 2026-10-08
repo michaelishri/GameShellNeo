@@ -16,7 +16,7 @@ PHASES = frozenset(('capture', 'sleep.experiment', 'pm.cycle', 'awake.probe',
     'route.usb', 'route.wifi', 'mac.connect', 'mac.tcp', 'mac.ssh',
     'device.tunnel', 'device.ssh', 'command.channel', 'command.request',
     'command.response', 'pm.submit', 'collection.wait', 'collection.attempt',
-    'proof.wifi', 'proof.final', 'clock.sample'))
+    'proof.wifi', 'proof.final', 'clock.sample', 'socket.prepare', 'socket.collect'))
 MAX_EVENTS = 8192
 _active = ContextVar('host_timing', default=None)
 # Executed only by read-only host probes. BOOTTIME shares the saved sleep
@@ -215,8 +215,10 @@ def forward_state(channel, stage='connect-finished'):
                 values[name] = bool(value)
         except Exception:
             pass  # Best-effort state must not replace connect's original error.
-    recorder.emit(event='forward_state', span=recorder.parent, stage=stage,
+    record = dict(event='forward_state', span=recorder.parent, stage=stage,
                   **values, **channel.counts)
+    recorder.emit(**record)
+    return record
 
 
 def ssh_state(client):
@@ -242,7 +244,9 @@ def ssh_state(client):
             observed = all(value is not None for value in values.values())
     except Exception:
         pass  # Inspection is best-effort and must preserve the original error.
-    recorder.emit(event='ssh_state', span=recorder.parent, observed=observed, **values)
+    record = dict(event='ssh_state', span=recorder.parent, observed=observed, **values)
+    recorder.emit(**record)
+    return record
 
 
 def summarize(directory):

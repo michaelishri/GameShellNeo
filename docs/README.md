@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[214 — SSH failure socket observations](214-ssh-failure-socket-observations.md)
+adds opt-in snapshots after original SSH outcomes, with no inserted greeting
+delay or retry. Awake silent/greeting-only/healthy controls and packet integration
+pass; missing sockets remain explicitly unknown. Full host checks and unchanged
+boot/PM health pass. Attended qualification and the intermittent cause remain.
+
 [213 — Forwarded socket identity](213-forwarded-socket-identity.md) validates
 Mac worker/socket attribution against independent GameShell endpoint records on
 USB and Wi-Fi. Saved awake controls reject ambiguity and unrelated transports;

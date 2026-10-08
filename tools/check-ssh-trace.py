@@ -316,6 +316,7 @@ def execute(config, path, sleep=False, smoke=False, burst=False, gap_smoke=False
 
 
 def main():
+    import socket_observation
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--sleep', action='store_true')
@@ -345,7 +346,8 @@ def main():
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         path = evidence_directory()
         print('Private two-ended TCP evidence:', path, flush=True)
-        execute(load_env(), path, args.sleep, args.smoke, args.burst, args.gap_smoke)
+        with socket_observation.capture(path, socket_observation.enabled()):
+            execute(load_env(), path, args.sleep, args.smoke, args.burst, args.gap_smoke)
 
 
 if __name__ == '__main__':

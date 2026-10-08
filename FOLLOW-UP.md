@@ -2,15 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
-**Latest awake work, 8 October 2026:** NEO-150 validates Mac SSH-worker/socket
-identity against independent GameShell endpoint records over USB and Wi-Fi.
-The saved smoke tasks reject duplicate-forward ambiguity and exclude a separate
-transport; offline reports and full host checks pass. Temporary helpers clean up.
-Final full health and the current unused continuation validate on the same boot
-at PM11/0. No sleep, reboot, display or cable action occurred. This is an awake
-observation method, not yet integrated into failed setup or PM; the original
-intermittent cause remains open under NEO-151.
-[Report 213](docs/213-forwarded-socket-identity.md).
+**Latest awake work, 8 October 2026:** NEO-151 integrates opt-in Mac socket state
+around actual forwarded SSH setup, preserving its original error and first byte
+observations. Silent/greeting-only loopback controls and healthy USB/Wi-Fi
+controls pass; the silent socket disappears before collection and is correctly
+recorded as missing. Seven awake packet-workflow setups pass with the option,
+with four two-ended USB greeting matches. Offline reports and full host checks
+pass. Final health and the unused continuation validate on the same boot at
+PM11/0. No sleep, reboot, display, cable or image action occurred. NEO-152 tracks
+one separately attended qualification; the original intermittent cause remains
+open. [Report 214](docs/214-ssh-failure-socket-observations.md).
 
 **Latest attended work, 8 October 2026:** NEO-149 passes one RTC sleep on
 diagnostic.23, same boot `cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM11/0
@@ -25,8 +26,9 @@ No further sleep is running. Post-sleep full health/continuation validation pass
 temporary services are inactive/not-found. The current unused continuation is
 `.local/diagnostics/20261008T070741.360669Z/qualification-next.json`, retaining
 rehearsal `e1afea155b864a79b04bb133496e4e26`. Its 062557 predecessor is consumed.
-Validate live state and obtain fresh readiness before further PM. NEO-150 tracks
-socket attribution and the still-open failure cause.
+Validate live state and obtain fresh readiness before further PM. NEO-150/151
+complete awake socket tooling; NEO-152 tracks attended qualification and the
+still-open failure investigation.
 [Report 212](docs/212-rtc-wake-forwarding-byte-validation.md).
 
 **Earlier attended work, 8 October 2026:** diagnostic.23 remains on boot
@@ -131,13 +133,18 @@ required separately attended qualification; NEO-147 below records its result.
   hashes and independent board records support offline rechecking. Full host
   checks and final health pass. No PM or runtime policy changes.
   [Report 213](docs/213-forwarded-socket-identity.md).
-- [ ] NEO-151: retain independently bound Mac socket state around the actual SSH
-  setup failure, preserving its first error and byte counters before cleanup.
-  Validate opt-in observation, bounds, cleanup, unavailable state and ambiguity
-  with awake failure controls. Avoid adding greeting delays or connection retries.
-  Successful awake endpoint corroboration does not prove historical failed-flow
-  ownership. No repeated PM merely to provoke failure; any new PM needs current
-  admission and fresh observer readiness. Root cause remains open.
+- [x] NEO-151: opt-in socket snapshots bracket actual SSH setup without work
+  between channel opening and greeting or new retries. Original error/state/byte
+  observations survive collection. Bounded silent/greeting-only/healthy awake
+  controls pass, followed by seven successful packet-workflow setups, offline
+  reports and full checks. Missing, ambiguous and unavailable observations remain
+  explicit; independent awake corroboration is not borrowed for failed-flow
+  ownership. [Report 214](docs/214-ssh-failure-socket-observations.md).
+- [ ] NEO-152: qualify `SOCKET_STATE=1` through one attended RTC wake after fresh
+  health, unused-receipt validation and watching/listening readiness. Use the
+  existing image; no card swap. Preserve any original failure before recovery,
+  with worker/endpoint evidence and packet gaps kept explicit. No repeated PM
+  merely to provoke failure. Root cause, CPU retention and energy remain open.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

@@ -19,6 +19,7 @@ import uuid
 import paramiko
 from private_config import load_env
 from host_timing import phase, ssh_state, observe_forward, forward_state
+import socket_observation
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / '.local'
@@ -80,36 +81,61 @@ def device(config, route):
         raise ValueError('Use ROUTE=usb/wifi and GAMESHELL_WIFI_VIA_MAC=0/1')
     with phase('route.'+route), ExitStack() as stack:
         address = config.get('GAMESHELL_USB_IP', '192.168.10.1') if route == 'usb' else config['GAMESHELL_IP']
-        sock = None
         if route == 'usb' or via_mac == '1':
             with phase('mac.connect'):
                 mac = stack.enter_context(connect_mac(config))
-            with phase('device.tunnel'):
-                sock = observe_forward(mac.get_transport().open_channel(
-                    'direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10))
-            stack.callback(sock.close)
-        client = stack.enter_context(paramiko.SSHClient())
-        authenticate_device(client, config, address, sock)
+            client = stack.enter_context(forwarded_device(config, mac, address))
+        else:
+            client = stack.enter_context(paramiko.SSHClient())
+            authenticate_device(client, config, address, None)
         yield client
 
 
-def authenticate_device(client, config, address, sock):
-    """Use the pinned device key and existing SSH policy on a caller-owned client."""
-    public = private_path(config.get('NEO_HOST_PUBLIC_KEY'), LOCAL / 'provisioning/device/ssh_host_ed25519_key.pub')
-    fields = public.read_text().split()
-    if fields[0] != 'ssh-ed25519':
-        raise ValueError('Expected the provisioned Ed25519 device host key')
-    client.get_host_keys().add(address, fields[0], paramiko.Ed25519Key(data=base64.b64decode(fields[1])))
-    client.set_missing_host_key_policy(paramiko.RejectPolicy())
-    key = private_path(config.get('NEO_SSH_KEY'), LOCAL / 'ssh/id_ed25519')
-    with phase('device.ssh'):
+@contextmanager
+def forwarded_device(config, mac, address, port=22):
+    """One forwarded setup; optional observations bracket, never delay, its exchange.
+
+    A nonstandard port is used only by the saved awake failure controls. Normal
+    device routes keep port 22, the pinned host key and all existing timeouts.
+    """
+    observer = socket_observation.prepare(mac, address, port)
+    with ExitStack() as stack:
         try:
-            client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
-                           sock=sock, look_for_keys=False, allow_agent=False,
-                           timeout=10, auth_timeout=10, banner_timeout=10)
-        finally:
-            ssh_state(client)
-            forward_state(sock)
+            with phase('device.tunnel'):
+                sock = observe_forward(mac.get_transport().open_channel(
+                    'direct-tcpip', (address, port), ('127.0.0.1', 0), timeout=10))
+        except BaseException:
+            socket_observation.finish(observer, 'tunnel-error', {})
+            raise
+        stack.callback(sock.close)
+        client = stack.enter_context(paramiko.SSHClient())
+        authenticate_device(client, config, address, sock, observer)
+        yield client
+
+
+def authenticate_device(client, config, address, sock, observer=None):
+    """Use the pinned device key and existing SSH policy on a caller-owned client."""
+    outcome, states = 'not-started', {}
+    try:
+        public = private_path(config.get('NEO_HOST_PUBLIC_KEY'), LOCAL / 'provisioning/device/ssh_host_ed25519_key.pub')
+        fields = public.read_text().split()
+        if fields[0] != 'ssh-ed25519':
+            raise ValueError('Expected the provisioned Ed25519 device host key')
+        client.get_host_keys().add(address, fields[0], paramiko.Ed25519Key(data=base64.b64decode(fields[1])))
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        key = private_path(config.get('NEO_SSH_KEY'), LOCAL / 'ssh/id_ed25519')
+        outcome = 'ssh-error'
+        with phase('device.ssh'):
+            try:
+                client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
+                               sock=sock, look_for_keys=False, allow_agent=False,
+                               timeout=10, auth_timeout=10, banner_timeout=10)
+                outcome = 'ok'
+            finally:
+                # Freeze the original observations before the optional snapshot.
+                states = dict(ssh=ssh_state(client), forward=forward_state(sock))
+    finally:
+        socket_observation.finish(observer, outcome, states)
 
 
 def run(client, command, password=None, output=None, display=True, timeout=300, input_data=None):

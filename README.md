@@ -448,8 +448,36 @@ connection to the same target. Keep USB connected and Wi-Fi associated; the task
 stays awake and temporarily opens extra test connections. Endpoint records remain
 private. `report:ssh-sockets CAPTURE=...` rechecks the saved evidence offline.
 [Report 213](docs/213-forwarded-socket-identity.md) records both passing routes,
-bounds and limits. This observer is not yet integrated into sleep or failed SSH
-setup, and it does not establish the earlier failure's cause.
+bounds and limits. It does not establish the earlier failure's cause.
+
+Use `SOCKET_STATE=1` with `device:ssh-timing` or the `device:ssh-trace-*` capture
+tasks to retain Mac socket snapshots around the actual forwarded SSH setup.
+The option defaults off. Each baseline runs before opening the forwarding
+channel; collection runs after the original SSH result and first byte/state
+observations, before the caller closes the connection. Nothing is inserted
+between channel opening and the SSH greeting, and the ten-second SSH timeouts
+and single-attempt behavior are unchanged. These snapshots add wall time outside
+the SSH setup span, so instrumented totals are not latency comparisons.
+
+```sh
+task device:ssh-failure-smoke # Awake silent/greeting-only Mac loopback peers, then healthy USB/Wi-Fi
+task device:ssh-timing CYCLES=1 SOCKET_STATE=1 # Awake real-route observations
+task report:ssh-socket-state CAPTURE=.local/diagnostics/<capture> # Offline, no device access
+```
+
+Keep USB connected and Wi-Fi associated for the awake controls; they do not
+blank the screen or change network policy. Loopback peers accept one connection
+and have a 60-second lifetime limit. Socket records, endpoints, source copies
+and the original timing remain private under `.local/diagnostics`. A missing
+socket may have disappeared before collection, including inside the SSH library;
+it is not proof that TCP never connected. A unique worker candidate remains
+distinct from an independently corroborated endpoint. Unavailable snapshots
+never replace the original SSH error or trigger retries. The snapshot command
+has a 15-second host watchdog and ten-second remote helper deadline; captures
+are limited to 32 observed setups. See
+[report 214](docs/214-ssh-failure-socket-observations.md) for awake qualification
+and the remaining attended-test boundary. `SOCKET_STATE=1` does not waive any
+existing sleep admission or readiness requirement.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

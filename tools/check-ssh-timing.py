@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import time
+import socket_observation
 
 from host_timing import CLOCK_SOURCE, capture_timing, clock_sample, phase, summarize
 from private_config import load_env
@@ -98,7 +99,8 @@ def main():
         return
     capture = evidence_directory()
     print('Private awake SSH timing:', capture, flush=True)
-    result = probe(load_env(), capture, int(os.environ.get('NEO_SSH_CYCLES', '3')))
+    with socket_observation.capture(capture, socket_observation.enabled()):
+        result = probe(load_env(), capture, int(os.environ.get('NEO_SSH_CYCLES', '3')))
     print('Fresh route samples:', len(result['samples']), '; same boot and unchanged PM counters.')
     (capture/'host-timing-summary.json').write_text(json.dumps(summarize(capture), indent=2)+'\n')
 

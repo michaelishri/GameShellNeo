@@ -137,7 +137,7 @@ def process(pid, deadline):
                 sshd=bool(re.match(r'^(?:.*/)?sshd(?:-session)?(?:[: ]|$)', fields[7])))
 
 
-def snapshot():
+def snapshot(source_sha256=None):
     if sys.platform != 'darwin':
         raise ValueError('Mac socket observation requires macOS')
     started = time.monotonic_ns()
@@ -161,7 +161,10 @@ def snapshot():
     if not any(r['local'] == outer['server'] and r['remote'] == outer['client'] and
                r['state'] == 'ESTABLISHED' for r in sockets):
         raise ValueError('SSH worker does not own this transport')
-    return dict(schema=1, source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    source_sha256 = source_sha256 or hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    if not re.fullmatch(r'[0-9a-f]{64}', source_sha256):
+        raise ValueError('Invalid observer source identity')
+    return dict(schema=1, source_sha256=source_sha256,
                 started_monotonic_ns=started, finished_monotonic_ns=time.monotonic_ns(),
                 worker=before, outer=outer, sockets=sockets)
 

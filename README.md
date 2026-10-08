@@ -9,8 +9,9 @@ board. Normal sleep, a launcher, OTA and other board revisions are later work.
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
 and guards against sleep interrupting awake measurements. It requires all four
 CPUs to participate and independent timekeeping-freeze evidence. This candidate
-has passed offline build validation; installation, sleep recovery and energy
-qualification remain pending. [Report 217](docs/217-wfi-s2idle-image-integration.md)
+has passed offline build validation and transfer verification on the Mac;
+installation, sleep recovery and energy qualification remain pending.
+[Report 217](docs/217-wfi-s2idle-image-integration.md)
 records the changes and first-install sequence. Diagnostic.23 remains installed.
 
 Diagnostic.23 is installed with passing full card readback, owner-confirmed

@@ -8,14 +8,16 @@ battery readings and NEO-101 awake measurement guards. Host checks pass and
 the installed diagnostic.23 timer inventory matches the audited source; the
 full new kernel, ARM matrix, DT and image checks pass. The 4 GiB image and 269 MB
 transfer archive are retained on the Intel host, with recovery checkpoint
-`diagnostic24-wfi-s2idle`. Mac transfer awaits confirmation of regular Wi-Fi.
-No live PM, display or policy change has occurred.
+`diagnostic24-wfi-s2idle`. NEO-156 transferred the archive after the owner
+confirmed home regular Wi-Fi; compressed and full decompressed hashes and sizes
+pass verification on the Mac. The image is ready for the coordinated card swap.
+No card write, live PM, display or policy change has occurred.
 [Report 217](docs/217-wfi-s2idle-image-integration.md)
 records the reproducible tasks and first-install gates. Keep NEO-96/100/101
 open for matching-image hardware qualification; all-CPU callbacks and frozen
 timekeeping are required before claiming this path works. Energy, CPU/DRAM
 power-off and sleeping battery protection remain unqualified. Preserve the
-diagnostic.23 worktree/tools and its original evidence. Next: transfer, coordinated
+diagnostic.23 worktree/tools and its original evidence. Next: coordinated
 DEV-card installation, awake admission and attended PM/RTC qualification using
 the new worktree. The image remains explicitly hardware-unqualified.
 

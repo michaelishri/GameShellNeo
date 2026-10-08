@@ -1,6 +1,6 @@
 # WFI s2idle and suspend-aware measurements: diagnostic.24
 
-Date: 8 October 2026. Tracking: NEO-155; hardware dependencies NEO-96, NEO-100
+Date: 8 October 2026. Tracking: NEO-155, transfer NEO-156; hardware dependencies NEO-96, NEO-100
 and NEO-101 remain open. Branch: `work/cpi-wfi-integration`.
 
 ## Purpose and boundary
@@ -158,11 +158,18 @@ The private artifact and its verified archive are:
 
 The raw image is under `.local/artifacts`, its archive/transfer manifest under
 `.local/flash`, all in this worktree. The checkpoint rehashes both artifacts and
-retains their build/transfer metadata without duplicating the image. Transfer to
-the Mac awaits regular-network confirmation; no card or installed-image change
-has occurred. `task mac:stage` performs the later verified transfer without a
-card write. Existing diagnostic.23 tooling remains the correct choice for its
-currently running image.
+retains their build/transfer metadata without duplicating the image.
+
+After the owner confirmed home regular Wi-Fi, NEO-156 staged the archive and
+flash helper on the Mac. Both compressed and full decompressed image hashes and
+sizes pass the Mac's `--source-only` verification, matching the table above.
+The archive is ready under the Mac account's `.local/share/GameShellNeo`.
+Private evidence is `.local/diagnostic24-mac-stage-network.log` in this worktree.
+The initial `task mac:stage` completed local packing but its network step was
+denied by the local sandbox; the same saved `tools/remote.py mac stage` step then
+succeeded with network access. No card or installed-image change has occurred.
+Existing diagnostic.23 tooling remains the correct choice for the currently
+installed image. Warning/shutdown and card movement await fresh owner readiness.
 
 Build incident record:
 
@@ -174,8 +181,8 @@ lock; they did not alter the running build.
 
 ## First-install sequence
 
-1. Coordinate regular-network transfer,
-   the warning/shutdown/card swap, full flash readback and owner-confirmed boot.
+1. Transfer is verified on the Mac. Coordinate the warning/shutdown/card swap,
+   full flash readback and owner-confirmed boot.
 2. Perform awake identity, journal, power-key ownership, battery schema/freshness,
    all-CPU/timer inventory and awake RTC alarm checks using this worktree's tools.
    Any missing driver, helper or CPU blocks PM testing.

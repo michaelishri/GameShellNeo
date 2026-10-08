@@ -1234,6 +1234,7 @@ task device:wifi-recovery SECONDS=120 # Installed firmware: four reconnections, 
 task device:rsb-compare SECONDS=120 DELAY_MS=100 # USB-powered bus-delay comparison
 task device:rsb-restore # Stop/recover an interrupted RSB comparison
 task device:pm-inspect # Read-only capabilities, counters and device links over USB
+task device:pm-inspect ROUTE=wifi # Same inspection through the configured Wi-Fi route
 task device:charge-inspect # Read-only documented charger/gauge inventory; USB remains connected
 task device:charge-baseline SECONDS=120 # Two-minute awake charging trace; USB stays connected
 task device:pm-test STAGE=freezer # Diagnostic.7 only, owner present; one debug cycle
@@ -1696,6 +1697,12 @@ Use `device:pm-inspect` for read-only kernel capabilities, runtime counters and
 RSB supplier/consumer links. It also works on diagnostic.6, where sleep support
 is absent. Full private evidence includes radio/network state and kernel logs;
 only a small capability summary is printed. The task never enters suspend.
+USB is the default transport; `ROUTE=wifi` selects the configured Wi-Fi route
+(including the Mac relay when enabled in `.env`). The private capture's
+`route.json` records the selected route even if connection fails. It does not
+retry through another route. This option applies only to read-only inspection;
+active PM tests and restoration retain their existing USB requirement. Direct
+tool users can pass `--inspect --inspect-route wifi`.
 
 `device:pm-test` requires the currently locked image/kernel/radio, stock USB
 polling, normal sleep masks, SDIO power retention, USB power, healthy services

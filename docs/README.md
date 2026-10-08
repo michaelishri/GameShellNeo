@@ -18,8 +18,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 [219 — Diagnostic.24 PM qualification](219-diagnostic24-pm-qualification.md)
 records all seven debug passes, retained keypad and both-route recovery at PM7/0,
-plus fresh health and combined admission. Batch observation, awake RTC rehearsal
-and actual sleep remain.
+plus owner-confirmed warnings/normal returns and a passing awake RTC rehearsal.
+The first actual sleep awaits fresh readiness; energy remains unqualified.
 
 [218 — Diagnostic.24 installation](218-diagnostic24-installation.md) records
 the coordinated shutdown, fresh card identity, full image readback and confirmed

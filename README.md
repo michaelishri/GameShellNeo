@@ -16,8 +16,8 @@ and energy qualification remain pending.
 [Report 218](docs/218-diagnostic24-installation.md) records these results.
 All seven freezer/driver/late-noirq debug checks pass, with both SSH routes
 recovered and the original keypad retained. [Report 219](docs/219-diagnostic24-pm-qualification.md)
-records PM7/0 and the owner-confirmed initial warning/display returns. Batch
-observation, awake RTC rehearsal and actual sleep remain pending.
+records PM7/0, owner-confirmed warnings/normal display returns throughout, and
+the passing awake RTC rehearsal. Actual sleep and energy qualification remain pending.
 [Report 217](docs/217-wfi-s2idle-image-integration.md)
 records the changes and first-install sequence.
 

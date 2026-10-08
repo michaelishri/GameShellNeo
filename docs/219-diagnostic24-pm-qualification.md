@@ -4,9 +4,10 @@
 The freezer, driver and all five late/noirq debug checks pass on diagnostic.24/kernel
 `6.18.54-gameshellneo23`, boot `44b698ad-7fef-46d4-9e0f-71153f6f81e9`.
 Both SSH routes recover and the original keypad connection is retained.
-PM success/fail is **7/0**. The owner confirms the initial driver and first
-late/noirq warning/display returns. Observation of the four-repeat batch,
-awake RTC rehearsal and actual RTC sleep remain pending.
+PM success/fail is **7/0**. The owner confirms clear warnings and normal display
+returns for the initial stages and four-repeat batch. The awake RTC rehearsal
+also passes with both routes working and all temporary controls restored.
+The first actual RTC sleep awaits fresh owner readiness.
 [Report 218](218-diagnostic24-installation.md) records the installation and
 passing awake prerequisites.
 
@@ -176,14 +177,49 @@ current snapshot, correctly failing the strict timestamp gate. The fresh
 read-only capture above meets that requirement. No gate was weakened or PM
 cycle repeated because of these errors.
 
-The owner has been asked to confirm all four audible warnings and normal
-display returns. No further screen test is running.
+The owner confirms that all four warnings/display returns seemed normal.
+
+## Awake RTC rehearsal
+
+After that confirmation, the existing task ran once:
+
+```sh
+task device:sleep-rehearse QUALIFICATION=.local/neo158-reference-history.json
+```
+
+The original completed result passes functional/recovery, source-bound
+qualification and power-policy restoration checks. Both USB and Wi-Fi SSH
+verify on the same boot. The screen stays on: brightness/backlight power stays
+1/0, PM stays 7/0 and all four s2idle callback counts stay zero. The alarm is
+delivered after 30.636 seconds while awake; this is not a wake-from-sleep result.
+POWER is handed back with a verified logical release and closed descriptor,
+with no input events. Policy, controls and RTC ownership markers are cleared;
+no diagnostic policy drop-in remains.
+
+| Evidence | Value |
+| --- | --- |
+| Capture | `.local/diagnostics/20261008T111833.022485Z` |
+| Rehearsal run | `f96b80e84fd9449080f042a43c78a69f` |
+| Result SHA-256 | `7a738628f577f60c494c57cecaa969f54fa2923d4ca2ca85295b115db6e3a5d3` |
+| Timing SHA-256 | `997a4dc01d767cc10d8c1ceaae40a36dd80bd3b6e88bffa92f737f4fc24e6bab` |
+
+The offline timing report validates with one submission, seven collection
+attempts and no recorded errors. Its 54.696-second capture includes setup,
+the awake alarm interval, collection and route proofs. Private files are
+`.local/neo158-rehearsal.log` and `.local/neo158-rehearsal-timing.json`.
+The owner has been asked for fresh readiness for one actual connected-USB
+RTC sleep. No sleep or screen test is running while awaiting that response.
 
 ## Next gates and efficiency limits
 
-Await the owner's four-repeat warning/display observation, then run the awake
-RTC rehearsal using `.local/neo158-reference-history.json`. Fresh watching
-readiness must precede actual sleep. Do not reuse diagnostic.23's qualification.
+After fresh watching readiness, run one actual connected-USB RTC sleep using
+`.local/neo158-reference-history.json` and rehearsal
+`f96b80e84fd9449080f042a43c78a69f`. The saved task performs fresh health and
+qualification checks before submission. Require all four s2idle callback counts
+to advance and independent timekeeping-freeze evidence as well as the existing
+RTC, peripheral, route and owner-observation gates. Keep the first result intact
+on failure; do not immediately repeat or weaken a gate. Do not reuse
+diagnostic.23's qualification.
 
 The intended efficiency opportunity is coordinated clock-event and timekeeping
 suspension when all CPUs enter s2idle, avoiding timer-driven wakeups. WFI itself

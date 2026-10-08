@@ -297,8 +297,14 @@ tasks:
     cmds: [bash tools/run-logged.sh axp-adc-drivers python3 tools/check-axp-adc-width.py --compile-driver]
 
   test:power-supply-lifetime:
-    desc: Reproduce deferred notification teardown with original and test-only reordered core functions; native and ARM32
+    desc: Reproduce deferred notification teardown with original and candidate core functions; native and ARM32
     cmds: [bash tools/run-logged.sh power-supply-lifetime python3 tools/check-power-supply-lifetime.py]
+
+  test:power-supply-kunit:
+    desc: Compare original and corrected teardown in KASAN Linux UML kernels (no board access)
+    env:
+      NEO_POWER_SUPPLY_KUNIT_VARIANT: '{{.VARIANT | default "all"}}'
+    cmds: [bash tools/run-logged.sh power-supply-kunit python3 tools/check-power-supply-kunit.py]
 
   check:power-supply-driver:
     desc: Run notification freeze/replay regressions and compile the complete ARM power-supply core

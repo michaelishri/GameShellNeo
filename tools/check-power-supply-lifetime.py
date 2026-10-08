@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproduce deferred-notification teardown ordering; no kernel/device change."""
+"""Compare original and candidate deferred-notification teardown core functions."""
 import fcntl
 import json
 import os
@@ -23,17 +23,10 @@ def function(source, name):
     return source[match.start():source.index('\n}', match.end()) + 3] + '\n'
 
 
-def variants(source):
-    text = '\n'.join(function(source, name) for name in
+def functions(source):
+    return '\n'.join(function(source, name) for name in
                      ('power_supply_changed', 'power_supply_deferred_register_work',
                       'power_supply_unregister'))
-    old = ('\tcancel_work_sync(&psy->changed_work);\n'
-           '\tcancel_delayed_work_sync(&psy->deferred_register_work);')
-    new = ('\tcancel_delayed_work_sync(&psy->deferred_register_work);\n'
-           '\tcancel_work_sync(&psy->changed_work);')
-    if text.count(old) != 1:
-        raise ValueError('Pinned unregister order changed; revisit the audit')
-    return {'original': text, 'reordered': text.replace(old, new)}
 
 
 def main():
@@ -57,7 +50,10 @@ def main():
         driver.write_bytes(source)
         patch = ROOT / 'kernel/patches/0013-power-supply-freezable-notifications.patch'
         run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=WORK / 'source')
-        texts = variants(driver.read_text())
+        texts = {'original': functions(driver.read_text())}
+        fix = ROOT / 'kernel/patches/0037-power-supply-unregister-producer.patch'
+        run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(fix)], cwd=WORK / 'source')
+        texts['reordered'] = functions(driver.read_text())
         harness = ROOT / 'kernel/tests/power_supply_lifetime_test.c'
         results = {}
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
@@ -99,11 +95,11 @@ def main():
             linux=lock['linux']['tag'], archive_sha256=sha256(archive),
             core_sha256=sha256(driver),
             inputs={str(p.relative_to(ROOT)): sha256(p) for p in
-                    (patch, harness, Path(__file__), ROOT / 'tools/kernel_checks.py')},
+                    (patch, fix, harness, Path(__file__), ROOT / 'tools/kernel_checks.py')},
             native=results, arm32=arm.strip(), builder=builder,
             limits='Actual producer, deferred callback and unregister functions; deterministic '
-                   'queue/lock/refcount/device API shims. Test-only reordered comparison, no shipped '
-                   'driver patch. No real scheduler, kref release, AXP detach, PM or hardware result.'
+                   'queue/lock/refcount/device API shims. Candidate patch 0037 compared with original. '
+                   'No real scheduler, kref release, AXP detach, PM or hardware result.'
         ), indent=2) + '\n')
         print(arm, end='')
         print('Evidence:', output.relative_to(ROOT))

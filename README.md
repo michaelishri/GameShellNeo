@@ -961,15 +961,31 @@ is saved under `.local/build/axp-adc-width-tests/`;
 It is not installed in diagnostic.21 and does not establish ADC coherence,
 calibration or a cause for the earlier voltage discrepancy.
 
-For the separate deferred-registration/unregister lifetime audit, use
-`task test:power-supply-lifetime`. It reproduces the original cancellation
-order and a test-only reordered comparison using actual core functions on
-native and ARM32 builds. Evidence is saved under
-`.local/build/power-supply-lifetime-tests/`.
+For the deferred-registration/unregister lifetime candidate, use:
+
+```sh
+task test:power-supply-lifetime # Original and patch 0037 functions, native + ARM32
+task test:power-supply-kunit    # Both orders in actual Linux UML kernels with KASAN
+task test:power-supply-kunit VARIANT=reordered # Candidate kernel only
+task check:power-supply-driver # Compile the production ARM core without test gates
+```
+
+The first task saves its modeled-workqueue evidence under
+`.local/build/power-supply-lifetime-tests/`. The kernel suite saves source,
+configuration, kernel and log identities under `.local/build/power-supply-kunit/`,
+with separate retained artifacts for each accepted run. Initial kernel builds
+take several minutes; unchanged builds reuse Kbuild output and rerun the tests.
+The original-order control expects a notification worker to outlive unregister;
+it retains a device reference until that worker drains, avoiding deliberate
+use-after-free. The candidate must join the worker before unregister returns.
+Test pause gates are generated into isolated sources and never exported in the
+board patch queue. These tasks access no physical hardware.
+
 [Report 157](docs/157-power-supply-unregister-lifetime.md) explains the late
 notification race, why ordinary AXP cleanup excludes it, and the independent
-producers that must be stopped before unregister. This task changes neither
-the production patch queue nor the installed image.
+producers that must be stopped before unregister. Patch 0037 is a candidate on
+`work/power-supply-unregister`; it has not changed the installed diagnostic.24.
+Image integration requires a new kernel/image identity and its own qualification.
 
 For the brcmfmac Wi-Fi sleep and clock error paths, use:
 

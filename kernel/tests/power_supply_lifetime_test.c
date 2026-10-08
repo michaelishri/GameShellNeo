@@ -158,6 +158,6 @@ int main(void)
 	assert(psy.changed_work.pending && psy.dev.released);
 	scenarios++;
 	printf("%u scenarios: %s order, parent-lock and external-producer boundaries verified\n",
-	       scenarios, EXPECT_REORDERED ? "test-only reordered" : "pinned original");
+	       scenarios, EXPECT_REORDERED ? "candidate reordered" : "pinned original");
 	return 0;
 }

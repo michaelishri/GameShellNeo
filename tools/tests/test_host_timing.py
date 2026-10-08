@@ -337,6 +337,27 @@ class AwakeProbe(unittest.TestCase):
             self.probe.probe({}, self.root, 1)
         run.assert_called_once()
 
+    def test_burst_checks_synthetic_data_and_keeps_both_health_routes(self):
+        sample=json.dumps(self.value).encode()
+        with patch.object(self.probe,'run',side_effect=[b'ip_address=192.0.2.20\n',sample,
+                                                      bytes(2*1024*1024),sample]):
+            result=self.probe.probe({},self.root,1,burst=True)
+        self.assertTrue(result['passed'])
+        self.assertEqual([v['route'] for v in result['samples']],['usb','wifi'])
+        self.assertEqual(result['transfers'][0]['bytes'],2*1024*1024)
+        self.assertLess((self.root/'awake-ssh.json').stat().st_size,2048)
+
+    def test_burst_truncation_or_corruption_stops_without_retry(self):
+        for payload in (bytes(16),b'x'+bytes(2*1024*1024-1)):
+            capture=self.root/str(len(payload));capture.mkdir()
+            with self.subTest(length=len(payload)),patch.object(self.probe,'run',side_effect=[
+                    b'ip_address=192.0.2.20\n',json.dumps(self.value).encode(),payload]) as run:
+                with self.assertRaisesRegex(ValueError,'length or digest mismatch'):
+                    self.probe.probe({},capture,3,burst=True)
+                self.assertEqual(run.call_count,3)
+                summary=json.loads((capture/'awake-ssh.json').read_text())
+                self.assertFalse(summary['passed']);self.assertEqual(summary['transfers'],[])
+
 
 if __name__ == '__main__':
     unittest.main()

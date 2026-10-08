@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Measure fresh USB and Wi-Fi SSH sessions while awake; no PM or policy writes."""
 import argparse
+import hashlib
 import ipaddress
 import json
 import os
@@ -21,11 +22,14 @@ print(json.dumps(dict(clock=clock, pm={name: int((stats/name).read_text())
 '''
 
 
-def probe(config, capture, cycles):
+def probe(config, capture, cycles, burst=False):
     if type(cycles) is not int or not 1 <= cycles <= 10:
         raise ValueError('Use CYCLES=1..10')
     records = []
+    transfers = []
     summary = dict(event='started', passed=False, cycles=cycles, samples=records)
+    if burst:
+        summary['transfers'] = transfers
     try:
         with capture_timing(capture) as timing:
             # Discover the current DHCP address over USB; stale .env Wi-Fi
@@ -55,6 +59,19 @@ def probe(config, capture, cycles):
                         if current != initial:
                             raise ValueError('Boot or PM counters changed during awake probe')
                         records.append(dict(cycle=index+1, route=route, **current))
+                        if burst and route == 'usb':
+                            # Fixed synthetic bytes; no disk, credentials or payload
+                            # artifact. Three 2 MiB replies reproduce collection load.
+                            size = 2*1024*1024
+                            start = time.monotonic()
+                            payload = run(client, **python_command('import sys\nsys.stdout.buffer.write(bytes(2*1024*1024))'),
+                                          display=False, timeout=30)
+                            elapsed = time.monotonic()-start
+                            digest = hashlib.sha256(payload).hexdigest()
+                            if len(payload) != size or digest != hashlib.sha256(bytes(size)).hexdigest():
+                                raise ValueError('Awake transfer length or digest mismatch')
+                            transfers.append(dict(cycle=index+1, bytes=size, sha256=digest, seconds=elapsed))
+                            del payload
                 if index+1 < cycles:
                     time.sleep(1)
         if timing.failed:

@@ -19,22 +19,35 @@ def integer(value, maximum=2**63-1):
     return value
 
 
-def load_side(root, identity, source, address):
+def boundary(stamp):
+    if not isinstance(stamp, dict) or set(stamp) != CLOCK_KEYS-{'event'}:
+        raise ValueError('Incomplete capture boundary')
+    for name in ('realtime_ns', 'monotonic_before_ns', 'monotonic_after_ns'):
+        integer(stamp[name])
+    if stamp['boottime_ns'] is not None:
+        integer(stamp['boottime_ns'])
+    if stamp['monotonic_after_ns'] < stamp['monotonic_before_ns']:
+        raise ValueError('Reversed capture boundary')
+
+
+def load_side(root, identity, source, address, partial=False):
     result = json.loads((root/'result.json').read_text())
     raw = (root/'packets.jsonl').read_bytes()
-    if (len(raw) > MAX_BYTES or result.get('schema') != 1 or result.get('run_id') != identity or
+    if (len(raw) > MAX_BYTES or result.get('schema') not in (1, 2, 3) or result.get('run_id') != identity or
             result.get('source_sha256') != source or result.get('address') != address or
             result.get('metadata_sha256') != hashlib.sha256(raw).hexdigest() or
-            result.get('passed') is not True or result.get('reason') != 'stopped' or
-            result.get('interface_index') != result.get('final_interface_index') or
-            result.get('rejected') != 0 or result.get('stats', {}).get('dropped') != 0 or
-            result['stats'].get('interface_dropped') not in (0, None)):
+            result.get('reason') != 'stopped' or result.get('rejected') != 0):
         raise ValueError('Incomplete, mismatched or lossy TCP capture')
     integer(result.get('interface_index'))
     for field in ('packets', 'rejected', 'reads', 'bytes'):
         integer(result.get(field))
     if result['bytes'] != len(raw) or result['reads'] < result['packets']:
         raise ValueError('Capture counters differ from metadata')
+    if result['schema'] in (2, 3):
+        if (result.get('selection') != 'flow-prefix16-control-first-payload' or
+                integer(result.get('matched')) != result['packets']+integer(result.get('selected_out')) or
+                result['matched'] > result['reads']):
+            raise ValueError('Unaccounted packet selection')
     for field in ('received', 'dropped'):
         integer(result['stats'].get(field))
     if result['stats'].get('interface_dropped') is not None:
@@ -43,7 +56,7 @@ def load_side(root, identity, source, address):
     packets, clocks = [], []
     for row in rows:
         if row.get('event') == 'packet':
-            if set(row) != PACKET_KEYS:
+            if set(row) != PACKET_KEYS | ({'segment'} if result['schema'] == 3 else set()):
                 raise ValueError('Unexpected packet fields')
             for name in ('source', 'destination'):
                 if str(ipaddress.IPv4Address(row[name])) != row[name]:
@@ -58,6 +71,8 @@ def load_side(root, identity, source, address):
             integer(row['realtime_ns']); integer(row['observed_monotonic_ns'])
             if row['ssh_prefix'] is not None and type(row['ssh_prefix']) is not bool:
                 raise ValueError('Invalid greeting observation')
+            if result['schema'] == 3:
+                integer(row['segment'], 3)
             packets.append(row)
         elif row.get('event') == 'clock':
             if set(row) != CLOCK_KEYS:
@@ -79,7 +94,77 @@ def load_side(root, identity, source, address):
                                (r['monotonic_before_ns']+r['monotonic_after_ns'])//2) for r in clocks]
     if max(offsets)-min(offsets) > 100_000_000:
         raise ValueError('Clock step or host sleep makes packet alignment ambiguous')
-    return packets, result
+    complete = (result.get('passed') is True and result['interface_index'] == result.get('final_interface_index') and
+                result['stats']['dropped'] == 0 and result['stats']['interface_dropped'] in (0, None))
+    qualified = [0] if complete else []
+    if result['schema'] == 3:
+        segments, gaps = result.get('segments'), result.get('gaps')
+        if not isinstance(segments, list) or not 1 <= len(segments) <= 4 or not isinstance(gaps, list) or len(gaps) > 3:
+            raise ValueError('Invalid bounded segment history')
+        if result.get('test_gap_after') not in (0, 32):
+            raise ValueError('Unknown capture injection')
+        if len(gaps) not in (len(segments)-1, len(segments)) or any(p['segment'] >= len(segments) for p in packets):
+            raise ValueError('Missing segment/gap identity')
+        qualified = []
+        previous_end = None
+        for index, segment in enumerate(segments):
+            if set(segment) != {'id', 'interface_index', 'opened', 'closed', 'stats', 'error'} or segment['id'] != index:
+                raise ValueError('Segment identity mismatch')
+            integer(segment['interface_index'])
+            for stamp in (segment['opened'], segment['closed']):
+                boundary(stamp)
+            start, end = segment['opened']['monotonic_before_ns'], segment['closed']['monotonic_after_ns']
+            if end < start or (previous_end is not None and start < previous_end):
+                raise ValueError('Overlapping/reversed capture segments')
+            previous_end = end
+            if any(not start <= p['observed_monotonic_ns'] <= end for p in packets if p['segment'] == index):
+                raise ValueError('Packet observed outside its segment')
+            stats = segment['stats']
+            if stats is not None:
+                for name in ('received', 'dropped'): integer(stats[name])
+                if stats['interface_dropped'] is not None: integer(stats['interface_dropped'])
+            if segment['error'] is None and stats is not None and stats['dropped'] == 0 and stats['interface_dropped'] in (0, None):
+                qualified.append(index)
+        for gap_index, gap in enumerate(gaps):
+            if (set(gap) != {'after_segment', 'started', 'ended', 'error', 'reopen_attempts'} or
+                    gap['after_segment'] != gap_index or not 0 <= integer(gap['reopen_attempts']) <= 60):
+                raise ValueError('Invalid capture gap')
+            boundary(gap['started'])
+            preceding = segments[gap_index]
+            if (gap['error'] != preceding['error'] or not isinstance(gap['error'], dict) or
+                    set(gap['error']) != {'phase', 'category', 'status', 'errno'} or
+                    gap['error']['phase'] != 'read' or gap['error']['category'] not in
+                    ('interface-disappeared', 'injected-interface-gap') or
+                    gap['started']['monotonic_before_ns'] < preceding['closed']['monotonic_after_ns']):
+                raise ValueError('Gap does not follow the recorded read interruption')
+            if gap['error']['category'] == 'injected-interface-gap' and result['test_gap_after'] != 32:
+                raise ValueError('Unmarked capture injection')
+            if gap_index+1 < len(segments):
+                following = segments[gap_index+1]
+                boundary(gap['ended'])
+                if (gap['reopen_attempts'] < 1 or
+                        following['opened']['monotonic_before_ns'] < gap['started']['monotonic_after_ns'] or
+                        gap['ended']['monotonic_before_ns'] < following['opened']['monotonic_after_ns'] or
+                        gap['ended']['monotonic_after_ns'] > following['closed']['monotonic_before_ns']):
+                    raise ValueError('Gap recovery boundary differs from its segment')
+            elif gap['ended'] is not None:
+                raise ValueError('Gap recovered without a new segment')
+        if sum(g['reopen_attempts'] for g in gaps) > 60:
+            raise ValueError('Capture exceeded the global reopen budget')
+        known = [s['stats'] for s in segments if s['stats'] is not None]
+        totals = dict(received=sum(s['received'] for s in known), dropped=sum(s['dropped'] for s in known),
+                      interface_dropped=None if len(known) != len(segments) or
+                          any(s['interface_dropped'] is None for s in known) else
+                          sum(s['interface_dropped'] for s in known))
+        if result['stats'] != totals or result['interface_index'] != segments[0]['interface_index']:
+            raise ValueError('Aggregate capture identity/counters differ from segments')
+        if result.get('final_interface_index') != segments[-1]['interface_index']:
+            qualified = [s for s in qualified if s != len(segments)-1]
+        complete = complete and not gaps and result['test_gap_after'] == 0 and qualified == [0]
+        packets = [p for p in packets if p['segment'] in qualified]
+    if not complete and not (partial and result['schema'] == 3):
+        raise ValueError('Incomplete, mismatched or lossy TCP capture')
+    return packets, dict(result, complete=complete, qualified_segments=qualified)
 
 
 def flows(packets, server):
@@ -90,9 +175,10 @@ def flows(packets, server):
         if outbound == inbound:
             continue
         key = (p['destination'], p['destination_port']) if outbound else (p['source'], p['source_port'])
-        groups.setdefault(key, []).append((outbound, p))
-    values = {}
-    for key, rows in groups.items():
+        groups.setdefault(key+(p.get('segment', 0),), []).append((outbound, p))
+    values, ambiguous = {}, set()
+    for segmented_key, rows in groups.items():
+        key = segmented_key[:2]
         syns = [p for outgoing, p in rows if not outgoing and p['flags'] & 0x12 == 0x02]
         initial = {p['seq'] for p in syns}
         if len(initial) != 1:
@@ -108,10 +194,12 @@ def flows(packets, server):
         greeting = [p for outgoing, p in rows if outgoing and p['payload_length'] and server_seq is not None and
                     p['seq'] == (server_seq+1) % 2**32]
         greeting.sort(key=lambda p:p['realtime_ns'])
-        values[key+(client_seq,)] = dict(client_isn=client_seq, server_isn=server_seq,
+        identity = key+(client_seq,)
+        if identity in values: ambiguous.add(identity)
+        values[identity] = dict(client_isn=client_seq, server_isn=server_seq,
             syn_realtime_ns=min(p['realtime_ns'] for p in syns), syn_observations=len(syns),
             server_first_payload=greeting[0] if greeting else None, packets=len(rows))
-    return values
+    return {k:v for k,v in values.items() if k not in ambiguous}
 
 
 def host_offset(anchors):
@@ -129,20 +217,20 @@ def host_offset(anchors):
     return low, high
 
 
-def report(path):
+def report(path, partial=False):
     manifest = json.loads((path/'tcp-run.json').read_text())
     identity, source, server = (manifest[k] for k in ('run_id', 'source_sha256', 'address'))
-    mac, ms = load_side(path/'tcp-mac', identity, source, server)
-    board, bs = load_side(path/'tcp-device', identity, source, server)
+    mac, ms = load_side(path/'tcp-mac', identity, source, server, partial)
+    board, bs = load_side(path/'tcp-device', identity, source, server, partial)
     if manifest.get('device', {}).get('sleep_unit'):
         supervisor = json.loads((path/'tcp-device/supervisor.json').read_text())
         if (supervisor.get('run_id') != identity or supervisor.get('source_sha256') != manifest.get('supervisor_sha256') or
-                supervisor.get('passed') is not True or supervisor.get('command_started') is not True or
+                (not partial and supervisor.get('passed') is not True) or supervisor.get('command_started') is not True or
                 supervisor.get('cleanup_errors') != [] or
                 supervisor.get('command_returncode') != 0 or supervisor.get('recorder_returncode') != 0 or
                 supervisor.get('cgroup') != '0::/system.slice/gameshellneo-sleep-test.service\n'):
             raise ValueError('Incomplete observer unit lifecycle')
-        if manifest['mode'] == 'smoke':
+        if manifest['mode'] in ('smoke', 'burst', 'gap-smoke'):
             smoke = json.loads((path/'tcp-device/smoke.json').read_text())
             allowed = {'gameshellneo-usb.service', 'gameshellneo-ready.service',
                        'gameshellneo-battery.service', 'gameshellneo-sleep-test.service'}
@@ -186,11 +274,15 @@ def report(path):
             row['host_tunnel_unique'] = False
     verified = [r for r in rows if r['matched_handshake'] and r['host_tunnel_unique'] and
                 r['mac_greeting_prefix'] is True and r['device_greeting_prefix'] is True]
-    return dict(schema=1, run_id=identity, metadata_valid=True, flows=rows,
+    return dict(schema=1, run_id=identity, metadata_valid=ms['complete'] and bs['complete'],
+                mac_complete=ms['complete'], device_complete=bs['complete'],
+                mac_qualified_segments=ms['qualified_segments'], device_qualified_segments=bs['qualified_segments'], flows=rows,
                 device_only_flows=[dict(client_address=k[0], client_port=k[1], client_isn=k[2], device=v)
                                    for k, v in bf.items() if k not in mf],
                 matched_greeting_flows=len(verified), mac_packets=ms['packets'], device_packets=bs['packets'],
                 capture_outcome=timing['capture_outcome'], clock_offset_bounds_ns=[low, high],
                 limits='Capture boundaries, not wire delivery or server scheduling proof. Prefix is not a '
-                'complete SSH banner. Partial, reused or ambiguous flows remain unqualified. '
+                'complete SSH banner. Flow selection omits bulk; incomplete segments are excluded. '
+                'Partial reports provide positive presence only, never absence across a gap. '
+                'Partial, reused or ambiguous flows remain unqualified. '
                 'Zero reported drops do not prove zero loss; segmentation/offload can differ between endpoints.')

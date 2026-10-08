@@ -351,7 +351,10 @@ uses the same connection path and timeouts:
 ```sh
 task device:ssh-trace-awake # Fixed three USB/Wi-Fi pairs; screen stays on
 task device:ssh-trace-smoke # Same probes with the observer owned by the sleep-test unit; no sleep
+task device:ssh-trace-burst # Awake: three checked 2 MiB USB replies plus Wi-Fi probes
+task device:ssh-trace-gap-smoke # Awake: close/reopen only the Mac capture handle, once
 task report:ssh-trace CAPTURE=.local/diagnostics/<capture> # Offline validation
+task report:ssh-trace-partial CAPTURE=.local/diagnostics/<capture> # Positive evidence from clean segments only
 # Only after fresh observer readiness and the normal same-boot sleep gates:
 task device:ssh-trace-sleep QUALIFICATION=<current-receipt> REHEARSAL=<original-run-id> ATTENDED=1
 # Stop/collect the original recorders after an interrupted controller:
@@ -372,6 +375,25 @@ sleep, program the RTC, consume a continuation or blank the screen. A deadline,
 packet/byte cap, reported drops, rejected headers, clock step or changed
 interface prevents accepting a complete capture. These observations add some
 CPU/network overhead and do not measure uninstrumented latency or energy.
+
+The burst and gap smoke tasks leave the screen on and check unchanged boot/PM
+counters. Burst data is synthetic and checked for length and SHA-256; it is not
+saved as a payload artifact. The Linux recorder requests a temporary 4 MiB
+receive buffer on its own socket and records the effective limit. It saves each
+flow's first 16 packets plus connection controls, zero-window notifications,
+SSH-prefix observations and the first server payload, counting omitted bulk
+explicitly. This reduces metadata work while retaining handshake evidence.
+
+On a recognized Mac capture-interface disappearance, the recorder closes that
+segment and attempts to reopen its handle at one-second intervals, bounded by
+60 attempts total, three gaps and the original deadline. It never resets the
+network interface. Every interruption stays visible. A gapped capture fails the
+normal report; the separate partial report matches positive observations only
+inside segments with known, clean capture statistics. It cannot establish that
+a greeting was absent across a gap. Unknown backend errors still stop capture.
+The gap smoke deliberately injects one handle interruption after 32 reads;
+success means the gap was rejected as continuous coverage and later flows were
+matched. It does not simulate device suspend or change USB connectivity.
 
 Private `tcp-mac/` and `tcp-device/` contain JSON metadata, not PCAP files:
 IPv4 endpoints/ports, TCP sequence/acknowledgment/flags/lengths, timestamps and
@@ -394,6 +416,8 @@ the recorder design; [report 207](docs/207-ssh-observer-sleep-unit-integration.m
 records the pre-sleep integration failure, correction and validation.
 [Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md) records the
 subsequent RTC sleep pass and independently rejected incomplete packet capture.
+[Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md) records the awake
+burst comparison, bounded handle-recovery test and remaining attended validation.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

@@ -727,6 +727,18 @@ tasks:
       NEO_ROUTE: usb
     cmds: [python3 tools/check-ssh-trace.py --smoke]
 
+  device:ssh-trace-burst:
+    desc: Awake observer smoke plus three fixed 2 MiB USB SSH replies; screen and PM remain unchanged
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py --burst]
+
+  device:ssh-trace-gap-smoke:
+    desc: Awake synthetic Mac capture-handle interruption; tests bounded reopening without changing the USB interface
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py --gap-smoke]
+
   device:ssh-trace-sleep:
     desc: One attended RTC sleep with bounded two-ended TCP metadata; QUALIFICATION/REHEARSAL/ATTENDED required
     env:
@@ -742,6 +754,10 @@ tasks:
   report:ssh-trace:
     desc: Validate and correlate private two-ended TCP metadata in CAPTURE; no device access
     cmds: [python3 tools/check-ssh-trace.py --report]
+
+  report:ssh-trace-partial:
+    desc: Offline positive flow evidence from clean segments; never qualifies continuous coverage across a gap
+    cmds: [python3 tools/check-ssh-trace.py --partial-report]
 
   device:exec:
     desc: Run an explicit device command, e.g. task device:exec -- uname -r

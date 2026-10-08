@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[209 — SSH recorder burst and gap recovery](209-ssh-recorder-burst-and-gap-recovery.md)
+records an awake reproduction of capture drops, reduced metadata volume with
+zero reported drops on the repeated workload, and bounded Mac handle recovery
+with explicitly unqualified gaps. Host checks and unchanged boot/PM health pass;
+real suspend-transition qualification remains separate.
+
 [204 — Unused Ethernet build candidate](204-unused-ethernet-build-candidate.md)
 audits platform MAC support inherited from the generic Sunxi configuration and
 adds a separate paired-kernel comparison. The compressed kernel shrinks by

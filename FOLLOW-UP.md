@@ -19,6 +19,16 @@ state before reuse; an audible warning does not replace fresh readiness.
 [Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md),
 [report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
 
+**Awake recorder work completed, 8 October:** NEO-146 reproduces capture pressure
+with three checked 2 MiB transfers, then passes the same workload with zero
+reported drops and four matched handshakes after recorder changes. A deliberate
+Mac capture-handle interruption also recovers with an explicit gap and four
+matched flows in the clean reopened segment; continuous coverage remains rejected.
+No sleep, reboot, cable action or display change occurred. Final health and the
+unused continuation above validate at unchanged PM9/0; both transient services
+are inactive/not-found. Actual USB-transition recovery still needs separately
+attended qualification. [Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md).
+
 - [x] NEO-144 bounded two-ended SSH metadata recorder: saved awake/sleep/collect
   tasks and offline flow report, with payload-free output, source/identity/hash
   checks, limits, cleanup and original clock anchors. Final awake smoke matches
@@ -41,15 +51,24 @@ state before reuse; an audible warning does not replace fresh readiness.
   Both transient services are inactive/not-found. Final health/receipt checks
   pass, and all original files remain retained.
   [Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
-- [ ] NEO-146: repair recorder coverage before further instrumented sleep:
-  preserve the Mac backend/error phase and explicit interface-loss gaps;
-  investigate bounded reopening without claiming continuous coverage. Reproduce
-  Linux capture pressure with awake bulk-transfer tests, measure effective
-  per-socket buffering and filtering, and consider handshake-focused recording.
-  The 538 diagnostic socket drops do not establish USB/TCP network loss. Keep
-  strict failure reporting, original PM verdicts, SSH policy and fresh attended
-  readiness. Initial investigation and awake tests require no physical interaction.
-  [Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
+- [x] NEO-146 recorder engineering and awake validation: fixed backend/phase
+  diagnostics, bounded Mac handle reopening, explicit segment/gap identities and
+  positive-only partial reports. Per-flow record selection plus a temporary
+  Linux receive buffer changes the repeated awake workload from 3,223 recorder
+  drops to zero, with all data checks/probes passing and four matched handshakes.
+  Synthetic interruption recovery and strict rejection both pass. Historical
+  failed captures stay rejected. The 538 earlier diagnostic drops and 3,223
+  reproduced drops do not establish USB/TCP network loss. No driver or SSH-policy
+  change, measured energy saving or resolved greeting cause is claimed.
+  [Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md).
+- [ ] NEO-147: qualify the revised observer across one separately attended actual RTC
+  sleep. Validate current state/receipt first, require fresh readiness and the
+  long warning, and preserve the first PM and recorder outcomes independently.
+  A recognized disappearance must create an explicit gap and bounded reopening;
+  only clean later segments can establish positive handshake observations.
+  The strict report must still reject any gapped window. Do not repeat PM just
+  to obtain a passing capture. Resolve the historical post-return SSH greeting
+  failure only from sufficient evidence; its underlying cause remains open.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

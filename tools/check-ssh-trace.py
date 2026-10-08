@@ -108,6 +108,8 @@ def start_smoke(config, client, manifest):
 def start(config, client, manifest, side):
     info = manifest[side]
     arguments = ['--interface', info['interface'], '--address', manifest['address'], '--seconds', '300']
+    if side == 'mac' and manifest['mode'] == 'gap-smoke':
+        arguments += ['--test-gap-after', '32']
     if side == 'mac':
         helper(config, client, manifest, side, 'launch', *arguments)
     else:
@@ -161,7 +163,7 @@ def finish_side(config, client, manifest, side, path):
                     time.sleep(0.2)
             else:
                 raise TimeoutError('Observer supervisor has not completed')
-            names = ['supervisor.json']+(['smoke.json'] if manifest['mode'] == 'smoke' else [])
+            names = ['supervisor.json']+(['smoke.json'] if manifest['mode'] in ('smoke', 'burst', 'gap-smoke') else [])
             for name in names:
                 data = helper(config, client, manifest, side, 'export', '--file', name)
                 file = destination/name
@@ -209,13 +211,16 @@ def inspect_boot(client):
     return dict(boot_id=value[0], success=int(value[1]), fail=int(value[2]))
 
 
-def execute(config, path, sleep=False, smoke=False):
+def execute(config, path, sleep=False, smoke=False, burst=False, gap_smoke=False):
+    if sum(map(bool, (sleep, smoke, burst, gap_smoke))) > 1:
+        raise ValueError('Choose exactly one observer operation; injection cannot accompany sleep')
     address = str(ipaddress.IPv4Address(config.get('GAMESHELL_USB_IP', '192.168.10.1')))
     source = (ROOT/'tools/tcp_metadata.py').read_bytes()
     supervisor = (ROOT/'tools/tcp_supervisor.py').read_bytes()
     manifest = dict(schema=1, run_id=uuid.uuid4().hex, address=address, source_sha256=hashlib.sha256(source).hexdigest(),
                     supervisor_sha256=hashlib.sha256(supervisor).hexdigest(),
-                    mode='sleep' if sleep else 'smoke' if smoke else 'awake', mac_clocks=[], operation_passed=False)
+                    mode='sleep' if sleep else 'gap-smoke' if gap_smoke else 'burst' if burst else 'smoke' if smoke else 'awake',
+                    mac_clocks=[], operation_passed=False)
     (path/'tcp_metadata.py').write_bytes(source)
     (path/'tcp_supervisor.py').write_bytes(supervisor)
     save(path/'tcp-run.json', manifest)
@@ -235,11 +240,11 @@ def execute(config, path, sleep=False, smoke=False):
         with device(config, 'usb') as board:
             manifest['before'] = inspect_boot(board)
             prepare(config, board, manifest, 'device', 'usb0')
-            manifest['device']['sleep_unit'] = sleep or smoke
+            manifest['device']['sleep_unit'] = sleep or smoke or burst or gap_smoke
             if not sleep:
                 manifest['device']['launch_requested'] = True
                 save(path/'tcp-run.json', manifest)
-                if smoke:
+                if smoke or burst or gap_smoke:
                     start_smoke(config, board, manifest)
                 else:
                     start(config, board, manifest, 'device')
@@ -255,7 +260,7 @@ def execute(config, path, sleep=False, smoke=False):
             continuation.setdefault('sleeps', []).append(dict(capture=str((path/'result.json').relative_to(ROOT)), run_id=value['run_id']))
             save(path/'qualification-next.json', continuation)
         else:
-            module('check-ssh-timing.py').probe(config, path, 3)
+            module('check-ssh-timing.py').probe(config, path, 3, burst=burst)
         manifest['operation_passed'] = True
     except BaseException as error:
         original_error = error
@@ -277,7 +282,32 @@ def execute(config, path, sleep=False, smoke=False):
         save(path/'tcp-run.json', manifest)
         raise ValueError('Boot/PM state differs from the intended operation')
     save(path/'tcp-run.json', manifest)
-    result = tcp_report.report(path)
+    try:
+        result = tcp_report.report(path)
+    except ValueError as primary:
+        # A separate positive-evidence view never turns an incomplete capture
+        # into a pass. Preserve the default failure except for the explicit
+        # awake synthetic-gap test, whose purpose is testing this rejection.
+        try:
+            partial = tcp_report.report(path, partial=True)
+            save(path/'tcp-partial-report.json', partial)
+        except Exception:
+            raise primary
+        if not gap_smoke:
+            raise
+        mac_result = json.loads((path/'tcp-mac/result.json').read_text())
+        gaps = mac_result['gaps']
+        if (partial['metadata_valid'] is not False or not partial['device_complete'] or
+                partial['mac_qualified_segments'] != [1] or partial['matched_greeting_flows'] < 3 or
+                mac_result['test_gap_after'] != 32 or len(gaps) != 1 or
+                gaps[0]['error']['category'] != 'injected-interface-gap' or gaps[0]['ended'] is None):
+            raise ValueError('Synthetic gap did not recover with separately qualified flows')
+        save(path/'gap-smoke.json', dict(passed=True, continuous_capture_qualified=False,
+                                       matched_greeting_flows=partial['matched_greeting_flows']))
+        print('Synthetic gap smoke passed; continuous capture remains unqualified.')
+        return
+    if gap_smoke:
+        raise ValueError('Synthetic gap was incorrectly accepted as continuous capture')
     save(path/'tcp-report.json', result)
     if not sleep and result['matched_greeting_flows'] < 4:
         raise ValueError('Awake smoke requires four uniquely matched USB flows with greetings at both ends')
@@ -290,19 +320,23 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--sleep', action='store_true')
     mode.add_argument('--smoke', action='store_true')
+    mode.add_argument('--burst', action='store_true')
+    mode.add_argument('--gap-smoke', action='store_true')
     mode.add_argument('--collect', action='store_true')
     mode.add_argument('--report', action='store_true')
+    mode.add_argument('--partial-report', action='store_true')
     args = parser.parse_args()
     os.umask(0o077)
-    if args.collect or args.report:
+    if args.collect or args.report or args.partial_report:
         path = Path(os.environ.get('NEO_SSH_CAPTURE', '')).resolve(strict=True)
         if not path.is_dir() or not path.is_relative_to((LOCAL/'diagnostics').resolve()):
             raise ValueError('CAPTURE must identify a private diagnostic directory')
         if args.collect:
             collect(load_env(), path, json.loads((path/'tcp-run.json').read_text()))
-        result = tcp_report.report(path)
-        save(path/'tcp-report.json', result)
-        print('Valid metadata; matched greeting flows:', result['matched_greeting_flows'])
+        result = tcp_report.report(path, partial=args.partial_report)
+        save(path/('tcp-partial-report.json' if args.partial_report else 'tcp-report.json'), result)
+        print('Continuous capture qualified:', result['metadata_valid'],
+              '; matched greeting flows:', result['matched_greeting_flows'])
         return
     if args.sleep and (os.environ.get('NEO_SLEEP_ATTENDED') != '1' or
                       not os.environ.get('NEO_SLEEP_QUALIFICATION') or not os.environ.get('NEO_SLEEP_REHEARSAL')):
@@ -311,7 +345,7 @@ def main():
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         path = evidence_directory()
         print('Private two-ended TCP evidence:', path, flush=True)
-        execute(load_env(), path, args.sleep, args.smoke)
+        execute(load_env(), path, args.sleep, args.smoke, args.burst, args.gap_smoke)
 
 
 if __name__ == '__main__':

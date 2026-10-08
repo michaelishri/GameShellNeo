@@ -80,7 +80,31 @@ checks, not a complete image build. Receipts include source inputs,
 native/ARM executable hashes, builder identity and ARM object/configuration
 hashes under `.local/build/musb-probe-roles/`.
 
-Final validation results will be recorded when the running builds finish.
+## Completed results
+
+- Native and ARM32 candidate: all 25 cases and 17 retry calls passed.
+- Original source and seven defective variants: all eight native negative
+  controls failed by assertion as required. Negative controls were not run
+  under ARM32.
+- ARM project gadget, host-only, dual-role and module builds passed, including
+  the combined module object. All recorded object/configuration hashes and
+  patch identities were checked against the saved files.
+- `task check`: 16 runtime tests and 814 tooling tests passed, with two optional
+  tooling skips; compiled helper tests, Bash syntax and ShellCheck passed.
+- Strict checkpatch on the production patch body: zero errors, warnings or
+  checks. Independent standards and specification reviews found no issues.
+
+| Artifact | SHA256 |
+| --- | --- |
+| Patch 0038 | `13564bf36f34e69f1102f6362e6069ee1b8805b0faafd52be67d1129563f8966` |
+| `.local/build/musb-probe-roles/compile-evidence.json` | `16ee27d42792c6f5a231291ce9c565e983d90aed29798bac99c8a42dc040aa4c` |
+
+The build log is `.local/build/musb-probe-drivers.log`; the host suite log is
+`.local/neo164-host-check.log`. Receipt inputs and native/ARM executable hashes
+also match. An initial fixture extraction check rejected an extra newline in
+its expected caller boundary before executing any tests; its failed log is
+retained under `.local/build/logs/`. Correcting that validator required no
+production-patch change. The completed receipt above is the accepted result.
 
 ## Remaining NEO-106 work
 

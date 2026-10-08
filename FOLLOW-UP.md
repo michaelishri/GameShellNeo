@@ -2,6 +2,9 @@
 
 Record deferred questions and activities here as they arise.
 
+- [x] NEO-164 source candidate: successful MUSB host/gadget registrations now unwind after a later probe mode-selection failure, before common resource cleanup. Native/ARM32 checks pass 25 cases with 17 retry calls each; eight native negative controls, four ARM build configurations and host checks pass. Standards/specification reviews found no issues. [Report 226](docs/226-musb-probe-role-unwind.md) records exact scope and receipts. No image or board operation occurred.
+- [ ] Continue NEO-106 core IRQ/work/timer/runtime-PM and backend producer retirement. NEO-164 resolves only completed role-registration ownership at probe failure; it does not qualify complete failed-probe cleanup, physical rebind or terminal controller removal. Its source candidate is on `work/musb-probe-unwind`. NEO-108 image installation remains parked until the owner is home and available for the card swap.
+
 **Awake SSH investigation complete, 9 October 2026:** NEO-160 reviews both
 diagnostic.24 late/noirq inner-SSH failures: 24 greeting bytes accepted by the
 forwarding API, zero received, active/open channels and no parsed greeting.

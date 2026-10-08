@@ -8,6 +8,7 @@ import unittest
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 from musb_restart_kunit import CASES, checked_cases, replace_once
+from musb_irq_kunit import CASES as IRQ_CASES, checked_cases as irq_checked_cases
 
 spec = importlib.util.spec_from_file_location('request_resume_checks', TOOLS / 'check-musb-request-resume.py')
 host = importlib.util.module_from_spec(spec)
@@ -68,3 +69,42 @@ class RestartEvidenceTests(unittest.TestCase):
         for text in ('', 'marker marker'):
             with self.assertRaises(ValueError):
                 replace_once(text, 'marker', 'hook')
+
+
+class IrqEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        counts = dict(tests=len(IRQ_CASES), passed=len(IRQ_CASES), failed=0, crashed=0, skipped=0, errors=0)
+        self.report = dict(name='KUnit Test Group', arch='um', misc=counts, test_cases=[],
+            sub_groups=[dict(name='musb-irq', arch='um', misc=counts, sub_groups=[],
+                             test_cases=[dict(name=name, status='PASS') for name in IRQ_CASES])])
+        self.log = 'musb-irq\n' + '\n'.join(IRQ_CASES)
+
+    def test_complete_irq_suite_is_not_a_restart_result(self):
+        self.assertEqual(len(irq_checked_cases(self.report, self.log)), 4)
+        with self.assertRaises(ValueError):
+            checked_cases(self.report, self.log)
+        restart = RestartEvidenceTests()
+        restart.setUp()
+        with self.assertRaises(ValueError):
+            irq_checked_cases(restart.report, restart.log)
+
+    def test_missing_duplicate_failed_or_skipped_irq_case(self):
+        for mode in ('missing', 'duplicate', 'FAIL', 'SKIP'):
+            report = copy.deepcopy(self.report)
+            cases = report['sub_groups'][0]['test_cases']
+            if mode == 'missing':
+                cases.pop()
+            elif mode == 'duplicate':
+                cases[-1] = cases[0]
+            else:
+                cases[0]['status'] = mode
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                irq_checked_cases(report, self.log)
+
+    def test_rejects_kernel_diagnostics_and_extra_suites(self):
+        for diagnostic in ('WARNING:', 'BUG:', 'possible circular locking', 'Kernel panic'):
+            with self.subTest(diagnostic=diagnostic), self.assertRaises(ValueError):
+                irq_checked_cases(self.report, self.log + diagnostic)
+        self.report['sub_groups'].append(copy.deepcopy(self.report['sub_groups'][0]))
+        with self.assertRaises(ValueError):
+            irq_checked_cases(self.report, self.log)

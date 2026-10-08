@@ -1,0 +1,100 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: release the core IRQ before backend teardown
+
+Unregister clients while their IRQ and hardware resources remain available,
+then mask the core and remove its shared IRQ action before backend or DMA
+resource release. Apply the same boundary on failed probe after role unwind.
+Wait outside the controller lock and clear action ownership after free_irq
+so later allocation cleanup cannot release the same action again.
+
+Keep the existing wake-reference policy and report disarm failures. Core
+IRQ retirement does not drain independent backend producers or establish
+complete failed-power teardown or wrapper interrupt-source masking.
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2184,6 +2184,41 @@
+ 	return NULL;
+ }
+ 
++/* The caller must not hold a lock needed by the interrupt handler. */
++static void musb_free_irq(struct musb *musb)
++{
++	int ret;
++
++	if (musb->nIrq < 0)
++		return;
++
++	if (musb->irq_wake) {
++		ret = disable_irq_wake(musb->nIrq);
++		if (ret)
++			dev_err(musb->controller, "wake IRQ %d cleanup failed: %d\n",
++				musb->nIrq, ret);
++	}
++	free_irq(musb->nIrq, musb);
++	musb->nIrq = -ENODEV;
++}
++
++/* Client cleanup must finish before terminal core IRQ retirement. */
++static void musb_shutdown_irq(struct musb *musb)
++{
++	unsigned long flags;
++
++	if (musb->nIrq < 0)
++		return;
++
++	musb_platform_disable(musb);
++	spin_lock_irqsave(&musb->lock, flags);
++	musb_disable_interrupts(musb);
++	musb_writeb(musb->mregs, MUSB_DEVCTL, 0);
++	spin_unlock_irqrestore(&musb->lock, flags);
++
++	musb_free_irq(musb);
++}
++
+ static void musb_free(struct musb *musb)
+ {
+ 	/* this has multiple entry modes. it handles fault cleanup after
+@@ -2191,11 +2226,7 @@
+ 	 * cleanup after everything's been de-activated.
+ 	 */
+ 
+-	if (musb->nIrq >= 0) {
+-		if (musb->irq_wake)
+-			disable_irq_wake(musb->nIrq);
+-		free_irq(musb->nIrq, musb);
+-	}
++	musb_free_irq(musb);
+ 
+ 	musb_host_free(musb);
+ }
+@@ -2608,6 +2639,7 @@
+ 	return 0;
+ 
+ fail3:
++	musb_shutdown_irq(musb);
+ 	cancel_delayed_work_sync(&musb->irq_work);
+ 	cancel_delayed_work_sync(&musb->finish_resume_work);
+ 	cancel_delayed_work_sync(&musb->deassert_reset_work);
+@@ -2663,7 +2695,6 @@
+ {
+ 	struct device	*dev = &pdev->dev;
+ 	struct musb	*musb = dev_to_musb(dev);
+-	unsigned long	flags;
+ 
+ 	/* this gets called on rmmod.
+ 	 *  - Host mode: host may still be active
+@@ -2679,11 +2710,7 @@
+ 	musb_host_cleanup(musb);
+ 	musb_gadget_cleanup(musb);
+ 
+-	musb_platform_disable(musb);
+-	spin_lock_irqsave(&musb->lock, flags);
+-	musb_disable_interrupts(musb);
+-	musb_writeb(musb->mregs, MUSB_DEVCTL, 0);
+-	spin_unlock_irqrestore(&musb->lock, flags);
++	musb_shutdown_irq(musb);
+ 	musb_platform_exit(musb);
+ 
+ 	pm_runtime_dont_use_autosuspend(musb->controller);

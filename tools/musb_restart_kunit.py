@@ -8,6 +8,12 @@ CASES = ('restart_busy_giveback_test', 'restart_empty_requeue_test',
          'restart_same_endpoint_test', 'restart_other_endpoint_test',
          'restart_follower_test', 'restart_nuke_test', 'restart_first_error_test')
 
+LIMITS = ('Actual full MUSB driver and USB giveback, real spinlocks and runtime-PM '
+          'accounting under Linux UML with KASAN/lockdep. Only the hardware restart '
+          'is intercepted. Controller runtime state is staged; a baseline PM reference '
+          'prevents real hardware power transitions. Single virtual CPU and synchronous '
+          'interleavings: no SMP, DMA, electrical USB, actual suspend or board qualification.')
+
 
 def replace_once(text, before, after):
     if text.count(before) != 1:
@@ -83,8 +89,8 @@ def manifest_for(queue):
     return [dict(name=name, sha256=hashlib.sha256(data).hexdigest()) for name, data in queue]
 
 
-def checked_cases(report, log):
-    counts = dict(tests=len(CASES), passed=len(CASES), failed=0, crashed=0, skipped=0, errors=0)
+def checked_cases(report, log, *, suite_name='musb-restart', expected_cases=CASES):
+    counts = dict(tests=len(expected_cases), passed=len(expected_cases), failed=0, crashed=0, skipped=0, errors=0)
     if re.search(r'WARNING:|BUG:|possible circular locking|suspicious RCU|'
                  r'sleeping function called|Kernel panic|not ok |'
                  r'rcu:.*detected .*stalls|INFO: task .*blocked for more than', log):
@@ -94,13 +100,13 @@ def checked_cases(report, log):
             report.get('test_cases') != [] or len(report.get('sub_groups', [])) != 1):
         raise ValueError('Expected exactly the requested UML KUnit group')
     suite = report['sub_groups'][0]
-    if (suite.get('name') != 'musb-restart' or suite.get('arch') != 'um' or
+    if (suite.get('name') != suite_name or suite.get('arch') != 'um' or
             suite.get('misc') != counts or suite.get('sub_groups') != []):
         raise ValueError('Wrong or incomplete MUSB suite')
     cases = suite.get('test_cases', [])
-    if (len(cases) != len(CASES) or {c.get('name') for c in cases} != set(CASES) or
+    if (len(cases) != len(expected_cases) or {c.get('name') for c in cases} != set(expected_cases) or
             any(c.get('status') != 'PASS' for c in cases)):
         raise ValueError('Expected every MUSB case exactly once, all passing')
-    if 'musb-restart' not in log or any(name not in log for name in CASES):
+    if suite_name not in log or any(name not in log for name in expected_cases):
         raise ValueError('Kernel log missing requested output')
     return cases

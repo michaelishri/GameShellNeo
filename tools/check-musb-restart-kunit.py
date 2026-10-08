@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Execute the real MUSB restart and giveback paths in an isolated UML kernel."""
+"""Execute a selected MUSB integration suite in an isolated UML kernel."""
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -11,11 +12,16 @@ import uuid
 
 from kernel_checks import ROOT, archive_for, check_overrides, run, sha256
 from kernel_sources import atomic_json, ensure_source, locked
-from musb_restart_kunit import checked_cases, manifest_for, test_patch
+from musb_restart_kunit import manifest_for
 
 
 def main():
-    work = ROOT / '.local/build/musb-restart-kunit'
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--suite', choices=('restart', 'irq'), default='restart')
+    args = parser.parse_args()
+    support = importlib.import_module('musb_' + args.suite + '_kunit')
+    stem = 'musb-' + args.suite
+    work = ROOT / '.local/build' / (stem + '-kunit')
     work.mkdir(parents=True, exist_ok=True)
     with locked(work / '.lock'):
         evidence = work / 'evidence.json'
@@ -26,14 +32,15 @@ def main():
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         queue = list(module.patches())
-        config = ROOT / 'kernel/tests/musb-restart-kunit.config'
+        config = ROOT / 'kernel/tests' / (stem + '-kunit.config')
         inputs = {str(p.relative_to(ROOT)): sha256(p) for p in (
-            Path(__file__), config, ROOT / 'tools/musb_restart_kunit.py',
-            ROOT / 'kernel/tests/musb-restart-kunit.c', ROOT / 'tools/kernel_sources.py',
+            Path(__file__), config, Path(support.__file__), ROOT / 'tools/musb_restart_kunit.py',
+            ROOT / 'kernel/tests' / (stem + '-kunit.c'), ROOT / 'tools/kernel_sources.py',
             ROOT / 'tools/kernel_checks.py', ROOT / 'tools/kernel-inputs.py',
             ROOT / 'build/sources.lock.json')}
+        inputs.update({name: sha256(ROOT / name) for name in getattr(support, 'EXTRA_INPUTS', ())})
         with tempfile.TemporaryDirectory(dir=work) as temporary:
-            queue.append(test_patch(ROOT, archive, lock, queue, module.apply_queue, Path(temporary)))
+            queue.append(support.test_patch(ROOT, archive, lock, queue, module.apply_queue, Path(temporary)))
         with locked(work / '.source-lock'):
             source, _, metadata = ensure_source(ROOT, work, archive, lock, manifest_for(queue),
                                                 recorded_patches=queue)
@@ -62,9 +69,9 @@ def main():
              f'--jobs={builder["jobs"]} --build_dir=/project/{relative}/output '
              f'--kunitconfig=/project/{relative}/kunit.config --timeout=120 '
              f'--json=/project/{relative}/results.json --kernel_args=uml_dir=/uml-tmp/state '
-             'musb-restart'])
+             + stem])
         check_overrides(output / '.config', [line for line in text.splitlines() if line.startswith('CONFIG_')])
-        cases = checked_cases(json.loads((scratch / 'results.json').read_text()),
+        cases = support.checked_cases(json.loads((scratch / 'results.json').read_text()),
                               (output / 'test.log').read_text(errors='replace'))
         accepted = scratch / 'accepted-runs' / uuid.uuid4().hex
         accepted.mkdir(parents=True)
@@ -76,14 +83,10 @@ def main():
             if sha256(accepted / name) != digest:
                 raise RuntimeError('Artifact changed during retention: ' + name)
             artifacts[name] = digest
-        record = dict(schema_version=1, suite='musb-restart', linux=lock['linux']['tag'],
+        record = dict(schema_version=1, suite=stem, linux=lock['linux']['tag'],
             builder=builder, inputs=inputs, source=metadata, cases=cases,
             artifact_dir=str(accepted.relative_to(ROOT)), artifacts=artifacts,
-            limits='Actual full MUSB driver and USB giveback, real spinlocks and runtime-PM '
-                   'accounting under Linux UML with KASAN/lockdep. Only the hardware restart '
-                   'is intercepted. Controller runtime state is staged; a baseline PM reference '
-                   'prevents real hardware power transitions. Single virtual CPU and synchronous '
-                   'interleavings: no SMP, DMA, electrical USB, actual suspend or board qualification.')
+            limits=support.LIMITS)
         atomic_json(accepted / 'evidence.json', record)
         atomic_json(evidence, record)
         print('KUnit evidence:', evidence.relative_to(ROOT), flush=True)

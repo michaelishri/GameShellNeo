@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[227 — MUSB core IRQ retirement](227-musb-core-irq-retirement.md)
+records the NEO-165 action-release boundary before backend/DMA resource release,
+source-order tests and Linux shared-IRQ tests. Full producer retirement remains
+under NEO-106.
+
 [226 — MUSB probe role cleanup](226-musb-probe-role-unwind.md)
 records the NEO-164 fix for successful host/gadget registrations left behind
 after a later mode-selection failure, with source fault tests and ARM builds.

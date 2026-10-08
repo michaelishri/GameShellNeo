@@ -122,6 +122,7 @@ tasks:
       - task: test:musb-sleep
       - task: test:musb-request-resume
       - task: test:musb-probe-roles
+      - task: test:musb-irq
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -257,6 +258,18 @@ tasks:
   test:musb-restart-kunit:
     desc: Execute actual MUSB restart/giveback paths in an isolated UML kernel with KASAN and lockdep
     cmds: [bash tools/run-logged.sh musb-restart-kunit python3 tools/check-musb-restart-kunit.py]
+
+  test:musb-irq-kunit:
+    desc: Execute the MUSB release helper with Linux shared IRQs and a held handler in UML
+    cmds: [bash tools/run-logged.sh musb-irq-kunit python3 tools/check-musb-restart-kunit.py --suite irq]
+
+  test:musb-irq:
+    desc: Test actual core IRQ ownership and teardown ordering on native and ARM32
+    cmds: [bash tools/run-logged.sh musb-irq python3 tools/check-musb-irq.py]
+
+  check:musb-irq-drivers:
+    desc: Test MUSB IRQ teardown and compile five isolated ARM configurations
+    cmds: [bash tools/run-logged.sh musb-irq-drivers python3 tools/check-musb-irq.py --compile-drivers]
 
   test:musb-probe-roles:
     desc: Test MUSB registration failure cleanup on native and ARM32 with negative controls

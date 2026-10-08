@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[217 — WFI s2idle image integration](217-wfi-s2idle-image-integration.md) combines
+the one-state CPU-idle candidate, BOOTTIME battery samples and awake measurement
+guards in diagnostic.24, with strict all-CPU/timer and clock-freeze evidence gates.
+Installed-image and energy qualification remain separate.
+
 [216 — SSH greeting source audit](216-ssh-greeting-source-audit.md) binds the
 installed versions to Paramiko, pinned Apple and exact patched Debian source
 references. It explains the local timeout/error sequence, checks forwarding

@@ -36,6 +36,17 @@ systemd-analyze
 '''
 
 
+def device_source(filename):
+    """Bundle shared observation helpers for standalone python -c diagnostics."""
+    source = 'import sys, types\n'
+    for name in ('battery_sample', 'awake_clock'):
+        helper = (ROOT / 'tools' / (name + '.py')).read_text()
+        source += (f'_helper = types.ModuleType({name!r})\n'
+                   'exec(' + repr(helper) + ', _helper.__dict__)\n'
+                   f'sys.modules[{name!r}] = _helper\n')
+    return source + (ROOT / 'tools' / filename).read_text()
+
+
 def private_path(value, default):
     return Path(value or default).expanduser().resolve()
 
@@ -232,7 +243,22 @@ def device_action(config, action, route):
             run(client, shlex.join(arguments))
             return
         directory = evidence_directory()
-        if action == 'check':
+        if action == 'awake-clock-check':
+            arguments = ['python3', '-B', '-c', device_source('record-awake-clock.py')]
+            path = directory / 'awake-clock.json'
+            inputs = ('record-awake-clock.py', 'awake_clock.py', 'battery_sample.py', 'remote.py')
+            (directory / 'clock-sources.json').write_text(json.dumps({name:
+                hashlib.sha256((ROOT / 'tools' / name).read_bytes()).hexdigest()
+                for name in inputs}, indent=2) + '\n')
+            with path.open('wb') as output:
+                run(client, shlex.join(arguments), output=output, display=False, timeout=20)
+            result = json.loads(path.read_text())
+            from awake_clock import checked_proof
+            summary = checked_proof(result.get('awake_proof'))
+            if result.get('passed') is not True or summary['observation_count'] != 21:
+                raise ValueError('Incomplete read-only clock check')
+            print(json.dumps(dict(kernel=result['kernel'], python=result['python'], **summary), indent=2))
+        elif action == 'check':
             country = config.get('GAMESHELL_WIFI_COUNTRY', '')
             active_country = os.environ.get('NEO_ACTIVE_COUNTRY') or country
             if not all(re.fullmatch(r'[A-Z]{2}', value) for value in (country, active_country)):
@@ -285,7 +311,7 @@ def device_action(config, action, route):
                 raise ValueError('SECONDS must be a multiple of 10 in 60..3600')
             if backlight not in ('keep', 'off'):
                 raise ValueError('BACKLIGHT must be keep or off')
-            remote_dir = stage_helpers(client, 'idle', ('sample-idle.py', 'speaker_audio.py'))
+            remote_dir = stage_helpers(client, 'idle')
             warning_owner = uuid.uuid4().hex
             (directory / 'warning.json').write_text(json.dumps(dict(owner=warning_owner, helper=remote_dir)) + '\n')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
@@ -303,13 +329,13 @@ def device_action(config, action, route):
             seconds = int(os.environ.get('NEO_PROFILE_SECONDS', '120'))
             if not 30 <= seconds <= 300 or seconds % 30:
                 raise ValueError('SECONDS must be a multiple of 30 in 30..300')
+            remote_dir = stage_helpers(client, 'power-profile')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-power-profile',
                          '--description=GameShellNeo awake-power counter profile',
                          '--property=RuntimeMaxSec=' + str(seconds + 90),
                          '--property=TimeoutStopSec=10', '--property=Nice=10',
-                         '/usr/bin/python3', '-B', '-u', '-c',
-                         (ROOT / 'tools/profile-power.py').read_text(), '--seconds', str(seconds)]
+                         '/usr/bin/python3', '-B', '-u', remote_dir + '/profile-power.py', '--seconds', str(seconds)]
             path = directory / 'power-profile.jsonl'
             print('Capturing private profile:', path, flush=True)
             with path.open('wb') as output:
@@ -373,7 +399,7 @@ def device_action(config, action, route):
             remote_dir = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-governor.XXXXXXXX',
                              display=False).decode().strip()
             arguments = governor_command(remote_dir, seconds, rate)
-            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py')
+            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py', 'battery_sample.py', 'awake_clock.py')
             with client.open_sftp() as sftp:
                 for name in names:
                     upload(sftp, ROOT / 'tools' / name, remote_dir + '/' + name)
@@ -408,7 +434,7 @@ def device_action(config, action, route):
                              display=False).decode().strip()
             if not re.fullmatch(r'/tmp/gameshellneo-sugov\.[A-Za-z0-9]+', remote_dir):
                 raise ValueError('Unexpected temporary governor profile directory')
-            names = ('profile-governor.py', 'profile-power.py')
+            names = ('profile-governor.py', 'profile-power.py', 'battery_sample.py', 'awake_clock.py')
             artifacts = ('perf.data', 'perf-record.txt', 'perf-report.txt', 'kallsyms.txt')
             with client.open_sftp() as sftp:
                 for name in names:
@@ -452,7 +478,7 @@ def device_action(config, action, route):
             with (directory / 'stability.jsonl').open('wb') as output:
                 run(client, shlex.join(arguments), output=output)
         elif action == 'backlight':
-            remote_dir = stage_helpers(client, 'backlight', ('check-backlight.sh', 'speaker_audio.py'))
+            remote_dir = stage_helpers(client, 'backlight')
             warning_owner = uuid.uuid4().hex
             (directory / 'warning.json').write_text(json.dumps(dict(owner=warning_owner, helper=remote_dir)) + '\n')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
@@ -486,18 +512,21 @@ def device_action(config, action, route):
         print('Private capture:', directory)
 
 
-def stage_helpers(client, purpose, names):
+def stage_helpers(client, purpose):
     """Keep standalone diagnostic dependencies together until recovery finishes."""
-    if purpose not in ('idle', 'backlight'):
+    bundles = {
+        'idle': ('sample-idle.py', 'speaker_audio.py', 'battery_sample.py', 'awake_clock.py'),
+        'power-profile': ('profile-power.py', 'battery_sample.py', 'awake_clock.py'),
+        'backlight': ('check-backlight.sh', 'speaker_audio.py'),
+    }
+    if purpose not in bundles:
         raise ValueError('Unknown diagnostic helper purpose')
     prefix = '/tmp/gameshellneo-' + purpose + '.'
     directory = run(client, 'umask 077; mktemp -d ' + prefix + 'XXXXXXXX', display=False).decode().strip()
     if not re.fullmatch(re.escape(prefix) + r'[A-Za-z0-9]+', directory):
         raise ValueError('Unexpected diagnostic helper directory')
     with client.open_sftp() as sftp:
-        for name in names:
-            if Path(name).name != name or name not in ('sample-idle.py', 'check-backlight.sh', 'speaker_audio.py'):
-                raise ValueError('Unknown diagnostic helper')
+        for name in bundles[purpose]:
             upload(sftp, ROOT / 'tools' / name, directory + '/' + name)
     return directory
 
@@ -670,7 +699,7 @@ def main():
     sub = parser.add_subparsers(dest='host', required=True)
     target = sub.add_parser('device')
     target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
-                                          'stability', 'battery-check', 'idle-sample', 'power-profile',
+                                          'stability', 'battery-check', 'awake-clock-check', 'idle-sample', 'power-profile',
                                           'governor-compare', 'governor-profile', 'usb-policy',
                                           'wifi-scan-test', 'wifi-scan-restore'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))

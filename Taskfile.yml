@@ -123,6 +123,7 @@ tasks:
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
+      - task: test:cpuidle-s2idle
       - task: build:kernel
       - task: test:usb-policy-board
       - task: check:dt
@@ -203,6 +204,10 @@ tasks:
     desc: Verify rollback through user-systemd with temporary files; no device access or sudo
     cmds: [NEO_SYSTEMD_TESTS=1 python3 -m unittest discover -s tools/tests -p test_governor_compare.py -v]
 
+  test:awake-clock:
+    desc: Simulate sleep during awake measurements and verify rejection/restoration; no device access
+    cmds: [bash tools/run-logged.sh awake-clock python3 -m unittest discover -s tools/tests -p test_awake_clock.py -v]
+
   test:nkmp:
     desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
     cmds: [bash tools/run-logged.sh nkmp python3 tools/check-nkmp.py]
@@ -242,6 +247,14 @@ tasks:
   check:musb-sleep-configs:
     desc: Check sleep/disconnect and callback regressions plus six isolated ARM configurations
     cmds: [bash tools/run-logged.sh musb-sleep-configs python3 tools/check-musb-sleep.py --compile-matrix]
+
+  test:cpuidle-s2idle:
+    desc: Test actual CPU-idle entry, scheduler, registration and tick-freeze functions on native and ARM32
+    cmds: [bash tools/run-logged.sh cpuidle-s2idle python3 tools/check-cpuidle-s2idle.py]
+
+  check:cpuidle-kernel:
+    desc: Run CPU-idle regressions and compile ARM entry, scheduler and timer objects in four configurations
+    cmds: [bash tools/run-logged.sh cpuidle-kernel python3 tools/check-cpuidle-s2idle.py --compile-kernel]
 
   check:musb-sleep-drivers:
     desc: Test MUSB sleep ownership and compile the complete ARM controller/gadget/glue
@@ -438,6 +451,10 @@ tasks:
   device:charge-baseline:
     desc: Read awake charging telemetry over USB for SECONDS=120; no control changes
     cmds: [python3 tools/check-charge-baseline.py]
+
+  device:awake-clock-check:
+    desc: Read-only clock/PM-counter observations on the running board; no settings or sleep operations
+    cmds: [python3 tools/remote.py device awake-clock-check]
 
   device:wifi-config:
     desc: Apply Wi-Fi credentials from .env over USB, verify Wi-Fi SSH, then update GAMESHELL_IP

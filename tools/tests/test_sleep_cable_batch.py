@@ -208,6 +208,11 @@ class DeviceAdmission(unittest.TestCase):
 class GuidedSession(unittest.TestCase):
     def setUp(self):
         self.root=Path(self.enterContext(tempfile.TemporaryDirectory()))
+        # These legacy cable fixtures predate the WFI candidate; keep their
+        # policy explicit instead of inheriting the current shipping lock.
+        (self.root/'build').mkdir()
+        (self.root/'build/sources.lock.json').write_text('{}')
+        self.enterContext(patch.object(guided, 'ROOT', self.root))
         self.baseline=self.root/'input.json';self.baseline.write_text('{"cycles":[]}')
         self.capture=self.root/'capture';self.capture.mkdir()
         self.enterContext(patch.object(sleep,'sources',return_value=chain.SOURCE))
@@ -336,6 +341,8 @@ class HostReceipt(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp,patch.object(sleep,'sources',return_value=chain.SOURCE), \
                 patch.object(sleep,'pm_module',return_value=Mock(FAULTS=())):
             root=Path(temp);private=root/'diagnostics';private.mkdir()
+            (root/'build').mkdir()
+            (root/'build/sources.lock.json').write_text('{}')
             d,r,a,o,c=fixture(1)
             paths={}
             for value in d+r+a:
@@ -346,7 +353,8 @@ class HostReceipt(unittest.TestCase):
             summary=dict(cycles=[dict(capture=str(paths[v['run_id']])) for v in d],
                 sleeps=[dict(capture=str(result),rehearsal=str(paths[a[0]['run_id']]))],cable_batch=BATCH)
             path=root/'history.json';path.write_text(json.dumps(summary))
-            with patch.object(host,'LOCAL',root),patch.object(sleep,'pm_module',return_value=Mock(FAULTS=())):
+            with patch.object(host,'LOCAL',root),patch.object(host,'ROOT',root), \
+                    patch.object(sleep,'pm_module',return_value=Mock(FAULTS=())):
                 receipt=host.receipt(path,c,'usb-attach')
                 self.assertEqual(receipt['cable_observations'],o)
                 observer=result.with_name('result-cable-observation.json')

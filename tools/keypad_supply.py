@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import cpi_idle
 
 DTB = 'sun8i-r16-clockworkpi-cpi3.dtb'
 BASE_DTB = 'sun8i-r16-clockworkpi-cpi3-power-off.dtb'
@@ -13,6 +14,8 @@ PROPERTY = 'regulator-always-on'
 
 def enabled(lock):
     experiments = lock.get('experiments', {})
+    cpi_idle.enabled(lock)
+    experiments = {k: v for k, v in experiments.items() if k != 'cpi_wfi_s2idle'}
     value = experiments.get('keypad_supply_retention', False)
     if type(value) is not bool or ('keypad_supply_retention' in experiments and
             (value is not True or experiments != {

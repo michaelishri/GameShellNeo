@@ -3,6 +3,18 @@
 Base: Linux **6.18.54**, source and upstream configuration hashes in
 [the lock](../build/sources.lock.json). Only CPI v3.1 is targeted.
 
+Diagnostic.24 integrates patches **0027/0028** and the default-off CPI WFI
+overlay driver. Patch 0027 enables valid state-0 s2idle entry and updates its
+scheduler return contract; it changes global core behavior even with the new
+driver disabled. Patch 0028 supplies Kbuild/Kconfig integration. This image
+explicitly enables the board option and integrates the BOOTTIME battery prerequisite.
+The source regression exercises 618 native/ARM32 scenarios, eleven native
+negative controls, four ARM compilation configurations and WFI disassembly.
+Hardware qualification is still pending. Remove these patches when equivalent upstream
+state-0 support and suitable board registration are verified. See
+[report 134](../docs/134-cpi-wfi-s2idle-candidate.md) and the integrated image's
+[report 217](../docs/217-wfi-s2idle-image-integration.md).
+
 `tools/kernel-inputs.py --export DIRECTORY` creates the complete patch queue
 and content manifest. Existing-source changes live in `patches/`; new source
 files and bindings live in `overlay/` and become the third generated patch.

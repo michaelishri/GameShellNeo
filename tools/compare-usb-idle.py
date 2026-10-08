@@ -12,7 +12,8 @@ import time
 
 import paramiko
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run, python_command
+from remote import LOCAL, ROOT, device, device_source, evidence_directory, run, python_command
+from awake_clock import checked_proof, windows
 
 
 def state(config):
@@ -20,15 +21,18 @@ def state(config):
     code = ('import json, hashlib\n'
             'from pathlib import Path\n'
             'scope = {"__name__": "power_state"}\n'
-            'exec(' + repr((ROOT / 'tools/profile-power.py').read_text()) + ', scope)\n'
+            'exec(' + repr(device_source('profile-power.py')) + ', scope)\n'
+            'clock_before = scope["observe"]()\n'
             'log = scope["subprocess"].run(["journalctl", "-b", "-k", "--no-pager", "-o", "cat"], '
             'check=True, capture_output=True, text=True, timeout=30).stdout\n'
-            'print(json.dumps(dict(health=scope["health"](), radio=scope["radio"](), '
+            'value = dict(health=scope["health"](), radio=scope["radio"](), '
             'capabilities=scope["capabilities"](), kernel=scope["os"].uname().release, '
             'radio_events=dict(firmware_crashes=log.count("brcmf_fw_crashed: Firmware has halted or crashed"), '
             'sdio_removals=log.count("mmc1: card 0001 removed")), '
             'firmware_sha256=hashlib.sha256(Path("/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.bin").read_bytes()).hexdigest(), '
-            'wifi_config_sha256=hashlib.sha256(Path("/etc/wpa_supplicant/wpa_supplicant-wlan0.conf").read_bytes()).hexdigest())))\n')
+            'wifi_config_sha256=hashlib.sha256(Path("/etc/wpa_supplicant/wpa_supplicant-wlan0.conf").read_bytes()).hexdigest(), '
+            'awake_window=[clock_before, scope["observe"]()])\n'
+            'scope["windows"]([value])\nprint(json.dumps(value))\n')
     with device(config, 'wifi') as client:
         return json.loads(run(client, **python_command(code), display=False))
 
@@ -139,7 +143,7 @@ def measurement(capture, name, arguments, filename, seconds):
     return checked_capture(directory, filename, seconds)
 
 
-def checked_capture(directory, filename, seconds):
+def checked_capture(directory, filename, seconds, boot_id=None):
     directory.relative_to((LOCAL / 'diagnostics').resolve())
     records = [json.loads(line) for line in (directory / filename).read_text().splitlines()]
     if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
@@ -148,6 +152,7 @@ def checked_capture(directory, filename, seconds):
     duration = records[-1]['duration_seconds']
     if len(ready) != 1 or ready[0].get('seconds') != seconds or not seconds - 1 <= duration <= seconds + 10:
         raise ValueError('Measurement duration does not match the comparison protocol')
+    checked_proof(records[-1].get('awake_proof'), seconds=duration, boot_id=boot_id)
     return dict(capture=str(directory), summary=records[-1])
 
 
@@ -169,11 +174,12 @@ def resume_report(capture, retry_incomplete=False):
         raise ValueError('Resume requires only completed phases at an interrupted phase boundary')
     baseline = fixed(report['baseline'])
     for phase in phases:
+        windows([phase['before'], phase['after']])
         require_state(phase['before'], baseline, phase['boot_id'])
         require_state(phase['after'], baseline, phase['boot_id'], phase['before']['radio_events'])
         for kind, filename, seconds in (('idle', 'idle-sample.jsonl', 300), ('profile', 'power-profile.jsonl', 120)):
             saved = phase[kind]
-            if checked_capture(Path(saved['capture']).resolve(), filename, seconds) != saved:
+            if checked_capture(Path(saved['capture']).resolve(), filename, seconds, phase['boot_id']) != saved:
                 raise ValueError('Completed capture changed since phase acceptance')
     rows = [json.loads(line) for line in (Path(phases[-1]['profile']['capture']) / 'power-profile.jsonl').read_text().splitlines()]
     started = datetime.fromisoformat(next(row['utc'] for row in rows if row.get('event') == 'ready'))
@@ -249,6 +255,7 @@ def main():
                     ['device:power-profile', 'ROUTE=wifi', 'SECONDS=120'], 'power-profile.jsonl', 120)
                 phase['after'] = state(config)
                 require_state(phase['after'], baseline, boot, events)
+                phase['awake_validation'] = windows([phase['before'], phase['after']])
                 phase['passed'] = True
                 previous_mode = mode
                 (capture / 'comparison.json').write_text(json.dumps(report, indent=2) + '\n')

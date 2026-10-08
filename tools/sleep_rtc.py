@@ -29,6 +29,7 @@ import speaker_audio
 import sleep_connection
 import sleep_cable
 import sleep_cable_batch
+import cpi_idle
 
 RESULTS = Path('/var/lib/gameshellneo/sleep-tests')
 OWNED = Path('/run/gameshellneo-sleep-controls.json')
@@ -38,7 +39,7 @@ MAX_SLEEP_CHAIN = 16
 SDIO = 'consumer:platform:1c10000.mmc'
 SDIO_PATCH = 'kernel/patches/0023-sunxi-mmc-sdio-reference-ownership.patch'
 SDIO_SHA = '52f4e3d8b966f8f69718340697606e30d174033d998be84f98b42bc2c97e92ee'
-SOURCES = ('sleep_rtc', 'test-pm-stages', 'keypad_pm', 'power_key', 'power_key_policy',
+SOURCES = ('sleep_rtc', 'test-pm-stages', 'battery_sample', 'cpi_idle', 'keypad_pm', 'power_key', 'power_key_policy',
            'power_key_pm', 'power_key_input', 'keypad_input', 'speaker_audio',
            'rtc_alarm', 'pm_platform', 'wifi_trace', 'usb_trace', 'sleep_connection', 'sleep_cable',
            'sleep_cable_batch')
@@ -326,14 +327,7 @@ def clock_interval(before, after):
 
 def idle_snapshot():
     """CPU-idle/timer inventory, not evidence of entering a hardware idle state."""
-    cpu = Path('/sys/devices/system/cpu')
-    return dict(online=keypad_pm.optional(cpu/'online'),
-                driver=keypad_pm.optional(cpu/'cpuidle/current_driver'),
-                governor=keypad_pm.optional(cpu/'cpuidle/current_governor_ro'),
-                clocksource=keypad_pm.optional('/sys/devices/system/clocksource/clocksource0/current_clocksource'),
-                states={str(p.relative_to(cpu)): {name: keypad_pm.optional(p/name) for name in
-                        ('name', 'desc', 'latency', 'residency', 'disable', 'usage', 'time', 's2idle_usage', 's2idle_time')}
-                        for p in sorted(cpu.glob('cpu[0-9]*/cpuidle/state*'))})
+    return cpi_idle.snapshot()
 
 
 def inspect_clocks():
@@ -617,6 +611,9 @@ class UntouchedHandoff:
 def health(pm, record, lock):
     # Preserve the wake/clock result even if a later device recovery check fails.
     record['delivery'] = validate_delivery(record)
+    if cpi_idle.enabled(lock):
+        record['cpi_wfi'] = cpi_idle.assess(record.get('cpu_idle_before'), record.get('cpu_idle_after'),
+                                          record['mode'], record['delivery'])
     before, after = record['before'], record['after']
     pm.validate(after, lock, sleep_connection.endpoint(record.get('connection', 'usb'), record['mode'], 'after'))
     cable_irqs = sleep_connection.validate(record)
@@ -723,6 +720,8 @@ def run(pm, token, mode, lock, receipt, rehearsal=None, connection='usb', cable_
         with keypad_pm.exclusive_pm(OWNED.parent):
             before = record['before'] = pm.snapshot()
             record['cpu_idle_before'] = idle_snapshot()
+            if cpi_idle.enabled(lock):
+                cpi_idle.validate(record['cpu_idle_before'])
             record['qualification'] = admission(pm, before, lock, receipt, connection,
                                                 rehearsal if mode == 'rtc-wake' else None)
             if connection != 'usb':

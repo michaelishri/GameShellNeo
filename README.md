@@ -6,6 +6,13 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
+and guards against sleep interrupting awake measurements. It requires all four
+CPUs to participate and independent timekeeping-freeze evidence. This candidate
+has passed offline build validation; installation, sleep recovery and energy
+qualification remain pending. [Report 217](docs/217-wfi-s2idle-image-integration.md)
+records the changes and first-install sequence. Diagnostic.23 remains installed.
+
 Diagnostic.23 is installed with passing full card readback, owner-confirmed
 login, both SSH routes and awake startup checks. Removing unused legacy PTYs
 eliminates 512 user-manager device-unit records while modern terminals and
@@ -1117,6 +1124,32 @@ qualify safe removal. The task introduces no driver patch and is not an image
 build gate. [Report 139](docs/139-musb-teardown-power-audit.md) documents the
 coverage, modeled boundaries and follow-on implementation requirements.
 
+For the CPI WFI s2idle candidate in diagnostic.24, use:
+
+```sh
+task test:cpuidle-s2idle  # Actual entry/scheduler/registration/tick source, native + ARM32
+task check:cpuidle-kernel # Also compile four ARM configurations and inspect WFI assembly
+```
+
+These tasks run locally and save evidence in `.local/build/cpuidle-s2idle-tests/`.
+Kconfig defaults the board driver off; diagnostic.24 explicitly enables it with
+the BOOTTIME battery prerequisite and a new kernel identity. The state-0 core
+correction is global, including when the board driver is disabled. `task build`
+includes the source regression. [Report 134](docs/134-cpi-wfi-s2idle-candidate.md)
+records the original source candidate; [report 217](docs/217-wfi-s2idle-image-integration.md)
+records integration and the remaining hardware gates.
+
+Before running PM checks on this image, `task device:sleep-clock-inspect` saves
+the live architecture-timer DT, active timers and all four CPU-idle inventories.
+PM admission requires the exact enabled WFI state on every CPU. Actual RTC-wake
+qualification additionally requires each CPU's grouped `state0/s2idle/usage`
+counter to advance and paired trace/clock evidence of frozen timekeeping.
+Awake rehearsal must not advance those counters. The offline sleep report
+recomputes these checks from original evidence. Counter duration is not physical
+residency, and these gates do not establish energy savings or CPU/DRAM power-off.
+Retain the diagnostic.23 worktree/tools for its installed image; source-bound
+receipts must not be carried across the image change.
+
 For the opt-in USB polling experiment, use:
 
 ```sh
@@ -1908,6 +1941,13 @@ three low readings, invalid/missing telemetry, charging or capacity recovery,
 sampling gaps and retry after a rejected shutdown request. Output is retained
 privately as `battery-policy.txt`.
 
+The separate `work/battery-boottime` candidate extends these regressions to
+sleep-inclusive reading age, interrupted reads and low-reading sequences across
+resume. `task test` runs the local simulations and consumer checks. Its schema-2
+producer and matching diagnostic tools must be deployed together in a later,
+separately identified image; the installed-source hash check deliberately rejects
+diagnostic.18's older guard. See [report 133](docs/133-battery-boottime.md).
+
 The checks run as the SSH user with a 60-second bound. Temporary state replaces
 the real `/run/gameshellneo` path inside that process, and a test function
 records every would-be shutdown command. The live battery service continues
@@ -2060,6 +2100,24 @@ its health every thirty seconds. A changed boot/CPU set/brightness/governor,
 external power, invalid/stale monitoring, reported capacity at or below 20%,
 excessive temperature or kernel taint fails the run. Failure ends profiling,
 not the running system.
+
+In diagnostic.24, idle, counter, governor and RSB
+measurements also reject observed system sleep/PM activity using bounded clock
+observations and suspend counters. Existing recovery still restores temporary
+settings. New comparisons require the recorded proof; historical USB reports
+remain readable with a label showing that sleep observations were absent.
+This includes the matching BOOTTIME battery producer/tools from NEO-100; do not
+use these battery consumers against legacy image samples. See
+[report 135](docs/135-awake-measurement-clock-guards.md) for detection limits.
+
+```sh
+task test:awake-clock                 # Local simulated interruptions and cleanup
+task device:awake-clock-check ROUTE=wifi # Short read-only clock/PM check; no sleep/settings changes
+```
+
+The device check saves observations and source hashes in its printed private
+capture directory. It can run independently of the battery-producer version;
+passing it does not qualify a complete power comparison or sleep recovery.
 
 The private `power-profile.jsonl` contains before/after CPU accounting,
 interrupts, softirqs, process CPU ticks, Wi-Fi packet counters/power-save state,

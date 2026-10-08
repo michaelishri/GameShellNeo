@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from awake_fixtures import window, clock
 
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
@@ -26,7 +27,9 @@ host = module('check-rsb-runtime')
 def counter(**changes):
     result = dict(control='auto', autosuspend_delay_ms=100, started_ns=1_000_000_000,
                   finished_ns=1_001_000_000, runtime_active_time=1000, runtime_suspended_time=0)
-    return result | changes
+    result.update(changes)
+    result['awake_window'] = window(result['started_ns'] / 1e9)
+    return result
 
 
 class RsbTests(unittest.TestCase):
@@ -94,7 +97,8 @@ class RsbTests(unittest.TestCase):
                 self.assertEqual(self.delay.read_text().strip(), '1000')
 
     def test_fresh_process_recovers_after_killed_worker(self):
-        setup = ('import importlib.util, pathlib, time\n'
+        setup = ('import importlib.util, pathlib, sys, time\n'
+                 f'sys.path.insert(0, {str(TOOLS)!r})\n'
                  f's = importlib.util.spec_from_file_location("rsb", {str(TOOLS / "compare-rsb.py")!r})\n'
                  'm = importlib.util.module_from_spec(s); s.loader.exec_module(m)\n'
                  f'm.DELAY = pathlib.Path({str(self.delay)!r})\n'
@@ -128,11 +132,11 @@ class RsbTests(unittest.TestCase):
                 compare.summarize(before, after | change)
 
     def test_runtime_control_and_error_states_are_not_measurements(self):
-        with patch.object(compare, 'BUS', self.root):
+        with patch.object(compare, 'BUS', self.root), patch.object(compare, 'observe', side_effect=clock()):
             power = self.root / 'power'
             power.mkdir()
             for name, value in counter().items():
-                if name not in ('started_ns', 'finished_ns'):
+                if name not in ('started_ns', 'finished_ns', 'awake_window'):
                     (power / name).write_text(str(value))
             (power / 'runtime_status').write_text('suspended')
             self.assertEqual(compare.residency()['runtime_status'], 'suspended')

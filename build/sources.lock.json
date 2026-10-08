@@ -1,16 +1,18 @@
 {
   "schema_version": 1,
   "board": "gameshellneo-cpi31",
-  "image_version": "0.1.0-diagnostic.23",
+  "image_version": "0.1.0-diagnostic.24",
   "features": {
     "speaker_audio": true,
     "usb_system_wakeup": false,
     "power_supply_system_wakeup": false,
-    "sleep_cable_irq_policy": "masked-cable-v2"
+    "sleep_cable_irq_policy": "masked-cable-v2",
+    "battery_sample_clock": "CLOCK_BOOTTIME"
   },
   "experiments": {
     "suspend_diagnostics": true,
-    "keypad_supply_retention": true
+    "keypad_supply_retention": true,
+    "cpi_wfi_s2idle": true
   },
   "architecture": "armhf",
   "armbian": {
@@ -20,7 +22,7 @@
   "linux": {
     "url": "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git",
     "tag": "v6.18.54",
-    "localversion": "-gameshellneo22",
+    "localversion": "-gameshellneo23",
     "commit": "1b357ecb321392158d507b04672ffee57bfa071d",
     "tarball_url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.18.54.tar.xz",
     "tarball_sha256": "9df30b02dd8102bbd0be52556288ef6889ddbe7f1ddb96fbf847d0becf3eacac",

@@ -12,6 +12,9 @@ import subprocess
 import sys
 import time
 
+from battery_sample import sample_age
+from awake_clock import AwakeRun, observe, validate, windows
+
 
 def read(path):
     return Path(path).read_text().strip()
@@ -61,6 +64,7 @@ def wifi_signal():
 
 
 def sample(battery, inputs):
+    clock_before = observe()
     guard = json.loads(read('/run/gameshellneo/battery.json'))
     now = time.monotonic()
     state = {
@@ -80,7 +84,7 @@ def sample(battery, inputs):
         'temperature_millic': int(read('/sys/class/thermal/thermal_zone0/temp')),
         'kernel_taint': int(read('/proc/sys/kernel/tainted')),
         'guard_monitoring': guard.get('monitoring'),
-        'guard_age_seconds': now - guard['monotonic_seconds'],
+        'guard_age_seconds': sample_age(guard),
     }
     if (state['present'] != 1 or state['status'] != 'Discharging' or
             not 20 < state['capacity_percent'] <= 100 or state['voltage_uv'] <= 0 or
@@ -90,12 +94,15 @@ def sample(battery, inputs):
             state['kernel_taint'] or state['temperature_millic'] >= 80000 or
             state['wifi_carrier'] != 1):
         raise ValueError('Health or Wi-Fi sampling conditions failed: ' + json.dumps(state))
+    state['awake_window'] = [clock_before, observe()]
+    validate(state['awake_window'])
     return state
 
 
 def summarize(samples):
     if len(samples) < 2:
         raise ValueError('At least two samples are needed')
+    awake = windows(samples)
     charge_uas = energy_mws = duration = 0.0
     powers = [s['voltage_uv'] * -s['current_ua'] / 1e9 for s in samples]
     for i, (left, right) in enumerate(zip(samples, samples[1:])):
@@ -117,15 +124,18 @@ def summarize(samples):
         'capacity_end_percent': samples[-1]['capacity_percent'],
         'frequency_samples_khz': sorted(set(s['frequency_khz'] for s in samples)),
         'peak_temperature_millic': max(s['temperature_millic'] for s in samples),
-        'calibrated': False,
+        'calibrated': False, 'awake_validation': awake,
     }
 
 
-def measure(battery, inputs, seconds, mode):
+def measure(battery, inputs, seconds, mode, awake=None):
+    if awake is None:
+        awake = AwakeRun()
     initial = sample(battery, inputs)
     fixed = ('boot_id', 'brightness', 'bl_power', 'governor')
 
     def checked_sample():
+        awake.check()
         value = sample(battery, inputs)
         if any(value[key] != initial[key] for key in fixed):
             raise ValueError('Boot, brightness or governor changed during sampling')
@@ -150,7 +160,9 @@ def measure(battery, inputs, seconds, mode):
             raise ValueError('Sampling gap exceeded twenty seconds')
         samples.append(value)
         emit('sample', **value)
-    return dict(wifi_signal_dbm=wifi_signal(), **summarize(samples))
+    result = dict(wifi_signal_dbm=wifi_signal(), **summarize(samples))
+    result['awake_proof'] = awake.finish()
+    return result
 
 
 def main():
@@ -165,12 +177,14 @@ def main():
     inputs = [p for p in supplies if read(p / 'type') != 'Battery' and (p / 'online').is_file()]
     if len(batteries) != 1 or not inputs:
         raise ValueError('Expected one battery and identifiable external-power inputs')
+    awake = AwakeRun()
     sample(batteries[0], inputs)  # Check battery/health before an optional display write.
     for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, interrupted)
     with backlight_mode(args.backlight):
-        result = measure(batteries[0], inputs, args.seconds, args.backlight)
+        result = measure(batteries[0], inputs, args.seconds, args.backlight, awake)
     # Success includes restoration, not just collection of the last sample.
+    result['awake_proof'] = awake.finish()
     emit('complete', passed=True, backlight_mode=args.backlight, **result)
 
 

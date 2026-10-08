@@ -1,0 +1,36 @@
+Subject: [PATCH] cpuidle: add opt-in ClockworkPi WFI driver build hooks
+
+The driver is supplied by the GameShellNeo overlay. Leave it disabled by
+default; enable only in a separately identified qualification image.
+
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -2,6 +2,16 @@
+ #
+ # ARM CPU Idle drivers
+ #
++config ARM_CPI_WFI_CPUIDLE
++	bool "WFI CPU idle driver for ClockworkPi CPI3"
++	depends on ARM && ARCH_SUNXI && OF && CPU_IDLE && SUSPEND
++	help
++	  Register one architectural WFI state on ClockworkPi CPI3 boards.
++	  Both ordinary idle and suspend-to-idle use the ARM WFI callback;
++	  the CPU-idle core owns tick suspension during suspend-to-idle.
++	  This does not provide CPU power-off or DRAM retention states.
++	  If unsure, say N.
++
+ config ARM_CPUIDLE
+ 	bool "Generic ARM CPU idle Driver"
+ 	depends on ARM
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -15,6 +15,7 @@
+ 
+ ##################################################################################
+ # ARM SoC drivers
++obj-$(CONFIG_ARM_CPI_WFI_CPUIDLE)		+= cpuidle-cpi-wfi.o
+ obj-$(CONFIG_ARM_MVEBU_V7_CPUIDLE) += cpuidle-mvebu-v7.o
+ obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
+ obj-$(CONFIG_ARM_CLPS711X_CPUIDLE)	+= cpuidle-clps711x.o

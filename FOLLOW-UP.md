@@ -2,6 +2,29 @@
 
 Record deferred questions and activities here as they arise.
 
+**Latest integration, 8 October 2026:** NEO-155 produced verified diagnostic.24 in
+`work/cpi-wfi-integration`, combining NEO-96 WFI s2idle with NEO-100 BOOTTIME
+battery readings and NEO-101 awake measurement guards. Host checks pass and
+the installed diagnostic.23 timer inventory matches the audited source; the
+full new kernel, ARM matrix, DT and image checks pass. The 4 GiB image and 269 MB
+transfer archive are retained on the Intel host, with recovery checkpoint
+`diagnostic24-wfi-s2idle`. Mac transfer awaits confirmation of regular Wi-Fi.
+No live PM, display or policy change has occurred.
+[Report 217](docs/217-wfi-s2idle-image-integration.md)
+records the reproducible tasks and first-install gates. Keep NEO-96/100/101
+open for matching-image hardware qualification; all-CPU callbacks and frozen
+timekeeping are required before claiming this path works. Energy, CPU/DRAM
+power-off and sleeping battery protection remain unqualified. Preserve the
+diagnostic.23 worktree/tools and its original evidence. Next: transfer, coordinated
+DEV-card installation, awake admission and attended PM/RTC qualification using
+the new worktree. The image remains explicitly hardware-unqualified.
+
+- [ ] Build host: inspect ownership and active users of stale `/tmp` content
+  before any cleanup. Its per-user quota blocked both native compiler temporary
+  files and the sandbox launcher on 8 October despite ample workspace space.
+  NEO-155 continues with private `.local/host-tmp` via `TMPDIR`; unrelated shared
+  temporary files were not removed. This is separate from image/driver behavior.
+
 **Latest awake work, 8 October 2026:** NEO-153 completes the installed SSH
 source/evidence audit and adds `task device:ssh-provenance`. Installed Paramiko
 matches upstream 4.0.0; pinned Apple and exact patched Debian references explain

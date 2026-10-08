@@ -24,6 +24,17 @@ def requirements(requested, lock):
                          CONFIG_PM_SLEEP_DEBUG='y', CONFIG_PM_ADVANCED_DEBUG='y',
                          CONFIG_HIBERNATION='n', CONFIG_PM_AUTOSLEEP='n', CONFIG_PM_WAKELOCKS='n',
                          CONFIG_ARM_PSCI_CPUIDLE='n', CONFIG_PM_TEST_SUSPEND='n')
+    wfi = experiments.get('cpi_wfi_s2idle', False)
+    if type(wfi) is not bool:
+        raise ValueError('CPI WFI experiment must be an explicit boolean')
+    if wfi:
+        if not suspend_tests or lock.get('features', {}).get('battery_sample_clock') != 'CLOCK_BOOTTIME':
+            raise ValueError('CPI WFI requires suspend diagnostics and BOOTTIME battery samples')
+        requested.update(CONFIG_ARM_CPI_WFI_CPUIDLE='y', CONFIG_CPU_IDLE='y',
+                         CONFIG_ARM_CPUIDLE='n', CONFIG_ARM_PSCI_CPUIDLE='n',
+                         CONFIG_SMP='y', CONFIG_NO_HZ_IDLE='y', CONFIG_HIGH_RES_TIMERS='y',
+                         CONFIG_GENERIC_CLOCKEVENTS_BROADCAST='y', CONFIG_ARM_ARCH_TIMER='y',
+                         CONFIG_GENERIC_SCHED_CLOCK='y', CONFIG_SUN4I_TIMER='y')
     if 'usb_absent_poll' in experiments:
         requested.update(CONFIG_USB_MUSB_GADGET='y', CONFIG_USB_MUSB_SUNXI='y',
                          CONFIG_USB_MUSB_HOST='n', CONFIG_USB_MUSB_DUAL_ROLE='n',

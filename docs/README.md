@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[213 — Forwarded socket identity](213-forwarded-socket-identity.md) validates
+Mac worker/socket attribution against independent GameShell endpoint records on
+USB and Wi-Fi. Saved awake controls reject ambiguity and unrelated transports;
+offline reassessment and full host checks pass. Failure-path integration remains.
+
 [212 — RTC wake with forwarding byte observations](212-rtc-wake-forwarding-byte-validation.md)
 records a passing attended sleep, healthy post-return SSH with byte counts,
 another explicitly gapped Mac recording and seven matched later flows. An

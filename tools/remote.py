@@ -88,23 +88,28 @@ def device(config, route):
                 sock = observe_forward(mac.get_transport().open_channel(
                     'direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10))
             stack.callback(sock.close)
-        public = private_path(config.get('NEO_HOST_PUBLIC_KEY'), LOCAL / 'provisioning/device/ssh_host_ed25519_key.pub')
-        fields = public.read_text().split()
-        if fields[0] != 'ssh-ed25519':
-            raise ValueError('Expected the provisioned Ed25519 device host key')
         client = stack.enter_context(paramiko.SSHClient())
-        client.get_host_keys().add(address, fields[0], paramiko.Ed25519Key(data=base64.b64decode(fields[1])))
-        client.set_missing_host_key_policy(paramiko.RejectPolicy())
-        key = private_path(config.get('NEO_SSH_KEY'), LOCAL / 'ssh/id_ed25519')
-        with phase('device.ssh'):
-            try:
-                client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
-                               sock=sock, look_for_keys=False, allow_agent=False,
-                               timeout=10, auth_timeout=10, banner_timeout=10)
-            finally:
-                ssh_state(client)
-                forward_state(sock)
+        authenticate_device(client, config, address, sock)
         yield client
+
+
+def authenticate_device(client, config, address, sock):
+    """Use the pinned device key and existing SSH policy on a caller-owned client."""
+    public = private_path(config.get('NEO_HOST_PUBLIC_KEY'), LOCAL / 'provisioning/device/ssh_host_ed25519_key.pub')
+    fields = public.read_text().split()
+    if fields[0] != 'ssh-ed25519':
+        raise ValueError('Expected the provisioned Ed25519 device host key')
+    client.get_host_keys().add(address, fields[0], paramiko.Ed25519Key(data=base64.b64decode(fields[1])))
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    key = private_path(config.get('NEO_SSH_KEY'), LOCAL / 'ssh/id_ed25519')
+    with phase('device.ssh'):
+        try:
+            client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
+                           sock=sock, look_for_keys=False, allow_agent=False,
+                           timeout=10, auth_timeout=10, banner_timeout=10)
+        finally:
+            ssh_state(client)
+            forward_state(sock)
 
 
 def run(client, command, password=None, output=None, display=True, timeout=300, input_data=None):

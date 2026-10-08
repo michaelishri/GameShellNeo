@@ -441,6 +441,16 @@ the original intermittent failure remains unresolved. Channel flags accept both
 booleans and Paramiko's integer `0`/`1` representation; unsupported values remain
 unknown. The correction is separately verified awake.
 
+`device:ssh-socket-smoke ROUTE=usb` (or `ROUTE=wifi`) independently checks the
+Mac SSH worker's outgoing socket against the authenticated GameShell endpoint.
+It rejects multiple forwards as ambiguous and excludes a separate transport's
+connection to the same target. Keep USB connected and Wi-Fi associated; the task
+stays awake and temporarily opens extra test connections. Endpoint records remain
+private. `report:ssh-sockets CAPTURE=...` rechecks the saved evidence offline.
+[Report 213](docs/213-forwarded-socket-identity.md) records both passing routes,
+bounds and limits. This observer is not yet integrated into sleep or failed SSH
+setup, and it does not establish the earlier failure's cause.
+
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;
 `ROUTE=wifi` selects the configured Wi-Fi route. The task records manager startup

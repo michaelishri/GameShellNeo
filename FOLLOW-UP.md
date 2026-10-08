@@ -2,6 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
+**Latest awake work, 8 October 2026:** NEO-150 validates Mac SSH-worker/socket
+identity against independent GameShell endpoint records over USB and Wi-Fi.
+The saved smoke tasks reject duplicate-forward ambiguity and exclude a separate
+transport; offline reports and full host checks pass. Temporary helpers clean up.
+Final full health and the current unused continuation validate on the same boot
+at PM11/0. No sleep, reboot, display or cable action occurred. This is an awake
+observation method, not yet integrated into failed setup or PM; the original
+intermittent cause remains open under NEO-151.
+[Report 213](docs/213-forwarded-socket-identity.md).
+
 **Latest attended work, 8 October 2026:** NEO-149 passes one RTC sleep on
 diagnostic.23, same boot `cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM11/0
 (seven debug checks and four actual sleeps). The owner confirms the clear warning
@@ -115,13 +125,19 @@ required separately attended qualification; NEO-147 below records its result.
   Correct integer/boolean channel flags and validate awake; preserve the original
   unknown fields. Full host checks pass. The intermittent cause remains open.
   [Report 212](docs/212-rtc-wake-forwarding-byte-validation.md).
-- [ ] NEO-150: independently identify the Mac's outgoing forwarded TCP socket
-  and collect bounded passive process/endpoint/state evidence. Validate attribution
-  with awake controls before another failure experiment. Keep original failures,
-  gaps and unknowns; timing overlap, a port match or channel peer address is not
-  proof of socket ownership. Do not repeat PM merely to provoke failure or change
-  retries/timeouts/driver behavior without cause evidence. Any further PM requires
-  current admission and fresh observer readiness.
+- [x] NEO-150: bounded Mac worker/socket snapshots confirmed against authenticated
+  board endpoints over USB and Wi-Fi. Multiple forwards are rejected as ambiguous;
+  a separate transport's same-target connection is excluded. Source/observation
+  hashes and independent board records support offline rechecking. Full host
+  checks and final health pass. No PM or runtime policy changes.
+  [Report 213](docs/213-forwarded-socket-identity.md).
+- [ ] NEO-151: retain independently bound Mac socket state around the actual SSH
+  setup failure, preserving its first error and byte counters before cleanup.
+  Validate opt-in observation, bounds, cleanup, unavailable state and ambiguity
+  with awake failure controls. Avoid adding greeting delays or connection retries.
+  Successful awake endpoint corroboration does not prove historical failed-flow
+  ownership. No repeated PM merely to provoke failure; any new PM needs current
+  admission and fresh observer readiness. Root cause remains open.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

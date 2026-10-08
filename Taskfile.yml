@@ -704,6 +704,16 @@ tasks:
     desc: Measure CYCLES=3 fresh USB/Wi-Fi SSH pairs while awake; no sleep or policy change
     cmds: [python3 tools/check-ssh-timing.py]
 
+  device:ssh-socket-smoke:
+    desc: Awake Mac worker/socket identity with board and ambiguity controls; no sleep or network-policy change
+    env:
+      NEO_ROUTE: '{{.ROUTE | default "usb"}}'
+    cmds: [python3 tools/check-forward-socket.py]
+
+  report:ssh-sockets:
+    desc: Recheck saved independent socket identity and ambiguity evidence; CAPTURE required, no device access
+    cmds: [python3 tools/check-forward-socket.py --report]
+
   device:user-startup:
     desc: Inspect user-manager startup and test Unix98/SSH terminals awake; LEGACY=either/enabled/disabled
     env:

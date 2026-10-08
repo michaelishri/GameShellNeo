@@ -37,6 +37,8 @@ indicator also continues to select the failed-probe wakeup-source cleanup.
 
 ## Validation plan and commands
 
+All kernel checks use the locked Linux 6.18.54 archive and pinned builder.
+
 ```sh
 task test:musb-irq
 task test:musb-irq-kunit
@@ -84,8 +86,33 @@ not produce a bootable image.
 
 ## Results
 
-Validation is in progress; final receipts and review results will be recorded
-after the checks finish.
+- Native and ARM32 source tests: all 34 scenarios passed; all nine native
+  negative controls failed by assertion as required.
+- All five ARM configurations passed. The 21 recorded objects, five configs,
+  native/ARM32 binaries, 14 source/tool inputs and complete patch identities
+  were checked against the saved files.
+- `task check`: 16 runtime and 817 tooling tests passed, with two optional
+  tooling skips; compiled helper checks, Bash syntax and ShellCheck passed.
+- Strict checkpatch on the production patch body: zero errors, zero warnings,
+  one naming CHECK for the existing `nIrq` field. The shared field is retained.
+- Standards review: no findings. Specification review: one fixture cleanup
+  finding, corrected and confirmed by the reviewer; no remaining findings.
+- Corrected UML KUnit: all four cases passed under KASAN and lockdep, with no
+  rejected kernel diagnostics. The strict validator accepted the exact suite;
+  all ten recorded inputs, four retained artifacts and the production patch
+  queue were independently checked against the saved files.
+
+| Artifact | SHA256 |
+| --- | --- |
+| Patch 0039 | `04450b969fd436452ff2aba6bb7bd7d62a04d7830071e71e6d36aa2fb2ff75dd` |
+| `.local/build/musb-irq-tests/compile-evidence.json` | `5f9000c3bad6e332bb4a7247ed3b24b4f1f4bfb4b419ee6e9bd4d3fdb47efb37` |
+| `.local/build/musb-irq-kunit/evidence.json` | `1cf9fe019d164a34d44ab18c2bdafc5f9cc82d07a82c70a5f706029d73bd23d0` |
+| Accepted UML `linux` binary | `fce402268af6c566ba42964ebad24a93df9f280410e1cf8616ffd16ae5c77737` |
+
+The accepted kernel binary, config, log, parsed results and receipt are retained
+under `.local/build/musb-irq-kunit/kernel-33646d956db6aa28/accepted-runs/aabee638d3df49ed98bc5fbb026ef8f2/`.
+The default restart-suite validator also passed its existing unit checks;
+the full restart kernel suite was not rerun for this IRQ-only change.
 
 The first UML execution correctly rejected the original fixture: its peer
 `dev_id` aliased the controller because `musb` was the fixture's first member.

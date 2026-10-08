@@ -120,6 +120,7 @@ tasks:
       - task: test:sunxi-sdio-refs
       - task: test:musb-context
       - task: test:musb-sleep
+      - task: test:musb-request-resume
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
@@ -248,6 +249,10 @@ tasks:
     desc: Check sleep/disconnect and callback regressions plus six isolated ARM configurations
     cmds: [bash tools/run-logged.sh musb-sleep-configs python3 tools/check-musb-sleep.py --compile-matrix]
 
+  test:musb-request-resume:
+    desc: Test actual deferred endpoint-restart ownership on native and ARM32 with negative controls
+    cmds: [bash tools/run-logged.sh musb-request-resume python3 tools/check-musb-request-resume.py]
+
   test:cpuidle-s2idle:
     desc: Test actual CPU-idle entry, scheduler, registration and tick-freeze functions on native and ARM32
     cmds: [bash tools/run-logged.sh cpuidle-s2idle python3 tools/check-cpuidle-s2idle.py]
@@ -259,6 +264,10 @@ tasks:
   check:musb-sleep-drivers:
     desc: Test MUSB sleep ownership and compile the complete ARM controller/gadget/glue
     cmds: [bash tools/run-logged.sh musb-sleep-drivers python3 tools/check-musb-sleep.py --compile-drivers]
+
+  check:musb-request-resume-drivers:
+    desc: Test deferred restart ownership and compile the ARM MUSB core and gadget drivers
+    cmds: [bash tools/run-logged.sh musb-request-resume-drivers python3 tools/check-musb-request-resume.py --compile-drivers]
 
   check:udc-driver:
     desc: Run trace-format regressions and compile the complete ARM USB device-controller core

@@ -16,6 +16,13 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[216 — SSH greeting source audit](216-ssh-greeting-source-audit.md) binds the
+installed versions to Paramiko, pinned Apple and exact patched Debian source
+references. It explains the local timeout/error sequence, checks forwarding
+and server admission paths, and adds a reusable awake provenance task. The
+original cause remains open as NEO-154; no speculative policy fix or extra
+sleep is introduced.
+
 [215 — RTC wake with socket observations](215-rtc-wake-socket-observation-validation.md)
 qualifies the integrated observer through one attended sleep: normal display and
 both-route recovery, twelve healthy SSH setups and three missing-socket failures

@@ -322,6 +322,7 @@ task device:status         # Capture the running board's status over Wi-Fi
 task device:status ROUTE=usb # Connect through the Mac's USB link
 task device:ssh-timing CYCLES=3 # Fresh USB/Wi-Fi timing pairs while awake
 task device:ssh-timing-report CAPTURE=.local/diagnostics/<capture> # Offline summary
+task device:ssh-provenance # Installed SSH versions, hashes and selected policy; stays awake
 task device:user-startup LEGACY=either # User-manager inventory and Unix98/SSH terminal checks
 ```
 
@@ -481,6 +482,17 @@ attended sleep qualification: twelve healthy setups, three missing-socket
 forwarding failures before PM return, and a separately unqualified packet gap.
 The earlier intermittent post-return failure remains unresolved.
 `SOCKET_STATE=1` does not waive any existing sleep admission or readiness requirement.
+
+`device:ssh-provenance` reads the Mac and GameShell SSH versions, authenticated
+server banners, executable hashes and selected global configuration, using the
+credentials in `.env` and the USB route. Keep USB connected. It also saves local
+Paramiko source identities and the device's linked libraries and access-rule
+counts, with no rule contents. Evidence stays private under `.local/diagnostics`.
+The task leaves the device awake and verifies unchanged boot, PM counters and
+display state. Its `sshd -G` view describes current on-disk global settings,
+without per-connection `Match` evaluation or historical-policy proof. The
+[source audit](docs/216-ssh-greeting-source-audit.md) explains the caller timeout
+and forwarding stages; the intermittent stall remains tracked as NEO-154.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

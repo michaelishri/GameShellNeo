@@ -2,6 +2,21 @@
 
 Record deferred questions and activities here as they arise.
 
+**Latest awake work, 8 October 2026:** NEO-153 completes the installed SSH
+source/evidence audit and adds `task device:ssh-provenance`. Installed Paramiko
+matches upstream 4.0.0; pinned Apple and exact patched Debian references explain
+the forwarding and pre-identification stages. The local caller deadline can
+produce `No existing session` before the background negotiation finishes. This
+explains the error shape, not the original stall. Current DNS/admission settings,
+empty wrapper rules and preserved journal searches establish no policy cause;
+the installed Debian package already includes the MaxStartups tracking fix.
+Host checks pass (13 runtime, 764 tooling, one optional skip, C and shell checks),
+and final full health/continuation validation passes on the same boot at PM12/0.
+No sleep, reboot, display or policy change occurred. **NEO-154 retains root-cause
+resolution**, using the existing diagnostics during independently planned tests;
+do not repeat sleep merely to seek recurrence or mask it with longer deadlines.
+[Report 216](docs/216-ssh-greeting-source-audit.md).
+
 **Latest attended work, 8 October 2026:** NEO-152 qualifies opt-in socket
 observations across one actual RTC sleep on diagnostic.23. The owner confirms
 the clear long warning and normal dim console returned untouched. Both routes
@@ -15,11 +30,11 @@ drops and seven matched later greetings; continuous coverage remains rejected.
 Final full health and the new unused continuation validate at PM12/0:
 `.local/diagnostics/20261008T083013.709559Z/qualification-next.json`, retaining
 rehearsal `e1afea155b864a79b04bb133496e4e26`. Its `070741.360669Z` predecessor is
-consumed. No further sleep/screen test is running. NEO-153 keeps the original
-greeting stall open for a non-interactive source/evidence audit; no repeated PM
-merely to provoke it. [Report 215](docs/215-rtc-wake-socket-observation-validation.md).
+consumed. No further sleep/screen test is running. The subsequent NEO-153 audit
+is complete above; NEO-154 retains the unresolved cause. No repeated PM merely
+to provoke it. [Report 215](docs/215-rtc-wake-socket-observation-validation.md).
 
-**Latest awake work, 8 October 2026:** NEO-151 integrates opt-in Mac socket state
+**Earlier awake work, 8 October 2026:** NEO-151 integrates opt-in Mac socket state
 around actual forwarded SSH setup, preserving its original error and first byte
 observations. Silent/greeting-only loopback controls and healthy USB/Wi-Fi
 controls pass; the silent socket disappears before collection and is correctly
@@ -44,8 +59,8 @@ temporary services are inactive/not-found. The then-unused continuation was
 `.local/diagnostics/20261008T070741.360669Z/qualification-next.json`, retaining
 rehearsal `e1afea155b864a79b04bb133496e4e26`. NEO-152 has since consumed it;
 use only the latest validated continuation above. NEO-150/151 complete awake
-socket tooling, NEO-152 qualifies it through sleep, and NEO-153 tracks the
-still-open failure investigation.
+socket tooling, NEO-152 qualifies it through sleep, and NEO-153 audits source
+paths. NEO-154 retains the still-open failure investigation.
 [Report 212](docs/212-rtc-wake-forwarding-byte-validation.md).
 
 **Earlier attended work, 8 October 2026:** diagnostic.23 remains on boot
@@ -163,11 +178,19 @@ required separately attended qualification; NEO-147 below records its result.
   retain their original state; the packet gap remains unqualified. Final health
   and new continuation pass at PM12/0. No implementation/image change or second
   sleep. [Report 215](docs/215-rtc-wake-socket-observation-validation.md).
-- [ ] NEO-153: audit the installed SSH implementations and original greeting-stall
-  evidence without physical interaction or repeated sleeps just to provoke it.
-  Keep socket candidates, independent endpoint proof and packet gaps distinct;
-  do not extend timeouts or add retries to conceal the unresolved cause.
-  CPU retention and energy remain separate qualification work.
+- [x] NEO-153: audit the installed SSH implementations, exact Debian patches and
+  original greeting-stall evidence. Save a reusable private version/hash/policy
+  inventory; host checks and unchanged full device health/continuation pass.
+  The caller timeout explains the generic error but establishes no faulty layer.
+  [Report 216](docs/216-ssh-greeting-source-audit.md).
+- [ ] NEO-154: resolve the original intermittent post-return SSH stall when bound
+  failure evidence becomes available during independently justified tests. Use
+  existing byte/state/socket observations first, preserving the first failure;
+  add a narrow discriminator only for the remaining ambiguous branch. No extra
+  sleeps solely to provoke it, speculative driver workaround, admission-policy
+  weakening or longer timeouts/retries. Missing sockets and packet gaps remain
+  unknown; a healthy comparison is not a fix. CPU retention and energy remain
+  separate qualification work.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

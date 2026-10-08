@@ -705,6 +705,10 @@ tasks:
     desc: Measure CYCLES=3 fresh USB/Wi-Fi SSH pairs while awake; no sleep or policy change
     cmds: [python3 tools/check-ssh-timing.py]
 
+  device:ssh-provenance:
+    desc: Read installed SSH versions, binary hashes and selected global policy; stays awake
+    cmds: [python3 tools/check-ssh-provenance.py]
+
   device:ssh-socket-smoke:
     desc: Awake Mac worker/socket identity with board and ambiguity controls; no sleep or network-policy change
     env:

@@ -2,6 +2,23 @@
 
 Record deferred questions and activities here as they arise.
 
+**Awake SSH investigation complete, 9 October 2026:** NEO-160 reviews both
+diagnostic.24 late/noirq inner-SSH failures: 24 greeting bytes accepted by the
+forwarding API, zero received, active/open channels and no parsed greeting.
+Bounded preflight clock alignment places inner negotiation after PM return,
+but the enclosing collection started before return. Two retained journal
+windows add no independently bound server-worker cause; NEO-154 remains open.
+Ordinary PM/RTC tasks now honor explicit `SOCKET_STATE=1` using the existing
+Mac observer, with separate batch-cycle limits and reuse of a dedicated trace's
+outer owner. Defaults, SSH deadlines/retries and device PM sources are unchanged.
+All host checks and three awake USB/Wi-Fi pairs pass; seven socket observations
+validate. Final health `20261008T120812.683399Z` retains PM12/0, original boot,
+all four WFI counts 5 and dim display. No sleep, reboot or blanking ran while
+the owner was away. Use the observer on a future independently planned,
+admitted and attended PM run; its ordinary-task wrapper still needs that
+hardware exercise. No extra sleeps solely to provoke the stall.
+[Report 221](docs/221-diagnostic24-ssh-stall-awake-investigation.md).
+
 **Connected sleep repeats qualified, 9 October 2026:** NEO-159 completes four
 further actual RTC sleep/wake cycles on diagnostic.24, same boot
 `44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM12/0. All four CPU callbacks advance
@@ -267,6 +284,9 @@ required separately attended qualification; NEO-147 below records its result.
   weakening or longer timeouts/retries. Missing sockets and packet gaps remain
   unknown; a healthy comparison is not a fix. CPU retention and energy remain
   separate qualification work.
+  NEO-160 adds the diagnostic.24 24-byte-send/zero-receive evidence and makes
+  `SOCKET_STATE=1` available in ordinary PM/RTC tasks; the original cause is
+  still unproven ([report 221](docs/221-diagnostic24-ssh-stall-awake-investigation.md)).
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

@@ -75,11 +75,15 @@ def capture_timing(directory):
 
 
 def timed_capture(name):
-    """Existing host workflows accept (config, capture, ...)."""
+    """One PM cycle's timing and explicitly requested socket observations."""
     def decorate(function):
         @wraps(function)
         def wrapped(config, capture, *args, **kwargs):
-            with capture_timing(capture), phase(name):
+            # Imported here because socket observations themselves use timing.
+            # A batch gets a separate bounded observer for each cycle; an SSH
+            # trace workflow can already own the observer for this same path.
+            from socket_observation import workflow_capture
+            with workflow_capture(capture), capture_timing(capture), phase(name):
                 return function(config, capture, *args, **kwargs)
         return wrapped
     return decorate

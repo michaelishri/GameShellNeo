@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[221 — Diagnostic.24 SSH stall awake investigation](221-diagnostic24-ssh-stall-awake-investigation.md)
+narrows two original failures to accepted client greeting bytes with no reply,
+preserves bounded timing/journal limits, and enables the existing opt-in socket
+observer in ordinary PM/RTC tasks. Host checks and awake route observations
+pass without sleep or display changes; the cause remains open as NEO-154.
+
 [220 — Diagnostic.24 connected sleep repeatability](220-diagnostic24-connected-sleep-repeatability.md)
 records four further actual RTC sleep/wake passes, all-CPU participation and
 timekeeping freeze each time, both-route recovery and owner-confirmed untouched

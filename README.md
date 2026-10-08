@@ -472,8 +472,11 @@ private. `report:ssh-sockets CAPTURE=...` rechecks the saved evidence offline.
 [Report 213](docs/213-forwarded-socket-identity.md) records both passing routes,
 bounds and limits. It does not establish the earlier failure's cause.
 
-Use `SOCKET_STATE=1` with `device:ssh-timing` or the `device:ssh-trace-*` capture
-tasks to retain Mac socket snapshots around the actual forwarded SSH setup.
+Use `SOCKET_STATE=1` with `device:ssh-timing`, the `device:ssh-trace-*` capture
+tasks, or ordinary PM debug/RTC rehearsal/sleep tasks to retain Mac socket
+snapshots around the actual forwarded SSH setup. A sleep batch keeps separate
+observations in each `cycle-N` directory; a dedicated SSH trace reuses its
+existing observer instead of starting a second one.
 The option defaults off. Each baseline runs before opening the forwarding
 channel; collection runs after the original SSH result and first byte/state
 observations, before the caller closes the connection. Nothing is inserted
@@ -486,6 +489,12 @@ task device:ssh-failure-smoke # Awake silent/greeting-only Mac loopback peers, t
 task device:ssh-timing CYCLES=1 SOCKET_STATE=1 # Awake real-route observations
 task report:ssh-socket-state CAPTURE=.local/diagnostics/<capture> # Offline, no device access
 ```
+
+For a planned, separately admitted and attended PM or sleep run, append
+`SOCKET_STATE=1` to its usual task command. After a batch, run
+`report:ssh-socket-state` on each completed `cycle-N` directory. The flag does
+not itself enable packet capture, and ordinary awake inspection tasks do not
+create socket observations. It remains off unless explicitly requested.
 
 Keep USB connected and Wi-Fi associated for the awake controls; they do not
 blank the screen or change network policy. Loopback peers accept one connection
@@ -503,6 +512,10 @@ attended sleep qualification: twelve healthy setups, three missing-socket
 forwarding failures before PM return, and a separately unqualified packet gap.
 The earlier intermittent post-return failure remains unresolved.
 `SOCKET_STATE=1` does not waive any existing sleep admission or readiness requirement.
+[Report 221](docs/221-diagnostic24-ssh-stall-awake-investigation.md) records the
+ordinary-workflow integration, awake validation and newer unresolved failure
+evidence: client greeting bytes accepted by the forwarding API, with no reply
+bytes returned before the setup timeout.
 
 `device:ssh-provenance` reads the Mac and GameShell SSH versions, authenticated
 server banners, executable hashes and selected global configuration, using the

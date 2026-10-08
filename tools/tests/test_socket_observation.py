@@ -163,6 +163,72 @@ class ObservationTests(unittest.TestCase):
         (root/'index.json').write_text(json.dumps(index))
         with self.assertRaisesRegex(ValueError,'state changed'):observer.report(self.root)
 
+    def workflow_failure(self, path):
+        @host_timing.timed_capture('pm.cycle')
+        def workflow(config, capture):
+            with remote.forwarded_device(config,self.mac,*TARGET):
+                self.fail('Unexpected success')
+        with self.assertRaises(paramiko.SSHException) as caught:
+            workflow({},path)
+        self.assertIs(caught.exception,self.error)
+
+    def test_pm_workflow_honors_opt_in_and_preserves_original_failure(self):
+        with patch.dict('os.environ',NEO_SOCKET_STATE='1'):
+            self.workflow_failure(self.root)
+        self.assertEqual(self.order,['baseline','connect','collect'])
+        item=observer.report(self.root)['observations'][0]
+        self.assertEqual(item['outcome'],'ssh-error')
+        self.assertEqual(item['status'],'unique-worker-candidate')
+        self.client.connect.assert_called_once()
+        self.channel.close.assert_called_once()
+        self.assertEqual(host_timing.summarize(self.root)['capture_outcome'],'error')
+        self.assertIsNone(observer._active.get())
+
+    def test_pm_workflow_default_off_adds_no_socket_commands_or_artifacts(self):
+        with patch.dict('os.environ',NEO_SOCKET_STATE='0'):
+            self.workflow_failure(self.root)
+        self.inline.assert_not_called()
+        self.assertFalse((self.root/'socket-observations').exists())
+        self.assertEqual(host_timing.summarize(self.root)['capture_outcome'],'error')
+
+    def test_existing_trace_observer_is_reused_and_only_outer_owner_finishes(self):
+        with patch.dict('os.environ',NEO_SOCKET_STATE='1'),observer.capture(self.root) as outer:
+            self.workflow_failure(self.root)
+            self.assertIs(observer._active.get(),outer)
+            self.assertEqual(outer.attempts,1)
+            self.assertFalse((outer.path/'index.json').exists())
+        self.assertEqual(len(observer.report(self.root)['observations']),1)
+        self.client.connect.assert_called_once()
+        self.assertIsNone(observer._active.get())
+
+    def test_batch_cycles_have_independent_observer_limits_and_artifacts(self):
+        batch=self.root
+        with patch.dict('os.environ',NEO_SOCKET_STATE='1'),patch.object(observer,'MAX_ATTEMPTS',1):
+            for number in range(1,5):
+                self.root=batch/f'cycle-{number}';self.root.mkdir()
+                self.snapshots=0
+                self.channel.reset_mock();self.client.reset_mock()
+                self.workflow_failure(self.root)
+                self.assertEqual(len(observer.report(self.root)['observations']),1)
+                self.assertIsNone(observer._active.get())
+        self.assertFalse((batch/'socket-observations').exists())
+
+    def test_invalid_flag_or_foreign_capture_stops_before_work(self):
+        body=MagicMock()
+        workflow=host_timing.timed_capture('sleep.experiment')(body)
+        with patch.dict('os.environ',NEO_SOCKET_STATE='invalid'):
+            with self.assertRaisesRegex(ValueError,'SOCKET_STATE'):
+                workflow({},self.root)
+        with patch.dict('os.environ',NEO_SOCKET_STATE='1'),observer.capture(self.root) as outer:
+            other=self.root/'other';other.mkdir()
+            with self.assertRaisesRegex(ValueError,'another capture'):
+                workflow({},other)
+            self.assertIs(observer._active.get(),outer)
+        body.assert_not_called()
+        self.inline.assert_not_called()
+        self.assertFalse((self.root/'host-timing.jsonl').exists())
+        self.assertFalse((other/'host-timing.jsonl').exists())
+
 
 class InlineObserverTests(unittest.TestCase):
     def test_inline_result_source_mismatch_output_bounds_and_cleanup(self):

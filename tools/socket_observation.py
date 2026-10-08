@@ -146,6 +146,20 @@ def enabled():
     return flag == '1'
 
 
+@contextmanager
+def workflow_capture(path):
+    """Honor the opt-in for an ordinary PM workflow, or reuse its outer owner."""
+    requested = enabled()  # Reject invalid configuration before any PM work.
+    active = _active.get()
+    if active is not None:
+        if active.path.parent.resolve() != Path(path).resolve():
+            raise ValueError('Socket observer belongs to another capture')
+        yield active
+        return
+    with capture(path, requested) as value:
+        yield value
+
+
 class Observation:
     def __init__(self, capture, mac, target, number):
         self.capture, self.mac, self.target = capture, mac, target

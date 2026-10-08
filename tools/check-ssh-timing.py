@@ -99,7 +99,7 @@ def main():
         return
     capture = evidence_directory()
     print('Private awake SSH timing:', capture, flush=True)
-    with socket_observation.capture(capture, socket_observation.enabled()):
+    with socket_observation.workflow_capture(capture):
         result = probe(load_env(), capture, int(os.environ.get('NEO_SSH_CYCLES', '3')))
     print('Fresh route samples:', len(result['samples']), '; same boot and unchanged PM counters.')
     (capture/'host-timing-summary.json').write_text(json.dumps(summarize(capture), indent=2)+'\n')

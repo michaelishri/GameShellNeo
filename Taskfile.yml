@@ -491,7 +491,9 @@ tasks:
     cmds: [python3 tools/check-rsb-runtime.py --restore]
 
   device:pm-inspect:
-    desc: Read PM capabilities and RSB debug state over USB without entering suspend
+    desc: Read PM capabilities and RSB state without suspend; ROUTE=usb (default) or wifi
+    env:
+      NEO_PM_INSPECT_ROUTE: '{{.ROUTE | default "usb"}}'
     cmds: [python3 tools/check-pm-stages.py --inspect]
 
   device:keypad-inspect:

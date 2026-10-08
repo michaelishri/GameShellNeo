@@ -441,7 +441,13 @@ def main():
     mode.add_argument('--platform', action='store_true')
     parser.add_argument('--power-key', action='store_true')
     parser.add_argument('--power-key-input', action='store_true')
+    parser.add_argument('--inspect-route', choices=('usb', 'wifi'),
+                        default=os.environ.get('NEO_PM_INSPECT_ROUTE'),
+                        help='Transport for read-only --inspect, default usb')
     args = parser.parse_args()
+    if args.inspect_route is not None and (
+            not args.inspect or args.inspect_route not in ('usb', 'wifi')):
+        parser.error('Inspection route requires --inspect and usb or wifi')
     os.umask(0o077)
     config = load_env()
     capture = evidence_directory()
@@ -463,7 +469,9 @@ def main():
         print('PM unit stopped and owned debug controls restored.')
         return
     if args.inspect:
-        with device(config, 'usb') as client:
+        route = args.inspect_route or 'usb'
+        (capture / 'route.json').write_text(json.dumps(dict(operation='pm.inspect', route=route)) + '\n')
+        with device(config, route) as client:
             data = inline(client, '--inspect')
         (capture / 'inspection.json').write_bytes(data)
         value = json.loads(data)

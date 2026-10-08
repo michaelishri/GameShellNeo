@@ -3,13 +3,14 @@
 Record deferred questions and activities here as they arise.
 
 **Attended qualification in progress, 8 October 2026:** NEO-158 passes the
-initial freezer and driver debug checks on diagnostic.24, same boot
-`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM2/0. Both SSH routes recover,
+freezer, driver and first late/noirq debug checks on diagnostic.24, same boot
+`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM3/0. Both SSH routes recover,
 original keypad identity/handle survive, POWER is handed back and trace/warning
 controls restore. SDIO usage stays 2; all four s2idle callback counts remain
-zero, as expected for these debug stages. One failed USB-route collection is
-retained; the PM operation was not resubmitted. Await owner warning/display
-confirmation and readiness for the first late/noirq test. No further screen
+zero, as expected for these debug stages. The initial driver USB-route failure
+and a first late/noirq SSH setup timeout are retained; no PM was resubmitted.
+The owner confirms the initial warning/display return. Await the first late/noirq
+observation and readiness for four repeats. No further screen
 test is running. [Report 219](docs/219-diagnostic24-pm-qualification.md).
 
 **Installation and awake checks complete, 8 October 2026:** NEO-157 shut down diagnostic.23

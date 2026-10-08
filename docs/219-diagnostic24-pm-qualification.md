@@ -1,11 +1,12 @@
 # Diagnostic.24 staged suspend/resume qualification
 
 8 October 2026; evidence timestamps are UTC. NEO-158 is in progress.
-The freezer and driver debug checks pass on diagnostic.24/kernel
+The freezer, driver and first late/noirq debug checks pass on diagnostic.24/kernel
 `6.18.54-gameshellneo23`, boot `44b698ad-7fef-46d4-9e0f-71153f6f81e9`.
 Both SSH routes recover and the original keypad connection is retained.
-PM success/fail is **2/0**. Owner confirmation of the warning and display return,
-late/noirq qualification and actual RTC sleep remain pending.
+PM success/fail is **3/0**. The owner confirms the initial warning/display return.
+Observation of the first late/noirq return, four repeats and actual RTC sleep
+remain pending.
 [Report 218](218-diagnostic24-installation.md) records the installation and
 passing awake prerequisites.
 
@@ -21,8 +22,9 @@ task device:pm-power-key STAGE=devices CYCLES=1 KEYPAD_TRACE=1 WIFI_TRACE=1
 
 The freezer leaves the display on. The driver cycle plays the one-second level-5
 warning before the dark interval, owns POWER input during the test, and records
-keypad and Wi-Fi traces. Playback/control restoration passes; audibility and
-the visual return still require the owner's separate observation.
+keypad and Wi-Fi traces. Playback/control restoration passes; the owner
+separately confirms the warning was audible and the dim console returned normally,
+and accepts proceeding to the first late/noirq check.
 
 | Stage | Capture under `.local/diagnostics/` | Run ID | Stage interval |
 | --- | --- | --- | ---: |
@@ -68,11 +70,45 @@ Original task logs are `.local/neo158-freezer.log` and `.local/neo158-driver.log
 timing summaries are `.local/neo158-{freezer,driver}-timing.json`, all in
 `work/cpi-wfi-integration`.
 
+## First late/noirq check
+
+`task device:pm-platform WIFI_TRACE=1` ran once after the owner's confirmation.
+The original result passes, with both SSH routes recovered on the same boot.
+Capture: `.local/diagnostics/20261008T105516.806486Z/cycle-1/`.
+Run ID: `962d8d0f5a5e4525a48e54dfda1bcd2a`.
+
+The stage interval is 7.915 seconds, including the five-second debug delay.
+PM advances 2/0 → 3/0 with every failure counter zero. Process memory, original
+keypad handle/device identity, zero disconnects/supply-disable events, POWER
+handback and loss-free trace restoration pass. The one-second level-5 warning
+passes playback/control-restoration checks. Brightness/backlight power returns
+to 1/0. All four s2idle callback counts remain zero; no actual sleep was entered.
+
+The three-result SDIO history passes with usage fixed at 2 and unchanged policy:
+`.local/neo158-three-reference-history.json`. Adjacent PM result counters are
+0/0 → 1/0 → 2/0 → 3/0. Owner confirmation of this stage's warning and display
+return, and readiness for four repeats, have been requested. No further test is
+running while awaiting that response.
+
+The validated timing capture records one PM submission and five collection
+attempts, one unsuccessful. The failing inner USB SSH setup lasts 10.028 seconds;
+the caller records `SSHException: No existing session`, and Paramiko's background
+thread logs an SSH-banner timeout. The original completed result is subsequently
+retrieved and both independent route proofs pass. The 63.440-second capture
+includes setup, test, collection and proofs; it is not wake latency. This matches
+the previously observed error shape, but does not establish its timing relative
+to device readiness or its cause. NEO-154 remains open; no PM resubmission or
+speculative SSH policy change occurred.
+
+- Result SHA-256: `46b5a55d5334486bcf4dfbd127ee110ac95abc8e664b38a755b2742321cdf579`.
+- Timing SHA-256: `1003fb4ae451312f5d5f2a2dea4d55208a5f3c51a4acaa5b5351bcd3ca2dfe85`.
+- Original log: `.local/neo158-platform-initial.log`.
+- Offline timing summary: `.local/neo158-platform-initial-timing.json`.
+
 ## Next gates and efficiency limits
 
-Await the owner's warning/display observation and readiness for the first
-late/noirq debug cycle, followed by four separately admitted repeats. Review
-each original result and stop on failure. An awake RTC rehearsal and fresh
+Await the owner's late/noirq warning/display observation and readiness for
+four repeats. Review each original result and stop on failure. An awake RTC rehearsal and fresh
 readiness must precede actual sleep.
 
 The intended efficiency opportunity is coordinated clock-event and timekeeping

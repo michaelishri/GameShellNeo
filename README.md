@@ -14,9 +14,10 @@ Awake checks pass: all four cores expose the WFI state, both SSH routes work,
 and the battery, timer, journal and power-key prerequisites pass. Sleep recovery
 and energy qualification remain pending.
 [Report 218](docs/218-diagnostic24-installation.md) records these results.
-The first freezer and driver debug checks also pass, with both SSH routes
+The freezer, driver and first late/noirq debug checks also pass, with both SSH routes
 recovered and the original keypad retained. [Report 219](docs/219-diagnostic24-pm-qualification.md)
-records PM2/0; owner observation, later debug stages and actual sleep remain pending.
+records PM3/0 and the initial owner-confirmed warning/display return. The first
+late/noirq observation, four repeats and actual sleep remain pending.
 [Report 217](docs/217-wfi-s2idle-image-integration.md)
 records the changes and first-install sequence.
 

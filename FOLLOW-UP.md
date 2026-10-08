@@ -2,6 +2,23 @@
 
 Record deferred questions and activities here as they arise.
 
+**Latest attended work, 8 October 2026:** NEO-152 qualifies opt-in socket
+observations across one actual RTC sleep on diagnostic.23. The owner confirms
+the clear long warning and normal dim console returned untouched. Both routes
+recover, original keypad/policy checks pass, and PM advances to **12/0** on boot
+`cc26703f-d9ef-4d71-8da1-9d766f3efdbe` (seven debug checks, five actual sleeps).
+All fifteen socket observations validate: twelve healthy SSH setups have unique
+established worker candidates; three failed forwarding opens before PM return
+have missing sockets. The original post-return setup failure does not recur.
+The Mac packet recorder retains a 29.009-second interface gap, zero reported
+drops and seven matched later greetings; continuous coverage remains rejected.
+Final full health and the new unused continuation validate at PM12/0:
+`.local/diagnostics/20261008T083013.709559Z/qualification-next.json`, retaining
+rehearsal `e1afea155b864a79b04bb133496e4e26`. Its `070741.360669Z` predecessor is
+consumed. No further sleep/screen test is running. NEO-153 keeps the original
+greeting stall open for a non-interactive source/evidence audit; no repeated PM
+merely to provoke it. [Report 215](docs/215-rtc-wake-socket-observation-validation.md).
+
 **Latest awake work, 8 October 2026:** NEO-151 integrates opt-in Mac socket state
 around actual forwarded SSH setup, preserving its original error and first byte
 observations. Silent/greeting-only loopback controls and healthy USB/Wi-Fi
@@ -9,11 +26,11 @@ controls pass; the silent socket disappears before collection and is correctly
 recorded as missing. Seven awake packet-workflow setups pass with the option,
 with four two-ended USB greeting matches. Offline reports and full host checks
 pass. Final health and the unused continuation validate on the same boot at
-PM11/0. No sleep, reboot, display, cable or image action occurred. NEO-152 tracks
-one separately attended qualification; the original intermittent cause remains
-open. [Report 214](docs/214-ssh-failure-socket-observations.md).
+PM11/0. No sleep, reboot, display, cable or image action occurred in that slice.
+The subsequent NEO-152 attended qualification is recorded above; the original
+intermittent cause remains open. [Report 214](docs/214-ssh-failure-socket-observations.md).
 
-**Latest attended work, 8 October 2026:** NEO-149 passes one RTC sleep on
+**Earlier attended work, 8 October 2026:** NEO-149 passes one RTC sleep on
 diagnostic.23, same boot `cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM11/0
 (seven debug checks and four actual sleeps). The owner confirms the clear warning
 and normal untouched dim-console return. Both routes recover; the earlier
@@ -23,11 +40,11 @@ interface-disappearance gap, then seven matched greeting flows; continuous
 coverage remains rejected and both recorders report zero drops. A channel-flag
 integer/boolean compatibility fix passes regression and subsequent awake checks.
 No further sleep is running. Post-sleep full health/continuation validation passes;
-temporary services are inactive/not-found. The current unused continuation is
+temporary services are inactive/not-found. The then-unused continuation was
 `.local/diagnostics/20261008T070741.360669Z/qualification-next.json`, retaining
-rehearsal `e1afea155b864a79b04bb133496e4e26`. Its 062557 predecessor is consumed.
-Validate live state and obtain fresh readiness before further PM. NEO-150/151
-complete awake socket tooling; NEO-152 tracks attended qualification and the
+rehearsal `e1afea155b864a79b04bb133496e4e26`. NEO-152 has since consumed it;
+use only the latest validated continuation above. NEO-150/151 complete awake
+socket tooling, NEO-152 qualifies it through sleep, and NEO-153 tracks the
 still-open failure investigation.
 [Report 212](docs/212-rtc-wake-forwarding-byte-validation.md).
 
@@ -140,11 +157,17 @@ required separately attended qualification; NEO-147 below records its result.
   reports and full checks. Missing, ambiguous and unavailable observations remain
   explicit; independent awake corroboration is not borrowed for failed-flow
   ownership. [Report 214](docs/214-ssh-failure-socket-observations.md).
-- [ ] NEO-152: qualify `SOCKET_STATE=1` through one attended RTC wake after fresh
-  health, unused-receipt validation and watching/listening readiness. Use the
-  existing image; no card swap. Preserve any original failure before recovery,
-  with worker/endpoint evidence and packet gaps kept explicit. No repeated PM
-  merely to provoke failure. Root cause, CPU retention and energy remain open.
+- [x] NEO-152: one attended RTC wake with `SOCKET_STATE=1` passes functional
+  recovery and the socket report, with owner-confirmed warning/display return.
+  Twelve healthy SSH setups and three failed forwarding opens before PM return
+  retain their original state; the packet gap remains unqualified. Final health
+  and new continuation pass at PM12/0. No implementation/image change or second
+  sleep. [Report 215](docs/215-rtc-wake-socket-observation-validation.md).
+- [ ] NEO-153: audit the installed SSH implementations and original greeting-stall
+  evidence without physical interaction or repeated sleeps just to provoke it.
+  Keep socket candidates, independent endpoint proof and packet gaps distinct;
+  do not extend timeouts or add retries to conceal the unresolved cause.
+  CPU retention and energy remain separate qualification work.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

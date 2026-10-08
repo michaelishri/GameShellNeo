@@ -476,8 +476,11 @@ never replace the original SSH error or trigger retries. The snapshot command
 has a 15-second host watchdog and ten-second remote helper deadline; captures
 are limited to 32 observed setups. See
 [report 214](docs/214-ssh-failure-socket-observations.md) for awake qualification
-and the remaining attended-test boundary. `SOCKET_STATE=1` does not waive any
-existing sleep admission or readiness requirement.
+and [report 215](docs/215-rtc-wake-socket-observation-validation.md) for the first
+attended sleep qualification: twelve healthy setups, three missing-socket
+forwarding failures before PM return, and a separately unqualified packet gap.
+The earlier intermittent post-return failure remains unresolved.
+`SOCKET_STATE=1` does not waive any existing sleep admission or readiness requirement.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

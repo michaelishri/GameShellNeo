@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[215 — RTC wake with socket observations](215-rtc-wake-socket-observation-validation.md)
+qualifies the integrated observer through one attended sleep: normal display and
+both-route recovery, twelve healthy SSH setups and three missing-socket failures
+before PM return. The Mac packet gap remains explicit; final health/continuation
+pass at PM12/0. The original intermittent setup failure remains unresolved.
+
 [214 — SSH failure socket observations](214-ssh-failure-socket-observations.md)
 adds opt-in snapshots after original SSH outcomes, with no inserted greeting
 delay or retry. Awake silent/greeting-only/healthy controls and packet integration

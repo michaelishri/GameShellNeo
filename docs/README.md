@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[211 — Forwarded SSH observations](211-forwarded-ssh-observation.md) separates
+channel confirmation, TCP identity and greeting delivery; records a later
+same-peer/port server closure; and adds passive byte/state counters validated
+with local failure controls and awake probes. The underlying cause remains open.
+
 [210 — RTC wake with a recovered segmented observer](210-rtc-wake-segmented-observer-validation.md)
 records one attended sleep pass, a real Mac interface-disappearance error,
 bounded recorder recovery, zero reported drops and five matched later flows.

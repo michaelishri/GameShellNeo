@@ -19,6 +19,16 @@ consumed. Final health and full continuation validation pass. Validate current
 state before reuse; an audible warning does not replace fresh readiness.
 [Report 210](docs/210-rtc-wake-segmented-observer-validation.md).
 
+**Subsequent awake investigation, 8 October:** NEO-148 finds a same-peer/port
+preauthentication closure in the saved boot's server journal at 59.817 seconds
+after PM return, well after host setup failure and recorder closure. This does
+not establish exact forwarded-socket ownership or the delay's cause. Passive
+forwarding byte/state observations now pass local failure controls and awake
+USB/Wi-Fi probes, with zero capture drops and four matched flows. Final health
+and the existing unused receipt validate at unchanged PM10/0. No sleep, reboot,
+display/cable action or policy change occurred.
+[Report 211](docs/211-forwarded-ssh-observation.md).
+
 **Earlier awake recorder work, 8 October:** NEO-146 reproduces capture pressure
 with three checked 2 MiB transfers, then passes the same workload with zero
 reported drops and four matched handshakes after recorder changes. A deliberate
@@ -70,14 +80,24 @@ required separately attended qualification; NEO-147 below records its result.
   nonzero for the real gap and saves its separate positive-only report. No PM
   repeat, altered acceptance or SSH-policy change is used.
   [Report 210](docs/210-rtc-wake-segmented-observer-validation.md).
-- [ ] NEO-148: investigate the post-return SSH setup failure captured in report
+- [x] NEO-148: audit the post-return SSH setup failure captured in report
   210. The forwarded-channel operation completes, but the associated flow has
   only two SYN observations at each endpoint and no established handshake in
   the report; the SSH state has no greeting/key exchange/authentication before
-  its ten-second failure. Audit forwarding and capture semantics, correlate
-  saved server logs privately, and design minimal socket/forwarding observations
-  with awake controls. Do not infer a USB/TCP/SSH-server cause or add retries
-  without evidence. Any subsequent PM test needs fresh observer readiness.
+  its ten-second failure. Source review separates forwarding confirmation from
+  greeting delivery; timing-only flow associations are now explicitly unverified
+  socket identities. The server journal adds a later same-peer/port closure.
+  Passive channel byte/state observations pass silent/greeting-only controls,
+  full host checks and awake two-ended recording. This completes the audit and
+  diagnostic preparation, not root-cause resolution.
+  [Report 211](docs/211-forwarded-ssh-observation.md).
+- [ ] NEO-149: retain the new forwarding observations during the next justified
+  attended sleep, after fresh readiness and current qualification checks. Do
+  not repeat PM merely to provoke failure. If channel bytes and packet evidence
+  still disagree, prepare a bounded TCP-state observer with independently tied
+  process/endpoint identity. The actual SSH/USB cause remains unresolved; keep
+  first failures and capture gaps, and do not alter timeouts/retries or driver
+  behavior without evidence.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

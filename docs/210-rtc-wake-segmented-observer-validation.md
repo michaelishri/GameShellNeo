@@ -1,5 +1,10 @@
 # RTC wake with a recovered segmented observer
 
+Subsequent clarification: [report 211](211-forwarded-ssh-observation.md) treats
+the unique host-span overlap below as a timing candidate, not verified socket
+ownership, and adds a later same-peer/port server closure. Original measurements
+and private artifacts below remain unchanged.
+
 8 October 2026; capture timestamps are UTC. NEO-147 runs one separately attended
 RTC sleep with [NEO-146's revised recorder](209-ssh-recorder-burst-and-gap-recovery.md).
 Functional sleep/recovery passes. The Mac recorder now identifies a real

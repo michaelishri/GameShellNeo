@@ -229,6 +229,8 @@ class CorrelationTests(unittest.TestCase):
             (root/'tcp-run.json').write_text(json.dumps(manifest))
             summary=report.report(root)
             self.assertEqual(summary['matched_greeting_flows'],1)
+            self.assertTrue(summary['flows'][0]['host_tunnel_unique'])
+            self.assertFalse(summary['flows'][0]['host_tunnel_identity_verified'])
             self.assertNotIn(SECRET.decode(),json.dumps(summary))
             manifest['mac_clocks'].append(dict(host_before_ns=0,host_after_ns=0,clock=dict(realtime_ns=0)))
             (root/'tcp-run.json').write_text(json.dumps(manifest))

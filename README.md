@@ -424,6 +424,18 @@ drops and five later matched handshakes. A post-return SSH setup failure is also
 preserved; its cause remains open. The strict task correctly exits nonzero for
 the gap even though the independent sleep/recovery result passes.
 
+Timing captures now also include passive `forward_state` observations at channel
+opening and immediately after device SSH setup succeeds or fails. They record
+send/receive byte and call counts, errors/timeouts, EOF/closed/active flags and
+whether receive data is buffered. They never read ahead or retain payloads.
+The existing `device:ssh-timing` and `device:ssh-trace-*` tasks enable these
+automatically; no timing capture means the channel remains unwrapped.
+Bytes accepted by the forwarding API are not proof of delivery over USB.
+Likewise, a packet flow's unique time overlap with a tunnel request is only a
+candidate association: `host_tunnel_identity_verified` remains false.
+[Report 211](docs/211-forwarded-ssh-observation.md) records the source audit,
+late server closure, local failure controls and passing awake validation.
+
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;
 `ROUTE=wifi` selects the configured Wi-Fi route. The task records manager startup

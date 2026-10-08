@@ -6,6 +6,7 @@ from functools import wraps
 import json
 import os
 import re
+import socket
 import statistics
 import sys
 import time
@@ -148,6 +149,71 @@ def clock_sample(value):
 
 
 SSH_STATE_FIELDS = ('banner_received', 'initial_kex_complete', 'authenticated', 'active')
+FORWARD_FLAGS = ('active', 'closed', 'eof_received', 'eof_sent', 'recv_ready')
+FORWARD_COUNTS = ('sent_bytes', 'received_bytes', 'send_calls', 'recv_calls',
+                  'send_errors', 'recv_errors', 'recv_timeouts')
+
+
+class ObservedForward:
+    """Count bytes crossing the existing channel; never read ahead or retain data.
+
+    Paramiko's packetizer uses send/recv. All other channel methods, including
+    timeout and close, delegate unchanged. Counts are observations at this API,
+    not acknowledgments or proof of TCP delivery on the Mac's outgoing socket.
+    """
+    def __init__(self, channel):
+        self.channel = channel
+        self.counts = dict.fromkeys(FORWARD_COUNTS, 0)
+
+    def __getattr__(self, name):
+        return getattr(self.channel, name)
+
+    def send(self, data, *args, **kwargs):
+        self.counts['send_calls'] += 1
+        try:
+            count = self.channel.send(data, *args, **kwargs)
+        except Exception:
+            self.counts['send_errors'] += 1
+            raise
+        self.counts['sent_bytes'] += count
+        return count
+
+    def recv(self, size, *args, **kwargs):
+        self.counts['recv_calls'] += 1
+        try:
+            data = self.channel.recv(size, *args, **kwargs)
+        except socket.timeout:
+            self.counts['recv_timeouts'] += 1
+            raise
+        except Exception:
+            self.counts['recv_errors'] += 1
+            raise
+        self.counts['received_bytes'] += len(data)
+        return data
+
+
+def observe_forward(channel):
+    if _active.get() is None:
+        return channel
+    observer = ObservedForward(channel)
+    forward_state(observer, 'opened')
+    return observer
+
+
+def forward_state(channel, stage='connect-finished'):
+    recorder = _active.get()
+    if recorder is None or not isinstance(channel, ObservedForward):
+        return
+    values = dict.fromkeys(FORWARD_FLAGS)
+    for name in FORWARD_FLAGS:
+        try:
+            value = getattr(channel.channel, name)
+            if name == 'recv_ready': value = value()
+            if type(value) is bool: values[name] = value
+        except Exception:
+            pass  # Best-effort state must not replace connect's original error.
+    recorder.emit(event='forward_state', span=recorder.parent, stage=stage,
+                  **values, **channel.counts)
 
 
 def ssh_state(client):
@@ -185,6 +251,7 @@ def summarize(directory):
     records = [json.loads(line) for line in raw.splitlines()]
     stack, groups, previous, seen = [], {}, -1, set()
     ssh_states, ssh_spans = [], set()
+    forward_states, forward_spans = [], set()
     if not records or len(records) > MAX_EVENTS:
         raise ValueError('Empty or oversized timing capture')
     for index, row in enumerate(records):
@@ -210,6 +277,21 @@ def summarize(directory):
             group = groups.setdefault((row['phase'], route), [])
             group.append((elapsed/1e6, outcome == 'error'))
             stack.pop()
+        elif event == 'forward_state':
+            required = {'schema', 'host_monotonic_ns', 'host_utc', 'event', 'span', 'stage'} | set(FORWARD_FLAGS+FORWARD_COUNTS)
+            if (set(row) != required or not stack or row.get('span') != stack[-1]['span'] or
+                    row['span'] in forward_spans or
+                    (row.get('stage'), stack[-1]['phase']) not in
+                    (('opened', 'device.tunnel'), ('connect-finished', 'device.ssh')) or
+                    any(row[name] is not None and type(row[name]) is not bool for name in FORWARD_FLAGS) or
+                    any(type(row[name]) is not int or not 0 <= row[name] < 2**63 for name in FORWARD_COUNTS)):
+                raise ValueError('Invalid forwarding observation')
+            if row['stage'] == 'opened' and any(row[name] != 0 for name in FORWARD_COUNTS):
+                raise ValueError('Forwarding counters do not start at zero')
+            forward_spans.add(row['span'])
+            route = next((r['phase'][6:] for r in reversed(stack) if r['phase'].startswith('route.')), 'none')
+            forward_states.append(dict(span=row['span'], stage=row['stage'], route=route,
+                                       **{name: row[name] for name in FORWARD_FLAGS+FORWARD_COUNTS}))
         elif event == 'ssh_state':
             if (not stack or row.get('span') != stack[-1]['span'] or
                     stack[-1]['phase'] not in ('mac.ssh', 'device.ssh') or
@@ -226,7 +308,8 @@ def summarize(directory):
             raise ValueError('Invalid timing event')
     if stack or records[-1].get('event') != 'end' or records[-1].get('phase') != 'capture':
         raise ValueError('Incomplete timing capture')
-    return dict(schema=1, capture_outcome=records[-1]['outcome'], ssh_states=ssh_states, phases=[dict(
+    return dict(schema=1, capture_outcome=records[-1]['outcome'], ssh_states=ssh_states,
+                forward_states=forward_states, phases=[dict(
         phase=name, route=route, count=len(values), errors=sum(error for _, error in values),
         min_ms=round(min(v for v, _ in values), 3),
         median_ms=round(statistics.median(v for v, _ in values), 3),

@@ -267,6 +267,7 @@ def report(path, partial=False):
             server_isn=flow['server_isn'], matched_handshake=match,
             mac_greeting_prefix=prefix(flow), device_greeting_prefix=prefix(peer),
             host_tunnel_candidates=candidates, host_tunnel_unique=len(candidates)==1,
+            host_tunnel_identity_verified=False,
             mac=flow, device=peer))
     # Do not silently choose between two flows associated with the same host span.
     for row in rows:
@@ -284,5 +285,7 @@ def report(path, partial=False):
                 limits='Capture boundaries, not wire delivery or server scheduling proof. Prefix is not a '
                 'complete SSH banner. Flow selection omits bulk; incomplete segments are excluded. '
                 'Partial reports provide positive presence only, never absence across a gap. '
+                'Host tunnel candidates are timing overlap only, not socket ownership proof; '
+                'a first observed SYN may be a retransmission from an earlier request. '
                 'Partial, reused or ambiguous flows remain unqualified. '
                 'Zero reported drops do not prove zero loss; segmentation/offload can differ between endpoints.')

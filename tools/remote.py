@@ -18,7 +18,7 @@ import uuid
 
 import paramiko
 from private_config import load_env
-from host_timing import phase, ssh_state
+from host_timing import phase, ssh_state, observe_forward, forward_state
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / '.local'
@@ -85,7 +85,8 @@ def device(config, route):
             with phase('mac.connect'):
                 mac = stack.enter_context(connect_mac(config))
             with phase('device.tunnel'):
-                sock = mac.get_transport().open_channel('direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10)
+                sock = observe_forward(mac.get_transport().open_channel(
+                    'direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10))
             stack.callback(sock.close)
         public = private_path(config.get('NEO_HOST_PUBLIC_KEY'), LOCAL / 'provisioning/device/ssh_host_ed25519_key.pub')
         fields = public.read_text().split()
@@ -102,6 +103,7 @@ def device(config, route):
                                timeout=10, auth_timeout=10, banner_timeout=10)
             finally:
                 ssh_state(client)
+                forward_state(sock)
         yield client
 
 

@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[219 — Diagnostic.24 PM qualification](219-diagnostic24-pm-qualification.md)
+records the initial freezer/driver passes, retained keypad and both-route
+recovery at PM2/0. Owner observations, later stages and actual sleep remain.
+
 [218 — Diagnostic.24 installation](218-diagnostic24-installation.md) records
 the coordinated shutdown, fresh card identity, full image readback and confirmed
 boot. Both SSH routes, all-CPU WFI/timer inventory and awake battery, clock,

@@ -2,6 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
+**Attended qualification in progress, 8 October 2026:** NEO-158 passes the
+initial freezer and driver debug checks on diagnostic.24, same boot
+`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM2/0. Both SSH routes recover,
+original keypad identity/handle survive, POWER is handed back and trace/warning
+controls restore. SDIO usage stays 2; all four s2idle callback counts remain
+zero, as expected for these debug stages. One failed USB-route collection is
+retained; the PM operation was not resubmitted. Await owner warning/display
+confirmation and readiness for the first late/noirq test. No further screen
+test is running. [Report 219](docs/219-diagnostic24-pm-qualification.md).
+
 **Installation and awake checks complete, 8 October 2026:** NEO-157 shut down diagnostic.23
 after the long warning sequence and owner-confirmed card-swap readiness.
 The Samsung DEV card now contains diagnostic.24; all 4 GiB passed readback,

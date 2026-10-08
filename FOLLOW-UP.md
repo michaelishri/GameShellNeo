@@ -2,11 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
-**Installation in progress, 8 October 2026:** NEO-157 shut down diagnostic.23
+**Installation and awake checks complete, 8 October 2026:** NEO-157 shut down diagnostic.23
 after the long warning sequence and owner-confirmed card-swap readiness.
 The Samsung DEV card now contains diagnostic.24; all 4 GiB passed readback,
-the mount guard passed and the card was safely ejected. Owner-confirmed boot
-and awake prerequisites remain pending. No PM test has run on diagnostic.24.
+the mount guard passed and the card was safely ejected. The owner confirmed boot;
+both routes, exact manifest/all 335 input hashes, schema-2 battery readings and
+12 installed guard tests, all-CPU WFI/timer inventory, integration, journal
+continuity, power-key ownership, awake RTC and 21 clock observations pass.
+Final full health passes on boot `44b698ad-7fef-46d4-9e0f-71153f6f81e9` at PM0/0,
+with unchanged dim backlight and no diagnostic key suppression. No PM test has
+run on diagnostic.24; all four s2idle callback counts remain zero.
 [Report 218](docs/218-diagnostic24-installation.md) retains the evidence and
 next gates. Use `work/cpi-wfi-integration` tools for the new image.
 
@@ -25,8 +30,7 @@ records the reproducible tasks and first-install gates. Keep NEO-96/100/101
 open for matching-image hardware qualification; all-CPU callbacks and frozen
 timekeeping are required before claiming this path works. Energy, CPU/DRAM
 power-off and sleeping battery protection remain unqualified. Preserve the
-diagnostic.23 worktree/tools and its original evidence. Next: confirmed boot,
-awake admission and attended PM/RTC qualification using
+diagnostic.23 worktree/tools and its original evidence. Next: attended PM/RTC qualification using
 the new worktree. The image remains explicitly hardware-unqualified.
 
 - [ ] Build host: inspect ownership and active users of stale `/tmp` content

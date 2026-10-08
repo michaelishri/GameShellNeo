@@ -1,9 +1,11 @@
 # Diagnostic.24 installation and awake prerequisites
 
-8 October 2026; evidence timestamps are UTC. NEO-157 is in progress.
-The Samsung DEV card has been written and its full 4 GiB readback verified.
-Owner-confirmed boot and awake qualification remain pending. No PM qualification
-or energy result is established by the card write.
+8 October 2026; evidence timestamps are UTC. NEO-157.
+Diagnostic.24 is installed after verified full 4 GiB readback and owner-confirmed
+boot. Awake prerequisites pass: both SSH routes, exact image identity, schema-2
+battery readings, the all-CPU WFI/timer inventory, journal continuity, power-key
+ownership and RTC alarm restoration. No PM or energy qualification is established
+by these awake checks.
 
 ## Warning and shutdown
 
@@ -46,15 +48,76 @@ read every image byte back and safely ejected the card.
 
 Original evidence is `.local/diagnostics/20261008T102614.682089Z/` in this
 worktree. Task logs are `.local/neo157-{mac-status,inspect,preflight,flash}.log`.
-The owner has been prompted to reinsert the ejected card, reconnect USB and
-confirm the login screen before awake checks.
+The owner reinserted the card and confirmed the GameShell was back online.
+USB access identified new boot `44b698ad-7fef-46d4-9e0f-71153f6f81e9`.
+
+## Awake qualification
+
+The installed manifest exactly matches the verified build: image
+`0.1.0-diagnostic.24`, kernel `6.18.54-gameshellneo23`, manifest SHA-256
+`bede8afee1bd321002b7563f8f2dd1ca948d1c33647ead79977273a646da9bd2`.
+All 335 recorded project input hashes match the local source files. The original
+manifest's `hardware_qualified=false` is preserved; the evidence below does not
+claim complete sleep qualification.
+
+| Saved task/check | Private capture under `.local/diagnostics/` | Result |
+| --- | --- | --- |
+| `device:status ROUTE=usb` | `20261008T103349.990802Z` | Expected kernel; configured high-speed USB; services healthy |
+| `device:status ROUTE=wifi` | `20261008T103413.132805Z` | Independent Wi-Fi SSH works |
+| `device:pm-inspect`, offline full health and image validation | `20261008T103411.253214Z` | All CPU/timer, battery, identity and existing health gates pass |
+| `device:battery-check ROUTE=usb` | `20261008T103435.489075Z` | All 12 tests pass against the exact installed guard, using simulated readings |
+| `device:check ROUTE=usb ACTIVE_COUNTRY=AU` | `20261008T103456.919595Z` | All seven integration groups pass |
+| `device:journal-rotation` | `20261008T103517.825701Z` | Policy and continuity pass; no journal restart, move or repair |
+| `device:power-key-smoke` | `20261008T103535.684489Z` | Exclusive ownership passes and is handed back |
+| `device:rtc-smoke` | `20261008T103557.525964Z` | Awake alarm delivery and restoration pass, 10.286 seconds |
+| `device:awake-clock-check ROUTE=usb` | `20261008T103629.587963Z` | 21 bounded observations pass; PM remains 0/0 |
+| Final `device:pm-inspect` and offline full health validation | `20261008T103657.298388Z` | Same boot, image, PM counters and backlight state; all gates pass |
+| `device:power-policy-inspect` | `20261008T103700.696200Z` | No retained diagnostic owner or drop-in; ordinary diagnostic poweroff policy |
+
+Private task logs use `.local/neo157-{boot-usb,boot-wifi,pm-inspect,battery-check,
+integration,journal,power-key,rtc,clock,pm-final,policy}.log` in this worktree.
+The PM inspection directories also retain `awake-validation.json`; the first
+retains `image-validation.json`. These apply the existing `test-pm-stages.py`
+validator to the original saved inspection and compare the installed manifest
+with `.local/artifacts/image-manifest.json`.
+
+All four CPUs are online. The driver is `cpi_wfi`, the governor is `menu`, and
+each CPU exposes exactly one enabled `WFI` / `ARM WFI` state. Ordinary idle
+usage counters are nonzero on every CPU. The architecture clocksource, four
+architecture clock-event devices, `sun4i_tick` broadcast and the live 24 MHz DT
+timer configuration match the candidate's strict inventory. These counters show
+driver use during ordinary idle; they do not establish physical low-power
+residency or energy savings. The earlier kernel also had an architectural idle
+fallback, so WFI's presence alone is not evidence of a new energy benefit.
+
+The first validated battery sample uses schema 2 and `CLOCK_BOOTTIME`, matches
+the current boot ID and is 1.505 seconds old. It reports 100%, Charging and about
+4.157 V. Final freshness is 7.084 seconds. These software readings do not resolve
+the separate battery/ADC calibration uncertainty. The installed guard tests
+exercise sleep gaps, delayed/interrupted sampling, clock-bracketing and
+low-reading reset behavior with mocked shutdown requests. They do not issue a
+real shutdown or alter charging controls. The live health validator separately
+checks the sample's clock type, current boot identity and age.
+
+The clock observer passes with a maximum bracket of 52,917 ns. This validates
+bounded awake observations on the new kernel, not exclusive sleep ownership or
+reliable detection below the observation resolution. Across this slice, all four
+s2idle callback counters stay zero, PM success/fail stays **0/0**, every PM failure
+counter stays zero, kernel taint is zero and no failed units are present. Backlight
+brightness remains 1 with power 0. No screen blanking, suspend, reboot or cable
+change was requested during the awake checks.
+
+Wi-Fi configuration remains NZ with the previously accepted AU home access-point
+announcement. MUSB and both supply wake controls remain disabled, normal sleep
+remains masked, and the product's quick-press sleep/wake policy is not enabled.
 
 ## Remaining qualification
 
-Use this worktree's diagnostic.24 tools after boot. Verify exact image identity,
-both SSH routes, fresh schema-2 battery readings, the all-CPU WFI/timer inventory,
-journal continuity, power-key ownership and awake RTC alarm restoration.
-Fresh readiness is required before the staged debug and actual sleep tests in
-report 217. NEO-96/100/101 remain open for matching-image hardware evidence;
-an installed driver alone does not establish all-CPU s2idle participation,
-timekeeping freeze, lower current or the standby target.
+Use this worktree's diagnostic.24 tools. Obtain fresh readiness for freezer and
+driver debug checks, then staged late/noirq checks. Use their matching seven-debug
+receipt for an awake RTC rehearsal before the first attended actual sleep.
+Require all four s2idle callback counts to advance and independently establish
+timekeeping freeze, alongside existing display/keypad/network recovery gates.
+NEO-96/100/101 remain open for sleep evidence. Broader connected, battery-only
+and cable-transition qualification and later energy comparisons remain pending;
+an installed driver alone does not establish lower current or the standby target.

@@ -9,10 +9,11 @@ board. Normal sleep, a launcher, OTA and other board revisions are later work.
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
 and guards against sleep interrupting awake measurements. It requires all four
 CPUs to participate and independent timekeeping-freeze evidence. This candidate
-has passed offline build validation, transfer verification and full DEV-card
-readback. Owner-confirmed boot, awake checks, sleep recovery and energy
-qualification remain pending. [Report 218](docs/218-diagnostic24-installation.md)
-records installation progress.
+is installed after verified full DEV-card readback and owner-confirmed boot.
+Awake checks pass: all four cores expose the WFI state, both SSH routes work,
+and the battery, timer, journal and power-key prerequisites pass. Sleep recovery
+and energy qualification remain pending.
+[Report 218](docs/218-diagnostic24-installation.md) records these results.
 [Report 217](docs/217-wfi-s2idle-image-integration.md)
 records the changes and first-install sequence.
 

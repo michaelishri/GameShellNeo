@@ -715,6 +715,28 @@ tasks:
     desc: Summarize host timing in CAPTURE=private/diagnostics/directory; no device access
     cmds: [python3 tools/check-ssh-timing.py --report]
 
+  device:ssh-trace-awake:
+    desc: Bounded Mac/device TCP metadata around three awake USB/Wi-Fi SSH pairs; no payload files or sleep
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py]
+
+  device:ssh-trace-sleep:
+    desc: One attended RTC sleep with bounded two-ended TCP metadata; QUALIFICATION/REHEARSAL/ATTENDED required
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py --sleep]
+
+  device:ssh-trace-collect:
+    desc: Stop/collect only the original bounded TCP recorders in CAPTURE; never resubmit a sleep
+    env:
+      NEO_ROUTE: '{{.ROUTE | default "usb"}}'
+    cmds: [python3 tools/check-ssh-trace.py --collect]
+
+  report:ssh-trace:
+    desc: Validate and correlate private two-ended TCP metadata in CAPTURE; no device access
+    cmds: [python3 tools/check-ssh-trace.py --report]
+
   device:exec:
     desc: Run an explicit device command, e.g. task device:exec -- uname -r
     cmds: [python3 tools/remote.py device exec]

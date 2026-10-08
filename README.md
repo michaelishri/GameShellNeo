@@ -345,6 +345,47 @@ milestone timestamps. [Report 202](docs/202-post-return-ssh-investigation.md)
 explains the post-return setup failure, privacy limits and passing awake checks.
 This host-only addition needs no image rebuild or card swap.
 
+For the intermittent SSH greeting failure, the optional two-ended TCP recorder
+uses the same connection path and timeouts:
+
+```sh
+task device:ssh-trace-awake # Fixed three USB/Wi-Fi pairs; screen stays on
+task report:ssh-trace CAPTURE=.local/diagnostics/<capture> # Offline validation
+# Only after fresh observer readiness and the normal same-boot sleep gates:
+task device:ssh-trace-sleep QUALIFICATION=<current-receipt> REHEARSAL=<original-run-id> ATTENDED=1
+# Stop/collect the original recorders after an interrupted controller:
+task device:ssh-trace-collect CAPTURE=.local/diagnostics/<capture>
+```
+
+Keep USB connected and the Mac awake. The GameShell recorder uses Linux's
+native packet socket on `usb0`; the Mac uses its system libpcap on the Ethernet
+interface selected by the USB route. Temporary privileged helpers close their
+capture handles after a requested stop or a five-minute limit. They do not
+install packages, change networking/SSH policy or leave a capture service
+enabled. The Linux helper also has a systemd runtime deadline. A deadline,
+packet/byte cap, reported drops, rejected headers, clock step or changed
+interface prevents accepting a complete capture. These observations add some
+CPU/network overhead and do not measure uninstrumented latency or energy.
+
+Private `tcp-mac/` and `tcp-device/` contain JSON metadata, not PCAP files:
+IPv4 endpoints/ports, TCP sequence/acknowledgment/flags/lengths, timestamps and
+a Boolean for the four-byte `SSH-` prefix. Packet payloads, greeting text,
+credentials and keys are not written. Raw endpoints remain in ignored
+`.local/diagnostics/`. Capture setup/collection can add unrelated control
+connections; matching requires a unique recorded tunnel span and matching
+TCP handshake identities. Missing or ambiguous flows stay unqualified.
+Zero reported drops do not prove complete wire delivery.
+
+Recollection never launches a recorder or resubmits sleep. `ROUTE=wifi` can
+retrieve the device recorder when USB recovery is incomplete; the Mac still
+needs SSH access. If the original sleep result is uncertain, separately use
+`device:sleep-collect RUN=<original-run-id>` before considering another test.
+TCP collection cannot qualify a failed sleep. Original packet/result files
+are immutable; recollection preserves their bytes and original clock anchors.
+Helpers and metadata remain in their recorded private temporary directories
+for diagnosis. [Report 206](docs/206-two-ended-ssh-tcp-metadata.md) records
+the implementation, awake validation and outstanding attended sleep test.
+
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;
 `ROUTE=wifi` selects the configured Wi-Fi route. The task records manager startup

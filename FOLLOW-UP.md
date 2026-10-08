@@ -20,6 +20,19 @@ rehearsal `e1afea155b864a79b04bb133496e4e26`; validate current state before reus
 An audible warning does not replace readiness.
 [Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md).
 
+- [x] NEO-144 bounded two-ended SSH metadata recorder: saved awake/sleep/collect
+  tasks and offline flow report, with payload-free output, source/identity/hash
+  checks, limits, cleanup and original clock anchors. Final awake smoke matches
+  four USB SSH flows and greeting prefixes at both endpoints with zero reported
+  drops, unchanged boot/PM8/0, and successful recollection. Full host checks pass.
+  [Report 206](docs/206-two-ended-ssh-tcp-metadata.md).
+- [ ] Run the new recorder across one separately attended actual RTC sleep,
+  then inspect any greeting stall against matching endpoint/sequence identities
+  and host timing. Fresh PM inspection still accepts report 205's continuation;
+  recheck state at submission. Owner readiness has been requested. No additional
+  sleep has run as part of NEO-144. Metadata success alone cannot resolve the
+  historical SSH fault or establish wire delivery, energy or wake latency.
+
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte
   (1.575%) smaller `zImage`. All 24 compiled-DTB negative controls pass for both
@@ -290,6 +303,12 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   observations must not be conflated with report 201's confirmed post-return
   failure. Bounded socket-correlated metadata remains the next diagnostic step.
   [Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md).
+  NEO-144's bounded Mac/libpcap and GameShell/AF_PACKET metadata recorder now
+  passes awake validation and recollection; four flows are matched at both
+  endpoints and to unique host tunnel spans. No packet payload is persisted,
+  and source/identity/bounds/drop/clock/interface checks guard interpretation.
+  Use `device:ssh-trace-sleep` only with current admission and fresh readiness.
+  [Report 206](docs/206-two-ended-ssh-tcp-metadata.md).
   Earlier untimestamped failures still cannot be classified.
   [Report 197](docs/197-ssh-collection-timing.md).
 

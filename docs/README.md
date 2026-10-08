@@ -17,8 +17,9 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 [219 — Diagnostic.24 PM qualification](219-diagnostic24-pm-qualification.md)
-records freezer/driver/first late-noirq passes, retained keypad and both-route
-recovery at PM3/0. Later observations, four repeats and actual sleep remain.
+records all seven debug passes, retained keypad and both-route recovery at PM7/0,
+plus fresh health and combined admission. Batch observation, awake RTC rehearsal
+and actual sleep remain.
 
 [218 — Diagnostic.24 installation](218-diagnostic24-installation.md) records
 the coordinated shutdown, fresh card identity, full image readback and confirmed

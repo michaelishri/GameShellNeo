@@ -2,15 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
-**Attended qualification in progress, 8 October 2026:** NEO-158 passes the
-freezer, driver and first late/noirq debug checks on diagnostic.24, same boot
-`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM3/0. Both SSH routes recover,
+**Attended qualification in progress, 9 October 2026:** NEO-158 passes all seven
+freezer/driver/late-noirq debug checks on diagnostic.24, same boot
+`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM7/0. Both SSH routes recover,
 original keypad identity/handle survive, POWER is handed back and trace/warning
 controls restore. SDIO usage stays 2; all four s2idle callback counts remain
-zero, as expected for these debug stages. The initial driver USB-route failure
-and a first late/noirq SSH setup timeout are retained; no PM was resubmitted.
-The owner confirms the initial warning/display return. Await the first late/noirq
-observation and readiness for four repeats. No further screen
+zero, as expected for these debug stages. USB forwarding and SSH setup errors
+are retained; no PM was resubmitted. The complete stable SDIO history is
+`.local/neo158-reference-history.json`. A fresh read-only health capture
+`20261008T110759.803909Z` passes full health and seven-debug admission.
+The owner confirms the initial driver/late-noirq warning/display returns;
+await the four-repeat observation before the awake RTC rehearsal. Actual sleep
+requires a separate fresh ready response. No further screen
 test is running. [Report 219](docs/219-diagnostic24-pm-qualification.md).
 
 **Installation and awake checks complete, 8 October 2026:** NEO-157 shut down diagnostic.23

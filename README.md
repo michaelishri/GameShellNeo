@@ -11,13 +11,15 @@ and guards against sleep interrupting awake measurements. It requires all four
 CPUs to participate and independent timekeeping-freeze evidence. This candidate
 is installed after verified full DEV-card readback and owner-confirmed boot.
 Awake checks pass: all four cores expose the WFI state, both SSH routes work,
-and the battery, timer, journal and power-key prerequisites pass. Sleep recovery
-and energy qualification remain pending.
+and the battery, timer, journal and power-key prerequisites pass.
 [Report 218](docs/218-diagnostic24-installation.md) records these results.
 All seven freezer/driver/late-noirq debug checks pass, with both SSH routes
 recovered and the original keypad retained. [Report 219](docs/219-diagnostic24-pm-qualification.md)
-records PM7/0, owner-confirmed warnings/normal display returns throughout, and
-the passing awake RTC rehearsal. Actual sleep and energy qualification remain pending.
+records the passing awake RTC rehearsal and first actual connected-USB RTC
+sleep at PM8/0. All four CPU sleep callbacks run, with independent timekeeping
+freeze and a 28.87-second BOOTTIME–MONOTONIC gap. Both routes recover, and the
+owner confirms the warning and normal untouched display return. Repeated-cycle
+reliability, other power/cable profiles and energy savings remain unqualified.
 [Report 217](docs/217-wfi-s2idle-image-integration.md)
 records the changes and first-install sequence.
 

@@ -2,22 +2,26 @@
 
 Record deferred questions and activities here as they arise.
 
-**Attended qualification in progress, 9 October 2026:** NEO-158 passes all seven
-freezer/driver/late-noirq debug checks on diagnostic.24, same boot
-`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM7/0. Both SSH routes recover,
-original keypad identity/handle survive, POWER is handed back and trace/warning
-controls restore. SDIO usage stays 2; all four s2idle callback counts remain
-zero, as expected for these debug stages. USB forwarding and SSH setup errors
-are retained; no PM was resubmitted. The complete stable SDIO history is
-`.local/neo158-reference-history.json`. A fresh read-only health capture
-`20261008T110759.803909Z` passes full health and seven-debug admission.
-The owner confirms clear warnings and normal returns throughout the batch.
-The awake RTC rehearsal passes with all controls restored and both routes
-verified, still PM7/0: capture `20261008T111833.022485Z`, run
-`f96b80e84fd9449080f042a43c78a69f`. Use that rehearsal and the seven-debug
-history for the first actual sleep; fresh readiness has been requested.
-No further screen
-test is running. [Report 219](docs/219-diagnostic24-pm-qualification.md).
+**First coordinated sleep qualified, 9 October 2026:** NEO-158 completes seven
+freezer/driver/late-noirq debug checks, the awake RTC rehearsal and one actual
+connected-USB RTC sleep on diagnostic.24, boot
+`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM8/0. All four CPU s2idle callbacks
+advance once, with independent timekeeping-freeze evidence and a 28.869-second
+BOOTTIME–MONOTONIC gap. Both SSH routes recover, the original keypad handle
+survives, SDIO usage stays 2 and all temporary controls restore. The owner
+confirms clear warnings and normal untouched display returns. The first sleep
+capture is `20261008T112241.497557Z`, run `5165eaa30fb54d6ba48d89e85b5d3c5f`.
+Its `qualification-next.json` is unused and passes continuation validation
+against fresh health capture `20261008T112529.727122Z`. The awake rehearsal is
+`f96b80e84fd9449080f042a43c78a69f`, capture `20261008T111833.022485Z`;
+the seven-debug history is `.local/neo158-reference-history.json`.
+Next: fresh readiness and four connected sleep repeats, then independently
+qualified battery/cable profiles and energy comparisons. BOOTTIME battery
+freshness passes after resume; awake-measurement interruption rejection still
+needs its own hardware exercise. Earlier USB forwarding/SSH setup failures
+remain preserved under NEO-154; no PM was resubmitted and their cause is open.
+No further screen test is running.
+[Report 219](docs/219-diagnostic24-pm-qualification.md).
 
 **Installation and awake checks complete, 8 October 2026:** NEO-157 shut down diagnostic.23
 after the long warning sequence and owner-confirmed card-swap readiness.

@@ -1,13 +1,18 @@
 # Diagnostic.24 staged suspend/resume qualification
 
-8–9 October 2026, Pacific/Auckland; evidence timestamps are UTC. NEO-158 is in progress.
+8–9 October 2026, Pacific/Auckland; evidence timestamps are UTC. NEO-158 is complete.
 The freezer, driver and all five late/noirq debug checks pass on diagnostic.24/kernel
 `6.18.54-gameshellneo23`, boot `44b698ad-7fef-46d4-9e0f-71153f6f81e9`.
 Both SSH routes recover and the original keypad connection is retained.
-PM success/fail is **7/0**. The owner confirms clear warnings and normal display
+PM success/fail is **8/0**. The owner confirms clear warnings and normal display
 returns for the initial stages and four-repeat batch. The awake RTC rehearsal
 also passes with both routes working and all temporary controls restored.
-The first actual RTC sleep awaits fresh owner readiness.
+The first actual connected-USB RTC sleep also passes: all four CPU s2idle
+callbacks advance once, with independent timekeeping-freeze evidence and a
+28.869-second BOOTTIME–MONOTONIC gap. The owner confirms a clear warning and
+normal dim-console return without touching the cable or controls. This is one
+successful coordinated sleep/wake run; broader reliability and energy savings
+remain unqualified.
 [Report 218](218-diagnostic24-installation.md) records the installation and
 passing awake prerequisites.
 
@@ -207,23 +212,107 @@ The offline timing report validates with one submission, seven collection
 attempts and no recorded errors. Its 54.696-second capture includes setup,
 the awake alarm interval, collection and route proofs. Private files are
 `.local/neo158-rehearsal.log` and `.local/neo158-rehearsal-timing.json`.
-The owner has been asked for fresh readiness for one actual connected-USB
-RTC sleep. No sleep or screen test is running while awaiting that response.
+The owner subsequently confirmed fresh readiness for one actual connected-USB
+RTC sleep, recorded below.
+
+## First actual coordinated sleep
+
+The saved task ran once after the owner's readiness response:
+
+```sh
+task device:sleep-rtc \
+  QUALIFICATION=.local/neo158-reference-history.json \
+  REHEARSAL=f96b80e84fd9449080f042a43c78a69f ATTENDED=1
+```
+
+The original completed result passes on the same boot. The RTC wakes the device,
+both independent SSH routes recover, process memory verifies and the original
+keypad handle remains healthy. PM advances 7/0 → 8/0, with every failure counter
+zero. SDIO runtime usage stays 2 with unchanged policy. Backlight brightness and
+power return to 1/0. The one-second level-5 warning passes playback and control
+restoration; the owner confirms hearing it and seeing the normal dim console
+return without cable or button intervention.
+
+All four `cpi_wfi` s2idle callback counters advance from 0 to 1. The independent
+trace records one timekeeping-freeze pair as well as the expected late/noirq
+and RSB suspend/resume phases. Paired clock samples measure:
+
+| Measurement | Value |
+| --- | ---: |
+| BOOTTIME interval | 31.333655296 seconds |
+| MONOTONIC interval | 2.465098387 seconds |
+| BOOTTIME–MONOTONIC gap | 28.868556909 seconds |
+| Clock sampling uncertainty | 0.000021187 seconds |
+| Alarm elapsed interval | 32.008844772 seconds |
+
+The recorded s2idle boundary spans only 129 microseconds of MONOTONIC time
+because that clock stops during timekeeping suspension. It is not a 129 µs
+sleep or a resume-latency measurement. Callback counts and the independent
+freeze trace establish participation in Linux's coordinated s2idle path;
+they do not establish CPU/DRAM power-off, exact hardware residency or energy.
+
+The post-return battery sample is valid schema 2 on this boot, with BOOTTIME
+age 1.582 seconds and a sample duration of 0.016 seconds. Its BOOTTIME and
+MONOTONIC timestamps now differ by about 28.869 seconds. This exercises the
+sleep-inclusive timestamp path, but does not calibrate voltage or capacity or
+exercise every critical-battery-policy case. Interruption rejection by the
+awake-only measurement tools remains a separate gate.
+
+POWER is handed back after verified logical release and descriptor closure,
+with no key events. Policy, control, RTC and console ownership markers are
+cleared; no diagnostic policy drop-in remains. USB, Wi-Fi and keypad traces
+restore without recorded loss/overrun, and both audio amplifiers finish off.
+
+| Evidence | Value |
+| --- | --- |
+| Capture | `.local/diagnostics/20261008T112241.497557Z` |
+| Run | `5165eaa30fb54d6ba48d89e85b5d3c5f` |
+| Result SHA-256 | `d596ad2ede15a66fd0c25bc86c099440039aad203796e8a3f930e4dc27b78faa` |
+| Timing SHA-256 | `eacccf61e72c48af0d806c3707f9910c992f8e97b4136d213ce93adada45843f` |
+| Continuation SHA-256 | `ee49a231cfcbffe58557f0f9965993d4f6ad9dd61b5af617321ad5f0571f22ef` |
+
+The offline `report:sleep-evidence` task independently recomputes and passes
+the RTC, trace, paired-clock and WFI checks. Its assessment is
+`.local/diagnostics/20261008T112437.983695Z/sleep-evidence.json`; it does not
+alter or requalify the original result. The original log is
+`.local/neo158-first-sleep.log`.
+
+The offline SSH timing report validates one submission and eight collection
+attempts with no recorded errors. Total capture time is 96.064 seconds;
+the longest collection attempt lasts 36.196 seconds and succeeds. These include
+waiting and collection, not just device recovery, and do not measure wake
+latency. Packet/socket observers were not enabled. The earlier collection
+failures remain preserved, and NEO-154's underlying investigation stays open.
+The timing summary is `.local/neo158-first-sleep-timing.json`.
+
+## Final health and continuation
+
+A subsequent read-only `task device:pm-inspect` capture at
+`.local/diagnostics/20261008T112529.727122Z` passes full health validation.
+It retains the same boot, PM8/0, dim backlight and four s2idle counts of 1.
+The controller's existing admission code also accepts the generated
+`20261008T112241.497557Z/qualification-next.json` against this newer snapshot,
+revalidating the seven debug results and one actual sleep without weakening a
+gate. Saved checks are `health-validation.json` in the inspection capture and
+`.local/neo158-sleep-receipt-check.json`.
+
+The continuation is unused. No further sleep or screen test is running.
 
 ## Next gates and efficiency limits
 
-After fresh watching readiness, run one actual connected-USB RTC sleep using
-`.local/neo158-reference-history.json` and rehearsal
-`f96b80e84fd9449080f042a43c78a69f`. The saved task performs fresh health and
-qualification checks before submission. Require all four s2idle callback counts
-to advance and independent timekeeping-freeze evidence as well as the existing
-RTC, peripheral, route and owner-observation gates. Keep the first result intact
-on failure; do not immediately repeat or weaken a gate. Do not reuse
-diagnostic.23's qualification.
+The next bounded gate is four observed connected-USB RTC sleep/wake repeats,
+using the unused continuation and a freshly validated current state. Obtain
+fresh watching readiness, retain the long warning before each dark interval,
+review each original result and stop on failure. Battery-only and cable-change
+profiles then need their own qualification on this image. Do not reuse
+diagnostic.23's qualification or treat the diagnostic.24 debug runs as actual
+sleep repeats.
 
 The intended efficiency opportunity is coordinated clock-event and timekeeping
 suspension when all CPUs enter s2idle, avoiding timer-driven wakeups. WFI itself
-already existed in the ARM idle fallback. A registered driver and successful
-debug return do not establish lower current. Ordinary awake framework overhead,
-actual all-CPU sleep participation, independent timekeeping freeze, reliable
-resume and eventual unplugged battery comparisons remain distinct evidence gates.
+already existed in the ARM idle fallback. This first actual run establishes
+all-CPU callback participation, timekeeping freeze and functional recovery.
+It does not establish lower current. Ordinary awake framework overhead,
+broader resume reliability and eventual unplugged battery comparisons remain
+distinct evidence gates. CPU/DRAM retention and the product power-button/idle
+sleep policy are still separate work.

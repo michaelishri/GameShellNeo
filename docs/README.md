@@ -17,9 +17,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 [219 — Diagnostic.24 PM qualification](219-diagnostic24-pm-qualification.md)
-records all seven debug passes, retained keypad and both-route recovery at PM7/0,
-plus owner-confirmed warnings/normal returns and a passing awake RTC rehearsal.
-The first actual sleep awaits fresh readiness; energy remains unqualified.
+records all seven debug passes, the awake RTC rehearsal and the first actual
+connected-USB RTC sleep at PM8/0. All four CPU callbacks advance, independent
+timekeeping freeze is observed and both routes recover. The owner confirms
+clear warnings and normal untouched returns; broader reliability and energy
+remain unqualified.
 
 [218 — Diagnostic.24 installation](218-diagnostic24-installation.md) records
 the coordinated shutdown, fresh card identity, full image readback and confirmed

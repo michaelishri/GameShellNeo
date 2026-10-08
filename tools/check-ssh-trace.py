@@ -18,6 +18,7 @@ from private_config import load_env
 from remote import ROOT, LOCAL, connect_mac, device, evidence_directory, run, sudo, upload
 import tcp_metadata
 import tcp_report
+import tcp_supervisor
 
 
 def module(filename):
@@ -78,6 +79,30 @@ def prepare(config, client, manifest, side, interface):
     manifest[side] = dict(directory=directory, interface=interface, ready=False)
     with client.open_sftp() as sftp:
         upload(sftp, ROOT/'tools/tcp_metadata.py', directory+'/tcp_metadata.py')
+        if side == 'device':
+            upload(sftp, ROOT/'tools/tcp_supervisor.py', directory+'/tcp_supervisor.py')
+
+
+def observer(manifest):
+    return dict(directory=manifest['device']['directory'], run_id=manifest['run_id'],
+                source_sha256=manifest['source_sha256'],
+                supervisor_sha256=manifest['supervisor_sha256'], address=manifest['address'])
+
+
+def start_smoke(config, client, manifest):
+    if run(client, 'systemctl show gameshellneo-sleep-test -p LoadState --value', display=False).decode().strip() != 'not-found':
+        raise ValueError('An earlier sleep unit exists; collect it without resubmission')
+    directory = manifest['device']['directory']
+    command = ['sudo', '-n', 'systemd-run', '--quiet', '--collect', '--unit=gameshellneo-sleep-test',
+               '--property=RuntimeMaxSec=180', '--property=TimeoutStopSec=10', '--property=UMask=0077']
+    command += tcp_supervisor.prefix(observer(manifest))
+    command += ['/usr/bin/systemd-inhibit', '--what=handle-power-key:sleep:idle', '--mode=block',
+                '--who=GameShellNeo observer smoke', '--why=Read-only unit ownership validation',
+                '/usr/bin/python3', '-B', directory+'/tcp_supervisor.py', '--directory', directory,
+                '--run-id', manifest['run_id'], '--smoke']
+    run(client, shlex.join(command), display=False, timeout=15)
+    manifest['device']['ready_record'] = ready(config, client, manifest, 'device')
+    manifest['device']['ready'] = True
 
 
 def start(config, client, manifest, side):
@@ -125,6 +150,28 @@ def finish_side(config, client, manifest, side, path):
                 with tcp_metadata.exclusive(file) as output:
                     output.write(data)
         info['collected'] = True
+        if side == 'device' and info.get('sleep_unit'):
+            # The recorder closes before the supervisor publishes its outcome.
+            for _ in range(30):
+                try:
+                    run(client, shlex.join(['sudo', '-n', '/bin/test', '-f', info['directory']+'/supervisor.json']),
+                        display=False, timeout=5)
+                    break
+                except RuntimeError:
+                    time.sleep(0.2)
+            else:
+                raise TimeoutError('Observer supervisor has not completed')
+            names = ['supervisor.json']+(['smoke.json'] if manifest['mode'] == 'smoke' else [])
+            for name in names:
+                data = helper(config, client, manifest, side, 'export', '--file', name)
+                file = destination/name
+                if file.exists():
+                    if file.read_bytes() != data:
+                        raise ValueError('Original observer artifact changed')
+                else:
+                    with tcp_metadata.exclusive(file) as output:
+                        output.write(data)
+            info['supervisor_collected'] = True
         return
     raise TimeoutError('Recorder result is not available; original run remains bounded')
 
@@ -162,12 +209,15 @@ def inspect_boot(client):
     return dict(boot_id=value[0], success=int(value[1]), fail=int(value[2]))
 
 
-def execute(config, path, sleep=False):
+def execute(config, path, sleep=False, smoke=False):
     address = str(ipaddress.IPv4Address(config.get('GAMESHELL_USB_IP', '192.168.10.1')))
     source = (ROOT/'tools/tcp_metadata.py').read_bytes()
+    supervisor = (ROOT/'tools/tcp_supervisor.py').read_bytes()
     manifest = dict(schema=1, run_id=uuid.uuid4().hex, address=address, source_sha256=hashlib.sha256(source).hexdigest(),
-                    mode='sleep' if sleep else 'awake', mac_clocks=[], operation_passed=False)
+                    supervisor_sha256=hashlib.sha256(supervisor).hexdigest(),
+                    mode='sleep' if sleep else 'smoke' if smoke else 'awake', mac_clocks=[], operation_passed=False)
     (path/'tcp_metadata.py').write_bytes(source)
+    (path/'tcp_supervisor.py').write_bytes(supervisor)
     save(path/'tcp-run.json', manifest)
     original_error = None
     try:
@@ -185,14 +235,22 @@ def execute(config, path, sleep=False):
         with device(config, 'usb') as board:
             manifest['before'] = inspect_boot(board)
             prepare(config, board, manifest, 'device', 'usb0')
-            manifest['device']['launch_requested'] = True
-            save(path/'tcp-run.json', manifest)
-            start(config, board, manifest, 'device')
+            manifest['device']['sleep_unit'] = sleep or smoke
+            if not sleep:
+                manifest['device']['launch_requested'] = True
+                save(path/'tcp-run.json', manifest)
+                if smoke:
+                    start_smoke(config, board, manifest)
+                else:
+                    start(config, board, manifest, 'device')
             save(path/'tcp-run.json', manifest)
         if sleep:
             runner = module('check-sleep-rtc.py')
             proof = Path(os.environ['NEO_SLEEP_QUALIFICATION'])
-            value = runner.experiment(config, path, proof, 'rtc-wake', os.environ['NEO_SLEEP_REHEARSAL'])
+            manifest['device']['launch_requested'] = True
+            save(path/'tcp-run.json', manifest)
+            value = runner.experiment(config, path, proof, 'rtc-wake', os.environ['NEO_SLEEP_REHEARSAL'],
+                                      observer=observer(manifest))
             continuation = json.loads(proof.read_text())
             continuation.setdefault('sleeps', []).append(dict(capture=str((path/'result.json').relative_to(ROOT)), run_id=value['run_id']))
             save(path/'qualification-next.json', continuation)
@@ -231,6 +289,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--sleep', action='store_true')
+    mode.add_argument('--smoke', action='store_true')
     mode.add_argument('--collect', action='store_true')
     mode.add_argument('--report', action='store_true')
     args = parser.parse_args()
@@ -252,7 +311,7 @@ def main():
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         path = evidence_directory()
         print('Private two-ended TCP evidence:', path, flush=True)
-        execute(load_env(), path, args.sleep)
+        execute(load_env(), path, args.sleep, args.smoke)
 
 
 if __name__ == '__main__':

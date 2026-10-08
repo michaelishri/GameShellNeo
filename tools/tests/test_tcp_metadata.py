@@ -233,6 +233,25 @@ class CorrelationTests(unittest.TestCase):
             manifest['mac_clocks'].append(dict(host_before_ns=0,host_after_ns=0,clock=dict(realtime_ns=0)))
             (root/'tcp-run.json').write_text(json.dumps(manifest))
             self.assertEqual(report.report(root),summary)
+            manifest.update(mode='smoke', device=dict(sleep_unit=True), supervisor_sha256='c'*64)
+            (root/'tcp-run.json').write_text(json.dumps(manifest))
+            supervised=dict(run_id=TOKEN, source_sha256='c'*64, passed=True, command_started=True,
+                            command_returncode=0, recorder_returncode=0, cleanup_errors=[],
+                            cgroup='0::/system.slice/gameshellneo-sleep-test.service\n')
+            smoke=dict(run_id=TOKEN, passed=True, cgroup=supervised['cgroup'],
+                       active_units=['gameshellneo-sleep-test.service'])
+            (root/'tcp-device/supervisor.json').write_text(json.dumps(supervised))
+            (root/'tcp-device/smoke.json').write_text(json.dumps(smoke))
+            self.assertEqual(report.report(root)['matched_greeting_flows'],1)
+            for field, bad in [('run_id','f'*32),('source_sha256','d'*64),('passed',False),
+                               ('command_started',False),('command_returncode',7),('recorder_returncode',1),
+                               ('cleanup_errors',['OSError']),('cgroup','0::/other\n')]:
+                (root/'tcp-device/supervisor.json').write_text(json.dumps(supervised|{field:bad}))
+                with self.assertRaisesRegex(ValueError,'lifecycle'):report.report(root)
+            (root/'tcp-device/supervisor.json').write_text(json.dumps(supervised))
+            (root/'tcp-device/smoke.json').write_text(json.dumps(smoke|{'active_units':['gameshellneo-foreign.service']}))
+            with self.assertRaisesRegex(ValueError,'ownership'):report.report(root)
+            (root/'tcp-device/smoke.json').write_text(json.dumps(smoke))
             state['stats']['dropped']=1
             (root/'tcp-device/result.json').write_text(json.dumps(state))
             with self.assertRaises(ValueError): report.report(root)

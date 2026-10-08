@@ -134,6 +134,23 @@ def report(path):
     identity, source, server = (manifest[k] for k in ('run_id', 'source_sha256', 'address'))
     mac, ms = load_side(path/'tcp-mac', identity, source, server)
     board, bs = load_side(path/'tcp-device', identity, source, server)
+    if manifest.get('device', {}).get('sleep_unit'):
+        supervisor = json.loads((path/'tcp-device/supervisor.json').read_text())
+        if (supervisor.get('run_id') != identity or supervisor.get('source_sha256') != manifest.get('supervisor_sha256') or
+                supervisor.get('passed') is not True or supervisor.get('command_started') is not True or
+                supervisor.get('cleanup_errors') != [] or
+                supervisor.get('command_returncode') != 0 or supervisor.get('recorder_returncode') != 0 or
+                supervisor.get('cgroup') != '0::/system.slice/gameshellneo-sleep-test.service\n'):
+            raise ValueError('Incomplete observer unit lifecycle')
+        if manifest['mode'] == 'smoke':
+            smoke = json.loads((path/'tcp-device/smoke.json').read_text())
+            allowed = {'gameshellneo-usb.service', 'gameshellneo-ready.service',
+                       'gameshellneo-battery.service', 'gameshellneo-sleep-test.service'}
+            active = smoke.get('active_units', [])
+            if (smoke.get('run_id') != identity or smoke.get('passed') is not True or
+                    smoke.get('cgroup') != supervisor['cgroup'] or
+                    'gameshellneo-sleep-test.service' not in active or any(unit not in allowed for unit in active)):
+                raise ValueError('Observer smoke did not establish diagnostic ownership')
     timing = summarize(path)  # Includes SSH observations, rejects truncated nesting.
     events = [json.loads(line) for line in (path/'host-timing.jsonl').read_text().splitlines()]
     begins = {r['span']: r for r in events if r['event'] == 'begin'}

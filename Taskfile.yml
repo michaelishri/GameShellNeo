@@ -721,6 +721,12 @@ tasks:
       NEO_ROUTE: usb
     cmds: [python3 tools/check-ssh-trace.py]
 
+  device:ssh-trace-smoke:
+    desc: Awake observer lifecycle in the sleep-test unit plus three SSH probe pairs; no PM or display change
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py --smoke]
+
   device:ssh-trace-sleep:
     desc: One attended RTC sleep with bounded two-ended TCP metadata; QUALIFICATION/REHEARSAL/ATTENDED required
     env:

@@ -314,7 +314,7 @@ def main():
     parser.add_argument('--interface')
     parser.add_argument('--address')
     parser.add_argument('--seconds', type=int, default=MAX_SECONDS)
-    parser.add_argument('--file', choices=('ready.json', 'result.json', 'packets.jsonl'))
+    parser.add_argument('--file', choices=('ready.json', 'result.json', 'packets.jsonl', 'supervisor.json', 'smoke.json'))
     args = parser.parse_args()
     os.umask(0o077)
     if args.mode == 'clock':

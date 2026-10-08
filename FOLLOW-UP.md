@@ -26,12 +26,23 @@ An audible warning does not replace readiness.
   four USB SSH flows and greeting prefixes at both endpoints with zero reported
   drops, unchanged boot/PM8/0, and successful recollection. Full host checks pass.
   [Report 206](docs/206-two-ended-ssh-tcp-metadata.md).
-- [ ] Run the new recorder across one separately attended actual RTC sleep,
-  then inspect any greeting stall against matching endpoint/sequence identities
-  and host timing. Fresh PM inspection still accepts report 205's continuation;
-  recheck state at submission. Owner readiness has been requested. No additional
-  sleep has run as part of NEO-144. Metadata success alone cannot resolve the
-  historical SSH fault or establish wire delivery, energy or wake latency.
+- [x] Correct the recorder's sleep-service integration. NEO-145's first attempt
+  was rejected before warning, alarm or PM entry because the independent recorder
+  was another active diagnostic. Originals are retained; no successor claim was
+  consumed. The recorder now shares the existing sleep-test service's lifecycle,
+  preserving the unchanged device admission guard and PM helper. The saved
+  `device:ssh-trace-smoke` passes while awake: four matched USB flows, six successful
+  route probes, verified cgroup/unit ownership, both children exit zero and no
+  cleanup errors. Full host checks pass; boot/PM8/0 unchanged.
+  [Report 207](docs/207-ssh-observer-sleep-unit-integration.md).
+- [ ] Complete NEO-145's separately attended actual RTC sleep with the corrected
+  observer integration, then inspect any greeting stall against matching
+  endpoint/sequence identities and host timing. Final health and receipt validation
+  still accept report 205's unused continuation; no source-qualified device helper
+  changed and no debug repeat or image swap is needed while that state holds.
+  Fresh owner readiness has been requested after the pre-entry rejection.
+  No further sleep or display test is running. Metadata success alone cannot
+  resolve the historical SSH fault or establish wire delivery, energy or wake latency.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte
@@ -309,6 +320,11 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   and source/identity/bounds/drop/clock/interface checks guard interpretation.
   Use `device:ssh-trace-sleep` only with current admission and fresh readiness.
   [Report 206](docs/206-two-ended-ssh-tcp-metadata.md).
+  NEO-145 corrects its first sleep-integration failure: the separate recorder
+  service was rejected before PM entry. The recorder is now owned by the
+  existing sleep service, with awake lifecycle/probe validation and the original
+  admission guard unchanged. The actual instrumented sleep is still pending.
+  [Report 207](docs/207-ssh-observer-sleep-unit-integration.md).
   Earlier untimestamped failures still cannot be classified.
   [Report 197](docs/197-ssh-collection-timing.md).
 

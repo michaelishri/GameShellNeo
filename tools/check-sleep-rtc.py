@@ -82,7 +82,7 @@ def receipt(path, before, connection='usb'):
     return proof
 
 
-def service(directory, token, mode, rehearsal, connection='usb'):
+def service(directory, token, mode, rehearsal, connection='usb', observer=None):
     diagnostic.sleep_connection.profile(connection)
     if not re.fullmatch(r'/tmp/gameshellneo-sleep\.[A-Za-z0-9]+', directory):
         raise ValueError('Unexpected sleep helper path')
@@ -105,6 +105,12 @@ def service(directory, token, mode, rehearsal, connection='usb'):
         command += ['--cable-action-confirmed']
     if mode == 'rtc-wake':
         command += ['--attended', '--rehearsal', diagnostic.policy.run_id(rehearsal)]
+    if observer is not None:
+        if mode != 'rtc-wake' or connection != 'usb':
+            raise ValueError('TCP observer requires a connected-USB actual sleep')
+        from tcp_supervisor import prefix
+        index = command.index('/usr/bin/systemd-inhibit')
+        command[index:index] = prefix(observer)
     return command
 
 
@@ -168,7 +174,7 @@ def usb_proof(config, expected_boot):
 
 
 @timed_capture('sleep.experiment')
-def experiment(config, capture, qualification, mode, rehearsal, connection='usb'):
+def experiment(config, capture, qualification, mode, rehearsal, connection='usb', observer=None):
     diagnostic.sleep_connection.profile(connection)
     route = 'usb' if connection == 'usb' else 'wifi'
     token = uuid.uuid4().hex
@@ -185,7 +191,7 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
         if run(client, 'systemctl show gameshellneo-sleep-test -p LoadState --value', display=False).decode().strip() != 'not-found':
             raise ValueError('An earlier sleep unit exists; collect it without resubmission')
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-sleep.XXXXXXXX', display=False).decode().strip()
-        command = service(directory, token, mode, rehearsal, connection)
+        command = service(directory, token, mode, rehearsal, connection, observer)
         (capture/'qualification.json').write_text(json.dumps(proof, indent=2)+'\n')
         (capture/'source.json').write_text(json.dumps(diagnostic.sources(), indent=2)+'\n')
         with client.open_sftp() as sftp:

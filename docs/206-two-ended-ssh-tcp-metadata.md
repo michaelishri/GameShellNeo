@@ -6,6 +6,11 @@ existing SSH path. Awake validation passes on diagnostic.23/kernel
 unchanged. The separately attended sleep test is pending. No image, installed
 package, driver, SSH timeout/retry policy or charging setting changed.
 
+Subsequent [report 207](207-ssh-observer-sleep-unit-integration.md) records the
+first sleep attempt's pre-entry admission rejection and the corrected observer
+ownership. The actual-sleep path now runs the recorder inside the existing
+sleep-test service; standalone awake capture retains the service described below.
+
 ## Question and design
 
 [Report 205](205-diagnostic23-fresh-boot-ssh-qualification.md) captured one

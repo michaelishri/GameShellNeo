@@ -350,6 +350,7 @@ uses the same connection path and timeouts:
 
 ```sh
 task device:ssh-trace-awake # Fixed three USB/Wi-Fi pairs; screen stays on
+task device:ssh-trace-smoke # Same probes with the observer owned by the sleep-test unit; no sleep
 task report:ssh-trace CAPTURE=.local/diagnostics/<capture> # Offline validation
 # Only after fresh observer readiness and the normal same-boot sleep gates:
 task device:ssh-trace-sleep QUALIFICATION=<current-receipt> REHEARSAL=<original-run-id> ATTENDED=1
@@ -362,7 +363,12 @@ native packet socket on `usb0`; the Mac uses its system libpcap on the Ethernet
 interface selected by the USB route. Temporary privileged helpers close their
 capture handles after a requested stop or a five-minute limit. They do not
 install packages, change networking/SSH policy or leave a capture service
-enabled. The Linux helper also has a systemd runtime deadline. A deadline,
+enabled. The Linux helper also has a systemd runtime deadline. For actual sleep,
+the recorder is a child of the existing sleep-test service, alongside the
+unchanged diagnostic. A source/identity/readiness check must pass before the
+diagnostic starts; its admission guard and 180-second service limit remain in
+force. The smoke task checks that ownership while awake. It does not qualify
+sleep, program the RTC, consume a continuation or blank the screen. A deadline,
 packet/byte cap, reported drops, rejected headers, clock step or changed
 interface prevents accepting a complete capture. These observations add some
 CPU/network overhead and do not measure uninstrumented latency or energy.
@@ -384,7 +390,8 @@ TCP collection cannot qualify a failed sleep. Original packet/result files
 are immutable; recollection preserves their bytes and original clock anchors.
 Helpers and metadata remain in their recorded private temporary directories
 for diagnosis. [Report 206](docs/206-two-ended-ssh-tcp-metadata.md) records
-the implementation, awake validation and outstanding attended sleep test.
+the recorder design; [report 207](docs/207-ssh-observer-sleep-unit-integration.md)
+records the pre-sleep integration failure, correction and validation.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

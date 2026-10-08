@@ -435,6 +435,11 @@ Likewise, a packet flow's unique time overlap with a tunnel request is only a
 candidate association: `host_tunnel_identity_verified` remains false.
 [Report 211](docs/211-forwarded-ssh-observation.md) records the source audit,
 late server closure, local failure controls and passing awake validation.
+[Report 212](docs/212-rtc-wake-forwarding-byte-validation.md) adds attended sleep
+validation: this time SSH setup succeeds after wake, with usable byte counts;
+the original intermittent failure remains unresolved. Channel flags accept both
+booleans and Paramiko's integer `0`/`1` representation; unsupported values remain
+unknown. The correction is separately verified awake.
 
 `device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
 diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;

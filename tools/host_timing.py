@@ -210,6 +210,9 @@ def forward_state(channel, stage='connect-finished'):
             value = getattr(channel.channel, name)
             if name == 'recv_ready': value = value()
             if type(value) is bool: values[name] = value
+            elif type(value) is int and value in (0, 1):
+                # Paramiko Channel mixes bool with integer active/EOF flags.
+                values[name] = bool(value)
         except Exception:
             pass  # Best-effort state must not replace connect's original error.
     recorder.emit(event='forward_state', span=recorder.parent, stage=stage,

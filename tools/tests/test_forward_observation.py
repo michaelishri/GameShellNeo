@@ -65,6 +65,26 @@ class ForwardObservation(unittest.TestCase):
         self.assertTrue(all(end[k] is None for k in timing.FORWARD_FLAGS))
         self.assertTrue(all(end[k]==0 for k in timing.FORWARD_COUNTS))
 
+    def test_channel_integer_flags_are_boolean_but_other_values_stay_unknown(self):
+        channel=MagicMock(active=1,closed=False,eof_received=0,eof_sent=1)
+        channel.recv_ready.return_value=False
+        with timing.capture_timing(self.root):
+            with timing.phase('device.tunnel'):wrapped=timing.observe_forward(channel)
+            with timing.phase('device.ssh'):
+                channel.active=0;channel.closed=True
+                channel.eof_received=2;channel.eof_sent='1'
+                channel.recv_ready.return_value=0.0
+                timing.forward_state(wrapped)
+        opened,finished=timing.summarize(self.root)['forward_states']
+        self.assertIs(opened['active'],True)
+        self.assertIs(opened['closed'],False)
+        self.assertIs(opened['eof_received'],False)
+        self.assertIs(opened['eof_sent'],True)
+        self.assertIs(finished['active'],False)
+        self.assertIs(finished['closed'],True)
+        for name in ('eof_received','eof_sent','recv_ready'):
+            self.assertIsNone(finished[name])
+
     def test_remote_observes_before_cleanup_and_preserves_original_error_and_timeouts(self):
         mac=MagicMock();channel=mac.get_transport.return_value.open_channel.return_value
         channel.active=True;channel.closed=False;channel.eof_received=False;channel.eof_sent=False

@@ -2,7 +2,24 @@
 
 Record deferred questions and activities here as they arise.
 
-**Latest attended work, 8 October 2026:** diagnostic.23 remains on boot
+**Latest attended work, 8 October 2026:** NEO-149 passes one RTC sleep on
+diagnostic.23, same boot `cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM11/0
+(seven debug checks and four actual sleeps). The owner confirms the clear warning
+and normal untouched dim-console return. Both routes recover; the earlier
+post-return SSH setup failure does not recur. Twelve inner SSH setups have
+healthy byte counts. The Mac observer records another explicit 29.92-second
+interface-disappearance gap, then seven matched greeting flows; continuous
+coverage remains rejected and both recorders report zero drops. A channel-flag
+integer/boolean compatibility fix passes regression and subsequent awake checks.
+No further sleep is running. Post-sleep full health/continuation validation passes;
+temporary services are inactive/not-found. The current unused continuation is
+`.local/diagnostics/20261008T070741.360669Z/qualification-next.json`, retaining
+rehearsal `e1afea155b864a79b04bb133496e4e26`. Its 062557 predecessor is consumed.
+Validate live state and obtain fresh readiness before further PM. NEO-150 tracks
+socket attribution and the still-open failure cause.
+[Report 212](docs/212-rtc-wake-forwarding-byte-validation.md).
+
+**Earlier attended work, 8 October 2026:** diagnostic.23 remains on boot
 `cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM10/0: seven qualified debug checks
 and three actual RTC sleeps. The latest sleep passes, with controls restored,
 original keypad retained, stable SDIO usage and both SSH routes healthy. The
@@ -11,8 +28,8 @@ The revised Mac observer records a real interface disappearance and recovers in
 29 attempts, retaining an explicit 29.907-second gap. Both recorders report zero
 drops; five later handshakes match within clean segments. Continuous coverage
 remains rejected. One post-return SSH setup fails without an observed greeting;
-its incomplete handshake does not establish the cause. NEO-148 investigates it.
-No further display or sleep test is running. The current unused continuation is
+its incomplete handshake does not establish the cause. NEO-148 audits it below.
+No further display or sleep test ran then. The then-unused continuation was
 `.local/diagnostics/20261008T062557.111288Z/qualification-next.json`, with
 rehearsal `e1afea155b864a79b04bb133496e4e26`; the former 054356 continuation was
 consumed. Final health and full continuation validation pass. Validate current
@@ -91,13 +108,20 @@ required separately attended qualification; NEO-147 below records its result.
   full host checks and awake two-ended recording. This completes the audit and
   diagnostic preparation, not root-cause resolution.
   [Report 211](docs/211-forwarded-ssh-observation.md).
-- [ ] NEO-149: retain the new forwarding observations during the next justified
-  attended sleep, after fresh readiness and current qualification checks. Do
-  not repeat PM merely to provoke failure. If channel bytes and packet evidence
-  still disagree, prepare a bounded TCP-state observer with independently tied
-  process/endpoint identity. The actual SSH/USB cause remains unresolved; keep
-  first failures and capture gaps, and do not alter timeouts/retries or driver
-  behavior without evidence.
+- [x] NEO-149: one attended sleep with forwarding observations passes functional
+  and both-route recovery checks, with owner confirmation. The earlier failed
+  SSH setup does not recur; twelve setups transfer bytes and authenticate. The
+  Mac gap stays rejected, with seven later matched flows and zero recorder drops.
+  Correct integer/boolean channel flags and validate awake; preserve the original
+  unknown fields. Full host checks pass. The intermittent cause remains open.
+  [Report 212](docs/212-rtc-wake-forwarding-byte-validation.md).
+- [ ] NEO-150: independently identify the Mac's outgoing forwarded TCP socket
+  and collect bounded passive process/endpoint/state evidence. Validate attribution
+  with awake controls before another failure experiment. Keep original failures,
+  gaps and unknowns; timing overlap, a port match or channel peer address is not
+  proof of socket ownership. Do not repeat PM merely to provoke failure or change
+  retries/timeouts/driver behavior without cause evidence. Any further PM requires
+  current admission and fresh observer readiness.
 
 - [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
   nine audited configuration removals, identical ten modules/DTB and a 103,648-byte

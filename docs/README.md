@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[212 — RTC wake with forwarding byte observations](212-rtc-wake-forwarding-byte-validation.md)
+records a passing attended sleep, healthy post-return SSH with byte counts,
+another explicitly gapped Mac recording and seven matched later flows. An
+integer-flag compatibility correction passes awake validation; the earlier
+intermittent SSH cause remains unresolved.
+
 [211 — Forwarded SSH observations](211-forwarded-ssh-observation.md) separates
 channel confirmation, TCP identity and greeting delivery; records a later
 same-peer/port server closure; and adds passive byte/state counters validated

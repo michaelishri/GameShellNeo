@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[232 — Diagnostic.25 MUSB restart integration](232-musb-restart-image-integration.md)
+records a built and offline-verified image from the reviewed NEO-108/163 endpoint
+restart fix, retaining diagnostic.24 recovery. The later NEO-106 teardown stack
+is excluded. Attended hardware qualification remains separate; the image is not
+yet installed.
+
 [225 — MUSB deferred restart ownership](225-musb-resume-request-ownership.md)
 records the NEO-108 candidate and NEO-163 review corrections: retaining restart
 ownership across a busy giveback, balancing its temporary PM reference, and

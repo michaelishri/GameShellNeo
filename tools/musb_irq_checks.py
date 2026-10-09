@@ -6,7 +6,9 @@ PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch
            '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch',
            '0037-musb-resume-request-ownership.patch', '0038-musb-probe-role-unwind.patch',
            '0039-musb-core-irq-retirement.patch', '0040-musb-core-work-retirement.patch',
-           '0041-musb-runtime-pm-retirement.patch', '0042-musb-resume-work-retirement.patch')
+           '0041-musb-runtime-pm-retirement.patch', '0042-musb-resume-work-retirement.patch',
+           '0043-extcon-notifier-drain.patch', '0044-sunxi-child-notifier-work.patch',
+           '0045-extcon-provider-link.patch')
 
 
 def extract_source(archive, lock, queue, apply_queue, scratch):

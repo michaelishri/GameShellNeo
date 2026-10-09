@@ -118,7 +118,8 @@ def main():
             ):
                 print('Compiling MUSB IRQ configuration:', name, flush=True)
                 evidence['arm_configurations'][name] = compile_objects(
-                    archive, lock, WORK, [prefix + obj for obj in objects],
+                    archive, lock, WORK, [prefix + obj for obj in objects] +
+                    ['drivers/extcon/extcon.o', 'drivers/extcon/devres.o'],
                     extra_config=config, project_config=name == 'project')
                 atomic_json(WORK / 'compile-progress.json', evidence)
         atomic_json(receipt, evidence)

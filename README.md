@@ -2870,3 +2870,26 @@ Changed helper/image inputs require fresh debug prerequisites and rehearsal.
 [Report 154](docs/154-usb-sleep-session-retirement.md) explains the prospective
 policy, source-test limits and required hardware qualification. Report 153's
 original failed result is unchanged.
+
+
+The `work/sunxi-retirement` integration combines Sunxi child notifier/work
+ownership and extcon provider lifetime with the core teardown queue. Host-only
+checks (run sequentially) are:
+
+```sh
+task test:sunxi-owner            # 240 actual-source scenarios, native and ARM32
+task check:extcon-drivers        # Notifier models and ARM board/module/TINY builds
+task check:musb-irq-drivers      # Combined MUSB + extcon objects, five ARM configurations
+task test:extcon-kunit           # Real notifier/SRCU tests, TREE and TINY kernels
+task test:extcon-provider-kunit  # Real provider/consumer ordering, same cached kernels
+```
+
+Use `VARIANT=tree` or `VARIANT=tiny` to select one KUnit configuration.
+The KUnit runner adds fixtures from `kernel/tests/` only to its isolated
+source tree; the production patch queue contains no extcon test fixtures.
+Accepted kernel/config/log/report copies and hashed receipts are retained
+under `.local/build/extcon-kunit/`; the two suites share compiled kernels
+but retain independent results. Source-test receipts are under
+`.local/build/{sunxi-owner-tests,extcon-notifier-tests,musb-irq-tests}/`.
+[Report 231](docs/231-sunxi-retirement-integration.md) records provenance,
+acceptance, results and remaining hardware/backend boundaries.

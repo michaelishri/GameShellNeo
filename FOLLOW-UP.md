@@ -1058,3 +1058,13 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] Audit whether explicitly identified diagnostic metadata can be excluded from the base-rootfs cache key. Diagnostic.19's new `sleep_cable_irq_policy` field correctly failed the current conservative cache match and triggered a fresh Debian bootstrap; diagnostic.20's additional supply-wake feature similarly requires a fresh bootstrap under this policy. The field is consumed by final image identity and diagnostic admission, but any narrower cache key needs a complete consumer audit and tests that still invalidate reuse for package, APT, builder and unknown feature changes. Do not bypass the existing provenance check merely to speed a build.
 
 - [ ] Preflight all dependencies when reusing a completed kernel in an isolated image-build workspace, including the locked kernel regulatory signing certificates. Diagnostic.20 assembled successfully but its first verification correctly rejected an empty certificate set because only compiled artifacts had been staged. Restoring the hash-checked, patched source allowed unchanged-image verification to pass. Consider exporting verified certificates with the completed stage and checking prerequisites before a long bootstrap; preserve the current signature/trust checks.
+
+
+- [ ] NEO-169 integrates the earlier Sunxi child notifier/work and extcon provider
+  candidates with the core retirement queue on `work/sunxi-retirement` (patches
+  0043–0045). [Report 231](docs/231-sunxi-retirement-integration.md) supersedes the
+  earlier separate-branch integration status, not its hardware limits. Finish
+  the Allwinner PHY detector's independent IRQ/work/resource audit and other PHY
+  consumer ordering, caller-frame/global-accessor lifetime and other backend/DMA
+  prerequisites before complete removal qualification. Keep NEO-106 open and
+  NEO-108's physical card swap parked; do not resume the abandoned SSH investigation.

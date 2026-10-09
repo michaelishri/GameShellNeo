@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[231 — Sunxi retirement integration](231-sunxi-retirement-integration.md)
+combines child notifier/work ownership and provider lifetime with the core
+teardown stack, with isolated framework KUnit fixtures and explicit limits.
+
 [230 — MUSB pending-resume callback retirement](230-musb-resume-work-retirement.md)
 records terminal admission, callback drain and borrowed-data ownership, including
 gadget giveback restart handoffs. Independent producer lifetime remains open.

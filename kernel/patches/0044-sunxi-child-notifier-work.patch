@@ -1,0 +1,145 @@
+Subject: [PATCH] usb: musb: sunxi: own notifier and work with the child
+
+Pair each child initialization with synchronous extcon unlink and work
+shutdown, including PHY initialization failure. Keep parent work disabled
+between child instances; reconstruct role state and sample the current
+connector state when a new instance is enabled.
+
+Requires synchronous extcon consumer drain, bound-provider lifetime
+ordering, and core IRQ/work/runtime-PM/resume retirement. This patch only
+establishes the Sunxi child notifier/work portion of that contract.
+
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -58,7 +58,6 @@
+ 
+ /* flags */
+ #define SUNXI_MUSB_FL_ENABLED			0
+-#define SUNXI_MUSB_FL_HOSTMODE			1
+ #define SUNXI_MUSB_FL_HOSTMODE_PEND		2
+ #define SUNXI_MUSB_FL_VBUS_ON			3
+ #define SUNXI_MUSB_FL_PHY_ON			4
+@@ -87,6 +86,7 @@
+ 	struct platform_device	*usb_phy;
+ 	struct usb_phy		*xceiv;
+ 	enum phy_mode		phy_mode;
++	enum phy_mode		initial_phy_mode;
+ 	unsigned long		flags;
+ 	struct work_struct	work;
+ 	struct extcon_dev	*extcon;
+@@ -106,11 +106,16 @@
+ 		struct musb *musb = glue->musb;
+ 		unsigned long flags;
+ 		u8 devctl;
++		int host;
++
++		host = extcon_get_state(glue->extcon, EXTCON_USB_HOST);
++		if (host < 0)
++			return;
+ 
+ 		spin_lock_irqsave(&musb->lock, flags);
+ 
+ 		devctl = readb(musb->mregs + SUNXI_MUSB_DEVCTL);
+-		if (test_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags)) {
++		if (host) {
+ 			set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
+ 			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
+ 			MUSB_HST_MODE(musb);
+@@ -208,11 +213,7 @@
+ {
+ 	struct sunxi_glue *glue = container_of(nb, struct sunxi_glue, host_nb);
+ 
+-	if (event)
+-		set_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags);
+-	else
+-		clear_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags);
+-
++	/* The worker samples current state, including after child rebind. */
+ 	set_bit(SUNXI_MUSB_FL_HOSTMODE_PEND, &glue->flags);
+ 	schedule_work(&glue->work);
+ 
+@@ -246,15 +247,24 @@
+ 
+ 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
+ 
+-	/* Register notifier before calling phy_init() */
+-	ret = devm_extcon_register_notifier(glue->dev, glue->extcon,
+-					EXTCON_USB_HOST, &glue->host_nb);
++	/* A previous child may have left role requests in the parent glue. */
++	glue->flags &= BIT(SUNXI_MUSB_FL_HAS_SRAM) |
++		       BIT(SUNXI_MUSB_FL_HAS_RESET) |
++		       BIT(SUNXI_MUSB_FL_NO_CONFIGDATA);
++	glue->musb = musb;
++	glue->phy_mode = glue->initial_phy_mode;
++	set_bit(SUNXI_MUSB_FL_HOSTMODE_PEND, &glue->flags);
++	enable_work(&glue->work);
++
++	/* The child owns this registration, including phy_init() failure. */
++	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
++				       &glue->host_nb);
+ 	if (ret)
+-		goto error_reset_assert;
++		goto error_disable_work;
+ 
+ 	ret = phy_init(glue->phy);
+ 	if (ret)
+-		goto error_reset_assert;
++		goto error_unregister_notifier;
+ 
+ 	musb->isr = sunxi_musb_interrupt;
+ 
+@@ -263,7 +273,11 @@
+ 
+ 	return 0;
+ 
+-error_reset_assert:
++error_unregister_notifier:
++	WARN_ON(extcon_unregister_notifier_sync(glue->extcon, EXTCON_USB_HOST,
++						&glue->host_nb));
++error_disable_work:
++	disable_work_sync(&glue->work);
+ 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+ 		reset_control_assert(glue->rst);
+ error_clk_disable:
+@@ -278,9 +292,13 @@
+ {
+ 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+ 
++	clear_bit(SUNXI_MUSB_FL_ENABLED, &glue->flags);
++	WARN_ON(extcon_unregister_notifier_sync(glue->extcon, EXTCON_USB_HOST,
++						&glue->host_nb));
++	/* Keep work disabled between child instances, including late queues. */
++	disable_work_sync(&glue->work);
++
+ 	pm_runtime_put(musb->controller);
+-
+-	cancel_work_sync(&glue->work);
+ 	if (test_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags))
+ 		phy_power_off(glue->phy);
+ 
+@@ -299,8 +317,6 @@
+ static void sunxi_musb_enable(struct musb *musb)
+ {
+ 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+-
+-	glue->musb = musb;
+ 
+ 	/* musb_core does not call us in a balanced manner */
+ 	if (test_and_set_bit(SUNXI_MUSB_FL_ENABLED, &glue->flags))
+@@ -716,6 +732,7 @@
+ 		dev_err(&pdev->dev, "Invalid or missing 'dr_mode' property\n");
+ 		return -EINVAL;
+ 	}
++	glue->initial_phy_mode = glue->phy_mode;
+ 	pdata.platform_ops	= &sunxi_musb_ops;
+ 
+ 	cfg = of_device_get_match_data(&pdev->dev);
+@@ -726,6 +743,7 @@
+ 
+ 	glue->dev = &pdev->dev;
+ 	INIT_WORK(&glue->work, sunxi_musb_work);
++	disable_work(&glue->work);
+ 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
+ 
+ 	if (cfg->has_sram)

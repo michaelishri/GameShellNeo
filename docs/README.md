@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[246 — Battery-repeat preparation stopped by lost journal history](246-battery-repeat-preparation-journal-loss.md)
+records five accepted debug checks followed by an evidence failure in check
+six. PM counters and owner observations are normal, but early kernel history
+is missing; no new battery sleep runs. Read-only checks preserve the failure
+and identify bounded evidence retention as the next work, tracked by NEO-184.
+
 [245 — Sleep collection reply recovery](245-sleep-collection-reply-recovery.md)
 records the host-only malformed-reply fix, bounded private failure capture and
 147 passing offline regressions. One sleep submission and the existing

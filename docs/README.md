@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[243 — First 60-second USB RTC-wake trial](243-first-60-second-usb-rtc-trial.md)
+records seven passing preparation checks, matching awake rehearsal and one
+owner-confirmed RTC wake with both routes recovered. All four CPUs participate,
+timekeeping freeze is observed and immediate battery endpoints pass. The
+60-second battery-only trial, repeatability and sleep energy remain pending.
+
 [242 — Bounded RTC duration protocol](242-bounded-rtc-duration-protocol.md)
 prepares a capped 60-second one-shot option with matching rehearsal/history,
 duration-aware deadlines and immediate battery endpoints. Offline regressions

@@ -2,6 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
+**First 60-second USB RTC trial passed, 9 October 2026:** NEO-181 completes
+fresh seven-debug preparation, matching awake rehearsal and one observed
+USB-connected trial on diagnostic.25. All four CPU callbacks and timekeeping
+freeze are verified, both routes recover, owner warning/display observations
+pass and PM finishes at 39/0 with all owned controls restored. Immediate battery
+endpoints are saved; USB charge-current readings do not measure sleep power.
+Next: separately qualify the 60-second battery trial with fresh preparation,
+explicit unplug/readiness and matching rehearsal, preserving the unplugged
+result before reconnection. Repeatability, longer intervals, sleeping
+low-battery protection and energy/endurance remain open.
+[Report 243](docs/243-first-60-second-usb-rtc-trial.md).
+
 **60-second RTC tooling prepared, 9 October 2026:** NEO-180 adds an explicit
 one-shot 60-second option with matching duration-bound evidence, reserve checks
 and immediate pre/post battery endpoints. Offline regressions pass; no live

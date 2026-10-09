@@ -68,8 +68,8 @@ Twenty native negative controls cover the previous nine IRQ defects, ordinary
 cancel in place of each permanent work disable, timer delete in place of
 shutdown, missing removal/probe closure, missing/foreign/duplicate session
 puts, releasing the session before the worker has drained or before runtime PM
-has been disabled. Only assertion
-failure counts as rejection. Three additional source controls reject missing
+has been disabled. Only assertion failure counts as rejection. Three additional
+source controls reject missing
 or late timer initialization and an extra terminal caller.
 
 The source fixture controls MMIO, clients, DMA, IRQ, PM, work and timer API
@@ -114,8 +114,35 @@ dual-role, combined module and no-PM configurations without building an image.
 
 ## Results
 
-Validation and review are in progress. Final results and receipt hashes will
-be recorded here before NEO-166 is closed.
+- Native and ARM32 source tests: all 42 scenarios passed. All 20 native
+  negative controls failed by assertion as required; all three source-boundary
+  controls were rejected.
+- Corrected UML KUnit: all eight cases passed under KASAN, lockdep and
+  work/timer debugging, with no rejected kernel diagnostics. The exact suite,
+  11 recorded inputs, complete production patch queue, four retained artifacts
+  and retained receipt were independently checked against the saved files.
+- All five ARM build configurations passed. The 15 recorded inputs, 21 native
+  binaries, ARM32 binary, extracted core source, five configurations, 21 ARM
+  objects and complete patch queue were checked against the saved files.
+- `task check`: 16 runtime and 821 tooling tests passed, with two optional
+  tooling skips. Compiled helper checks, Bash syntax and ShellCheck passed.
+- Strict checkpatch on the production patch body: zero errors, zero warnings
+  and zero checks.
+- Standards review: no findings. Specification review: one P1 ordering finding,
+  corrected and confirmed by the reviewer; no remaining findings.
+
+| Artifact | SHA256 |
+| --- | --- |
+| Patch 0040 | `a4c10515794b451dbb720b77192340ab450460248b996e67acdd8dc816065c62` |
+| `.local/build/musb-irq-tests/compile-evidence.json` | `1c5bc8d1d2a14dc69cbb9f7418b10a945001f10f1bf4725cd560425a6517ee21` |
+| `.local/build/musb-work-kunit/evidence.json` | `4264c263cd4fde3ebf3e9f2b8bc78712d8688be68f8440409714380464f1784b` |
+| Accepted UML `linux` binary | `7b8c6fcd8ff5410a1d5714a511ac1e7b8e02e60b457f237dd67d6be9627677f8` |
+
+Accepted kernel artifacts are retained under
+`.local/build/musb-work-kunit/kernel-55ad40410f3f8015/accepted-runs/c707511b91af438a9d0e5b1b57445e07/`.
+The shared restart/IRQ suite validators passed their unit tests. Their full
+kernel suites were not rerun for this change; the source suite retains the
+previous IRQ scenarios.
 
 Specification review caught a P1 ordering defect in the first candidate: its
 passive session put made the subsequent existing core `pm_runtime_put_sync()`
@@ -138,9 +165,10 @@ callback data and runtime-PM callbacks need coordinated retirement while
 resources remain available. Runtime resume can restore registers and run those
 callbacks; work shutdown does not disable runtime PM or fix its current
 post-platform-exit ordering. In particular, the existing no-session teardown
-case still needs that broader resource-ordering correction. Core masking must ultimately be reconciled with
-all remaining producers. Independent DMA destruction/source masking and the
-backend-specific resource contracts in report 141 are also still open.
+case still needs that broader resource-ordering correction. Core masking must
+ultimately be reconciled with all remaining producers. Independent DMA
+destruction/source masking and the backend-specific resource contracts in
+report 141 are also still open.
 
 Failed PM acquisition does not establish register accessibility; this patch
 does not supply an inaccessible-hardware removal path. The older extcon/Sunxi

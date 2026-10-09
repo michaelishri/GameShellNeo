@@ -17,24 +17,28 @@ def checked_cases(report, log):
 
 
 def test_patch(root, archive, lock, queue, apply_queue, scratch):
+    return core_test_patch(root, archive, lock, queue, apply_queue, scratch,
+                           suite='irq', extra_config='\tselect IRQ_SIM\n')
+
+
+def core_test_patch(root, archive, lock, queue, apply_queue, scratch, *, suite, extra_config=''):
     # Append only test declarations; no production function is replaced.
     from musb_irq_checks import extract_source
     extract_source(archive, lock, queue, apply_queue, scratch)
     prefix = 'drivers/usb/musb/'
     core = (scratch / prefix / 'musb_core.c').read_text()
     kconfig = (scratch / prefix / 'Kconfig').read_text()
-    changed = core + '\n#ifdef CONFIG_MUSB_IRQ_KUNIT_TEST\n#include "musb-irq-kunit.c"\n#endif\n'
-    config = kconfig + '''
-config MUSB_IRQ_KUNIT_TEST
-	bool "MUSB IRQ lifetime tests (isolated test kernel only)"
-	depends on KUNIT=y && USB_MUSB_HDRC=y && USB_MUSB_GADGET
-	select IRQ_SIM
-'''
+    symbol = 'MUSB_' + suite.upper() + '_KUNIT_TEST'
+    filename = 'musb-' + suite + '-kunit.c'
+    changed = core + f'\n#ifdef CONFIG_{symbol}\n#include "{filename}"\n#endif\n'
+    config = (kconfig + f'\nconfig {symbol}\n'
+              f'\tbool "MUSB {suite} lifetime tests (isolated test kernel only)"\n'
+              '\tdepends on KUNIT=y && USB_MUSB_HDRC=y && USB_MUSB_GADGET\n' + extra_config)
     replacements = {prefix + 'musb_core.c': (core, changed),
                     prefix + 'Kconfig': (kconfig, config),
-                    prefix + 'musb-irq-kunit.c': ('', (root / 'kernel/tests/musb-irq-kunit.c').read_text())}
+                    prefix + filename: ('', (root / 'kernel/tests' / filename).read_text())}
     patch = ''.join(''.join(difflib.unified_diff(
         before.splitlines(True), after.splitlines(True),
         fromfile='a/' + name if before else '/dev/null', tofile='b/' + name))
         for name, (before, after) in replacements.items())
-    return ('9999-musb-irq-test-only.patch', patch.encode())
+    return ('9999-musb-' + suite + '-test-only.patch', patch.encode())

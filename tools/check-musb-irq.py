@@ -13,7 +13,7 @@ from kernel_sources import atomic_json, locked
 from musb_irq_checks import PATCHES, extract_source, mutations, test_functions
 
 WORK = ROOT / '.local/build/musb-irq-tests'
-EXPECTED = 'MUSB IRQ retirement: 34 source scenarios passed'
+EXPECTED = 'MUSB core retirement: 42 source scenarios passed'
 
 
 def main():
@@ -32,6 +32,21 @@ def main():
         extract_source(archive, lock, list(module.patches()), module.apply_queue, WORK / 'patched')
         core = WORK / 'patched/drivers/usb/musb/musb_core.c'
         functions = test_functions(core.read_text())
+        timer = '\ttimer_setup(&musb->otg_timer, musb_otg_timer_func, 0);\n'
+        without_timer = core.read_text().replace(timer, '')
+        source_controls = {
+            'missing-timer-init': without_timer,
+            'late-timer-init': without_timer.replace('\t/* attach to the IRQ */',
+                                                     timer + '\t/* attach to the IRQ */'),
+            'extra-terminal-caller': core.read_text() + '\n\tmusb_shutdown_work(musb);\n',
+        }
+        for name, text in source_controls.items():
+            try:
+                test_functions(text)
+            except ValueError:
+                print(name + ': expected source-boundary rejection', flush=True)
+            else:
+                raise RuntimeError('Source control was not rejected: ' + name)
         header = WORK / 'musb_irq_functions.h'
         harness = ROOT / 'kernel/tests/musb_irq_retirement_test.c'
         flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -75,9 +90,10 @@ def main():
         evidence = dict(linux=lock['linux']['tag'], archive_sha256=sha256(archive), builder=builder,
             inputs={str(p.relative_to(ROOT)): sha256(p) for p in inputs},
             core_sha256=sha256(core), native=results, arm32=arm.strip(),
+            source_controls=list(source_controls),
             arm32_binary_sha256=sha256(WORK / 'arm'),
-            limits='Actual IRQ helpers, remove body and probe failure tail with controlled '
-                   'MMIO/client/DMA/PM/IRQ boundaries. No real interrupt synchronization, '
+            limits='Actual IRQ/work helpers, remove body and probe failure tails with controlled '
+                   'MMIO/client/DMA/PM/IRQ/work/timer boundaries. No real synchronization, '
                    'complete probe execution, independent producer retirement or hardware result.')
         if args.compile_drivers:
             prefix = 'drivers/usb/musb/'

@@ -263,12 +263,16 @@ tasks:
     desc: Execute the MUSB release helper with Linux shared IRQs and a held handler in UML
     cmds: [bash tools/run-logged.sh musb-irq-kunit python3 tools/check-musb-restart-kunit.py --suite irq]
 
+  test:musb-work-kunit:
+    desc: Test terminal MUSB work/timer shutdown with real Linux APIs in UML
+    cmds: [bash tools/run-logged.sh musb-work-kunit python3 tools/check-musb-restart-kunit.py --suite work]
+
   test:musb-irq:
-    desc: Test actual core IRQ ownership and teardown ordering on native and ARM32
+    desc: Test actual core IRQ/work ownership and teardown ordering on native and ARM32
     cmds: [bash tools/run-logged.sh musb-irq python3 tools/check-musb-irq.py]
 
   check:musb-irq-drivers:
-    desc: Test MUSB IRQ teardown and compile five isolated ARM configurations
+    desc: Test MUSB IRQ/work teardown and compile five isolated ARM configurations
     cmds: [bash tools/run-logged.sh musb-irq-drivers python3 tools/check-musb-irq.py --compile-drivers]
 
   test:musb-probe-roles:

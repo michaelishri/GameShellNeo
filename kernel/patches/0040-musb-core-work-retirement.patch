@@ -1,0 +1,73 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: shut down core work and timer before resource release
+
+Client cleanup and backend callbacks can queue core work after removal's
+initial cancellation. Permanently disable the three core delayed works and
+shut down the OTG timer after client/IRQ retirement, before resources go away.
+Initialize the timer alongside core work so every fail3 entry owns it.
+
+Once irq_work has stopped, balance its session reference without scheduling
+runtime-PM activity. This does not retire backend producers, pending resume
+callbacks or runtime-PM callbacks, and is not a complete removal protocol.
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2219,6 +2219,21 @@
+ 	musb_free_irq(musb);
+ }
+ 
++/* Terminal teardown only; callers retain resources and hold no controller lock. */
++static void musb_shutdown_work(struct musb *musb)
++{
++	timer_shutdown_sync(&musb->otg_timer);
++	disable_delayed_work_sync(&musb->finish_resume_work);
++	disable_delayed_work_sync(&musb->deassert_reset_work);
++	disable_delayed_work_sync(&musb->irq_work);
++
++	/* irq_work was the sole owner of this extra runtime-PM reference. */
++	if (musb->session) {
++		musb->session = false;
++		pm_runtime_put_noidle(musb->controller);
++	}
++}
++
+ static void musb_free(struct musb *musb)
+ {
+ 	/* this has multiple entry modes. it handles fault cleanup after
+@@ -2591,6 +2606,7 @@
+ 	INIT_DELAYED_WORK(&musb->irq_work, musb_irq_work);
+ 	INIT_DELAYED_WORK(&musb->deassert_reset_work, musb_deassert_reset);
+ 	INIT_DELAYED_WORK(&musb->finish_resume_work, musb_host_finish_resume);
++	timer_setup(&musb->otg_timer, musb_otg_timer_func, 0);
+ 
+ 	/* setup musb parts of the core (especially endpoints) */
+ 	status = musb_core_init(plat->config->multipoint
+@@ -2598,8 +2614,6 @@
+ 			: MUSB_CONTROLLER_HDRC, musb);
+ 	if (status < 0)
+ 		goto fail3;
+-
+-	timer_setup(&musb->otg_timer, musb_otg_timer_func, 0);
+ 
+ 	/* attach to the IRQ */
+ 	if (request_irq(nIrq, musb->isr, IRQF_SHARED, dev_name(dev), musb)) {
+@@ -2640,9 +2654,7 @@
+ 
+ fail3:
+ 	musb_shutdown_irq(musb);
+-	cancel_delayed_work_sync(&musb->irq_work);
+-	cancel_delayed_work_sync(&musb->finish_resume_work);
+-	cancel_delayed_work_sync(&musb->deassert_reset_work);
++	musb_shutdown_work(musb);
+ 	if (musb->dma_controller)
+ 		musb_dma_controller_destroy(musb->dma_controller);
+ 
+@@ -2711,6 +2723,7 @@
+ 	musb_gadget_cleanup(musb);
+ 
+ 	musb_shutdown_irq(musb);
++	musb_shutdown_work(musb);
+ 	musb_platform_exit(musb);
+ 
+ 	pm_runtime_dont_use_autosuspend(musb->controller);

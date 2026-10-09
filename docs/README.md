@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[228 — MUSB core work and timer retirement](228-musb-core-work-retirement.md)
+records permanent core-work/timer closure and session-reference accounting,
+with source tests and real Linux workqueue/timer/PM tests. Backend producer
+and runtime-PM retirement remain under NEO-106.
+
 [227 — MUSB core IRQ retirement](227-musb-core-irq-retirement.md)
 records the NEO-165 action-release boundary before backend/DMA resource release,
 source-order tests and Linux shared-IRQ tests. Full producer retirement remains

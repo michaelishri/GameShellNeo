@@ -1184,20 +1184,23 @@ physical USB registration or controller removal. See
 [report 226](docs/226-musb-probe-role-unwind.md). The native/ARM32 check is also
 part of `task build`.
 
-The core IRQ retirement candidate has three saved checks (run sequentially):
+The core IRQ/work retirement candidate has saved checks (run sequentially):
 
 ```sh
-task test:musb-irq             # Actual removal and failure-tail ordering, native/ARM32
+task test:musb-irq             # Actual IRQ/work removal and failure tails, native/ARM32
 task test:musb-irq-kunit       # Real Linux shared IRQ removal and held-handler drain in UML
+task test:musb-work-kunit      # Real work/timer closure and session PM accounting in UML
 task check:musb-irq-drivers    # Source regressions and five ARM configurations
 ```
 
 The source check is part of `task build`. Its receipts are under
 `.local/build/musb-irq-tests/`; the kernel suite retains its accepted binary,
 configuration and results under `.local/build/musb-irq-kunit/`. The existing
-`test:musb-restart-kunit` task still selects its original suite. Neither suite
-accesses the GameShell. [Report 227](docs/227-musb-core-irq-retirement.md)
-separates core IRQ action removal from wider shutdown and hardware qualification.
+`test:musb-restart-kunit` task still selects its original suite. The work/timer
+suite retains its artifacts under `.local/build/musb-work-kunit/`. These suites
+run entirely on the development machine. [Report 227](docs/227-musb-core-irq-retirement.md)
+and [report 228](docs/228-musb-core-work-retirement.md) distinguish the implemented
+boundaries from wider teardown and hardware qualification.
 
 For the CPI WFI s2idle candidate in diagnostic.24, use:
 

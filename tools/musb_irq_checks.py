@@ -5,7 +5,7 @@ import tarfile
 PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
            '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch',
            '0037-musb-resume-request-ownership.patch', '0038-musb-probe-role-unwind.patch',
-           '0039-musb-core-irq-retirement.patch')
+           '0039-musb-core-irq-retirement.patch', '0040-musb-core-work-retirement.patch')
 
 
 def extract_source(archive, lock, queue, apply_queue, scratch):
@@ -52,11 +52,23 @@ def test_functions(core):
         raise ValueError('Probe ownership/caller boundary changed')
     if core.count('\tmusb->nIrq = -ENODEV;') != 2:
         raise ValueError('Expected allocation and release IRQ ownership resets')
+    timer = '\ttimer_setup(&musb->otg_timer, musb_otg_timer_func, 0);'
+    work = '\tINIT_DELAYED_WORK(&musb->finish_resume_work, musb_host_finish_resume);'
+    if (init.count(timer) != 1 or init.index(timer) < init.index(work) or
+            init.index(timer) > init.index('\tstatus = musb_core_init(') or
+            init.index(timer) > init.index('\t\tgoto fail3;')):
+        raise ValueError('Every fail3 entry must own the core timer and work')
+    if core.count('\tmusb_shutdown_work(musb);') != 2:
+        raise ValueError('Terminal work shutdown must be confined to fail3 and remove')
     tail = init[init.index('fail3:\n'):]
     probe = ('static int probe_failure(struct musb *musb, struct device *dev)\n{\n'
              '\tint status = -EIO;\n' + tail + '\n}\n')
+    for name, label in (('probe_before_work', 'fail2_5:'), ('probe_before_pm', 'fail2:')):
+        probe += ('static int ' + name + '(struct musb *musb, struct device *dev)\n{\n'
+                  '\tint status = -EIO;\n' + init[init.index(label):] + '\n}\n')
     return ''.join(function(core, name) for name in
-                   ('musb_free_irq', 'musb_shutdown_irq', 'musb_free', 'musb_remove')) + probe
+                   ('musb_free_irq', 'musb_shutdown_irq', 'musb_shutdown_work',
+                    'musb_free', 'musb_remove')) + probe
 
 
 def replace_once(text, old, new):
@@ -81,7 +93,7 @@ def mutations(functions):
     wrong_number = replace_once(free, '\tmusb->nIrq = -ENODEV;\n', '')
     wrong_number = replace_once(wrong_number, '\tif (musb->irq_wake) {',
                                  '\tmusb->nIrq = -ENODEV;\n\tif (musb->irq_wake) {')
-    return {
+    result = {
         'late-remove': replace_once(functions, remove, late_remove),
         'early-remove': replace_once(functions, remove, early_remove),
         'late-probe': replace_once(functions, 'fail3:\n\tmusb_shutdown_irq(musb);', 'fail3:\n'),
@@ -94,3 +106,23 @@ def mutations(functions):
         'unowned-mask': replace_once(functions, shutdown,
             replace_once(shutdown, '\tif (musb->nIrq < 0)\n\t\treturn;\n', '')),
     }
+    work = function(functions, 'musb_shutdown_work')
+    for member in ('irq_work', 'finish_resume_work', 'deassert_reset_work'):
+        result['cancel-' + member] = replace_once(functions, work,
+            replace_once(work, f'disable_delayed_work_sync(&musb->{member});',
+                          f'cancel_delayed_work_sync(&musb->{member});'))
+    result['delete-timer'] = replace_once(functions, 'timer_shutdown_sync(&musb->otg_timer);',
+                                         'timer_delete_sync(&musb->otg_timer);')
+    result['missing-remove-work'] = replace_once(functions, remove,
+        replace_once(remove, '\tmusb_shutdown_work(musb);\n', ''))
+    result['missing-probe-work'] = replace_once(functions,
+        'fail3:\n\tmusb_shutdown_irq(musb);\n\tmusb_shutdown_work(musb);',
+        'fail3:\n\tmusb_shutdown_irq(musb);')
+    result['missing-session-put'] = replace_once(functions,
+        '\t\tpm_runtime_put_noidle(musb->controller);', '\t\t(void)musb;')
+    result['foreign-session-put'] = replace_once(functions, '\tif (musb->session) {', '\t{')
+    result['duplicate-session-put'] = replace_once(functions, '\t\tmusb->session = false;\n', '')
+    early = replace_once(work, '\tdisable_delayed_work_sync(&musb->irq_work);\n', '')
+    early = early[:-2] + '\tdisable_delayed_work_sync(&musb->irq_work);\n}\n'
+    result['early-session-put'] = replace_once(functions, work, early)
+    return result

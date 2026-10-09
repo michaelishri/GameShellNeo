@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[238 — Diagnostic.25 guided cable sleeps](238-diagnostic25-guided-cable-sleep-qualification.md)
+records four accepted attended cycles: remove, attach, remove, attach. Both
+insertions stay dark until RTC wake; endpoint-specific network access, original
+keypad, all-CPU callbacks, timekeeping freeze and restored policy pass. Final
+both-route health is PM31/0. Energy and broad reliability remain separate.
+
 [237 — Diagnostic.25 battery-only RTC qualification](237-diagnostic25-battery-rtc-qualification.md)
 records seven fresh debug passes, the awake battery rehearsal and one attended
 battery-only sleep with Wi-Fi recovery, all-CPU callbacks, timekeeping freeze

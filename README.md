@@ -30,8 +30,13 @@ unchanged PM/keypad state in
 sequence, awake battery rehearsal and one attended battery-only RTC sleep also
 pass, followed by separate USB reattachment and both-route health checks.
 [Report 237](docs/237-diagnostic25-battery-rtc-qualification.md) records PM20/0,
-all-CPU sleep callbacks and owner-confirmed normal display return. Cable changes
-during sleep and energy measurements remain open.
+all-CPU sleep callbacks and owner-confirmed normal display return. Four guided
+cable changes during sleep also pass—two removals and two insertions—with the
+screen staying asleep after both insertions until RTC wake. Final health and
+both routes pass at PM31/0 in
+[report 238](docs/238-diagnostic25-guided-cable-sleep-qualification.md).
+This completes the planned bounded diagnostic.25 functional coverage; broader
+reliability, charging during sleep and energy measurements remain open.
 The newer controller-removal work is outside this candidate.
 
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps

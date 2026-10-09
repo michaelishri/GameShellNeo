@@ -3,6 +3,7 @@ import math
 
 import power_key_policy as policy
 import sleep_connection
+import kernel_evidence
 
 SEQUENCE = ('usb-remove', 'usb-attach', 'usb-remove', 'usb-attach')
 SDIO = 'consumer:platform:1c10000.mmc'
@@ -17,6 +18,8 @@ def definition(value, count, connection):
 
 
 def identity(snapshot, current):
+    if kernel_evidence.KEY in snapshot or kernel_evidence.KEY in current:
+        kernel_evidence.delta(snapshot, current)
     now = snapshot['monotonic_seconds']
     if type(now) not in (int, float) or not math.isfinite(now) or now < 0:
         raise ValueError('Invalid cable batch snapshot time')
@@ -35,10 +38,10 @@ def identity(snapshot, current):
 
 
 def follows(before, after):
+    kernel_evidence.delta(before, after)
     times = (before['monotonic_seconds'], after['monotonic_seconds'])
     if (any(type(t) not in (int, float) or not math.isfinite(t) for t in times) or
-            not 0 <= times[0] < times[1] or before['stats'] != after['stats'] or
-            not after['journal'].startswith(before['journal'])):
+            not 0 <= times[0] < times[1] or before['stats'] != after['stats']):
         raise ValueError('Cable batch has intervening PM, journal loss or overlapping evidence')
 
 

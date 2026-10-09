@@ -31,6 +31,7 @@ import sleep_cable
 import sleep_cable_batch
 import cpi_idle
 import sleep_window
+import kernel_evidence
 
 RESULTS = Path('/var/lib/gameshellneo/sleep-tests')
 OWNED = Path('/run/gameshellneo-sleep-controls.json')
@@ -40,7 +41,7 @@ MAX_SLEEP_CHAIN = 16
 SDIO = 'consumer:platform:1c10000.mmc'
 SDIO_PATCH = 'kernel/patches/0023-sunxi-mmc-sdio-reference-ownership.patch'
 SDIO_SHA = '52f4e3d8b966f8f69718340697606e30d174033d998be84f98b42bc2c97e92ee'
-SOURCES = ('sleep_rtc', 'test-pm-stages', 'battery_sample', 'cpi_idle', 'keypad_pm', 'power_key', 'power_key_policy',
+SOURCES = ('sleep_rtc', 'test-pm-stages', 'battery_sample', 'cpi_idle', 'kernel_evidence', 'keypad_pm', 'power_key', 'power_key_policy',
            'power_key_pm', 'power_key_input', 'keypad_input', 'speaker_audio',
            'rtc_alarm', 'pm_platform', 'wifi_trace', 'usb_trace', 'sleep_connection', 'sleep_cable',
            'sleep_cable_batch', 'sleep_window')
@@ -79,6 +80,8 @@ def prerequisite(records, current):
             raise ValueError('Unaccepted prerequisite')
         for side in ('before', 'after'):
             s = r[side]
+            if kernel_evidence.KEY in s or kernel_evidence.KEY in current:
+                kernel_evidence.delta(s, current)
             if (s['boot_id'] != current['boot_id'] or s['image'] != current['image'] or
                     s['kernel'] != current['kernel'] or s['rsb_links'][SDIO]['consumer']['power'] != reference):
                 raise ValueError('Prerequisite boot/image/reference mismatch')
@@ -87,6 +90,8 @@ def prerequisite(records, current):
                 if s.get('power_supply_system_wakeup') != expected or current.get('power_supply_system_wakeup') != expected:
                     raise ValueError('Prerequisite power-supply wake policy changed')
         a, b = r['before'], r['after']
+        if kernel_evidence.KEY in a or kernel_evidence.KEY in b:
+            kernel_evidence.delta(a, b)
         if a['monotonic_seconds'] >= b['monotonic_seconds'] or (previous is not None and
                 (previous['monotonic_seconds'] >= a['monotonic_seconds'] or previous['stats'] != a['stats'])):
             raise ValueError('Overlapping prerequisite or unrecorded intervening PM')
@@ -188,6 +193,8 @@ def history(pm, records, sleeps, current, lock, connection='usb', cable_batch=No
         rehearsal = policy.run_id(record['rehearsal'])
         for side in ('before', 'after'):
             snapshot = record[side]
+            if kernel_evidence.KEY in snapshot or kernel_evidence.KEY in current:
+                kernel_evidence.delta(snapshot, current)
             if any(snapshot[k] != current[k] for k in ('boot_id', 'kernel', 'image')):
                 raise ValueError('Sleep history boot/image differs')
             if snapshot['rsb_links'][SDIO]['consumer']['power'] != current['rsb_links'][SDIO]['consumer']['power']:
@@ -667,9 +674,9 @@ def health(pm, record, lock):
         record['cable_irq_observation'] = cable_irqs
     keys = ('boot_id', 'kernel', 'image', 'pm', 'pm_test_delay', 'masks', 'inputs', 'backlight',
             'wifi_config_sha256', 'wifi_power_save', 'charger', 'cpu_policy')
-    if any(before[k] != after[k] for k in keys) or not after['journal'].startswith(before['journal']):
+    if any(before[k] != after[k] for k in keys):
         raise ValueError('State restoration or journal continuity failed')
-    delta = after['journal'][len(before['journal']):]
+    delta = kernel_evidence.delta(before, after)
     if any(x in delta for x in pm.FAULTS) or 'suspend debug: Waiting' in delta:
         raise ValueError('Kernel fault or unexpected debug return')
     successes = int(after['stats']['success'])-int(before['stats']['success'])

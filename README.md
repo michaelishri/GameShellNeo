@@ -1301,7 +1301,7 @@ task device:wifi-firmware-connected SECONDS=120 # Four reconnections and Wi-Fi S
 task device:wifi-recovery SECONDS=120 # Installed firmware: four reconnections, unavailable/connected windows
 task device:rsb-compare SECONDS=120 DELAY_MS=100 # USB-powered bus-delay comparison
 task device:rsb-restore # Stop/recover an interrupted RSB comparison
-task device:pm-inspect # Read-only capabilities, counters and device links over USB
+task device:pm-inspect # Read capabilities/counters; update protected kernel evidence; no PM
 task device:pm-inspect ROUTE=wifi # Same inspection through the configured Wi-Fi route
 task device:charge-inspect # Read-only documented charger/gauge inventory; USB remains connected
 task device:charge-baseline SECONDS=120 # Two-minute awake charging trace; USB stays connected
@@ -1761,14 +1761,17 @@ further dependency analysis, not an energy-saving claim. See
 
 ### Staged power-management diagnostics
 
-Use `device:pm-inspect` for read-only kernel capabilities, runtime counters and
-RSB supplier/consumer links. It also works on diagnostic.6, where sleep support
-is absent. Full private evidence includes radio/network state and kernel logs;
-only a small capability summary is printed. The task never enters suspend.
+Use `device:pm-inspect` to read kernel capabilities, runtime counters and
+RSB supplier/consumer links. Full private evidence includes radio/network state
+and kernel logs; only a small capability summary is printed. The task never
+enters suspend or changes hardware settings. It now creates/updates the bounded,
+root-owned kernel-evidence checkpoint described below. The new collector's
+hardware qualification is pending; older diagnostic-image inspections remain
+documented in their historical source revisions.
 USB is the default transport; `ROUTE=wifi` selects the configured Wi-Fi route
 (including the Mac relay when enabled in `.env`). The private capture's
 `route.json` records the selected route even if connection fails. It does not
-retry through another route. This option applies only to read-only inspection;
+retry through another route. This option applies only to awake inspection;
 active PM tests and restoration retain their existing USB requirement. Direct
 tool users can pass `--inspect --inspect-route wifi`.
 
@@ -2837,10 +2840,27 @@ task report:journal-volume -- .local/journal-volume.jsonl
 
 The offline report hashes the original and counts message bytes in fixed categories;
 it does not equate uncompressed text with disk usage or infer a deletion cause.
-Keep the raw capture private. Missing boot logs still fail PM admission: do not
+Keep the raw capture private. Missing evidence still fails PM admission: do not
 clear logs, substitute old records or repeat PM to bypass that failure.
 [Report 152](docs/152-diagnostic-command-log-volume.md) records the stopped
 prerequisite sequence, excessive command logging and the transport correction.
+
+PM snapshots now preserve sequence-numbered `/dev/kmsg` records independently
+of the general journal. The initial anchor requires a complete kernel sequence
+from zero and an observed kernel firmware identity. A root-owned checkpoint
+retains that prefix and exact later records, bound to boot/image/firmware and
+collector/PM-helper source hashes. Gaps, ring overruns, changed overlap, source
+changes and storage failures stop admission; no journal fallback or silent
+reset is permitted. Existing fault checks remain enforced.
+
+The checkpoint is capped at 4 MiB, with at most another 4 MiB staging file;
+there is no background monitor. PM inspection updates this diagnostic storage
+but leaves hardware settings unchanged. Old results remain historical and
+cannot qualify the new collector. Use `task test:kernel-evidence` for the
+offline failure/retention tests, and `task check` for the full suite.
+[Report 247](docs/247-bounded-kernel-evidence.md) explains bounds, private
+evidence preservation and interruption recovery. NEO-184's board qualification
+is pending; no image/card swap is needed for these diagnostic helper changes.
 
 [Report 119](docs/119-guarded-rtc-sleep-preparation.md) records admission,
 recovery limits and the two successful awake rehearsals. Ordinary sleep remains

@@ -214,6 +214,10 @@ tasks:
     desc: Offline RTC duration, admission, evidence, restoration and transport regressions; no device access
     cmds: [bash tools/run-logged.sh sleep-protocol python3 -m unittest discover -s tools/tests -p 'test_sleep_*.py' -v]
 
+  test:kernel-evidence:
+    desc: Offline printk continuity, retention, provenance and storage regressions; no device access
+    cmds: [bash tools/run-logged.sh kernel-evidence python3 -m unittest discover -s tools/tests -p test_kernel_evidence.py -v]
+
   test:nkmp:
     desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
     cmds: [bash tools/run-logged.sh nkmp python3 tools/check-nkmp.py]
@@ -509,7 +513,7 @@ tasks:
     cmds: [python3 tools/check-rsb-runtime.py --restore]
 
   device:pm-inspect:
-    desc: Read PM capabilities and RSB state without suspend; ROUTE=usb (default) or wifi
+    desc: Read PM state and update protected kernel evidence without suspend; ROUTE=usb (default) or wifi
     env:
       NEO_PM_INSPECT_ROUTE: '{{.ROUTE | default "usb"}}'
     cmds: [python3 tools/check-pm-stages.py --inspect]

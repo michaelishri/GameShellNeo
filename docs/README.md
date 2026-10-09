@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[247 — Bounded kernel evidence independent of journal retention](247-bounded-kernel-evidence.md)
+implements sequence-checked printk checkpoints and provenance-bound PM/sleep
+admission. Offline checks pass 16 runtime and 874 tooling tests plus C/lint
+checks; hardware qualification is pending. Existing failed records stay intact.
+
 [246 — Battery-repeat preparation stopped by lost journal history](246-battery-repeat-preparation-journal-loss.md)
 records five accepted debug checks followed by an evidence failure in check
 six. PM counters and owner observations are normal, but early kernel history

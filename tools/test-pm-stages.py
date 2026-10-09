@@ -15,6 +15,7 @@ import time
 
 from battery_sample import sample_age
 import cpi_idle
+import kernel_evidence
 
 POWER = Path('/sys/power')
 BOOT = Path('/proc/sys/kernel/random/boot_id')
@@ -134,7 +135,6 @@ def snapshot():
         'systemctl', 'show', unit, '-p', 'ActiveState', '-p', 'NRestarts').splitlines())
         for unit in SERVICES}
     battery = json.loads(read('/run/gameshellneo/battery.json'))
-    journal = command('journalctl', '-b', '-k', '--no-pager', '-o', 'short-monotonic')
     config = gzip.decompress(Path('/proc/config.gz').read_bytes()).decode()
     result = dict(boot_id=read(BOOT), image=image, kernel=os.uname().release,
                 monotonic_seconds=time.monotonic(), taint=read('/proc/sys/kernel/tainted'),
@@ -174,8 +174,12 @@ def snapshot():
                 inputs=sorted(read(p) for p in Path('/sys/class/input').glob('event*/device/name')),
                 backlight={n: read('/sys/class/backlight/ocp8178/' + n) for n in ('brightness', 'bl_power')},
                 firmware_sha256=hashlib.sha256(Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.bin').read_bytes()).hexdigest(),
-                nvram_sha256=hashlib.sha256(Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt').read_bytes()).hexdigest(),
-                journal=journal)
+                nvram_sha256=hashlib.sha256(Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt').read_bytes()).hexdigest())
+    result['pm_source_sha256'] = kernel_evidence.loaded_source(globals())
+    result[kernel_evidence.KEY] = kernel_evidence.capture(result)
+    # Retain this field for existing report consumers. New records identify
+    # their actual source explicitly; it is not copied from systemd's journal.
+    result['journal'] = kernel_evidence.validate(result[kernel_evidence.KEY])
     result['boottime_seconds'] = time.clock_gettime(time.CLOCK_BOOTTIME)
     result['battery_age_seconds'] = sample_age(battery, now=result['boottime_seconds'], boot_id=result['boot_id'])
     if cpi_idle.enabled(result['image']['sources']):
@@ -213,6 +217,9 @@ def validate(snapshot, lock, connection='usb'):
     for option in ('HIBERNATION', 'PM_AUTOSLEEP', 'PM_WAKELOCKS', 'ARM_PSCI_CPUIDLE', 'PM_TEST_SUSPEND'):
         if f'CONFIG_{option}=y\n' in s['kernel_config']:
             raise ValueError('Unexpected deep/automatic/test-boot power support')
+    kernel_evidence.validate_snapshot(s)
+    if kernel_evidence.KEY in s and s['pm_source_sha256'] != kernel_evidence.loaded_source(globals()):
+        raise ValueError('PM snapshot producer differs from the validating source')
     identities = re.findall(r'brcmf_c_preinit_dcmds: (Firmware: .+)', s['journal'])
     if (not identities or any(v != lock['radio']['firmware']['runtime_identity'] for v in identities) or
             any(x in s['journal'] for x in FAULTS)):
@@ -276,9 +283,7 @@ def validate(snapshot, lock, connection='usb'):
 def check_result(before, after, stage, memory_ok):
     if stage not in STAGES or before['boot_id'] != after['boot_id'] or not memory_ok:
         raise ValueError('Stage, boot identity or process memory changed')
-    if not after['journal'].startswith(before['journal']):
-        raise ValueError('Kernel evidence lost or rotated during stage')
-    delta = after['journal'][len(before['journal']):]
+    delta = kernel_evidence.delta(before, after)
     if delta.count('suspend debug: Waiting for 5 second(s).') != 1 or any(x in delta for x in FAULTS):
         raise ValueError('Expected bounded debug wait missing or new kernel fault')
     if int(after['stats']['success']) - int(before['stats']['success']) != 1:

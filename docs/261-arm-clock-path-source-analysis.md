@@ -1,5 +1,14 @@
 # ARM clock paths and the saved RAW discrepancy
 
+**Correction from the subsequent same-boot investigation:**
+[report 263](263-native-clock-vdso-availability.md) identifies an omitted
+boot-time gate in `arch/arm/kernel/vdso.c`. The observed timer DT flag makes
+Linux remove the clock export names, and the live mapped vDSO resolves none
+of the four clock functions. A mapping and `CONFIG_VDSO=y` therefore do not
+establish clock-function availability on this board. The counter-access
+comparison below remains useful source analysis, but a working direct vDSO
+route is no longer the supported explanation for the saved discrepancy.
+
 10 October 2026. NEO-192. This source investigation follows the single
 750 ns cross-path discrepancy in
 [report 260](260-clock-comparison-provenance.md). It identifies a concrete
@@ -61,8 +70,9 @@ does not select a different RAW timekeeper.
 Python's normal API can reach a libc implementation that uses the vDSO or
 falls back to a syscall. The kernel's ARM vDSO provides both time64 and time32
 fallback helpers; its time64 fallback also invokes syscall 403. Presence of a
-vDSO mapping, an exported function, or `CONFIG_VDSO=y` establishes availability,
-not the branch taken by an individual recorded call.
+A vDSO mapping or `CONFIG_VDSO=y` alone does not establish clock exports;
+those can be removed at boot. Even a resolved exported function does not prove
+the internal branch taken by an individual call. See the correction above.
 ([ARM fallbacks](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch/arm/include/asm/vdso/gettimeofday.h?id=1b357ecb321392158d507b04672ffee57bfa071d#n36).)
 
 For a direct vDSO RAW read, `__cvdso_clock_gettime_common()` selects `CS_RAW`

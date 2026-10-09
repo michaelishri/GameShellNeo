@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[263 — Native clock diagnostic and vDSO availability](263-native-clock-vdso-availability.md)
+records a stopped three-route comparison and a successful same-boot export
+inventory. The ARM kernel deliberately hides the clock exports for this timer
+DT configuration, correcting the earlier candidate-route interpretation.
+
 [262 — Installed clock-runtime inventory](262-clock-runtime-inventory.md)
 identifies Python's time64 import and the installed libc's dispatch structure
 from verified binary copies. Repeatable awake inventory and offline report

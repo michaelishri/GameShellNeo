@@ -1,0 +1,147 @@
+"""Independently classify all retained integer readings; never repair their order."""
+import json
+import hashlib
+import os
+import re
+
+ROUTES = (0, 1, 2, 0, 2, 1, 2, 1, 0)
+NAMES = ('libc', 'kernel', 'vdso')
+CLOCKS = (1, 4, 7)
+SAMPLES = 15000
+MAX_BYTES = 16 * 1024 * 1024
+
+
+def validate_inventory(data, boot_id, libc_version):
+    value = json.loads(data)
+    meta = value['before']
+    if (value.get('type') != 'vdso-inventory' or value.get('schema') != 1 or
+            value.get('complete') is not True or value.get('mapping_found') is not True or
+            value.get('handle_base_verified') is not True or value.get('version') != 'LINUX_2.6' or
+            value.get('libc') != libc_version or meta != value['after'] or
+            meta['boot_id'] != boot_id or meta['clocksource'] != 'arch_sys_counter' or
+            type(meta['affinity']) is not int or not 0 < meta['affinity'] < 16 or
+            set(value['symbols']) != {'__vdso_clock_gettime64', '__vdso_clock_gettime',
+                                     '__vdso_gettimeofday', '__vdso_clock_getres'}):
+        raise ValueError('Unqualified vDSO inventory identity')
+    for record in value['symbols'].values():
+        if (set(record) != {'versioned', 'unversioned', 'base_verified'} or
+                any(type(v) is not bool for v in record.values()) or
+                record['versioned'] is not record['base_verified']):
+            raise ValueError('Incomplete vDSO symbol attribution')
+    return value
+
+
+def analyze(data, boot_id, libc_version):
+    if len(data) > MAX_BYTES:
+        raise ValueError('Native capture exceeds its fixed bound')
+    lines = data.splitlines()
+    if len(lines) != SAMPLES + 2:
+        raise ValueError('Incomplete native capture')
+    header, footer = json.loads(lines[0]), json.loads(lines[-1])
+    expected = dict(type='header', schema=1, operation='native-clock-comparison', batches=300,
+        per_batch=50, pause_ns=100000000, routes=list(ROUTES), clocks=list(CLOCKS),
+        vdso_symbol='__vdso_clock_gettime64', vdso_version='LINUX_2.6', vdso_base_verified=True,
+        libc=libc_version)
+    # Equality alone accepts booleans as integers; require matching JSON types too.
+    if any(json.dumps(header.get(k), sort_keys=True) != json.dumps(v, sort_keys=True)
+           for k, v in expected.items()):
+        raise ValueError('Unexpected native capture identity or bounds')
+    meta = header['before']
+    mask = meta['affinity']
+    if (meta['boot_id'] != boot_id or meta['clocksource'] != 'arch_sys_counter' or
+            type(mask) is not int or not 0 < mask < 16 or meta != footer.get('after') or
+            footer.get('type') != 'footer' or footer.get('complete') is not True or
+            type(footer.get('completed')) is not int or footer['completed'] != SAMPLES or
+            json.dumps(footer.get('failure'), sort_keys=True) != json.dumps(dict(present=False,
+                sequence=0, clock=0, position=0, stage=0, rc=0, errno=0, sec=0, nsec=0), sort_keys=True)):
+        raise ValueError('Native capture incomplete or metadata changed')
+    result = {str(c): dict(adjacent={}, within={}, between={}, cpu_before_counts={},
+        cpu_brackets_differ=0) for c in CLOCKS}
+    previous = {}
+    events = []
+    bad_sequences = 0
+
+    def observe(stats, key, delta):
+        entry = stats.setdefault(key, dict(count=0, negative=0, min_ns=delta, max_ns=delta))
+        entry['count'] += 1
+        entry['negative'] += int(delta < 0)
+        entry['min_ns'] = min(entry['min_ns'], delta)
+        entry['max_ns'] = max(entry['max_ns'], delta)
+        return delta < 0
+
+    for index, line in enumerate(lines[1:-1], 1):
+        row = json.loads(line)
+        if (row.get('type') != 'sample' or type(row.get('index')) is not int or row['index'] != index or
+                type(row.get('clocks')) is not list or len(row['clocks']) != 3):
+            raise ValueError('Unordered or incomplete native samples')
+        reasons = []
+        for clock, family in zip(CLOCKS, row['clocks']):
+            stats = result[str(clock)]
+            cpus = [family['cpu_before'], family['cpu_after']]
+            if any(type(c) is not int or c not in range(4) or not mask & (1 << c) for c in cpus):
+                raise ValueError('CPU context outside process affinity')
+            counts = stats['cpu_before_counts']
+            counts[str(cpus[0])] = counts.get(str(cpus[0]), 0) + 1
+            stats['cpu_brackets_differ'] += int(cpus[0] != cpus[1])
+            readings = family['ns']
+            if (type(readings) is not list or len(readings) != len(ROUTES) or
+                    any(type(n) is not int or not 0 <= n <= 2**63-1 for n in readings)):
+                raise ValueError('Invalid integer nanosecond evidence')
+            for p in range(1, len(ROUTES)):
+                pair = NAMES[ROUTES[p-1]] + '->' + NAMES[ROUTES[p]]
+                if observe(stats['adjacent'], pair, readings[p] - readings[p-1]):
+                    reasons.append(dict(clock=clock, kind='adjacent', position=p, pair=pair,
+                                        delta_ns=readings[p] - readings[p-1]))
+            for route, name in enumerate(NAMES):
+                ns = [n for r, n in zip(ROUTES, readings) if r == route]
+                for p in range(1, len(ns)):
+                    if observe(stats['within'], name, ns[p] - ns[p-1]):
+                        reasons.append(dict(clock=clock, kind='within', route=name,
+                                            position=p, delta_ns=ns[p] - ns[p-1]))
+                key = (clock, route)
+                if key in previous and observe(stats['between'], name, ns[0] - previous[key]):
+                    reasons.append(dict(clock=clock, kind='between', route=name,
+                                        previous_ns=previous[key], delta_ns=ns[0] - previous[key]))
+                previous[key] = ns[-1]
+        if reasons:
+            bad_sequences += 1
+            if len(events) < 32:
+                events.append(dict(index=index, reasons=reasons, sample=row))
+    return dict(complete=True, samples=SAMPLES, reads=SAMPLES*27, discrepancy_sequences=bad_sequences,
+        statistics=result, first_events=events, events_truncated=bad_sequences > len(events),
+        all_readings_retained=True, metadata=meta, clock_reliability_qualified=False, pm_admission=False,
+        per_read_cpu_proven=False, vdso_internal_fallback_excluded=False)
+
+
+def main():
+    """Replay a completed capture offline, leaving the original report intact."""
+    from remote import LOCAL, evidence_directory
+    name = os.environ.get('NEO_CAPTURE', '')
+    if not re.fullmatch(r'[0-9]{8}T[0-9]{6}\.[0-9]{6}Z', name):
+        raise ValueError('Use the timestamp CAPTURE printed by device:clock-native')
+    capture = LOCAL / 'diagnostics' / name
+    summary = json.loads((capture / 'summary.json').read_text())
+    raw = capture / 'native-output.ndjson'
+    if raw.stat().st_size > MAX_BYTES:
+        raise ValueError('Native capture exceeds its fixed bound')
+    data = raw.read_bytes()
+    if (summary.get('complete') is not True or summary.get('observation_validated') is not True or
+            summary.get('operation') != 'comparison' or
+            hashlib.sha256(data).hexdigest() != summary.get('raw_sha256')):
+        raise ValueError('Original completed capture or raw hash is missing/changed')
+    before = json.loads((capture / 'before.json').read_text())
+    # The original host validation checked this header version against the
+    # hash-verified installed runtime. Replay never re-executes a device helper.
+    version = json.loads(data.splitlines()[0])['libc']
+    result = analyze(data, before['boot_id'], version)
+    os.umask(0o077)
+    destination = evidence_directory()
+    result['original_capture'] = name
+    result['raw_sha256'] = summary['raw_sha256']
+    (destination / 'analysis.json').write_text(json.dumps(result, indent=2) + '\n')
+    print('Offline native analysis:', destination)
+    print('Discrepancy sequences:', result['discrepancy_sequences'])
+
+
+if __name__ == '__main__':
+    main()

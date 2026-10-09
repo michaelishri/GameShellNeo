@@ -2,6 +2,26 @@
 
 Record deferred questions and activities here as they arise.
 
+**vDSO clock exports unavailable, 10 October 2026:** NEO-192's prepared native
+three-route comparison stopped before sampling. A separate verified same-boot
+inventory resolves the actual vDSO mapping but none of its four clock exports,
+matching `arch/arm/kernel/vdso.c`: the timer DT flag suppresses their names at
+boot. This corrects a missing gate in report 261 and substantially weakens the
+physical-versus-virtual counter explanation for the saved RAW discrepancy.
+Both network routes, PM53/0, restart count 1 and protected evidence stay intact.
+Offline native/ARM fixtures and full checks pass: 24 runtime / 947 tooling
+tests (one optional skip), existing C checks and lint.
+Next specify a native libc/syscall comparison explicitly; do not silently drop
+the third route, force a hidden entry or change the DT flag to pass a test.
+Keep the original clock fault, NEO-191 and NEO-182 open.
+[Report 263](docs/263-native-clock-vdso-availability.md).
+
+- [ ] Future timer optimization: assess whether the board can safely expose
+  vDSO clocks after proving bootloader/per-CPU virtual-counter configuration and
+  suspend/resume retention. The current DT flag disables these exports by
+  design. No flag change or efficiency claim is justified by source inspection
+  alone; investigate the current physical-counter fault first. See report 263.
+
 **Clock paths narrowed, 10 October 2026:** NEO-192 now has hash-verified live
 Python/libc inventory and offline disassembly. Python imports the time64 libc
 API; the installed libc contains the expected vDSO candidates and syscall403

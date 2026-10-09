@@ -1084,6 +1084,37 @@ and test results. [Report 261](docs/261-arm-clock-path-source-analysis.md)
 traces the pinned kernel counter/conversion paths and the remaining hypotheses.
 Neither task grants clock reliability or PM admission.
 
+The native comparator and its read-only vDSO inventory use a tested ARM binary:
+
+```sh
+task check:clock-native
+task device:clock-vdso BUILD=20261009T232021.120014Z RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+```
+
+Use the build/inventory timestamps produced on your checkout. The offline build
+verifies the pinned ARM time64 ABI and vDSO sources, runs host and ARM/QEMU
+fixtures, compiles the comparator and retains its ELF imports/disassembly.
+The device task verifies the binary and installed libc, resolves the actual
+mapped vDSO by its auxiliary-vector identity, then checks the versioned and
+unversioned clock exports without calling them. It keeps the screen on and
+preserves the PM state, original fault and protected kernel checkpoint.
+
+**On diagnostic.25, all four clock exports are unavailable.** The timer DT flag
+causes the pinned ARM kernel to suppress them at boot. The completed inventory
+is valid evidence of that absence; it is not a completed timing comparison.
+[Report 263](docs/263-native-clock-vdso-availability.md) corrects the earlier
+candidate-path interpretation and records the stopped comparison.
+
+`task device:clock-native BUILD=<build> RUNTIME_CAPTURE=<inventory>` prepares
+one fixed 15,000-sequence libc/syscall/vDSO comparison, with the optional explicit
+`INSPECTION_REVISION` above. It deliberately stops before sampling when the
+versioned vDSO entry cannot be verified. Do not run it repeatedly on the current
+image or enable that entry to make the test pass. It retains every integer
+reading when available; `task report:clock-native CAPTURE=<completed-capture>`
+reclassifies a completed comparison offline into a fresh report, checking the
+original raw-data hash. A vDSO inventory or stopped attempt cannot pass as a
+completed comparison. All raw results remain under ignored `.local/diagnostics/`.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

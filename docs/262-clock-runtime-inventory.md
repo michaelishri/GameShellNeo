@@ -1,5 +1,12 @@
 # Installed clock-runtime inventory
 
+**Subsequent finding:** [report 263](263-native-clock-vdso-availability.md)
+verifies that this boot's mapped vDSO has no resolvable clock exports. The
+kernel removes their names because of the timer DT flag. The static libc
+dispatch described here remains accurate, but its vDSO candidates are not
+available clock routes on this boot; the expected installed path is the syscall
+fallback. The original fault remains unresolved.
+
 10 October 2026. NEO-192. This continues the saved discrepancy in
 [report 260](260-clock-comparison-provenance.md) and complements the kernel
 source analysis in [report 261](261-arm-clock-path-source-analysis.md).

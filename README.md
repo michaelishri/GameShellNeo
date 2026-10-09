@@ -2859,8 +2859,17 @@ but leaves hardware settings unchanged. Old results remain historical and
 cannot qualify the new collector. Use `task test:kernel-evidence` for the
 offline failure/retention tests, and `task check` for the full suite.
 [Report 247](docs/247-bounded-kernel-evidence.md) explains bounds, private
-evidence preservation and interruption recovery. NEO-184's board qualification
-is pending; no image/card swap is needed for these diagnostic helper changes.
+evidence preservation and interruption recovery.
+
+Use `task device:kernel-evidence-smoke` for the awake append/readback check.
+It writes one userspace/debug marker to `/dev/kmsg`, verifies its exact sequence
+and exclusion from kernel-only text, checks protected checkpoint storage and
+unchanged device settings, and independently proves both USB and Wi-Fi access.
+It does not run PM, play audio or blank the screen. An uncertain marker write
+is never automatically repeated; preserve the private diagnostic files on
+failure. [Report 248](docs/248-kernel-evidence-awake-validation.md) records the
+passing awake board check. Fresh attended PM qualification remains pending;
+no image/card swap is needed for these diagnostic helper changes.
 
 [Report 119](docs/119-guarded-rtc-sleep-preparation.md) records admission,
 recovery limits and the two successful awake rehearsals. Ordinary sleep remains

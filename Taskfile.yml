@@ -216,7 +216,7 @@ tasks:
 
   test:kernel-evidence:
     desc: Offline printk continuity, retention, provenance and storage regressions; no device access
-    cmds: [bash tools/run-logged.sh kernel-evidence python3 -m unittest discover -s tools/tests -p test_kernel_evidence.py -v]
+    cmds: [bash tools/run-logged.sh kernel-evidence python3 -m unittest discover -s tools/tests -p 'test_kernel_evidence*.py' -v]
 
   test:nkmp:
     desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
@@ -517,6 +517,10 @@ tasks:
     env:
       NEO_PM_INSPECT_ROUTE: '{{.ROUTE | default "usb"}}'
     cmds: [python3 tools/check-pm-stages.py --inspect]
+
+  device:kernel-evidence-smoke:
+    desc: Awake protected-checkpoint append test with one userspace debug marker; no PM or screen changes
+    cmds: [python3 tools/check-kernel-evidence.py]
 
   device:keypad-inspect:
     desc: Save keypad identity, USB persistence, input paths and power state without changing policy

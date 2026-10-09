@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[248 — Awake validation of bounded kernel evidence](248-kernel-evidence-awake-validation.md)
+records complete boot capture, a sequence-checked userspace marker append,
+protected storage and both-route proof on the unchanged boot, with PM53/0.
+All 16 runtime and 882 tooling tests pass; attended PM qualification remains open.
+
 [247 — Bounded kernel evidence independent of journal retention](247-bounded-kernel-evidence.md)
 implements sequence-checked printk checkpoints and provenance-bound PM/sleep
 admission. Offline checks pass 16 runtime and 874 tooling tests plus C/lint

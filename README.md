@@ -26,8 +26,12 @@ PM to 12/0; the owner confirms normal warnings/display returns throughout.
 batch and preserved collection errors. Four subsequent awake USB reconnects
 also pass, with independent USB access after each, final Wi-Fi/Mac health and
 unchanged PM/keypad state in
-[report 236](docs/236-diagnostic25-post-sleep-usb-reconnects.md). Remaining
-battery/cable sleep qualification and energy measurements are still open.
+[report 236](docs/236-diagnostic25-post-sleep-usb-reconnects.md). A fresh seven-debug
+sequence, awake battery rehearsal and one attended battery-only RTC sleep also
+pass, followed by separate USB reattachment and both-route health checks.
+[Report 237](docs/237-diagnostic25-battery-rtc-qualification.md) records PM20/0,
+all-CPU sleep callbacks and owner-confirmed normal display return. Cable changes
+during sleep and energy measurements remain open.
 The newer controller-removal work is outside this candidate.
 
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps

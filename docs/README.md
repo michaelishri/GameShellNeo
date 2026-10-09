@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[237 — Diagnostic.25 battery-only RTC qualification](237-diagnostic25-battery-rtc-qualification.md)
+records seven fresh debug passes, the awake battery rehearsal and one attended
+battery-only sleep with Wi-Fi recovery, all-CPU callbacks, timekeeping freeze
+and owner-confirmed normal return. Separate USB reattachment and both-route
+health pass; PM is 20/0. Cable changes during sleep and energy remain separate.
+
 [236 — Diagnostic.25 USB reconnects after sleep](236-diagnostic25-post-sleep-usb-reconnects.md)
 records four physical awake reconnects, per-cycle independent USB SSH proofs,
 final USB/Wi-Fi/Mac health and unchanged PM12/0, SDIO usage and keypad identity.

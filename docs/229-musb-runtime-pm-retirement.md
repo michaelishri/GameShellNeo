@@ -88,7 +88,7 @@ earlier paths, preserved reference counts and uninitialized-work avoidance.
 It controls PM and hardware boundaries; it is not real PM scheduling.
 
 Twenty-nine native negative controls include the previous work/IRQ/session
-mutations and missing, late or policy-after-barrier inversions, missing PM
+mutations and missing/late barriers or policy-before-barrier ordering, missing PM
 closure on each probe entry, and active/missing/duplicate core puts. Only an
 assertion failure is accepted. Four source-boundary controls reject missing
 or late timer initialization and extra work/PM terminal callers. The five ARM
@@ -131,8 +131,31 @@ results as executions of this candidate.
 
 ## Results
 
-Implementation validation and independent review are in progress. Final
-receipts and any corrections will be recorded before NEO-167 is closed.
+- All 43 source scenarios passed natively and on ARM32. The 29 native negative
+  controls failed by assertion, and four source-boundary controls were rejected.
+- `task check` passed: 16 runtime and 826 tooling tests, with two optional
+  tooling skips; compiled helper checks, Bash syntax and ShellCheck passed.
+- Strict production-patch checkpatch: zero errors, zero warnings, zero checks.
+- Standards review: zero findings. Specification review: zero findings.
+- UML KUnit: all eight cases passed under KASAN and lockdep, with no rejected
+  kernel diagnostics. The exact suite, 11 inputs, complete production patch
+  queue, four retained artifacts and retained receipt were independently
+  checked against the saved files.
+- All five ARM configurations passed. The 16 recorded inputs, 30 native
+  binaries, ARM32 binary, extracted core source, five configurations, 21 ARM
+  objects and complete patch queue were checked against the saved files.
+
+| Artifact | SHA256 |
+| --- | --- |
+| Patch 0041 | `8e4ede64b81a9172108d7210ba10ff6041ee76db416e15d9e536837dec1b69f3` |
+| `.local/build/musb-irq-tests/compile-evidence.json` | `c4f348830874a921ef89e7d033c0d03b205b256e8b00aa5ddecb66ae989b132f` |
+| `.local/build/musb-pm-kunit/evidence.json` | `aadd29c82e2d81945e1a87f517048f9e4b9b8027995519ab0e03a4ba2ca9935c` |
+| Accepted UML `linux` | `61ca6eb09e648c2b569e366e26ce6468af4edfbebf42112ea24e47bc367475bb` |
+
+Accepted kernel artifacts are retained under
+`.local/build/musb-pm-kunit/kernel-1b944a0549b3675b/accepted-runs/8e11d3ca07fa47d2af384ce520f415c7/`.
+The shared restart/IRQ/work evidence validators also passed their unit tests;
+their full kernel suites were not rerun for this change.
 
 ## Remaining boundaries
 

@@ -1204,7 +1204,7 @@ and [report 228](docs/228-musb-core-work-retirement.md) distinguish the implemen
 boundaries from wider teardown and hardware qualification. The PM suite stores
 its own accepted artifacts under `.local/build/musb-pm-kunit/`;
 [report 229](docs/229-musb-runtime-pm-retirement.md) covers callback retirement
-before backend resource release, including pending and running PM operations.
+before backend resource release and retained-reference accounting.
 
 For the CPI WFI s2idle candidate in diagnostic.24, use:
 

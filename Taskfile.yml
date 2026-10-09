@@ -440,6 +440,14 @@ tasks:
     desc: Test isolated Wi-Fi mailbox read/ACK error candidate, native and ARM32
     cmds: [bash tools/run-logged.sh brcmfmac-mailbox python3 tools/check-brcmfmac-mailbox.py]
 
+  test:axp223-controls:
+    desc: Test isolated charger-control diagnostic with real regmap, PM and debugfs in UML
+    cmds: [bash tools/run-logged.sh axp223-controls python3 tools/check-axp223-controls.py]
+
+  check:axp223-controls-driver:
+    desc: Run charger-control UML tests and compile the complete ARM RSB MFD driver
+    cmds: [bash tools/run-logged.sh axp223-controls-driver python3 tools/check-axp223-controls.py --compile-driver]
+
   check:brcmfmac-mailbox-drivers:
     desc: Test mailbox candidate and compile complete normal/debug ARM drivers outside the image queue
     cmds: [bash tools/run-logged.sh brcmfmac-mailbox-drivers python3 tools/check-brcmfmac-mailbox.py --compile-drivers]

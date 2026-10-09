@@ -87,12 +87,13 @@ def compile_locked(archive, lock, work, objects, extra_config, project_config):
     return build_objects(source, scratch, lock, objects, extra_config, project_config, metadata)
 
 
-def build_objects(source, scratch, lock, objects, extra_config, project_config, metadata):
+def build_objects(source, scratch, lock, objects, extra_config, project_config, metadata, *, offline=False):
     builder = lock['builder']
     relative = scratch.relative_to(ROOT).as_posix()
     config_check = ('python3 /project/tools/check-kernel-config.py "$output/.config"\n'
                     if project_config else '')
-    run(['docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
+    run(['docker', 'run', '--rm', *(['--network', 'none', '--pull', 'never'] if offline else []),
+         '--user', f'{os.getuid()}:{os.getgid()}',
          '--platform', builder['platform'], '--entrypoint', 'bash', '-v', f'{ROOT}:/project',
          '-v', f'{source}:/kernel-source:ro',
          '-e', f'NEO_DRIVER_SCRATCH=/project/{relative}',

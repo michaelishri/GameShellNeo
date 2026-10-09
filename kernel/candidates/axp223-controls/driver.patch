@@ -1,0 +1,79 @@
+From: GameShellNeo contributors
+Subject: [PATCH] mfd: axp20x-rsb: add optional AXP223 control provenance diagnostic
+
+Isolated NEO-188 candidate. The checker composes this hook patch with the
+adjacent axp223-control-diag.h. No charger writes or cache synchronization.
+Default off; hardware qualification and image integration remain separate.
+
+--- a/drivers/mfd/axp20x-rsb.c
++++ b/drivers/mfd/axp20x-rsb.c
+@@ -21,15 +21,22 @@
+ #include <linux/regmap.h>
+ #include <linux/slab.h>
+ #include <linux/sunxi-rsb.h>
++#include "axp223-control-diag.h"
++
++static bool control_diagnostics;
++module_param(control_diagnostics, bool, 0444);
++MODULE_PARM_DESC(control_diagnostics, "Enable read-only AXP223 charger-control snapshots");
+ 
+ static int axp20x_rsb_probe(struct sunxi_rsb_device *rdev)
+ {
++	struct axp20x_rsb *chip;
+ 	struct axp20x_dev *axp20x;
+ 	int ret;
+ 
+-	axp20x = devm_kzalloc(&rdev->dev, sizeof(*axp20x), GFP_KERNEL);
+-	if (!axp20x)
++	chip = devm_kzalloc(&rdev->dev, sizeof(*chip), GFP_KERNEL);
++	if (!chip)
+ 		return -ENOMEM;
++	axp20x = &chip->axp;
+ 
+ 	axp20x->dev = &rdev->dev;
+ 	axp20x->irq = rdev->irq;
+@@ -46,13 +53,21 @@
+ 		return ret;
+ 	}
+ 
+-	return axp20x_device_probe(axp20x);
++	ret = axp20x_device_probe(axp20x);
++	if (ret)
++		return ret;
++
++	ret = axp223_control_init(chip, control_diagnostics);
++	if (ret)
++		dev_warn(&rdev->dev, "Control diagnostics unavailable: %d\n", ret);
++	return 0;
+ }
+ 
+ static void axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
+ {
+ 	struct axp20x_dev *axp20x = sunxi_rsb_device_get_drvdata(rdev);
+ 
++	axp223_control_remove(axp223_controls(&rdev->dev));
+ 	axp20x_device_remove(axp20x);
+ }
+ 
+@@ -75,7 +90,20 @@
+ 	.probe	= axp20x_rsb_probe,
+ 	.remove	= axp20x_rsb_remove,
+ };
+-module_sunxi_rsb_driver(axp20x_rsb_driver);
++/* Preserve the default driver's PM callback selection when diagnostics are off. */
++static int __init axp20x_rsb_init(void)
++{
++	if (control_diagnostics)
++		axp20x_rsb_driver.driver.pm = &axp223_control_pm_ops;
++	return sunxi_rsb_driver_register(&axp20x_rsb_driver);
++}
++module_init(axp20x_rsb_init);
++
++static void __exit axp20x_rsb_exit(void)
++{
++	sunxi_rsb_driver_unregister(&axp20x_rsb_driver);
++}
++module_exit(axp20x_rsb_exit);
+ 
+ MODULE_DESCRIPTION("PMIC MFD sunXi RSB driver for AXP20X");
+ MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");

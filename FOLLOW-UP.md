@@ -2,6 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
+**AXP223 control diagnostic tested offline, 10 October 2026:** NEO-188 has an
+isolated default-off REG33/34 normal/bypass diagnostic with PM admission,
+protected removal, per-read errors and timestamps. It performs no charger
+writes or cache repair. Full host checks pass 16 runtime / 898 tooling tests
+(one optional skip), C checks and lint. All seven real UML regmap/PM/debugfs
+tests pass with KASAN/lockdep, and the complete ARM RSB MFD driver compiles.
+The candidate remains outside the active image queue, ready for review.
+Integration, collector provenance and attended
+hardware qualification remain separate. NEO-10's voltage, pack limits and
+conflicting REG34 semantics are still unresolved. No device was contacted.
+[Report 255](docs/255-axp223-control-provenance-diagnostic.md).
+
 **Wi-Fi mailbox candidate tested, 10 October 2026:** NEO-187's isolated 0039
 candidate checks read/ACK errors before decoding firmware flags and routes
 failures to the existing host-owned worker cleanup. Actual-source native/ARM32

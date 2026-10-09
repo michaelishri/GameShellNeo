@@ -29,6 +29,13 @@ installed change or complete controller teardown. See
 [report 253](../docs/253-musb-queue-dma-rollback-candidate.md) for evidence and
 the source-suite/image integration still required before promotion.
 
+The isolated [AXP223 control diagnostic](candidates/axp223-controls/driver.patch)
+is composed with its adjacent helper by `test:axp223-controls` and
+`check:axp223-controls-driver`. It is default-off, outside the image queue and
+has no charger writes. Real UML regmap/PM/debugfs tests and full ARM compilation
+are required before promotion. [Report 255](../docs/255-axp223-control-provenance-diagnostic.md)
+records validation status, lifetime admission and the remaining hardware gates.
+
 The isolated [0039 mailbox-error candidate](candidates/0039-brcmfmac-mailbox-errors.patch)
 checks the Wi-Fi mailbox read and ACK before decoding status, then sends errors
 through patch 0018's existing worker cleanup. It also lives outside the active

@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[255 — AXP223 charger-control provenance diagnostic](255-axp223-control-provenance-diagnostic.md)
+adds an isolated default-off normal/bypass read candidate and PM/removal
+admission. Seven real-kernel tests and complete ARM driver compilation pass;
+the active image and charger settings are unchanged, with hardware gates open.
+
 [254 — Wi-Fi mailbox transport-error candidate](254-brcmfmac-mailbox-error-candidate.md)
 checks reads and ACKs before decoding status, with 131/133 normal/DEBUG scenarios
 on native and ARM32, 43 negative controls and complete ARM driver builds. The

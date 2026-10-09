@@ -995,6 +995,22 @@ updated inventory admission; build and installation progress are recorded in
 [report 187](docs/187-diagnostic21-gauge-integration.md). This is not an ADC or
 battery-calibration fix.
 
+The separate AXP223 control-provenance diagnostic has offline tasks:
+
+```sh
+task test:axp223-controls          # Real Linux UML/regmap/PM/debugfs tests
+task check:axp223-controls-driver # Also compile the complete ARM RSB MFD driver
+```
+
+These require the locked Linux archive and pinned builder already cached;
+both containers have networking and image pulls disabled. The candidate is
+default-off and outside the active image queue. It compares ordinary and
+bypassed REG33/34 reads without charger writes or cache repair. Its records
+can clarify register provenance, not calibrate battery voltage. The saved
+receipts live under `.local/build/axp223-controls-tests/`; missing receipts
+mean validation is incomplete. [Report 255](docs/255-axp223-control-provenance-diagnostic.md)
+records the PM/removal contract, test status and remaining integration gates.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

@@ -37,6 +37,11 @@ def main():
         source_controls = {
             'missing-resume-wait-init': core.read_text().replace(
                 '\tinit_waitqueue_head(&musb->resume_work_wait);', ''),
+            'late-resume-wait-init': core.read_text().replace(
+                '\tinit_waitqueue_head(&musb->resume_work_wait);', '').replace(
+                '\tstatus = musb_platform_init(musb);',
+                '\tstatus = musb_platform_init(musb);\n'
+                '\tinit_waitqueue_head(&musb->resume_work_wait);'),
             'missing-timer-init': without_timer,
             'late-timer-init': without_timer.replace('\t/* attach to the IRQ */',
                                                      timer + '\t/* attach to the IRQ */'),

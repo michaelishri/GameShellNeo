@@ -419,6 +419,8 @@ static void check_resume_running(struct kunit *test, bool queued, bool handoff, 
 	f->resume_in_completion = handoff;
 	f->complete_on_restart = restart;
 	f->handoff_running = handoff && restart;
+	if (restart)
+		f->queue_target = 1; /* Leave a follower behind the held completion. */
 	f->musb->is_runtime_suspended = queued || handoff;
 	if (handoff) {
 		fixture_queue(f, 0);
@@ -468,6 +470,7 @@ static void check_resume_running(struct kunit *test, bool queued, bool handoff, 
 	KUNIT_EXPECT_EQ(test, f->musb->resume_work_count, 0U);
 	KUNIT_EXPECT_TRUE(test, list_empty(&f->musb->pending_list));
 	KUNIT_EXPECT_EQ(test, f->starts[0], restart ? 1U : 0U);
+	KUNIT_EXPECT_EQ(test, f->starts[1], 0U);
 	KUNIT_EXPECT_FALSE(test, fixture_ep(f, 0)->restart_deferred);
 	KUNIT_EXPECT_FALSE(test, fixture_ep(f, 0)->restart_pending);
 	KUNIT_EXPECT_EQ(test, atomic_read(&f->device->power.usage_count), 1);

@@ -242,6 +242,7 @@ static void finish(void)
 {
  assert(!instance.lock && !instance.list_lock && !controller.refs && !pending_allocs);
  assert(!endpoints[0].restart_deferred && !endpoints[1].restart_deferred);
+ assert(!instance.resume_work_count);
  for (unsigned i = 0; i < allocated; i++) {
 #ifdef REAL_FREE
   if (allocations[i].alive)

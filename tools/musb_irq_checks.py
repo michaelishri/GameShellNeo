@@ -63,7 +63,12 @@ def test_functions(core):
         raise ValueError('Terminal work shutdown must be confined to fail3 and remove')
     if core.count('\tmusb_disable_runtime_pm(musb);') != 4:
         raise ValueError('Expected remove and three PM-enabled failure entries')
-    if core.count('\tinit_waitqueue_head(&musb->resume_work_wait);') != 1:
+    allocation = core[core.index('static struct musb *allocate_instance('):]
+    allocation = allocation[:allocation.index('\n}')]
+    wait_init = '\tinit_waitqueue_head(&musb->resume_work_wait);'
+    if (core.count(wait_init) != 1 or
+            '\tINIT_LIST_HEAD(&musb->pending_list);\n' + wait_init not in allocation or
+            init.index('musb = allocate_instance(') > init.index('musb_platform_init(musb)')):
         raise ValueError('Expected resume wait initialization before platform publication')
     tail = init[init.index('fail3:\n'):]
     probe = ('static int probe_failure(struct musb *musb, struct device *dev)\n{\n'

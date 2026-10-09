@@ -1219,6 +1219,21 @@ receipt is `.local/build/musb-sleep-tests/matrix-evidence.json`. These checks
 do not install an image or qualify physical USB or system sleep. See
 [report 225](docs/225-musb-resume-request-ownership.md) for results and limits.
 
+The separate failed-queue DMA rollback candidate has explicit offline tasks:
+
+```sh
+task test:musb-queue-dma          # Actual mapping/queue functions, native + sanitizers + ARM32
+task check:musb-queue-dma-drivers  # Also compile board and DMA-enabled ARM driver objects
+```
+
+This candidate lives under `kernel/candidates`, outside the active image patch
+queue and `task build`. It returns buffer ownership when deferred-work
+allocation fails; success paths and the installed image remain unchanged.
+Evidence is saved under `.local/build/musb-queue-dma-tests/`.
+[Report 253](docs/253-musb-queue-dma-rollback-candidate.md) records passing
+checks and the later source-suite/image integration requirements. It does not
+complete controller teardown or qualify DMA hardware on the PIO-only GameShell.
+
 For the CPI WFI s2idle candidate in diagnostic.24, use:
 
 ```sh

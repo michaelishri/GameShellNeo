@@ -21,6 +21,14 @@ files and bindings live in `overlay/` and become the third generated patch.
 The same queue is applied by `--apply SOURCE` for local compilation. Input
 changes require a fresh source extraction; do not silently reuse a patched tree.
 
+The isolated [0038 failed-queue DMA rollback candidate](candidates/0038-musb-queue-dma-rollback.patch)
+is kept under `candidates/`, outside that exporter and the image queue. Its
+`test:musb-queue-dma` and `check:musb-queue-dma-drivers` tasks exercise actual
+mapping/queue functions and separately compile the candidate. It is not an
+installed change or complete controller teardown. See
+[report 253](../docs/253-musb-queue-dma-rollback-candidate.md) for evidence and
+the source-suite/image integration still required before promotion.
+
 Patch 0036 is installed in diagnostic.22 and retained in diagnostic.23. It
 masks unused low-register bits in the shared 9–16-bit ADC helper while retaining
 16-bit values, read order and error propagation. The saved

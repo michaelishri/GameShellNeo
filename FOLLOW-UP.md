@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**USB failed-queue candidate tested, 10 October 2026:** NEO-186's isolated
+rollback returns DMA ownership after deferred-work allocation failure. All
+74 actual-source scenarios pass natively, under Address/UndefinedBehavior
+Sanitizers and ARM32; six negative controls reject and board/DMA-enabled core
+and gadget objects compile. Full 16 runtime / 893 tooling tests pass (one
+optional skip), plus C/lint. The patch is outside the active image queue.
+Integrate the affected suites/patch queue under a new image identity before
+hardware qualification; Sunxi PIO cannot qualify other boards' DMA engines.
+NEO-106's broader teardown and channel-release mapping lead remain open.
+[Report 253](docs/253-musb-queue-dma-rollback-candidate.md).
+
 **Three board tickets investigated offline, 10 October 2026:** NEO-106 has a
 demonstrated failed-queue DMA rollback gap and a separate channel-release versus
 mapping-lifetime lead ([report 250](docs/250-musb-queue-failure-audit.md)); NEO-186

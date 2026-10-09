@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[253 — MUSB failed-queue DMA rollback candidate](253-musb-queue-dma-rollback-candidate.md)
+adds a one-line isolated correction with 74 native/ARM32 scenarios, sanitizer
+checks, six negative controls and board/DMA driver compilation. Active image
+inputs are unchanged; integration and broader teardown remain open.
+
 [252 — Charging-voltage evidence gap](252-charging-voltage-evidence-gap.md)
 identifies a driver-owned fresh-register read path and its PM/lifetime gates;
 cached controls and physical voltage accuracy remain distinct questions.

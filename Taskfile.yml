@@ -222,6 +222,14 @@ tasks:
     desc: Offline speaker timing, cleanup and report validation with fake playback; no device or sound
     cmds: [bash tools/run-logged.sh audio-timing python3 -m unittest discover -s tools/tests -p 'test_speaker*.py' -v]
 
+  test:musb-queue-dma:
+    desc: Test isolated failed-queue DMA rollback candidate natively and ARM32; active image queue unchanged
+    cmds: [bash tools/run-logged.sh musb-queue-dma python3 tools/check-musb-queue-dma.py]
+
+  check:musb-queue-dma-drivers:
+    desc: Test isolated DMA rollback and compile PIO/DMA ARM drivers; no image or device changes
+    cmds: [bash tools/run-logged.sh musb-queue-dma-drivers python3 tools/check-musb-queue-dma.py --compile-drivers]
+
   test:nkmp:
     desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
     cmds: [bash tools/run-logged.sh nkmp python3 tools/check-nkmp.py]

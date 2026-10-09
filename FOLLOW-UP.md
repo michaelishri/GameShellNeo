@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**Clock-path comparison prepared, 10 October 2026:** NEO-192 has saved
+`check:clock-abi` and `device:clock-compare` tasks for a fixed awake comparison
+of Python clock APIs and explicit ARM time64 calls. Eleven focused tests and
+the real hash-verified source/ABI check pass. Full sandbox checks hit five
+existing local-socket fixture errors; automatic review timed out twice for
+the unrestricted suite. The device attempt was denied socket creation before
+reaching the Mac, and its authorized request also timed out in review. No
+hardware measurement occurred. Finish full checks and one capture when access
+is available; retain the original fault and keep PM admission blocked.
+[Report 259](docs/259-clock-path-comparison.md).
+
 **Battery clock-fault handling prepared, 10 October 2026:** NEO-192 now has
 tested producer handling for invalid, failed and decreasing clock observations.
 Schema-3 records preserve first/latest raw evidence and a count through good

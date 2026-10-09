@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[259 — Prepared clock-path comparison](259-clock-path-comparison.md)
+adds a fixed awake Python/kernel clock comparison with pinned-source and live
+ARM ABI checks. Focused tests pass; full checks and hardware capture await
+execution access. No new hardware result or clock-reliability claim is made.
+
 [258 — Battery clock-fault handling](258-battery-clock-fault-handling.md)
 adds degraded publication and retained raw incident evidence, tests service
 restart behavior and keeps diagnostic admission blocked after sample recovery.

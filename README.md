@@ -1029,6 +1029,20 @@ The guard fault-handling change is now implemented and tested offline in
 [report 258](docs/258-battery-clock-fault-handling.md); the underlying clock
 regression remains unresolved and the live guard has not been replaced.
 
+The next clock diagnostic compares the Python APIs with explicit ARM EABI
+kernel calls:
+
+```sh
+task check:clock-abi       # Offline verification of the pinned syscall/time64 ABI
+task device:clock-compare # One awake 15000-sequence comparison; USB stays connected
+```
+
+The comparison verifies the live ABI before any explicit syscall and preserves
+raw discrepancies and CPU context. It changes no clocksource, affinity, service
+or PM setting and keeps the screen on. It does not establish that Python uses
+vDSO or qualify clock reliability. [Report 259](docs/259-clock-path-comparison.md)
+records the passing focused checks and pending full-suite/device execution.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

@@ -50,6 +50,10 @@ def validate_result(result, before, after):
             any(counts.get(k, 0) < v for k, v in observed_counts.items()) or
             (count <= 32 and counts != observed_counts)):
         raise ValueError('Clock anomaly counts disagree with retained evidence')
+    validate_state(before, after)
+
+
+def validate_state(before, after):
     for key in ('boot_id', 'image', 'kernel', 'pm', 'stats', 'services', 'backlight',
                 'usb', 'charger', 'cpu_policy', 'wifi_config_sha256', 'taint', 'failed_units'):
         if before[key] != after[key]:

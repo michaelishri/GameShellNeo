@@ -556,6 +556,14 @@ tasks:
     desc: Record 60000 awake clock brackets without changing clocksource or PM; no sleep admission
     cmds: [python3 tools/check-clock-observation.py]
 
+  check:clock-abi:
+    desc: Verify ARM EABI/time64 definitions from the hash-locked kernel archive; no device access
+    cmds: [python3 tools/check-clock-paths.py --check-abi]
+
+  device:clock-compare:
+    desc: One awake Python/kernel clock comparison with fixed work and retained discrepancies; no sleep admission
+    cmds: [python3 tools/check-clock-paths.py]
+
   device:keypad-inspect:
     desc: Save keypad identity, USB persistence, input paths and power state without changing policy
     cmds: [python3 tools/check-keypad.py]

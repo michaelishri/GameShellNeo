@@ -151,8 +151,8 @@ archive and the saved flash helper to the Mac account's
 both compressed and complete decompressed image checksums. The private task log
 is `.local/diagnostic25-mac-stage.log`; staging performed no physical disk write.
 NEO-170 build and transfer are complete. [Report 233](233-diagnostic25-installation.md)
-records the subsequent guarded card write and full readback. Boot, awake checks
-and new-image hardware qualification remain under NEO-108.
+records the subsequent guarded card write, full readback, confirmed boot and
+passing awake prerequisites. Attended PM/USB qualification remains under NEO-108.
 
 ## Attended qualification
 

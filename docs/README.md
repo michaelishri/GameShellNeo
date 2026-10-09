@@ -18,13 +18,15 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 [233 — Diagnostic.25 installation](233-diagnostic25-installation.md) records
 the warning/shutdown, fresh DEV-card identity, guarded write and complete 4 GiB
-readback with safe ejection. Owner-confirmed boot and awake checks are pending.
+readback, confirmed boot and passing awake prerequisites. Both routes, image,
+battery, CPU-idle/timer, journal, power-key ownership and RTC checks pass;
+attended PM/USB qualification remains open.
 
 [232 — Diagnostic.25 MUSB restart integration](232-musb-restart-image-integration.md)
 records a built and offline-verified image from the reviewed NEO-108/163 endpoint
 restart fix, retaining diagnostic.24 recovery. The later NEO-106 teardown stack
-is excluded. Report 233 follows its verified card write; boot and attended
-hardware qualification remain separate.
+is excluded. Report 233 follows its verified installation and awake checks;
+attended PM/USB qualification remains separate.
 
 [225 — MUSB deferred restart ownership](225-musb-resume-request-ownership.md)
 records the NEO-108 candidate and NEO-163 review corrections: retaining restart

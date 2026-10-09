@@ -54,11 +54,11 @@ class RestartEvidenceTests(unittest.TestCase):
             checked_cases(self.report, 'musb-restart')
 
     def test_native_count_cannot_be_doubled_or_truncated(self):
-        self.assertEqual(host.scenario_count('MUSB deferred-request audit: 48 source scenarios pass (24 per direction)\n'),
-                         dict(total=48, per_direction=24))
+        self.assertEqual(host.scenario_count('MUSB deferred-request audit: 52 source scenarios pass (26 per direction)\n'),
+                         dict(total=52, per_direction=26))
         for text in ('', 'MUSB deferred-request audit: 36 source scenarios pass (18 per direction)',
                      'MUSB deferred-request audit: 72 source scenarios pass (36 per direction)',
-                     'MUSB deferred-request audit: 48 source scenarios pass (24 per direction)\nextra'):
+                     'MUSB deferred-request audit: 52 source scenarios pass (26 per direction)\nextra'):
             with self.assertRaises(ValueError):
                 host.scenario_count(text)
 

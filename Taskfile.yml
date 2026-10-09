@@ -256,7 +256,7 @@ tasks:
     cmds: [bash tools/run-logged.sh musb-request-resume python3 tools/check-musb-request-resume.py]
 
   test:musb-restart-kunit:
-    desc: Execute actual MUSB restart/giveback paths in an isolated UML kernel with KASAN and lockdep
+    desc: Test MUSB restart, giveback and terminal callback drain in UML with KASAN and lockdep
     cmds: [bash tools/run-logged.sh musb-restart-kunit python3 tools/check-musb-restart-kunit.py]
 
   test:musb-irq-kunit:

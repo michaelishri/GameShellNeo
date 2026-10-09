@@ -6,7 +6,7 @@ PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch
            '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch',
            '0037-musb-resume-request-ownership.patch', '0038-musb-probe-role-unwind.patch',
            '0039-musb-core-irq-retirement.patch', '0040-musb-core-work-retirement.patch',
-           '0041-musb-runtime-pm-retirement.patch')
+           '0041-musb-runtime-pm-retirement.patch', '0042-musb-resume-work-retirement.patch')
 
 
 def extract_source(archive, lock, queue, apply_queue, scratch):
@@ -63,6 +63,8 @@ def test_functions(core):
         raise ValueError('Terminal work shutdown must be confined to fail3 and remove')
     if core.count('\tmusb_disable_runtime_pm(musb);') != 4:
         raise ValueError('Expected remove and three PM-enabled failure entries')
+    if core.count('\tinit_waitqueue_head(&musb->resume_work_wait);') != 1:
+        raise ValueError('Expected resume wait initialization before platform publication')
     tail = init[init.index('fail3:\n'):]
     probe = ('static int probe_failure(struct musb *musb, struct device *dev)\n{\n'
              '\tint status = -EIO;\n' + tail + '\n}\n')
@@ -103,8 +105,8 @@ def mutations(functions):
         'late-remove': replace_once(functions, remove, late_remove),
         'early-remove': replace_once(functions, remove, early_remove),
         'late-probe': replace_once(functions,
-            'fail3:\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);',
-            'fail3:\n\tmusb_disable_runtime_pm(musb);'),
+            'fail3:\n\tmusb_shutdown_resume_work(musb);\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);',
+            'fail3:\n\tmusb_shutdown_resume_work(musb);\n\tmusb_disable_runtime_pm(musb);'),
         'missing-free': replace_once(functions, '\tfree_irq(musb->nIrq, musb);', '\t(void)musb;'),
         'double-free': replace_once(functions, '\tmusb->nIrq = -ENODEV;\n', ''),
         'wait-under-lock': replace_once(functions, shutdown, locked),
@@ -124,8 +126,8 @@ def mutations(functions):
     result['missing-remove-work'] = replace_once(functions, remove,
         replace_once(remove, '\tmusb_shutdown_work(musb);\n', ''))
     result['missing-probe-work'] = replace_once(functions,
-        'fail3:\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);\n\tmusb_shutdown_work(musb);',
-        'fail3:\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);')
+        'fail3:\n\tmusb_shutdown_resume_work(musb);\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);\n\tmusb_shutdown_work(musb);',
+        'fail3:\n\tmusb_shutdown_resume_work(musb);\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);')
     result['missing-session-put'] = replace_once(functions,
         '\t\tpm_runtime_put_noidle(musb->controller);', '\t\t(void)musb;')
     result['foreign-session-put'] = replace_once(functions, '\tif (musb->session) {', '\t{')
@@ -151,7 +153,8 @@ def mutations(functions):
     for name, label in (('fail3', 'fail3:'), ('phy-shutdown', 'fail2_5:'),
                         ('phy-init', 'err_usb_phy_init:')):
         result['missing-probe-pm-' + name] = functions.replace(
-            label + '\n\tmusb_disable_runtime_pm(musb);', label + '\n')
+            label + '\n\tmusb_shutdown_resume_work(musb);\n\tmusb_disable_runtime_pm(musb);',
+            label + '\n\tmusb_shutdown_resume_work(musb);')
     result['active-core-put'] = replace_once(functions, remove,
         replace_once(remove, '\tpm_runtime_put_noidle(musb->controller);',
                       '\tpm_runtime_put_sync(musb->controller);'))
@@ -161,4 +164,9 @@ def mutations(functions):
         replace_once(remove, '\tpm_runtime_put_noidle(musb->controller);',
                       '\tpm_runtime_put_noidle(musb->controller);\n'
                       '\tpm_runtime_put_noidle(musb->controller);'))
+    result['missing-remove-resume'] = replace_once(functions, remove,
+        replace_once(remove, '\tmusb_shutdown_resume_work(musb);\n', ''))
+    for label in ('fail3:', 'fail2_5:', 'err_usb_phy_init:', 'fail2:'):
+        result['missing-resume-' + label.removesuffix(':')] = functions.replace(
+            label + '\n\tmusb_shutdown_resume_work(musb);', label + '\n')
     return result

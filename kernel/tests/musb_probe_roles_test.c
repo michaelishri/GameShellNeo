@@ -7,7 +7,7 @@
 
 enum { MUSB_HOST = 1, MUSB_PERIPHERAL, MUSB_OTG };
 struct device { int unused; };
-struct musb { int port_mode; struct device *controller; };
+struct musb { int port_mode; struct device *controller; bool resume_stopped; };
 struct musb_hdrc_platform_data { int power; };
 static int host_error, gadget_error, mode_result;
 static bool host_live, gadget_live, resources_live;
@@ -53,6 +53,7 @@ static int musb_platform_set_mode(struct musb *musb, int mode)
 
 static void musb_gadget_cleanup(struct musb *musb)
 {
+	assert(musb->resume_stopped);
 	assert(musb->port_mode != MUSB_HOST && gadget_live);
 	assert(musb->port_mode != MUSB_OTG || host_live);
 	event('g');
@@ -61,16 +62,24 @@ static void musb_gadget_cleanup(struct musb *musb)
 
 static void musb_host_cleanup(struct musb *musb)
 {
+	assert(musb->resume_stopped);
 	assert(musb->port_mode != MUSB_PERIPHERAL && host_live);
 	assert(!gadget_live);
 	event('h');
 	host_live = false;
 }
 
+static void musb_shutdown_resume_work(struct musb *musb)
+{
+	assert(resources_live);
+	musb->resume_stopped = true;
+}
+
 #include "musb_probe_roles_function.h"
 
 static void clean_success(struct musb *musb)
 {
+	musb_shutdown_resume_work(musb);
 	if (gadget_live)
 		musb_gadget_cleanup(musb);
 	if (host_live)
@@ -101,8 +110,9 @@ static void check(int role, int host, int gadget, int mode, int expected,
 	cases++;
 	if (expected < 0) {
 		assert(!host_live && !gadget_live);
-		/* A failed registration must leave no owner for a subsequent try. */
+		/* A subsequent probe uses a fresh allocation after terminal cleanup. */
 		if (role >= MUSB_HOST && role <= MUSB_OTG) {
+			musb = (struct musb){ .port_mode = role };
 			host_error = gadget_error = mode_result = 0;
 			reset_events();
 			assert(!musb_init_roles(&musb, 127));

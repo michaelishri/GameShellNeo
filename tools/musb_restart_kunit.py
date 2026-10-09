@@ -2,16 +2,22 @@
 import difflib
 import hashlib
 import re
-import tarfile
+from musb_irq_checks import extract_source
+
+EXTRA_INPUTS = ('tools/musb_irq_checks.py',)
 
 CASES = ('restart_busy_giveback_test', 'restart_empty_requeue_test',
          'restart_same_endpoint_test', 'restart_other_endpoint_test',
-         'restart_follower_test', 'restart_nuke_test', 'restart_first_error_test')
+         'restart_follower_test', 'restart_nuke_test', 'restart_first_error_test',
+         'resume_cancel_test', 'resume_active_gate_test', 'resume_suspended_gate_test',
+         'resume_immediate_running_test', 'resume_queued_running_test',
+         'resume_deferred_handoff_test', 'resume_restart_running_test',
+         'resume_handoff_running_test', 'resume_nested_test', 'resume_fresh_instance_test')
 
 LIMITS = ('Actual full MUSB driver and USB giveback, real spinlocks and runtime-PM '
           'accounting under Linux UML with KASAN/lockdep. Only the hardware restart '
           'is intercepted. Controller runtime state is staged; a baseline PM reference '
-          'prevents real hardware power transitions. Single virtual CPU and synchronous '
+          'prevents real hardware power transitions. Single virtual CPU with controlled kthread '
           'interleavings: no SMP, DMA, electrical USB, actual suspend or board qualification.')
 
 
@@ -23,27 +29,18 @@ def replace_once(text, before, after):
 
 def test_patch(root, archive, lock, queue, apply_queue, scratch):
     prefix = 'drivers/usb/musb/'
-    names = ('musb_core.c', 'musb_core.h', 'musb_gadget.c', 'musb_gadget.h',
-             'musb_gadget_ep0.c', 'musb_regs.h', 'sunxi.c', 'Kconfig')
-    version = 'linux-' + lock['linux']['tag'].removeprefix('v') + '/'
-    with tarfile.open(archive, 'r:xz') as stream:
-        for name in names:
-            path = scratch / prefix / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(stream.extractfile(version + prefix + name).read())
-    selected = [p for p in queue if p[0] in (
-        '0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
-        '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch',
-        '0037-musb-resume-request-ownership.patch')]
-    if len(selected) != 5:
-        raise ValueError('Incomplete MUSB candidate queue')
-    apply_queue(scratch, selected)
+    extract_source(archive, lock, queue, apply_queue, scratch)
     core = (scratch / prefix / 'musb_core.c').read_text()
     gadget = (scratch / prefix / 'musb_gadget.c').read_text()
     kconfig = (scratch / prefix / 'Kconfig').read_text()
     changed_core = replace_once(core, 'static void musb_deassert_reset(struct work_struct *work)', '''
 #ifdef CONFIG_MUSB_RESTART_KUNIT_TEST
 int musb_restart_test_run(struct musb *musb);
+void musb_restart_test_stop(struct musb *musb);
+void musb_restart_test_stop(struct musb *musb)
+{
+	musb_shutdown_resume_work(musb);
+}
 int musb_restart_test_run(struct musb *musb)
 {
 	lockdep_assert_held(&musb->lock);

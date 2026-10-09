@@ -1197,7 +1197,8 @@ task check:musb-irq-drivers    # Source regressions and five ARM configurations
 The source check is part of `task build`. Its receipts are under
 `.local/build/musb-irq-tests/`; the kernel suite retains its accepted binary,
 configuration and results under `.local/build/musb-irq-kunit/`. The existing
-`test:musb-restart-kunit` task still selects its original suite. The work/timer
+`test:musb-restart-kunit` task now tests callback retirement as well as its
+original restart/giveback regressions. The work/timer
 suite retains its artifacts under `.local/build/musb-work-kunit/`. These suites
 run entirely on the development machine. [Report 227](docs/227-musb-core-irq-retirement.md)
 and [report 228](docs/228-musb-core-work-retirement.md) distinguish the implemented
@@ -1205,6 +1206,11 @@ boundaries from wider teardown and hardware qualification. The PM suite stores
 its own accepted artifacts under `.local/build/musb-pm-kunit/`;
 [report 229](docs/229-musb-runtime-pm-retirement.md) covers callback retirement
 before backend resource release and retained-reference accounting.
+[Report 230](docs/230-musb-resume-work-retirement.md) covers pending-resume
+admission/drain, request ownership and completion restart handoffs. The same
+saved tasks exercise the current source candidate; the UML restart suite uses
+real locks/waits and controlled thread interleavings, with hardware restart
+intercepted.
 
 For the CPI WFI s2idle candidate in diagnostic.24, use:
 

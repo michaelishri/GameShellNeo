@@ -19,6 +19,8 @@ PRIOR = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
          '0033-musb-sleep-session-retirement.patch',
          '0037-musb-resume-request-ownership.patch')
 PATCH = ROOT / 'kernel/patches/0038-musb-probe-role-unwind.patch'
+LATER = ('0039-musb-core-irq-retirement.patch', '0040-musb-core-work-retirement.patch',
+         '0041-musb-runtime-pm-retirement.patch', '0042-musb-resume-work-retirement.patch')
 HARNESS = ROOT / 'kernel/tests/musb_probe_roles_test.c'
 EXPECTED = 'MUSB probe roles: 25 cases passed (17 successful retries)'
 
@@ -61,6 +63,7 @@ def variants(helper, baseline):
             '\tif (host_registered)\n\t\tmusb_host_cleanup(musb);')
     return {
         'candidate': helper,
+        'missing-resume-close': replace_once(helper, '\tmusb_shutdown_resume_work(musb);\n', ''),
         'original-leaks-registration': baseline,
         'misses-host-cleanup': replace_once(helper, '\t\tmusb_host_cleanup(musb);', '\t\t(void)0;'),
         'misses-gadget-cleanup': replace_once(helper, '\t\tmusb_gadget_cleanup(musb);', '\t\t(void)0;'),
@@ -114,6 +117,12 @@ def main():
         before = core.read_text()
         run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(PATCH)], cwd=source)
         helper, baseline = role_sources(before, core.read_text())
+        for name in LATER:
+            run(['patch', '--batch', '--fuzz=0', '-p1', '-i',
+                 str(ROOT / 'kernel/patches' / name)], cwd=source)
+        from musb_irq_checks import function
+        helper = function(core.read_text(), 'musb_init_roles')
+        patches.extend(ROOT / 'kernel/patches' / name for name in LATER)
         header = WORK / 'musb_probe_roles_function.h'
         flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function']
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
@@ -149,7 +158,7 @@ def main():
         evidence = dict(linux=lock['linux']['tag'], archive_sha256=sha256(archive), builder=builder,
             inputs={str(p.relative_to(ROOT)): sha256(p) for p in (*patches, HARNESS, Path(__file__),
                 ROOT / 'tools/kernel_checks.py', ROOT / 'tools/kernel_sources.py',
-                ROOT / 'tools/kernel-inputs.py', ROOT / 'build/sources.lock.json')},
+                ROOT / 'tools/kernel-inputs.py', ROOT / 'tools/musb_irq_checks.py', ROOT / 'build/sources.lock.json')},
             native=results, arm32=arm.strip(), arm32_binary_sha256=sha256(WORK / 'arm'),
             limits='Actual probe role helper, controlled registration/mode/cleanup boundaries. '
                    'Not actual HCD/UDC registration, callback concurrency, hardware mode selection, '

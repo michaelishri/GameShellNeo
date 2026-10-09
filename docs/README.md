@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[230 — MUSB pending-resume callback retirement](230-musb-resume-work-retirement.md)
+records terminal admission, callback drain and borrowed-data ownership, including
+gadget giveback restart handoffs. Independent producer lifetime remains open.
+
 [229 — MUSB runtime-PM retirement](229-musb-runtime-pm-retirement.md)
 records core runtime callback retirement before backend resource release,
 source-bound teardown tests and real Linux runtime-PM tests. Independent

@@ -12,7 +12,7 @@ struct musb {
 	int nIrq, lock;
 	struct delayed_work irq_work, finish_resume_work, deassert_reset_work;
 	struct timer_list otg_timer;
-	bool irq_wake, session;
+	bool irq_wake, session, resume_stopped;
 	struct device *controller;
 	void *mregs, *dma_controller, *xceiv;
 };
@@ -83,6 +83,7 @@ static void musb_writeb(void *base, int offset, int value)
 
 static void musb_platform_exit(struct musb *musb)
 {
+	assert(musb->resume_stopped);
 	assert(musb == &instance && !irq_live && clients_done);
 	assert(!pm_owned || pm_disabled);
 	if (musb->irq_work.initialized) {
@@ -95,6 +96,7 @@ static void musb_platform_exit(struct musb *musb)
 
 static void musb_host_free(struct musb *musb)
 {
+	assert(musb->resume_stopped);
 	assert(musb == &instance && !irq_live);
 	host_frees++;
 }
@@ -109,6 +111,7 @@ static void musb_dma_controller_destroy(void *dma)
 static void musb_exit_debugfs(struct musb *musb) { assert(musb == &instance); }
 static void musb_host_cleanup(struct musb *musb)
 {
+	assert(musb->resume_stopped);
 	assert(musb == &instance && irq_live && backend_live && !clients_done);
 }
 static void musb_gadget_cleanup(struct musb *musb)
@@ -170,6 +173,8 @@ static void pm_runtime_put_sync(struct device *dev)
 }
 static void pm_runtime_disable(struct device *dev)
 {
+	if (pm_owned)
+		assert(instance.resume_stopped);
 	assert(dev == &platform.dev && !pm_disabled && !instance.lock && backend_live);
 	pm_disabled = true;
 	pm_disables++;
@@ -182,6 +187,13 @@ static void usb_phy_shutdown(void *phy)
 static void device_init_wakeup(struct device *dev, int value)
 {
 	assert(dev == &platform.dev && !value);
+}
+
+/* Synchronization is tested with real locks/waits in the restart KUnit suite. */
+static void musb_shutdown_resume_work(struct musb *musb)
+{
+	assert(musb == &instance && !musb->lock);
+	musb->resume_stopped = true;
 }
 
 #include "musb_irq_functions.h"

@@ -44,6 +44,8 @@ static void list_del(struct list_head *n)
 typedef bool spinlock_t;
 static void spin_lock(spinlock_t *p) { assert(!*p); *p = true; }
 static void spin_unlock(spinlock_t *p) { assert(*p); *p = false; }
+#define lockdep_assert_held(p) assert(*(p))
+#define wake_up_all(p) ((void)(p))
 #define spin_lock_irqsave(p, f) do { (f) = 0; spin_lock(p); } while (0)
 #define spin_unlock_irqrestore(p, f) do { (void)(f); spin_unlock(p); } while (0)
 
@@ -79,7 +81,8 @@ struct musb {
  struct { struct device dev; } g;
  spinlock_t lock, list_lock;
  struct list_head pending_list;
- bool is_runtime_suspended;
+ bool is_runtime_suspended, resume_work_stopping;
+ unsigned resume_work_count, resume_work_wait;
  struct dma_controller *dma_controller;
  void *mregs;
 };
@@ -285,6 +288,22 @@ int main(void)
    assert(started == 1 && !stale && !detached); cancel(a); finish();
   }
   cancel_free(tx);
+  /* Terminal rejection must cover active, suspended and coalesced queues,
+   * including the mapping performed before the controller lock is taken. */
+  for (unsigned suspended = 0; suspended < 2; suspended++) {
+   setup(suspended, tx); a = new_request(0);
+   instance.resume_work_stopping = true;
+   endpoints[0].restart_pending = true;
+   assert(musb_gadget_queue(&a->ep->end_point, &a->request, 0) == -ESHUTDOWN);
+   spin_lock(&instance.lock);
+   assert(musb_queue_resume_work(&instance, companion_callback, &companion_calls) == -ESHUTDOWN);
+   spin_unlock(&instance.lock);
+   assert(!started && !companion_calls && !pending_allocs && mappings == unmaps);
+   assert(list_empty(&endpoints[0].req_list) && !instance.resume_work_count);
+   endpoints[0].restart_pending = false;
+   finish();
+  }
+
 
   /* Direct restart after resume: the coalescing flag must be cleared. */
   setup(true, tx); a = new_request(0); enqueue(a); resume_work();

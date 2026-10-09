@@ -22,7 +22,10 @@ FILES = ('musb_core.c', 'musb_core.h', 'musb_regs.h', 'musb_gadget.c',
 PRIOR_PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
                   '0030-musb-gadget-callback-lifetime.patch',
                   '0033-musb-sleep-session-retirement.patch')
-CORE_FUNCTIONS = ('musb_queue_resume_work', 'musb_run_resume_work')
+CORE_FUNCTIONS = ('musb_invoke_resume_work', 'musb_queue_resume_work', 'musb_run_resume_work')
+LATER_PATCHES = ('0038-musb-probe-role-unwind.patch', '0039-musb-core-irq-retirement.patch',
+                 '0040-musb-core-work-retirement.patch', '0041-musb-runtime-pm-retirement.patch',
+                 '0042-musb-resume-work-retirement.patch')
 GADGET_FUNCTIONS = ('musb_ep_restart_resume_work', 'musb_ep_finish_restart',
                     'musb_free_request', 'musb_g_giveback',
                     'musb_gadget_dequeue', 'musb_gadget_queue')
@@ -33,8 +36,8 @@ HARNESS = ROOT / 'kernel/tests/musb_request_resume_test.c'
 def scenario_count(output):
     match = re.fullmatch(r'MUSB deferred-request audit: (\d+) source scenarios pass '
                          r'\((\d+) per direction\)\n?', output)
-    if not match or (int(match[1]), int(match[2])) != (48, 24):
-        raise ValueError('Expected the complete 48-scenario suite (24 per direction)')
+    if not match or (int(match[1]), int(match[2])) != (52, 26):
+        raise ValueError('Expected the complete 52-scenario suite (26 per direction)')
     return dict(total=int(match[1]), per_direction=int(match[2]))
 
 
@@ -83,13 +86,13 @@ def mutate(gadget, resume):
         '\t\tif (true) {\n\t\t\tmusb_ep->restart_pending = true;\n')
     assert ignore != queue_body()
     drop = resume_body().replace(
-        '\t\tret = callback(musb, data);',
+        '\t\tret = musb_invoke_resume_work(musb, callback, data);',
         '\t\tret = 0; (void)callback; (void)data; /* dropped work */')
     assert drop != resume_body()
     holds = resume_body().replace(
         '\t\tspin_unlock_irqrestore(&musb->list_lock, flags);\n\n'
-        '\t\tret = callback(musb, data);',
-        '\t\tret = callback(musb, data);')
+        '\t\tret = musb_invoke_resume_work(musb, callback, data);',
+        '\t\tret = musb_invoke_resume_work(musb, callback, data);')
     assert holds != resume_body()
     holds = holds.replace(
         '\t\tspin_lock_irqsave(&musb->list_lock, flags);\n\t}\n',
@@ -115,7 +118,15 @@ def mutate(gadget, resume):
     first_error = resume_body().replace('\t\t\tif (!error)\n\t\t\t\terror = ret;',
                                         '\t\t\terror = ret;')
     assert first_error != resume_body()
-    return dict(ignores_coalescing=(resume, splice(gadget, 'musb_gadget_queue', ignore)),
+    closed_queue = queue_body().replace('!musb_ep->desc || musb->resume_work_stopping',
+                                         '!musb_ep->desc')
+    closed_api = function(resume, 'musb_queue_resume_work').replace(
+        '\tif (musb->resume_work_stopping)\n\t\treturn -ESHUTDOWN;\n', '')
+    assert closed_queue != queue_body()
+    assert closed_api != function(resume, 'musb_queue_resume_work')
+    return dict(accepts_closed_queue=(resume, splice(gadget, 'musb_gadget_queue', closed_queue)),
+                stages_after_shutdown=(splice(resume, 'musb_queue_resume_work', closed_api), gadget),
+                ignores_coalescing=(resume, splice(gadget, 'musb_gadget_queue', ignore)),
                 drops_pending_work=(splice(resume, 'musb_run_resume_work', drop), gadget),
                 holds_list_lock_through_callbacks=(
                     splice(resume, 'musb_run_resume_work', holds), gadget),
@@ -177,6 +188,13 @@ def main():
         for name in ('musb_free_request', 'musb_gadget_dequeue'):
             assert function(locked_gadget, name) == function(patched_gadget, name), name
 
+        # Retain the 0037 boundary audit, then exercise the current queued candidate.
+        for name in LATER_PATCHES:
+            run(['patch', '--batch', '--fuzz=0', '-p1', '-i',
+                 str(ROOT / 'kernel/patches' / name)], cwd=WORK / 'patched')
+        patched_core = (patched / 'musb_core.c').read_text()
+        patched_gadget = (patched / 'musb_gadget.c').read_text()
+
         good = header_functions(patched_core, patched_gadget)
         cases = {'candidate': good}
         cases.update({name: header_functions(core, gadget)
@@ -234,7 +252,7 @@ def main():
             'qemu-arm .local/build/musb-request-resume-tests/arm'], text=True)
         print(arm, end='', flush=True)
         counts = scenario_count(arm)
-        inputs = (PATCH, HARNESS, *(ROOT / 'kernel/patches' / p for p in PRIOR_PATCHES),
+        inputs = (PATCH, HARNESS, *(ROOT / 'kernel/patches' / p for p in (*PRIOR_PATCHES, *LATER_PATCHES)),
                   Path(__file__), ROOT / 'tools/kernel_checks.py',
                   ROOT / 'tools/kernel_sources.py', ROOT / 'tools/kernel-inputs.py',
                   ROOT / 'build/sources.lock.json')

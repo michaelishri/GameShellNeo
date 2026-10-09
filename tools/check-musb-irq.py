@@ -35,6 +35,8 @@ def main():
         timer = '\ttimer_setup(&musb->otg_timer, musb_otg_timer_func, 0);\n'
         without_timer = core.read_text().replace(timer, '')
         source_controls = {
+            'missing-resume-wait-init': core.read_text().replace(
+                '\tinit_waitqueue_head(&musb->resume_work_wait);', ''),
             'missing-timer-init': without_timer,
             'late-timer-init': without_timer.replace('\t/* attach to the IRQ */',
                                                      timer + '\t/* attach to the IRQ */'),
@@ -94,7 +96,7 @@ def main():
             source_controls=list(source_controls),
             arm32_binary_sha256=sha256(WORK / 'arm'),
             limits='Actual IRQ/work helpers, remove body and probe failure tails with controlled '
-                   'MMIO/client/DMA/PM/IRQ/work/timer boundaries. No real synchronization, '
+                   'MMIO/client/DMA/PM/IRQ/work/timer/resume-drain boundaries. No real synchronization, '
                    'complete probe execution, independent producer retirement or hardware result.')
         if args.compile_drivers:
             prefix = 'drivers/usb/musb/'

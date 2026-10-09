@@ -8,14 +8,16 @@ board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
 Diagnostic.25 is built and offline-verified with the reviewed NEO-108/163 USB
 deferred restart fix. [Report 232](docs/232-musb-restart-image-integration.md)
-records its separate build and qualification plan. Transfer and both archive/image
-checksum checks on the Mac have passed. Diagnostic.24 remains installed;
-the newer controller-removal work is outside this candidate.
+records its separate build and qualification plan. Transfer, both archive/image
+checksums on the Mac and full DEV-card readback have passed; the card is safely
+ejected. Owner-confirmed boot and awake checks are pending in
+[report 233](docs/233-diagnostic25-installation.md). The newer controller-removal
+work is outside this candidate.
 
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
 and guards against sleep interrupting awake measurements. It requires all four
 CPUs to participate and independent timekeeping-freeze evidence. This candidate
-is installed after verified full DEV-card readback and owner-confirmed boot.
+was installed after verified full DEV-card readback and owner-confirmed boot.
 Awake checks pass: all four cores expose the WFI state, both SSH routes work,
 and the battery, timer, journal and power-key prerequisites pass.
 [Report 218](docs/218-diagnostic24-installation.md) records these results.

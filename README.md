@@ -19,8 +19,12 @@ owner-confirmed warning/display return in
 [report 234](docs/234-diagnostic25-pm-qualification.md). The awake RTC rehearsal
 and first actual connected-USB sleep also pass: all four CPU sleep callbacks run,
 with independent timekeeping-freeze evidence, both routes recovered and an
-owner-confirmed normal untouched display return. Repeated sleep and the remaining
-USB qualification are still open. The newer controller-removal work is outside
+owner-confirmed normal untouched display return. Four further connected-USB
+sleep/wake repeats also pass with the same recovery and CPU evidence, bringing
+PM to 12/0; the owner confirms normal warnings/display returns throughout.
+[Report 235](docs/235-diagnostic25-connected-sleep-repeatability.md) records the
+batch and preserved collection errors. USB reconnect/cable qualification and
+energy measurements remain open. The newer controller-removal work is outside
 this candidate.
 
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps

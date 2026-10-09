@@ -16,11 +16,17 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[235 — Diagnostic.25 connected sleep repeats](235-diagnostic25-connected-sleep-repeatability.md)
+records four passing attended RTC sleep/wake repeats, both-route recovery,
+retained keypad, all-CPU callbacks and timekeeping freeze, with owner-confirmed
+normal warnings/display returns. PM is 12/0; USB reconnect/cable coverage and
+energy remain separate.
+
 [234 — Diagnostic.25 PM qualification](234-diagnostic25-pm-qualification.md)
 records all seven passing freezer/driver/late-noirq checks, retained keypad,
 both-route recovery and owner-confirmed warning/display returns. The awake RTC
 rehearsal and first actual connected-USB sleep pass with all-CPU callback and
-timekeeping-freeze evidence; repeated sleep and remaining USB coverage stay open.
+timekeeping-freeze evidence; report 235 follows the four connected-USB repeats.
 
 [233 — Diagnostic.25 installation](233-diagnostic25-installation.md) records
 the warning/shutdown, fresh DEV-card identity, guarded write and complete 4 GiB

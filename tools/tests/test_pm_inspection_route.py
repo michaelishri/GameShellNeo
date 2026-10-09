@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
@@ -41,7 +41,7 @@ class InspectionRouteTests(unittest.TestCase):
     def test_inspection_uses_usb_by_default_despite_general_wifi_default(self):
         self.invoke('--inspect')
         self.device.assert_called_once_with(self.config.return_value, 'usb')
-        self.inline.assert_called_once_with(self.client, '--inspect')
+        self.inline.assert_called_once_with(self.client, '--inspect', output=ANY)
         self.assertEqual(json.loads((self.capture / 'inspection.json').read_text()), self.snapshot)
         self.assertEqual(json.loads((self.capture / 'route.json').read_text()),
                          dict(operation='pm.inspect', route='usb'))
@@ -56,7 +56,7 @@ class InspectionRouteTests(unittest.TestCase):
                 with patch.dict(os.environ, {'NEO_PM_INSPECT_ROUTE': 'usb' if cli else 'wifi'}):
                     self.invoke('--inspect', *(['--inspect-route', 'wifi'] if cli else []))
                 self.device.assert_called_once_with(self.config.return_value, 'wifi')
-                self.inline.assert_called_once_with(self.client, '--inspect')
+                self.inline.assert_called_once_with(self.client, '--inspect', output=ANY)
                 self.assertEqual(json.loads((self.capture / 'route.json').read_text())['route'], 'wifi')
         for operation in self.operations:
             operation.assert_not_called()
@@ -85,6 +85,22 @@ class InspectionRouteTests(unittest.TestCase):
         self.assertFalse((self.capture / 'inspection.json').exists())
         self.assertEqual(json.loads((self.capture / 'route.json').read_text())['route'], 'wifi')
         self.inline.assert_not_called()
+        for operation in self.operations:
+            operation.assert_not_called()
+
+    def test_failed_inspection_preserves_partial_remote_error_without_success_json(self):
+        evidence = b'Traceback: Kernel checkpoint source/image changed within this boot\n'
+        failure = RuntimeError('Remote command failed (exit 1)')
+        def failed(client, *args, output):
+            output.write(evidence)
+            raise failure
+        self.inline.side_effect = failed
+        with self.assertRaises(RuntimeError) as caught:
+            self.invoke('--inspect')
+        self.assertIs(caught.exception, failure)
+        self.assertEqual((self.capture / 'inspection-output.txt').read_bytes(), evidence)
+        self.assertFalse((self.capture / 'inspection.json').exists())
+        self.inline.assert_called_once_with(self.client, '--inspect', output=ANY)
         for operation in self.operations:
             operation.assert_not_called()
 

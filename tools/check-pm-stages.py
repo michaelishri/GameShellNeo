@@ -65,18 +65,31 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
                 ['--power-key-input'] if power_key_input else [])
 
 
-def inline(client, *args):
-    # Inline inspection/recovery also needs the same saved keypad helper.
+INLINE_HELPERS = ('battery_sample', 'cpi_idle', 'kernel_evidence', 'keypad_pm', 'keypad_input',
+                  'speaker_audio', 'wifi_trace', 'power_key', 'rtc_alarm', 'pm_platform')
+INLINE_FILES = tuple(name + '.py' for name in INLINE_HELPERS) + ('test-pm-stages.py',)
+
+
+def inline_program(sources):
+    if set(sources) != set(INLINE_FILES):
+        raise ValueError('Incomplete inline diagnostic source bundle')
     program = 'import sys, types\n'
-    for name in ('battery_sample', 'cpi_idle', 'kernel_evidence', 'keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace', 'power_key', 'rtc_alarm', 'pm_platform'):
-        source = (ROOT / 'tools' / (name + '.py')).read_text()
+    for name in INLINE_HELPERS:
+        source = sources[name + '.py']
         program += ('keypad_helper = types.ModuleType(' + repr(name) + ')\n'
                     'keypad_helper.__source_sha256__ = ' + repr(hashlib.sha256(source.encode()).hexdigest()) + '\n'
                     'exec(' + repr(source) + ', keypad_helper.__dict__)\n'
                     'sys.modules[' + repr(name) + '] = keypad_helper\n')
-    source = (ROOT / 'tools/test-pm-stages.py').read_text()
+    source = sources['test-pm-stages.py']
     program += '__source_sha256__ = ' + repr(hashlib.sha256(source.encode()).hexdigest()) + '\n' + source
-    return run(client, **python_command(program, *args), display=False, timeout=40)
+    return program
+
+
+def inline(client, *args, output=None):
+    # PM operations always use current sources. Historical bundles are limited
+    # to the separate awake clock diagnostic's explicit --inspect command.
+    program = inline_program({name: (ROOT / 'tools' / name).read_text() for name in INLINE_FILES})
+    return run(client, **python_command(program, *args), output=output, display=False, timeout=40)
 
 
 def wifi_proof(config, snapshot):
@@ -476,7 +489,8 @@ def main():
         route = args.inspect_route or 'usb'
         (capture / 'route.json').write_text(json.dumps(dict(operation='pm.inspect', route=route)) + '\n')
         with device(config, route) as client:
-            data = inline(client, '--inspect')
+            with (capture / 'inspection-output.txt').open('wb') as output:
+                data = inline(client, '--inspect', output=output)
         (capture / 'inspection.json').write_bytes(data)
         value = json.loads(data)
         print(json.dumps({key: value[key] for key in ('kernel', 'boot_id', 'pm', 'pm_test_delay', 'rsb')}, indent=2))

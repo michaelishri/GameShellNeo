@@ -16,10 +16,16 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[260 — Clock comparison and inspection provenance](260-clock-comparison-provenance.md)
+records a validated 15,000-sequence capture with one 750 ns RAW cross-path
+discrepancy. Explicit inspection revision pinning preserves the original
+checkpoint; full offline checks pass. The clock cause remains open and PM
+admission stays blocked.
+
 [259 — Prepared clock-path comparison](259-clock-path-comparison.md)
 adds a fixed awake Python/kernel clock comparison with pinned-source and live
-ARM ABI checks. Focused tests pass; full checks and hardware capture await
-execution access. No new hardware result or clock-reliability claim is made.
+ARM ABI checks. It preserves the initial preparation and access failures;
+report 260 records the subsequent full-suite and hardware results.
 
 [258 — Battery clock-fault handling](258-battery-clock-fault-handling.md)
 adds degraded publication and retained raw incident evidence, tests service

@@ -4,6 +4,12 @@
 [report 257](257-awake-clock-regression-investigation.md) and the uninstalled
 guard candidate in [report 258](258-battery-clock-fault-handling.md).
 
+**Execution update:** the authorized full suite subsequently passed, and the
+first hardware capture completed after preserving the original inspection
+revision. It found one RAW cross-path discrepancy; see
+[report 260](260-clock-comparison-provenance.md). The preparation and earlier
+access failures below are retained as the historical record.
+
 The next diagnostic compares the guard's ordinary Python clock APIs with
 explicit ARM EABI `clock_gettime64` calls. Its focused tests and pinned-source
 ABI check pass. **There is no hardware result yet:** the sandbox denied socket

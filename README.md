@@ -1040,8 +1040,26 @@ task device:clock-compare # One awake 15000-sequence comparison; USB stays conne
 The comparison verifies the live ABI before any explicit syscall and preserves
 raw discrepancies and CPU context. It changes no clocksource, affinity, service
 or PM setting and keeps the screen on. It does not establish that Python uses
-vDSO or qualify clock reliability. [Report 259](docs/259-clock-path-comparison.md)
-records the passing focused checks and pending full-suite/device execution.
+vDSO or qualify clock reliability. The first completed capture retains one
+750 ns RAW cross-path discrepancy, with unchanged device state and both routes
+working. Full offline checks pass. See
+[report 260](docs/260-clock-comparison-provenance.md) for exact readings and limits;
+[report 259](docs/259-clock-path-comparison.md) describes the recorder.
+
+If a protected checkpoint belongs to a previous inspection producer, this
+awake-only task can explicitly use that committed inspection bundle:
+
+```sh
+task device:clock-compare INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+```
+
+The revision must be a full local ancestor commit with the same collector as
+the current validator. All inspection source hashes and exact bundled bytes
+are saved privately. Select it only when it matches the checkpoint's original
+producer; this is not an automatic fallback or PM-admission override. Normal
+PM tasks still use current sources. Failed comparison inspections save
+`before-output.txt` or `after-output.txt`; `device:pm-inspect` saves
+`inspection-output.txt`, so the underlying remote error remains available.
 
 The candidate ADC width correction has its own saved checks:
 

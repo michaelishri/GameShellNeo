@@ -562,6 +562,8 @@ tasks:
 
   device:clock-compare:
     desc: One awake Python/kernel clock comparison with fixed work and retained discrepancies; no sleep admission
+    env:
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
     cmds: [python3 tools/check-clock-paths.py]
 
   device:keypad-inspect:

@@ -8,10 +8,11 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import tarfile
 
 from private_config import load_env
-from remote import ROOT, LOCAL, device, evidence_directory, run
+from remote import ROOT, LOCAL, device, evidence_directory, run, python_command
 from kernel_checks import sha256
 
 FILES = ('arch/arm/tools/syscall.tbl', 'include/uapi/linux/time_types.h',
@@ -66,6 +67,40 @@ def source_receipt(lock):
     verify_headers(files)
     return dict(linux=lock['linux'], files={name: hashlib.sha256(text.encode()).hexdigest()
                                           for name, text in files.items()})
+
+
+def inspection_program(pm, revision, capture):
+    """Pin inspection only; never relabel sources or select an old PM test."""
+    def git(*args):
+        return subprocess.run(['git', '-C', str(ROOT), *args], check=True,
+                              capture_output=True, timeout=10).stdout
+    if revision:
+        if not re.fullmatch('[0-9a-f]{40}', revision):
+            raise ValueError('Inspection revision must be an explicit full commit ID')
+        if git('rev-parse', '--verify', revision + '^{commit}').decode().strip() != revision:
+            raise ValueError('Inspection revision is not a commit')
+        git('merge-base', '--is-ancestor', revision, 'HEAD')
+        sources = {name: git('show', revision + ':tools/' + name).decode() for name in pm.INLINE_FILES}
+    else:
+        sources = {name: (ROOT / 'tools' / name).read_text() for name in pm.INLINE_FILES}
+    if sources['kernel_evidence.py'] != (ROOT / 'tools/kernel_evidence.py').read_text():
+        raise ValueError('Historical collector differs from the current evidence validator')
+    receipt = dict(revision=revision or None, operation='inspect-only', files={
+        name: hashlib.sha256(source.encode()).hexdigest() for name, source in sources.items()})
+    (capture / 'inspection-sources.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    # Keep the exact executed bundle privately, alongside its component hashes.
+    program = pm.inline_program(sources)
+    (capture / 'inspection-source.py').write_text(program)
+    return program
+
+
+def inspect(client, program, capture, label):
+    with (capture / (label + '-output.txt')).open('wb') as output:
+        data = run(client, **python_command(program, '--inspect'), output=output,
+                   display=False, timeout=40)
+    value = json.loads(data)
+    (capture / (label + '.json')).write_text(json.dumps(value, indent=2) + '\n')
+    return value
 
 
 def validate_result(result, before, after):
@@ -139,6 +174,8 @@ def validate_result(result, before, after):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check-abi', action='store_true', help='Verify pinned ABI inputs offline only')
+    parser.add_argument('--inspection-revision', default=os.environ.get('NEO_CLOCK_INSPECTION_REVISION', ''),
+                        help='Explicit ancestor commit for inspection only; preserve same-boot provenance')
     args = parser.parse_args()
     os.umask(0o077)
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
@@ -150,12 +187,12 @@ def main():
         print('Pinned ARM EABI/time64 inputs verified; no device accessed.', flush=True)
         return
     pm = load('clock_paths_pm', 'check-pm-stages.py')
+    program = inspection_program(pm, args.inspection_revision, capture)
     config = load_env()
     with (LOCAL / 'pm-stages.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
         with device(config, 'usb') as client:
-            before = json.loads(pm.inline(client, '--inspect'))
-            (capture / 'before.json').write_text(json.dumps(before, indent=2) + '\n')
+            before = inspect(client, program, capture, 'before')
             if (before['kernel'] != lock['linux']['tag'][1:] + lock['linux']['localversion'] or
                     before['image']['version'] != lock['image_version'] or
                     before['pm']['pm_test'].split()[0] != '[none]' or before['usb'] != ['configured'] or
@@ -175,8 +212,7 @@ def main():
                     data = run(client, 'timeout --signal=TERM --kill-after=5 90 /usr/bin/python3 -B -',
                                input_data=source, output=output, display=False, timeout=105)
             finally:
-                after = json.loads(pm.inline(client, '--inspect'))
-                (capture / 'after.json').write_text(json.dumps(after, indent=2) + '\n')
+                after = inspect(client, program, capture, 'after')
             result = json.loads(data)
             validate_result(result, before, after)
             pm.wifi_proof(config, after)

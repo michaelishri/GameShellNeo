@@ -2,16 +2,19 @@
 
 Record deferred questions and activities here as they arise.
 
-**Clock-path comparison prepared, 10 October 2026:** NEO-192 has saved
-`check:clock-abi` and `device:clock-compare` tasks for a fixed awake comparison
-of Python clock APIs and explicit ARM time64 calls. Eleven focused tests and
-the real hash-verified source/ABI check pass. Full sandbox checks hit five
-existing local-socket fixture errors; automatic review timed out twice for
-the unrestricted suite. The device attempt was denied socket creation before
-reaching the Mac, and its authorized request also timed out in review. No
-hardware measurement occurred. Finish full checks and one capture when access
-is available; retain the original fault and keep PM admission blocked.
-[Report 259](docs/259-clock-path-comparison.md).
+**Clock-path discrepancy captured, 10 October 2026:** NEO-192's first completed
+Python/API versus explicit ARM time64 comparison records one RAW cross-path
+discrepancy in 15,000 sequences: Python reads 750 ns below the preceding kernel
+read. Neither individual path decreases in that sequence; this is not yet the
+original Python MONOTONIC failure. Trace installed API dispatch and pinned
+kernel counter/conversion paths before assigning cause. Both routes, PM53/0,
+restart count 1 and protected kernel evidence remain intact. An explicit
+inspection-only commit pin preserves the original checkpoint provenance after
+the host producer changed; failed inspections now save their raw error output.
+Full checks pass 24 runtime / 930 tooling tests (one optional skip), C and lint.
+Keep the fault, guard deployment and PM qualification open.
+[Report 260](docs/260-clock-comparison-provenance.md); preparation and earlier
+access failures in [report 259](docs/259-clock-path-comparison.md).
 
 **Battery clock-fault handling prepared, 10 October 2026:** NEO-192 now has
 tested producer handling for invalid, failed and decreasing clock observations.

@@ -195,17 +195,20 @@ class Validation(unittest.TestCase):
                 pm={'pm_test': '[none]'}, usb=['configured'],
                 external_power={'axp20x-usb': {'type': 'USB', 'present': '1', 'online': '1'}},
                 services={'battery': {'ActiveState': 'active', 'NRestarts': '1'}})
-            pm = SimpleNamespace(inline=Mock(return_value=json.dumps(before)), wifi_proof=Mock())
+            pm = SimpleNamespace(wifi_proof=Mock())
+            inspect = Mock(return_value=before)
             remote = Mock(side_effect=[b'', RuntimeError('transport ended')])
             with patch.object(sys, 'argv', ['clock-paths']), patch.object(host, 'ROOT', root), \
                     patch.object(host, 'LOCAL', root), patch.object(host, 'evidence_directory', return_value=root), \
                     patch.object(host, 'source_receipt', return_value={}), patch.object(host, 'load_env'), \
                     patch.object(host, 'device', return_value=MagicMock()), patch.object(host, 'load', return_value=pm), \
+                    patch.object(host, 'inspection_program', return_value='inspection source'), \
+                    patch.object(host, 'inspect', inspect), \
                     patch.object(host, 'run', remote), self.assertRaisesRegex(RuntimeError, 'transport ended'):
                 host.main()
             self.assertEqual(remote.call_count, 2)  # Active-unit check and one submission.
-            self.assertEqual(pm.inline.call_count, 2)
-            self.assertTrue((root/'after.json').is_file())
+            self.assertEqual(inspect.call_count, 2)
+            self.assertEqual([call.args[-1] for call in inspect.call_args_list], ['before', 'after'])
             self.assertFalse((root/'summary.json').exists())
             pm.wifi_proof.assert_not_called()
 

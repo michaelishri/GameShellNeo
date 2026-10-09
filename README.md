@@ -1103,6 +1103,21 @@ records preparation and [report 93](docs/93-diagnostic13-installation.md) record
 the running baseline. Source-test evidence is under
 `.local/build/brcmfmac-{irq,lifecycle}-worker-tests/`.
 
+The isolated mailbox-error candidate has separate offline checks:
+
+```sh
+task test:brcmfmac-mailbox          # Actual mailbox + worker, native/ARM32 normal and DEBUG
+task check:brcmfmac-mailbox-drivers # Also compile the complete normal/debug ARM driver
+```
+
+These test candidate 0039 against the complete locked image source queue in
+separate scratch storage. They inject failed reads and acknowledgements, verify
+that invalid mailbox data cannot publish state, and retain valid-message and
+worker cleanup checks. Evidence is under `.local/build/brcmfmac-mailbox-tests/`.
+The candidate lives in `kernel/candidates`, outside `task build` and the active
+image patch queue. [Report 254](docs/254-brcmfmac-mailbox-error-candidate.md)
+records coverage and the integration/hardware qualification still required.
+
 Country-request ordering across suspend has saved checks:
 
 ```sh

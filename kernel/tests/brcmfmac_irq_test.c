@@ -31,7 +31,8 @@ static unsigned errors;
 #include "brcmfmac_irq_types.h"
 
 enum { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA };
-struct sdio_func { int unused; };
+struct device { int unused; };
+struct sdio_func { struct device dev; };
 struct work_struct { int unused; };
 struct brcmf_core { u32 base; };
 struct pktq { unsigned len; };
@@ -57,8 +58,9 @@ struct brcmf_sdio {
  unsigned ctrl_frame_len;
  int ctrl_frame_err;
  uint txbound, rxbound, txminmax, clkstate, hostintmask, flowcontrol, idlecount;
+ u8 rx_seq, sdpcm_ver;
  struct pktq txq;
- struct { unsigned f1regdata, intrcount; } sdcnt;
+ struct { unsigned f1regdata, intrcount, fc_xoff, fc_xon, fc_rcvd; } sdcnt;
 };
 static struct {
  struct brcmf_sdio bus;
@@ -78,6 +80,11 @@ static struct {
  bool pending_work, running_work, parked, inject_during_frames, hold_receive;
  bool in_irq, clock_pending, clock_ready, byte_write_error, release_irq_error;
  bool retire_on_spin, irq_retired;
+#ifdef NEO_MAILBOX_ERRORS
+ u32 mailbox_data;
+ int mailbox_read_error, mailbox_ack_error;
+ unsigned mailbox_writes, crashes, console_reads;
+#endif
 } hw;
 static unsigned scenarios, characterizations;
 static void brcmf_sdio_isr(struct brcmf_sdio *bus, bool in_isr);
@@ -101,6 +108,13 @@ static void enable_irq(int irq)
          (!f.bus.ipend || f.bus.clkstate == CLK_PENDING)); hw.enables++; }
 static u32 brcmf_sdiod_readl(struct brcmf_sdio_dev *dev, u32 addr, int *err)
 {
+#ifdef NEO_MAILBOX_ERRORS
+ if (addr == f.core.base + SD_REG(tohostmailboxdata)) {
+  assert(dev == &f.dev); access_ok(); assert(f.bus.clkstate == CLK_AVAIL);
+  hw.mail++; *err = hw.mailbox_read_error;
+  return hw.mailbox_data; /* Model zero/window and all-ones/transfer failures. */
+ }
+#endif
  assert(dev == &f.dev && addr == f.core.base + SD_REG(intstatus));
  access_ok(); assert(f.bus.clkstate == CLK_AVAIL); hw.reads++;
  *err = hw.read_error ? hw.read_error : hw.reads == hw.fail_read_at ? -EIO : 0;
@@ -108,6 +122,14 @@ static u32 brcmf_sdiod_readl(struct brcmf_sdio_dev *dev, u32 addr, int *err)
 }
 static void brcmf_sdiod_writel(struct brcmf_sdio_dev *dev, u32 addr, u32 val, int *err)
 {
+#ifdef NEO_MAILBOX_ERRORS
+ if (addr == f.core.base + SD_REG(tosbmailbox)) {
+  assert(dev == &f.dev && val == SMB_INT_ACK); access_ok();
+  assert(f.bus.clkstate == CLK_AVAIL && hw.mail && !hw.mailbox_read_error);
+  hw.mailbox_writes++; *err = hw.mailbox_ack_error;
+  return;
+ }
+#endif
  assert(dev == &f.dev && addr == f.core.base + SD_REG(intstatus));
  access_ok(); assert(f.bus.clkstate == CLK_AVAIL); hw.writes++;
  *err = hw.write_error ? hw.write_error : hw.writes == hw.fail_write_at ? -EIO : 0;
@@ -133,8 +155,26 @@ static int brcmf_sdio_bus_sleep(struct brcmf_sdio *bus, bool sleep, bool pending
  if (hw.clock_pending) bus->clkstate = CLK_PENDING;
  return hw.wake_error;
 }
+#ifndef NEO_MAILBOX_ERRORS
 static u32 brcmf_sdio_hostmail(struct brcmf_sdio *bus)
 { assert(bus == &f.bus); access_ok(); hw.mail++; return hw.mailbox_result; }
+#else
+static void decoded_mailbox_ok(void)
+{
+ access_ok();
+ assert(hw.mail && hw.mailbox_writes == hw.mail);
+ assert(!hw.mailbox_read_error && !hw.mailbox_ack_error);
+}
+static void brcmf_fw_crashed(struct device *dev)
+{ assert(dev == &f.func.dev); decoded_mailbox_ok(); hw.crashes++; }
+static void brcmf_sdio_get_console_addr(struct brcmf_sdio *bus)
+{
+ assert(bus == &f.bus); decoded_mailbox_ok();
+#ifdef DEBUG
+ hw.console_reads++;
+#endif
+}
+#endif
 static void brcmf_sdio_readframes(struct brcmf_sdio *bus, uint limit)
 {
  assert(bus == &f.bus && limit == 8 && !hw.host_depth);
@@ -348,6 +388,9 @@ static void oob_rearm(void)
 static void mailbox_frame(void)
 {
  setup(); hw.status = I_HMB_HOST_INT; hw.mailbox_result = I_HMB_FRAME_IND;
+#ifdef NEO_MAILBOX_ERRORS
+ hw.mailbox_data = HMB_DATA_NAKHANDLED; f.bus.rxskip = true;
+#endif
  hw.frames_remaining = 1;
  irq(true); drain();
  assert(hw.mail == 1 && hw.frames == 1 && !f.bus.intstatus);
@@ -430,6 +473,117 @@ static void pending_clock(bool oob, bool start_pending)
  finish();
 }
 #endif
+#ifdef NEO_MAILBOX_ERRORS
+static void mailbox_seed(void)
+{
+ f.bus.rxskip = true; f.bus.rx_seq = 12; f.bus.sdpcm_ver = 7;
+ f.bus.flowcontrol = 0x12;
+ f.bus.sdcnt.fc_xoff = 3; f.bus.sdcnt.fc_xon = 5; f.bus.sdcnt.fc_rcvd = 9;
+}
+static void mailbox_unchanged(void)
+{
+ assert(f.bus.rxskip && f.bus.rx_seq == 12 && f.bus.sdpcm_ver == 7);
+ assert(f.bus.flowcontrol == 0x12 && f.bus.sdcnt.fc_xoff == 3);
+ assert(f.bus.sdcnt.fc_xon == 5 && f.bus.sdcnt.fc_rcvd == 9);
+ assert(!hw.crashes && !hw.console_reads);
+}
+static void mailbox_error(bool ack, u32 data, int error)
+{
+ setup(); mailbox_seed(); hw.mailbox_data = data;
+ if (ack) hw.mailbox_ack_error = error;
+ else hw.mailbox_read_error = error;
+ u32 status = UINT32_MAX;
+ sdio_claim_host(&f.func);
+ assert(brcmf_sdio_hostmail(&f.bus, &status) == error);
+ sdio_release_host(&f.func);
+ assert(!status && hw.mail == 1 && hw.mailbox_writes == ack);
+ assert(f.bus.sdcnt.f1regdata == 1u + ack && !errors);
+ mailbox_unchanged(); finish();
+}
+static void mailbox_fatal(bool ack, bool oob, bool hard, u32 data, int error)
+{
+ setup(); mailbox_seed(); hw.mailbox_data = data;
+ if (ack) hw.mailbox_ack_error = error;
+ else hw.mailbox_read_error = error;
+ hw.status = I_HMB_HOST_INT | I_HMB_FRAME_IND;
+ hw.frames_remaining = 1;
+ f.bus.ctrl_frame_stat = true; f.bus.txbound = 1; f.bus.txq.len = 1;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = oob;
+ f.dev.sd_irq_requested = !oob;
+ irq(hard); drain();
+ assert(f.dev.io_error == error && f.bus.io_error_handled);
+ assert(f.dev.state == BRCMF_SDIOD_DOWN && !f.bus.ctrl_frame_stat);
+ assert(f.bus.ctrl_frame_err == error && hw.wakes == 1 && hw.responses == 1);
+ assert(hw.stops == 1 && !hw.frames && !hw.enables);
+ assert(!f.bus.ipend && !f.bus.intstatus && !f.dev.sd_irq_requested);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2));
+ assert(hw.reads == 1 && hw.writes == 1 && hw.mail == 1 && hw.mailbox_writes == ack);
+ assert(f.bus.sdcnt.f1regdata == 3u + ack);
+ mailbox_unchanged();
+ unsigned count = hw.queue;
+ irq(false); irq(true); brcmf_sdio_trigger_dpc(&f.bus);
+ assert(hw.queue == count);
+ /* Already queued work must neither repeat I/O nor retire IRQs twice. */
+ hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+ assert(hw.stops == 1 && hw.responses == 1 && hw.wakes == 1);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2));
+ assert(hw.reads == 1 && hw.writes == 1 && hw.mail == 1 && hw.mailbox_writes == ack);
+ assert(f.dev.io_error == error); mailbox_unchanged(); finish();
+}
+static void mailbox_success(u32 data, bool skipped)
+{
+ setup(); mailbox_seed(); hw.mailbox_data = data; f.bus.rxskip = skipped;
+ u32 status = UINT32_MAX;
+ sdio_claim_host(&f.func);
+ assert(!brcmf_sdio_hostmail(&f.bus, &status));
+ sdio_release_host(&f.func);
+ assert(hw.mail == 1 && hw.mailbox_writes == 1 && f.bus.sdcnt.f1regdata == 2);
+ assert(status == ((data & HMB_DATA_NAKHANDLED) ? I_HMB_FRAME_IND : 0));
+ assert(f.bus.rxskip == (skipped && !(data & HMB_DATA_NAKHANDLED)));
+ assert(hw.crashes == !!(data & HMB_DATA_FWHALT));
+ bool ready = data & (HMB_DATA_DEVREADY | HMB_DATA_FWREADY);
+ u8 version = (data & HMB_DATA_VERSION_MASK) >> HMB_DATA_VERSION_SHIFT;
+ assert(f.bus.sdpcm_ver == (ready ? version : 7));
+#ifdef DEBUG
+ assert(hw.console_reads == ready);
+#else
+ assert(!hw.console_reads);
+#endif
+ bool flow = data & HMB_DATA_FC;
+ u8 fc = (data & HMB_DATA_FCDATA_MASK) >> HMB_DATA_FCDATA_SHIFT;
+ assert(f.bus.flowcontrol == (flow ? fc : 0x12));
+ assert(f.bus.sdcnt.fc_xoff == 3u + (flow && (fc & ~0x12)));
+ assert(f.bus.sdcnt.fc_xon == 5u + (flow && (0x12 & ~fc)));
+ assert(f.bus.sdcnt.fc_rcvd == 9u + flow);
+ u32 known = HMB_DATA_DEVREADY | HMB_DATA_FWREADY | HMB_DATA_NAKHANDLED |
+             HMB_DATA_FWHALT | HMB_DATA_FC | HMB_DATA_FCDATA_MASK | HMB_DATA_VERSION_MASK;
+ assert(errors == (unsigned)(ready && version != SDPCM_PROT_VERSION) +
+                  (unsigned)(!skipped && (data & HMB_DATA_NAKHANDLED)) + !!(data & ~known));
+ finish();
+}
+static void mailbox_cases(void)
+{
+ const u32 data[] = {0, UINT32_MAX};
+ const int faults[] = {-EIO, -ETIMEDOUT, -EILSEQ};
+ for (unsigned ack = 0; ack < 2; ack++)
+  for (unsigned d = 0; d < 2; d++)
+   for (unsigned e = 0; e < 3; e++) {
+    mailbox_error(ack, data[d], faults[e]);
+    for (unsigned oob = 0; oob < 2; oob++)
+     for (unsigned hard = 0; hard < 2; hard++)
+      mailbox_fatal(ack, oob, hard, data[d], faults[e]);
+   }
+ const u32 ready = SDPCM_PROT_VERSION << HMB_DATA_VERSION_SHIFT;
+ const u32 valid[] = {0, HMB_DATA_NAKHANDLED, HMB_DATA_DEVREADY | ready,
+  HMB_DATA_FWREADY | ready, HMB_DATA_FWREADY | (5u << HMB_DATA_VERSION_SHIFT),
+  HMB_DATA_FC, HMB_DATA_FC | (0x12u << HMB_DATA_FCDATA_SHIFT),
+  HMB_DATA_FC | (0x25u << HMB_DATA_FCDATA_SHIFT), HMB_DATA_FWHALT,
+  HMB_DATA_FWHALT | HMB_DATA_NAKHANDLED | HMB_DATA_DEVREADY | HMB_DATA_FWREADY |
+  HMB_DATA_FC | ready | (0x25u << HMB_DATA_FCDATA_SHIFT), 0x8000};
+ for (unsigned n = 0; n < sizeof(valid) / sizeof(valid[0]); n++)
+  for (unsigned skipped = 0; skipped < 2; skipped++) mailbox_success(valid[n], skipped);
+}
+#endif
 int main(void)
 {
  for (unsigned hard = 0; hard < 2; hard++)
@@ -451,6 +605,9 @@ int main(void)
 #endif
  for (unsigned oob = 0; oob < 2; oob++)
   for (unsigned pending = 0; pending < 2; pending++) pending_clock(oob, pending);
+#endif
+#ifdef NEO_MAILBOX_ERRORS
+ mailbox_cases();
 #endif
  printf("%u IRQ service scenarios passed (%u characterize existing error limitations)\n",
         scenarios, characterizations);

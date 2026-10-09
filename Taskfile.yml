@@ -436,6 +436,14 @@ tasks:
     desc: Test worker errors and compile the complete ARM driver in normal/debug configurations
     cmds: [bash tools/run-logged.sh brcmfmac-worker-drivers python3 tools/check-brcmfmac-pm.py --irq-service --worker-errors --compile-driver]
 
+  test:brcmfmac-mailbox:
+    desc: Test isolated Wi-Fi mailbox read/ACK error candidate, native and ARM32
+    cmds: [bash tools/run-logged.sh brcmfmac-mailbox python3 tools/check-brcmfmac-mailbox.py]
+
+  check:brcmfmac-mailbox-drivers:
+    desc: Test mailbox candidate and compile complete normal/debug ARM drivers outside the image queue
+    cmds: [bash tools/run-logged.sh brcmfmac-mailbox-drivers python3 tools/check-brcmfmac-mailbox.py --compile-drivers]
+
   check:usb-policy-driver:
     desc: Run USB policy regressions and compile the complete ARM driver in isolated scratch
     cmds: [bash tools/run-logged.sh usb-policy-driver python3 tools/check-usb-policy.py --compile-driver]

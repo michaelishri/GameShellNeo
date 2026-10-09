@@ -29,6 +29,15 @@ installed change or complete controller teardown. See
 [report 253](../docs/253-musb-queue-dma-rollback-candidate.md) for evidence and
 the source-suite/image integration still required before promotion.
 
+The isolated [0039 mailbox-error candidate](candidates/0039-brcmfmac-mailbox-errors.patch)
+checks the Wi-Fi mailbox read and ACK before decoding status, then sends errors
+through patch 0018's existing worker cleanup. It also lives outside the active
+queue. `test:brcmfmac-mailbox` and `check:brcmfmac-mailbox-drivers` exercise the
+actual helper/worker and compile a separate source queue with this candidate.
+See [report 254](../docs/254-brcmfmac-mailbox-error-candidate.md) for validation
+and integration limits. Remove the candidate when equivalent upstream handling
+is verified; it supplies no automatic Wi-Fi recovery or firmware modification.
+
 Patch 0036 is installed in diagnostic.22 and retained in diagnostic.23. It
 masks unused low-register bits in the shared 9–16-bit ADC helper while retaining
 16-bit values, read order and error propagation. The saved

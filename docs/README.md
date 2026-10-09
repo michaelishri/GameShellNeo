@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[254 — Wi-Fi mailbox transport-error candidate](254-brcmfmac-mailbox-error-candidate.md)
+checks reads and ACKs before decoding status, with 131/133 normal/DEBUG scenarios
+on native and ARM32, 43 negative controls and complete ARM driver builds. The
+candidate remains outside the active image queue pending integration/qualification.
+
 [253 — MUSB failed-queue DMA rollback candidate](253-musb-queue-dma-rollback-candidate.md)
 adds a one-line isolated correction with 74 native/ARM32 scenarios, sanitizer
 checks, six negative controls and board/DMA driver compilation. Active image

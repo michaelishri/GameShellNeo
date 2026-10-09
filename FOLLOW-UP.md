@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**Wi-Fi mailbox candidate tested, 10 October 2026:** NEO-187's isolated 0039
+candidate checks read/ACK errors before decoding firmware flags and routes
+failures to the existing host-owned worker cleanup. Actual-source native/ARM32
+normal/DEBUG runs pass 131/133 scenarios; 43 negative controls reject and both
+complete ARM driver configurations compile. Full 16 runtime / 893 tooling tests
+pass (one optional skip), plus C/lint. It is outside the active image queue;
+source-suite integration and a new image/hardware qualification remain required.
+No hardware was contacted, and no RF, power-saving or historical crash-cause
+claim follows. NEO-58's RX cleanup, clock-ready and recovery leads remain open.
+[Report 254](docs/254-brcmfmac-mailbox-error-candidate.md).
+
 **USB failed-queue candidate tested, 10 October 2026:** NEO-186's isolated
 rollback returns DMA ownership after deferred-work allocation failure. All
 74 actual-source scenarios pass natively, under Address/UndefinedBehavior

@@ -12,8 +12,16 @@ records its separate build and qualification plan. Transfer, both archive/image
 checksums on the Mac and full DEV-card readback have passed. Diagnostic.25 is now
 installed with owner-confirmed boot and passing awake image, both-route, battery,
 WFI/timer, journal, power-key ownership and RTC checks in
-[report 233](docs/233-diagnostic25-installation.md). Attended PM/USB qualification
-remains open. The newer controller-removal work is outside this candidate.
+[report 233](docs/233-diagnostic25-installation.md). All seven freezer, driver and
+late/noirq debug checks now pass, with both routes recovered, the original keypad
+retained and
+owner-confirmed warning/display return in
+[report 234](docs/234-diagnostic25-pm-qualification.md). The awake RTC rehearsal
+and first actual connected-USB sleep also pass: all four CPU sleep callbacks run,
+with independent timekeeping-freeze evidence, both routes recovered and an
+owner-confirmed normal untouched display return. Repeated sleep and the remaining
+USB qualification are still open. The newer controller-removal work is outside
+this candidate.
 
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
 and guards against sleep interrupting awake measurements. It requires all four

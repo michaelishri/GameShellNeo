@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[234 — Diagnostic.25 PM qualification](234-diagnostic25-pm-qualification.md)
+records all seven passing freezer/driver/late-noirq checks, retained keypad,
+both-route recovery and owner-confirmed warning/display returns. The awake RTC
+rehearsal and first actual connected-USB sleep pass with all-CPU callback and
+timekeeping-freeze evidence; repeated sleep and remaining USB coverage stay open.
+
 [233 — Diagnostic.25 installation](233-diagnostic25-installation.md) records
 the warning/shutdown, fresh DEV-card identity, guarded write and complete 4 GiB
 readback, confirmed boot and passing awake prerequisites. Both routes, image,

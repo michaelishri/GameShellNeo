@@ -249,6 +249,11 @@ class Evidence(unittest.TestCase):
     def test_preflight_accepts_only_the_isolated_healthy_image(self):
         good, lock = healthy_fixture()
         pm.validate(good, lock)
+        for fault in ({'count': 1}, None, False):
+            with self.subTest(clock_fault=fault), self.assertRaisesRegex(ValueError, 'clock fault'):
+                pm.validate(good | {'battery': good['battery'] | {'clock_fault': fault}}, lock)
+        with self.assertRaisesRegex(ValueError, 'battery_freshness'):
+            pm.validate(good | dict(battery_age_seconds=None), lock)
         clock_lock = deepcopy(lock)
         clock_lock['features'] = {'battery_sample_clock': 'CLOCK_BOOTTIME'}
         clock_good = deepcopy(good)

@@ -33,6 +33,13 @@ def source_lock():
 
 
 class BootFirmwareTests(unittest.TestCase):
+    def test_retained_clock_fault_fails_even_after_monitor_recovers(self):
+        for fault in (None, {}, {'count': 1}):
+            snapshot = healthy_snapshot()
+            snapshot['battery']['clock_fault'] = fault
+            with self.subTest(fault=fault):
+                self.assertEqual(boot_cycles.validate(snapshot, source_lock()), ['battery_monitor'])
+
     def test_single_pinned_load_passes_and_preserves_evidence(self):
         snapshot = healthy_snapshot()
         self.assertEqual(boot_cycles.validate(snapshot, source_lock()), [])

@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-from battery_sample import sample_age
+from battery_sample import age_evidence, sample_age
 import cpi_idle
 import kernel_evidence
 
@@ -181,7 +181,7 @@ def snapshot():
     # their actual source explicitly; it is not copied from systemd's journal.
     result['journal'] = kernel_evidence.validate(result[kernel_evidence.KEY])
     result['boottime_seconds'] = time.clock_gettime(time.CLOCK_BOOTTIME)
-    result['battery_age_seconds'] = sample_age(battery, now=result['boottime_seconds'], boot_id=result['boot_id'])
+    result.update(age_evidence(battery, now=result['boottime_seconds'], boot_id=result['boot_id']))
     if cpi_idle.enabled(result['image']['sources']):
         result['cpu_idle'] = cpi_idle.snapshot()
     return result
@@ -232,6 +232,8 @@ def validate(snapshot, lock, connection='usb'):
             'gameshellneo_slow_poll=' in s['cmdline'] or 'gameshellneo_diagnostics=' in s['cmdline']):
         raise ValueError('PM stage isolation or ordinary sleep policy failed')
     b = s['battery']
+    if 'clock_fault' in b:
+        raise ValueError('Battery monitor retains a clock fault')
     features = lock.get('features', {})
     if 'battery_sample_clock' in features:
         if (features['battery_sample_clock'] != 'CLOCK_BOOTTIME' or
@@ -261,7 +263,8 @@ def validate(snapshot, lock, connection='usb'):
         usb_configured=s['usb'] == ['configured'],
         wifi_connected='wpa_state=COMPLETED' in s['wifi'].splitlines(),
         battery_monitoring=b.get('monitoring') == 'valid',
-        battery_freshness=0 <= s['battery_age_seconds'] <= 25,
+        battery_freshness=type(s['battery_age_seconds']) in (int, float) and
+                          0 <= s['battery_age_seconds'] <= 25,
         usb_external_power=usb_supply == {'type': 'USB', 'present': '1', 'online': '1'},
         battery_status=b.get('status') in ('Charging', 'Discharging', 'Full', 'Not charging'),
         battery_capacity=b.get('capacity_percent', 0) > 20,

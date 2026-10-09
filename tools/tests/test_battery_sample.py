@@ -29,6 +29,26 @@ def load(filename):
 
 
 class BatteryAge(unittest.TestCase):
+    def test_latched_clock_fault_rejects_even_fresh_recovered_sample(self):
+        for fault in (None, {}, False, {'count': 1, 'first': {'reason': 'backwards'}}):
+            sample = reading() | {'clock_fault': fault}
+            with self.subTest(fault=fault), self.assertRaisesRegex(ValueError, 'clock fault'):
+                battery_sample.sample_age(sample, now=101, boot_id='boot')
+            evidence = battery_sample.age_evidence(sample, now=101, boot_id='boot')
+            self.assertIsNone(evidence['battery_age_seconds'])
+            self.assertIn('clock fault', evidence['battery_age_error'])
+            self.assertEqual(sample['clock_fault'], fault)
+        self.assertEqual(battery_sample.age_evidence(reading(), now=101, boot_id='boot'),
+                         {'battery_age_seconds': 1})
+
+    def test_fault_aware_schema_uses_same_boottime_contract_without_legacy_clock_fallback(self):
+        sample = reading() | {'schema_version': 3}
+        self.assertEqual(battery_sample.sample_age(sample, now=3700, boot_id='boot'), 3600)
+        for changed in ({'clock_fault': {'count': 1}}, {'boottime_seconds': None},
+                        {'sample_clock': 'CLOCK_MONOTONIC'}, {'boot_id': 'other'}):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                battery_sample.sample_age(sample | changed, now=101, boot_id='boot')
+
     def test_offline_image_requires_the_clock_contract_and_exact_producer(self):
         verify = load('verify-rootfs.py')
         with tempfile.TemporaryDirectory() as directory:
@@ -54,7 +74,7 @@ class BatteryAge(unittest.TestCase):
 
     def test_unknown_clock_legacy_cross_boot_and_malformed_timestamps_reject(self):
         bad = [dict(monotonic_seconds=20), reading() | dict(schema_version=True),
-               reading() | dict(schema_version=3), reading() | dict(sample_clock='CLOCK_MONOTONIC'),
+               reading() | dict(schema_version=4), reading() | dict(sample_clock='CLOCK_MONOTONIC'),
                reading() | dict(boot_id='other')]
         bad += [reading() | dict(boottime_seconds=value)
                 for value in (None, True, '100', -1, 102, float('nan'), float('inf'))]

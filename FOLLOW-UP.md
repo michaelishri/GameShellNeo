@@ -2,6 +2,20 @@
 
 Record deferred questions and activities here as they arise.
 
+**Battery clock-fault handling prepared, 10 October 2026:** NEO-192 now has
+tested producer handling for invalid, failed and decreasing clock observations.
+Schema-3 records preserve first/latest raw evidence and a count through good
+samples and service restarts, reject the bad sample and reset low-battery
+history. Later valid samples can restore battery protection; retained faults
+still block age/PM/boot qualification. Offline checks pass 24 runtime / 913
+tooling tests (one optional skip), both C checks and shell lint.
+The live diagnostic.25 guard is unchanged. Root cause, controlled deployment
+and hardware qualification remain open; never erase the original restart or
+treat the earlier short non-reproduction as clearance. Next useful comparison
+is the normal clock API versus explicit kernel calls, with verified ARM ABI
+and CPU context. This is separate from any clocksource or driver change.
+[Report 258](docs/258-battery-clock-fault-handling.md).
+
 **Clock regression investigation, 10 October 2026:** NEO-192 verifies the
 installed guard/unit hashes and preserves the original unhandled backwards
 MONOTONIC bracket. `device:clock-observe` now records 60,000 fixed awake

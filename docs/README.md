@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[258 — Battery clock-fault handling](258-battery-clock-fault-handling.md)
+adds degraded publication and retained raw incident evidence, tests service
+restart behavior and keeps diagnostic admission blocked after sample recovery.
+The candidate passes offline checks; the underlying clock cause and deployment
+remain open.
+
 [257 — Awake clock-regression investigation](257-awake-clock-regression-investigation.md)
 preserves the battery guard's original failure and adds a bounded raw-clock
 recorder. A 60,000-sequence awake capture finds no recurrence, without clearing

@@ -1025,6 +1025,9 @@ It permits inspection of the known service-restart condition without granting
 PM admission. A clean short capture does not clear a historical clock failure.
 [Report 257](docs/257-awake-clock-regression-investigation.md) records evidence,
 measurement overhead and the remaining guard/clock-source investigation.
+The guard fault-handling change is now implemented and tested offline in
+[report 258](docs/258-battery-clock-fault-handling.md); the underlying clock
+regression remains unresolved and the live guard has not been replaced.
 
 The candidate ADC width correction has its own saved checks:
 
@@ -2117,12 +2120,24 @@ three low readings, invalid/missing telemetry, charging or capacity recovery,
 sampling gaps and retry after a rejected shutdown request. Output is retained
 privately as `battery-policy.txt`.
 
-The separate `work/battery-boottime` candidate extends these regressions to
-sleep-inclusive reading age, interrupted reads and low-reading sequences across
-resume. `task test` runs the local simulations and consumer checks. Its schema-2
-producer and matching diagnostic tools must be deployed together in a later,
-separately identified image; the installed-source hash check deliberately rejects
-diagnostic.18's older guard. See [report 133](docs/133-battery-boottime.md).
+The BOOTTIME contract covers sleep-inclusive reading age, interrupted reads and
+low-reading sequences across resume; [report 133](docs/133-battery-boottime.md)
+records its introduction. The next guard candidate adds schema 3 and retained
+clock-fault evidence. On a clock failure it publishes a degraded sample with
+unusable timestamps, resets the low-reading history and preserves first/latest
+raw observations and a count in `battery.json`. That record survives service
+restarts within the boot. Later good samples can rebuild battery protection,
+but the retained fault continues to block diagnostic admission. No clock value
+is clamped and no clocksource is changed.
+
+`task check` runs the local simulations and consumer checks, including every
+clock-read failure boundary and restart retention. The matching age tools read
+schema 2 and 3; older schema-2 tools reject the new producer. This candidate is
+not installed on diagnostic.25, so `device:battery-check` will intentionally
+reject the source mismatch until a matching guard is deployed. Do not restart
+the live service or clear its original failure to make qualification pass.
+[Report 258](docs/258-battery-clock-fault-handling.md) records implementation,
+validation and the remaining clock-cause/hardware work.
 
 The checks run as the SSH user with a 60-second bound. Temporary state replaces
 the real `/run/gameshellneo` path inside that process, and a test function

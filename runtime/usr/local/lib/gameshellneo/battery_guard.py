@@ -13,15 +13,59 @@ REQUIRED = 3
 MAX_SAMPLE_SECONDS = 2
 
 
+class ClockFault(ValueError):
+    """An unusable observation, with original integers (or partial reads)."""
+
+    def __init__(self, reason, observations):
+        super().__init__(reason)
+        self.observations = observations
+
+
 def clocks():
     # Bracket BOOTTIME with MONOTONIC to bound syscall/preemption uncertainty.
-    left = time.monotonic_ns()
-    boot = time.clock_gettime_ns(time.CLOCK_BOOTTIME)
-    right = time.monotonic_ns()
+    raw = {}
+    try:
+        raw['monotonic_ns'] = left = time.monotonic_ns()
+        raw['boottime_ns'] = boot = time.clock_gettime_ns(time.CLOCK_BOOTTIME)
+        raw['monotonic_right_ns'] = right = time.monotonic_ns()
+    except (OSError, ValueError) as error:
+        raise ClockFault('clock read failed: ' + str(error), [raw]) from error
+    if any(type(value) is not int or value < 0 for value in raw.values()):
+        raise ClockFault('invalid clock integer', [raw])
     if right < left:
-        raise ValueError('non-increasing clock observation')
-    return dict(boottime_ns=boot, monotonic_ns=left,
-                gap_low=boot-right, gap_high=boot-left)
+        raise ClockFault('decreasing MONOTONIC bracket', [raw])
+    return dict(raw, gap_low=boot-right, gap_high=boot-left)
+
+
+def ordered(before, after):
+    if (after['monotonic_ns'] < before['monotonic_right_ns'] or
+            after['boottime_ns'] < before['boottime_ns']):
+        raise ClockFault('decreasing consecutive clock observations', [before, after])
+
+
+def saved_clock_fault(path, boot_id):
+    # battery.json is both the atomic published state and the boot-local latch.
+    # RuntimeDirectoryPreserve=yes keeps it through a service restart. Never
+    # overwrite unreadable/malformed evidence with a clean state on startup.
+    try:
+        state = json.loads(path.read_text())
+    except FileNotFoundError:
+        return None
+    if (type(state) is not dict or state.get('boot_id') != boot_id or
+            type(state.get('schema_version')) is not int or state['schema_version'] not in (2, 3)):
+        raise ValueError('Existing battery state has an unknown schema or boot identity')
+    if 'clock_fault' not in state:
+        return None
+    fault = state['clock_fault']
+    if (type(fault) is not dict or type(fault.get('schema_version')) is not int or
+            fault['schema_version'] != 1 or
+            fault.get('boot_id') != boot_id or type(fault.get('count')) is not int or
+            fault['count'] < 1 or any(type(fault.get(key)) is not dict or
+                not isinstance(fault[key].get('reason'), str) or
+                type(fault[key].get('observations')) is not list
+                for key in ('first', 'last'))):
+        raise ValueError('Existing battery clock-fault evidence is malformed')
+    return fault
 
 
 def crossed_suspend(before, after):
@@ -48,6 +92,9 @@ def read_sample(root=Path('/sys/class/power_supply')):
 
 class Guard:
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.count = 0
         self.previous = None
 
@@ -70,33 +117,58 @@ def main():
     state_dir = Path('/run/gameshellneo')
     state_dir.mkdir(exist_ok=True)
     boot_id = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+    clock_fault = saved_clock_fault(state_dir / 'battery.json', boot_id)
     previous_state = None
     previous_clock = None
     while True:
-        started = clocks()
+        phase = 'start'
+        now = monotonic = elapsed = None
         try:
-            sample = read_sample()
-            state = {'monitoring': 'valid', **sample}
-        except (OSError, ValueError) as error:
-            sample = None
-            state = {'monitoring': 'degraded', 'reason': str(error)}
-        finished = clocks()
-        elapsed = (finished['boottime_ns'] - started['boottime_ns']) / 1e9
-        if not 0 <= elapsed <= MAX_SAMPLE_SECONDS or crossed_suspend(started, finished):
-            sample = None
-            state = {'monitoring': 'degraded', 'reason': 'battery read delayed or crossed suspend'}
-        resumed = previous_clock is not None and crossed_suspend(previous_clock, started)
-        previous_clock = finished
-        now = started['boottime_ns'] / 1e9
-        shutdown = guard.update(sample, now, resumed=resumed)
+            started = clocks()
+            phase = 'between-samples'
+            if previous_clock is not None:
+                ordered(previous_clock, started)
+            try:
+                sample = read_sample()
+                state = {'monitoring': 'valid', **sample}
+            except (OSError, ValueError) as error:
+                sample = None
+                state = {'monitoring': 'degraded', 'reason': str(error)}
+            phase = 'finish'
+            finished = clocks()
+            phase = 'sample-window'
+            ordered(started, finished)
+            elapsed = (finished['boottime_ns'] - started['boottime_ns']) / 1e9
+            if elapsed > MAX_SAMPLE_SECONDS or crossed_suspend(started, finished):
+                sample = None
+                state = {'monitoring': 'degraded', 'reason': 'battery read delayed or crossed suspend'}
+            resumed = previous_clock is not None and crossed_suspend(previous_clock, started)
+            previous_clock = finished
+            now = started['boottime_ns'] / 1e9
+            monotonic = started['monotonic_ns'] / 1e9
+            shutdown = guard.update(sample, now, resumed=resumed)
+        except ClockFault as error:
+            event = dict(phase=phase, reason=str(error), observations=error.observations)
+            clock_fault = dict(schema_version=1, boot_id=boot_id,
+                count=clock_fault['count'] + 1 if clock_fault else 1,
+                first=clock_fault['first'] if clock_fault else event, last=event)
+            logging.error('battery clock fault: %s', json.dumps(event))
+            guard.reset()
+            previous_clock = None
+            shutdown = False
+            state = {'monitoring': 'degraded', 'reason': 'unusable clock observation'}
         log_state = (state['monitoring'], state.get('status'), shutdown)
         if log_state != previous_state:
             logging.info('battery monitoring=%s status=%s critical=%s', *log_state)
             previous_state = log_state
-        state.update(schema_version=2, sample_clock='CLOCK_BOOTTIME', boot_id=boot_id,
-                     boottime_seconds=now, sample_monotonic_seconds=started['monotonic_ns'] / 1e9,
+        # Schema 3 forces older strict age consumers to reject this producer
+        # instead of overlooking a latched fault after current readings recover.
+        state.update(schema_version=3, sample_clock='CLOCK_BOOTTIME', boot_id=boot_id,
+                     boottime_seconds=now, sample_monotonic_seconds=monotonic,
                      sample_duration_seconds=elapsed, consecutive_low_samples=guard.count,
                      provisional_threshold_percent=THRESHOLD)
+        if clock_fault is not None:
+            state['clock_fault'] = clock_fault
         temporary = state_dir / 'battery.json.tmp'
         temporary.write_text(json.dumps(state) + '\n')
         os.replace(temporary, state_dir / 'battery.json')

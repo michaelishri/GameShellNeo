@@ -23,9 +23,12 @@ owner-confirmed normal untouched display return. Four further connected-USB
 sleep/wake repeats also pass with the same recovery and CPU evidence, bringing
 PM to 12/0; the owner confirms normal warnings/display returns throughout.
 [Report 235](docs/235-diagnostic25-connected-sleep-repeatability.md) records the
-batch and preserved collection errors. USB reconnect/cable qualification and
-energy measurements remain open. The newer controller-removal work is outside
-this candidate.
+batch and preserved collection errors. Four subsequent awake USB reconnects
+also pass, with independent USB access after each, final Wi-Fi/Mac health and
+unchanged PM/keypad state in
+[report 236](docs/236-diagnostic25-post-sleep-usb-reconnects.md). Remaining
+battery/cable sleep qualification and energy measurements are still open.
+The newer controller-removal work is outside this candidate.
 
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
 and guards against sleep interrupting awake measurements. It requires all four

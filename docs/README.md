@@ -16,11 +16,16 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[236 — Diagnostic.25 USB reconnects after sleep](236-diagnostic25-post-sleep-usb-reconnects.md)
+records four physical awake reconnects, per-cycle independent USB SSH proofs,
+final USB/Wi-Fi/Mac health and unchanged PM12/0, SDIO usage and keypad identity.
+Remaining battery/cable sleep profiles, latency and energy stay separate.
+
 [235 — Diagnostic.25 connected sleep repeats](235-diagnostic25-connected-sleep-repeatability.md)
 records four passing attended RTC sleep/wake repeats, both-route recovery,
 retained keypad, all-CPU callbacks and timekeeping freeze, with owner-confirmed
-normal warnings/display returns. PM is 12/0; USB reconnect/cable coverage and
-energy remain separate.
+normal warnings/display returns. PM is 12/0; report 236 follows awake USB
+reconnects, while battery/cable sleep coverage and energy remain separate.
 
 [234 — Diagnostic.25 PM qualification](234-diagnostic25-pm-qualification.md)
 records all seven passing freezer/driver/late-noirq checks, retained keypad,

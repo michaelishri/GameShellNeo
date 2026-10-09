@@ -35,8 +35,11 @@ cable changes during sleep also pass—two removals and two insertions—with th
 screen staying asleep after both insertions until RTC wake. Final health and
 both routes pass at PM31/0 in
 [report 238](docs/238-diagnostic25-guided-cable-sleep-qualification.md).
-This completes the planned bounded diagnostic.25 functional coverage; broader
-reliability, charging during sleep and energy measurements remain open.
+The final [integration review](docs/239-musb-restart-integration-review.md)
+found no actionable Standards or Spec findings and verified the source/test/image
+provenance. NEO-108's restart fix and planned bounded diagnostic.25 coverage are
+complete; broader reliability, charging during sleep and energy measurements
+remain open.
 The newer controller-removal work is outside this candidate.
 
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps

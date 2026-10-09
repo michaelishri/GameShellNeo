@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[239 — Diagnostic.25 MUSB restart integration review](239-musb-restart-integration-review.md)
+records no actionable Standards or Spec findings, verified source/test/image
+provenance and completion of NEO-108's restart scope. Hardware coverage is
+21 debug checks and 10 actual sleep/wake cycles, with zero PM failures.
+Energy, broader reliability and controller removal remain separate.
+
 [238 — Diagnostic.25 guided cable sleeps](238-diagnostic25-guided-cable-sleep-qualification.md)
 records four accepted attended cycles: remove, attach, remove, attach. Both
 insertions stay dark until RTC wake; endpoint-specific network access, original

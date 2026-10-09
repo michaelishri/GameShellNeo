@@ -218,6 +218,10 @@ tasks:
     desc: Offline printk continuity, retention, provenance and storage regressions; no device access
     cmds: [bash tools/run-logged.sh kernel-evidence python3 -m unittest discover -s tools/tests -p 'test_kernel_evidence*.py' -v]
 
+  test:audio-timing:
+    desc: Offline speaker timing, cleanup and report validation with fake playback; no device or sound
+    cmds: [bash tools/run-logged.sh audio-timing python3 -m unittest discover -s tools/tests -p 'test_speaker*.py' -v]
+
   test:nkmp:
     desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
     cmds: [bash tools/run-logged.sh nkmp python3 tools/check-nkmp.py]
@@ -643,6 +647,10 @@ tasks:
   report:journal-volume:
     desc: Summarize a private journalctl JSON-lines capture supplied after --; no message text or device access
     cmds: [python3 tools/report-journal-volume.py]
+
+  report:audio-timing:
+    desc: Summarize saved audio/PM/sleep cue software timing after --; offline, no sound or acoustic-onset claim
+    cmds: [python3 tools/report-audio-timing.py]
 
   device:sleep-cable-remove-rehearse:
     desc: Awake rehearsal for USB removal scenario; USB connected, QUALIFICATION/CABLE_ACTION required

@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[249 — Separating speaker confirmation timing](249-speaker-confirmation-timing.md)
+distinguishes input/prompt waits from amplifier startup and playback, adds
+bounded cue phase timestamps and an offline report task, and preserves audible
+behavior. All 16 runtime and 893 tooling tests pass; physical timing remains open.
+
 [248 — Awake validation of bounded kernel evidence](248-kernel-evidence-awake-validation.md)
 records complete boot capture, a sequence-checked userspace marker append,
 protected storage and both-route proof on the unchanged boot, with PM53/0.

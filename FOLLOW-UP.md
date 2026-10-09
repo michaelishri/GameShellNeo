@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**Speaker timing prepared offline, 10 October 2026:** NEO-185 adds fixed cue
+phase timestamps and `report:audio-timing`, without changing the waveform,
+volume, driver startup delay, prompt waits or playback cleanup. The report
+separates historical total operations from new phase measurements; it does
+not claim acoustic onset or PM acceptance. 29 speaker regressions and the full
+16 runtime / 893 tooling tests pass (one optional skip), plus C/lint. No sound,
+PM or device configuration ran. The next attended session can gather current
+source records; the owner-deferred latency fix and audio energy tests remain
+open. NEO-184/182 still need fresh attended qualification; no card swap needed.
+[Report 249](docs/249-speaker-confirmation-timing.md).
+
 **Kernel-evidence awake checks passed, 10 October 2026:** NEO-184 captures a
 complete 1,660-record boot prefix on the existing diagnostic.25 boot, although
 the independent general journal still lacks the firmware identity. The saved
@@ -846,6 +857,12 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] Extend physical input qualification to other buttons/chords and release during suspension. The four face buttons and held-A/reset-state observation do not cover every input case.
 - [x] NEO-48: installed diagnostic.10 with upstream A33 speaker cues and saved audio/input tasks. Host checks passed 257 tool tests (one optional skip), 13 runtime tests, compiled/lint, kernel and DT checks. Transfer, card flash/full readback, boot, home Wi-Fi update and integration passed. Three quiet tones and a nine-cue physical-input/driver PM test passed; owner confirmed clear tones and normal dim screen return. Both SSH routes, original keypad handle, complete mixer/idle and console/trace/PM restoration passed; no PM failures or ULPI warnings. Actual sleep, wider audio and idle energy remain separate work. [Preparation report 65](docs/65-speaker-confirmation-cues.md); [hardware report 66](docs/66-speaker-hardware-validation.md).
 - [ ] Investigate the significant speaker-confirmation delay on **every keypress**, reported by the owner after NEO-48. The helper closes playback and verifies both amplifiers off after each cue, so the upstream 700 ms startup wait repeats; measured complete cue operations were 0.953–1.006 s, not direct audible-onset latency. The owner explicitly deferred a fix. Later measure keypress-to-sound latency and audio-enabled idle cost; compare a bounded ready audio path during the input sequence with per-cue shutdown, preserving idle/restoration before PM and after the test. Do not shorten the upstream delay without reliable-start/pop/noise evidence.
+  NEO-185's [report 249](docs/249-speaker-confirmation-timing.md) now separates
+  completed-tap handling, held-key verification, prompt pauses and the long
+  waveform from driver startup. Fixed cue phase timestamps and the offline
+  `report:audio-timing` task are tested, with no playback-policy change. Obtain
+  attended phase measurements next; acoustic onset and powered-audio cost
+  remain unmeasured. Historical totals cannot supply the missing phases.
 - [ ] Define the future application's held-button policy across sleep. NEO-47's trace/source inspection shows generic Linux input suspend deliberately releases held keys even when the evdev handle survives; the owner confirmed still holding A. Keep this distinct from disconnection. Qualify fresh input and release/repress behavior before considering any narrowly scoped state-resynchronization change; do not remove the generic release behavior globally.
 - [ ] Installed keypad MCU/firmware identity and retention energy remain unqualified. Keep keypad wake disabled and normal sleep masked; choose a normal supply policy only after energy measurement.
 - [x] NEO-46: preserve a rejected device-owned PM preflight snapshot and name failed health gates. The first retention batch stopped before its second stage, but the old recorder omitted the rejected snapshot. The recorder now retains it without relaxing checks; a regression proves rejection cannot enter PM. Host checks passed 234 tool tests (one optional skip), 13 runtime tests and compiled/lint checks. The original transient cause remains unproven; its completed first cycle and same-boot healthy inspection are retained under NEO-45.

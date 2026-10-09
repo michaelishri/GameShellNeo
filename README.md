@@ -1974,6 +1974,15 @@ PM recovery tasks also restore audio after an audio-assisted keypad run.
 The owner observed a significant delay on every button confirmation: each cue
 powers the amplifiers up again and repeats the upstream 700 ms startup wait.
 Improving that latency is recorded for later investigation.
+Completed cues now save separate software timings for waveform preparation,
+idle checks, mixer setup and playback. Use `task report:audio-timing --
+.local/diagnostics/<capture>/result.json` (or a PM `cycle-1/result.json`) to
+summarize an existing result without contacting the device or playing sound.
+Old cues retain their original total interval with no invented phase timings;
+the report does not measure acoustic onset or qualify a failed result.
+`task test:audio-timing` runs the offline playback/timing regressions.
+[Report 249](docs/249-speaker-confirmation-timing.md) explains the known delays,
+new measurements and remaining optimization work. Playback behavior is unchanged.
 See [report 65](docs/65-speaker-confirmation-cues.md) for routing, levels,
 recovery and qualification status.
 

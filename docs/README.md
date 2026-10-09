@@ -16,6 +16,17 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[257 — Awake clock-regression investigation](257-awake-clock-regression-investigation.md)
+preserves the battery guard's original failure and adds a bounded raw-clock
+recorder. A 60,000-sequence awake capture finds no recurrence, without clearing
+the incident or granting PM admission. Guard handling and root cause remain open.
+
+[256 — Camera PM preflight](256-camera-pm-preflight.md) adopts the authorized
+camera workflow and verifies a readable current baseline. PM preparation stops
+before any cycle because the battery guard previously restarted on a backwards
+clock observation. NEO-192 tracks the independent blocker; no human screen
+confirmation is needed once health and camera readiness pass.
+
 [255 — AXP223 charger-control provenance diagnostic](255-axp223-control-provenance-diagnostic.md)
 adds an isolated default-off normal/bypass read candidate and PM/removal
 admission. Seven real-kernel tests and complete ARM driver compilation pass;

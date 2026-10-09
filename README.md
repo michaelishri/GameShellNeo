@@ -1011,6 +1011,21 @@ receipts live under `.local/build/axp223-controls-tests/`; missing receipts
 mean validation is incomplete. [Report 255](docs/255-axp223-control-provenance-diagnostic.md)
 records the PM/removal contract, test status and remaining integration gates.
 
+The clock-regression investigation has a bounded awake recorder:
+
+```sh
+task device:clock-observe
+```
+
+It reads 60,000 MONOTONIC/BOOTTIME/RAW sequences in fixed batches, retaining
+the first 32 anomalous sequences and total counts. It changes no clocksource,
+CPU affinity or PM setting and leaves the screen on. A device timeout bounds
+execution; both network routes and unchanged device state are checked afterward.
+It permits inspection of the known service-restart condition without granting
+PM admission. A clean short capture does not clear a historical clock failure.
+[Report 257](docs/257-awake-clock-regression-investigation.md) records evidence,
+measurement overhead and the remaining guard/clock-source investigation.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh
@@ -1823,8 +1838,9 @@ tool users can pass `--inspect --inspect-route wifi`.
 
 `device:pm-test` requires the currently locked image/kernel/radio, stock USB
 polling, normal sleep masks, SDIO power retention, USB power, healthy services
-and working USB/Wi-Fi SSH. Be present for the initial hardware tests and retain
-the preceding verified recovery image. Leave USB connected, the Mac awake, Wi-Fi
+and working USB/Wi-Fi SSH. Use an owner observer or the authorized camera
+workflow below for visual display checks, and retain the preceding verified
+recovery image. Leave USB connected, the Mac awake, Wi-Fi
 available and the controls untouched. Start with one `STAGE=freezer`, then one
 `STAGE=devices`. After those pass and the console/backlight return normally,
 `STAGE=devices CYCLES=4` repeats four identical cycles with 20 seconds between
@@ -2430,6 +2446,15 @@ while the Mac itself sleeps. These commands provide capture tooling; visual
 review and other hardware acceptance gates remain explicit.
 [Report 166](docs/166-mac-camera-observation.md) records setup evidence and limits.
 
+The owner's current authorization in `AGENTS.md` lets a verified camera
+sequence replace a separate human-ready/screen-return exchange for simple
+screen observations. Inspect a fresh baseline, wait for the sequence's readiness,
+then run one authorized test and inspect its actual images before continuing.
+Retain the long warning tone; video-only evidence cannot confirm its audibility.
+Cable/card/button actions still need the owner, and a camera cannot override a
+failed device health check. [Report 256](docs/256-camera-pm-preflight.md) records
+the first current-branch preflight and its independent battery-service blocker.
+
 ### Backing up the original card
 
 Insert the original card in the Mac while the GameShell runs from the DEV card.
@@ -2613,12 +2638,13 @@ RTC and late/noirq preparation is repeatable:
 task device:rtc-inspect  # RTC time and logical alarm; no change
 task device:rtc-smoke    # Ten-second alarm while awake, then restore
 task device:rtc-restore  # Explicit recovery of an interrupted owned alarm
-task device:pm-platform # One attended late/noirq debug cycle; never real sleep
+task device:pm-platform # One observed late/noirq debug cycle; never real sleep
 ```
 
 The platform task requires the wake-fixed image, same-boot RTC qualification,
-power-key ownership and complete PM traces. Run it only after explicit observer
-readiness. [Report 102](docs/102-rtc-and-platform-diagnostic-preparation.md)
+power-key ownership and complete PM traces. Run it after owner readiness or
+verified camera readiness for the authorized visual test, as described above.
+[Report 102](docs/102-rtc-and-platform-diagnostic-preparation.md)
 records the awake evidence, guards and prepared hardware sequence.
 
 The first actual-s2idle experiment has its own commands:

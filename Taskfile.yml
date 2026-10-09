@@ -552,6 +552,10 @@ tasks:
     desc: Awake protected-checkpoint append test with one userspace debug marker; no PM or screen changes
     cmds: [python3 tools/check-kernel-evidence.py]
 
+  device:clock-observe:
+    desc: Record 60000 awake clock brackets without changing clocksource or PM; no sleep admission
+    cmds: [python3 tools/check-clock-observation.py]
+
   device:keypad-inspect:
     desc: Save keypad identity, USB persistence, input paths and power state without changing policy
     cmds: [python3 tools/check-keypad.py]
@@ -597,7 +601,7 @@ tasks:
     cmds: [python3 tools/check-audio.py --restore]
 
   device:pm-test:
-    desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required
+    desc: Freezer/devices debug stage with owner or verified camera observation; USB powered, explicit STAGE required
     cmds: [python3 tools/check-pm-stages.py --test]
 
   device:wifi-trace-smoke:
@@ -651,7 +655,7 @@ tasks:
     cmds: [python3 tools/check-power-key-policy.py --collect]
 
   device:pm-platform:
-    desc: One attended late/noirq debug cycle; checked image, same-boot RTC smoke, power-key ownership and traces required
+    desc: One observed late/noirq debug cycle; checked image, same-boot RTC smoke, power-key ownership and traces required
     cmds: [python3 tools/check-pm-stages.py --platform]
 
   device:sleep-rehearse:

@@ -2,6 +2,29 @@
 
 Record deferred questions and activities here as they arise.
 
+**Clock regression investigation, 10 October 2026:** NEO-192 verifies the
+installed guard/unit hashes and preserves the original unhandled backwards
+MONOTONIC bracket. `device:clock-observe` now records 60,000 fixed awake
+sequences, bounded raw anomaly evidence and state/route checks. Its first
+capture has zero regressions, unchanged PM53/0 and the same restart count of 1;
+this does not clear the historical fault or qualify clock reliability.
+Full checks pass 16 runtime / 910 tooling tests (one optional skip), C and lint.
+Next: distinguish source/call-path/CPU effects and implement tested degraded
+guard reporting with retained raw fault evidence, without hiding a driver issue.
+Keep NEO-191 PM checks and NEO-182 battery sleep pending; no live clocks,
+services, charger settings or image inputs were changed by the recorder.
+[Report 257](docs/257-awake-clock-regression-investigation.md).
+
+**Camera PM preflight stopped, 10 October 2026:** NEO-191 imports the owner's
+camera workflow, verifies existing permission and directly inspects a readable
+fresh still. Both SSH routes reach the same diagnostic.25 boot at PM53/0.
+No screen or PM test starts: the battery service has one automatic restart,
+with an unhandled backwards-clock observation in its original journal.
+NEO-192 tracks the clock cause and guard fault handling; keep the failed
+preflight, restart count and installed image intact. Camera readiness can now
+replace human visual confirmation, but not the health gate or physical actions.
+[Report 256](docs/256-camera-pm-preflight.md).
+
 **AXP223 control diagnostic tested offline, 10 October 2026:** NEO-188 has an
 isolated default-off REG33/34 normal/bypass diagnostic with PM admission,
 protected removal, per-read errors and timestamps. It performs no charger

@@ -56,6 +56,8 @@ env:
   NEO_COMPARISON_CAPTURE: '{{.CAPTURE | default ""}}'
   NEO_COMPARISON_RESUME: '{{.RESUME | default ""}}'
   NEO_COMPARISON_RETRY_INCOMPLETE: '{{.RETRY_INCOMPLETE | default "0"}}'
+  NEO_CAMERA_SECONDS: '{{.SECONDS | default "0"}}'
+  NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
 
 tasks:
   default:
@@ -727,6 +729,18 @@ tasks:
   mac:status:
     desc: Show Mac connectivity and physical external disks without changing them
     cmds: [python3 tools/remote.py mac status]
+
+  mac:camera-setup:
+    desc: Install the bounded camera app and request normal macOS camera permission
+    cmds: [python3 tools/mac-camera.py setup]
+
+  mac:camera-status:
+    desc: Read camera permission through the desktop helper without opening the camera
+    cmds: [python3 tools/mac-camera.py status]
+
+  mac:camera-capture:
+    desc: Observe the GameShell screen; SECONDS=0 saves a still, 1..300 a sequence, FPS=1..5
+    cmds: [python3 tools/mac-camera.py capture --seconds "$NEO_CAMERA_SECONDS" --fps "$NEO_CAMERA_FPS"]
 
   mac:usb-inspect:
     desc: Save read-only Mac USB/network and sleep history; no lease renewal or settings change

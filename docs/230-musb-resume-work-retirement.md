@@ -142,7 +142,41 @@ suites are not claimed as executions of this candidate unless rerun.
 
 ## Results
 
-Validation and review are in progress; no completion or hardware claim yet.
+- Request suite: all 52 scenarios passed natively, with real-free allocation,
+  and on ARM32; all 12 native negative controls failed as required.
+- Role suite: all 25 cases and 17 fresh-allocation retries passed natively and
+  on ARM32; all nine native negative controls failed as required.
+- Teardown suite: all 43 cases passed natively and on ARM32; all 34 native
+  negative controls and six source-boundary controls rejected broken versions.
+- All five ARM configurations passed: project peripheral, host, dual-role,
+  module, and no-PM. The 17 recorded inputs, extracted core, 35 native binaries,
+  ARM32 binary, five configurations, 21 ARM objects and current production
+  patch queue were checked against the retained files.
+- `task check` passed: 16 runtime tests, 826 tooling tests with two optional
+  skips, helper checks, Bash syntax and ShellCheck.
+- Strict production checkpatch: zero errors, warnings or checks.
+- Standards review: zero findings. Specification review: zero findings,
+  including the later initialization-order and follower-request test refinements.
+- All 17 UML integration cases passed with KASAN/lockdep enabled and no
+  rejected kernel diagnostics. The nine inputs, exact case set, production
+  patch queue, four retained artifacts and retained receipt were independently
+  verified against saved files.
+
+The request and role receipt inputs, native binaries, extracted/generated
+request sources and recorded ARM32 artifacts were checked against saved files.
+
+| Artifact | SHA256 |
+| --- | --- |
+| Patch 0042 | `bbb8e558fa02592f38e647ba59ae707463fd729565c40cffa0b8cf31111ee82a` |
+| Request receipt | `90828a55c6e874f2799282b18b1c371f06707c586204db218f7dc1c0174c8f71` |
+| Role receipt | `2a50c9dde15b6c4d90ac0fc70facef888e67821b0c126870a1adc0a3ec712236` |
+| ARM/teardown receipt | `daa81103fe8e50b7912928d09ede51d2b1609c207b7f71b225e351c56ed40149` |
+| UML receipt | `25ea671e314cb5b29fb2d4de045b6ea3e7d4f545218ed11b1e200e1301e48c16` |
+| Accepted UML kernel | `a4b529f948624d9ec5ed3c8b5422226f509a0c11d70f8d868031b3b37eec6b26` |
+
+Accepted kernel artifacts are retained under
+`.local/build/musb-restart-kunit/kernel-d06e3a71a46f0bfc/accepted-runs/6495561963244c6c85fdb4ec75608630/`.
+Implementation commits: `9716128`, `6ce2736`.
 
 ## Remaining boundaries
 

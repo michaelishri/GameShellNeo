@@ -2,6 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
+**Diagnostic.25 awake battery baseline, 9 October 2026:** NEO-178's 61 samples
+over ten minutes pass, after a separate settling minute, with approximately
+264 mA / 1.05 W at the normal dim display. Raw summary recomputation and awake
+clock/PM checks pass; PM remains 31/0. This is an uncalibrated awake reference,
+not an asleep-consumption or optimization result. Next compare backlight-off
+awake operation against surrounding lit windows, then extend the fixed
+30-second RTC protocol deliberately for bounded longer observations. A
+qualified sleep-energy integral and sleeping battery protection remain open.
+[Report 240](docs/240-diagnostic25-battery-measurement-baseline.md).
+
 **MUSB restart integration review complete, 9 October 2026:** NEO-177 found
 no actionable Standards or Spec findings in `8d8a2e4...6ac61a3`. Exact
 patch/test/image provenance passes, and diagnostic.25's bounded qualification
@@ -676,6 +686,15 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   gauge programming has been performed. Preserve the unset cached capacity
   observation from NEO-120 without inferring actual pack health or configuration
   accuracy. Direct charging-through-sleep evidence remains NEO-117.
+
+- [ ] Re-audit the exact diagnostic.24/.25 image/kernel register contract before
+  using `device:charge-inspect` or `device:charge-baseline` on those images.
+  `tools/charge_inventory.py` currently admits profiles only through
+  diagnostic.23 and deliberately rejects newer identities before reading
+  registers. Preserve that rejection; add explicit cache/ADC-width profiles
+  and focused regressions rather than bypassing identity validation. The
+  sysfs-based idle sampler is independent of this allowlist. Identified during
+  NEO-178; [report 240](docs/240-diagnostic25-battery-measurement-baseline.md).
 
 - [ ] Qualify software charge inhibition separately from forced battery discharge.
   The installed AXP22x battery driver already exposes a root-writable `status`

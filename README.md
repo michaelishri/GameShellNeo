@@ -42,6 +42,12 @@ complete; broader reliability, charging during sleep and energy measurements
 remain open.
 The newer controller-removal work is outside this candidate.
 
+The first diagnostic.25 battery-only awake baseline passes: 61 samples over
+ten minutes, after a settling minute, estimate **264 mA / 1.05 W** with the dim
+screen on. [Report 240](docs/240-diagnostic25-battery-measurement-baseline.md)
+records the uncalibrated result and the planned backlight/sleep comparisons.
+It does not measure asleep consumption or establish an optimization gain.
+
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
 and guards against sleep interrupting awake measurements. It requires all four
 CPUs to participate and independent timekeeping-freeze evidence. This candidate

@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[240 — Diagnostic.25 battery baseline](240-diagnostic25-battery-measurement-baseline.md)
+records the passing 61-sample awake battery window, approximately 264 mA / 1.05 W
+with the dim display, unchanged PM31/0 and no screen or sleep operation. It
+defines the next backlight/sleep comparison steps and limits of software-only
+sleep-energy measurements.
+
 [239 — Diagnostic.25 MUSB restart integration review](239-musb-restart-integration-review.md)
 records no actionable Standards or Spec findings, verified source/test/image
 provenance and completion of NEO-108's restart scope. Hardware coverage is

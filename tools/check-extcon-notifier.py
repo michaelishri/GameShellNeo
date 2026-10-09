@@ -5,12 +5,12 @@ import json
 import os
 from pathlib import Path
 import re
-import resource
 import subprocess
 import tarfile
 
 from kernel_checks import ROOT, archive_for, compile_objects, run, sha256
 from kernel_sources import atomic_json, locked
+from native_source_variants import run_variants
 
 EXPECTED = '29 extcon scenarios passed (modeled SRCU/IRQ boundaries)'
 
@@ -104,28 +104,7 @@ def main():
         harness = ROOT / 'kernel/tests/extcon_notifier_test.c'
         header = WORK / 'extcon_notifier_functions.h'
         flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-pthread']
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-        results = {}
-        try:
-            for name, value in variants.items():
-                header.write_text(value)
-                binary = WORK / name
-                run(['cc', *flags, '-I', str(WORK), str(harness), '-o', str(binary)])
-                result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=30)
-                (WORK / (name + '.log')).write_text(result.stdout + result.stderr)
-                if name == 'candidate':
-                    result.check_returncode()
-                    if result.stdout.strip() != EXPECTED:
-                        raise ValueError('Incomplete source scenario result')
-                elif result.returncode == 0 or 'Assertion' not in result.stderr:
-                    raise RuntimeError('Negative control must fail an assertion: ' + name)
-                results[name] = dict(returncode=result.returncode, stdout=result.stdout.strip(),
-                                     stderr=result.stderr.strip(), extracted_sha256=sha256(header),
-                                    binary_sha256=sha256(binary),
-                                    log_sha256=sha256(WORK / (name + '.log')))
-                print(name + ': ' + (result.stdout.strip() or 'expected assertion failure'), flush=True)
-        finally:
-            header.write_text(functions)
+        results = run_variants(WORK, header, functions, variants, harness, flags, EXPECTED)
         builder = lock['builder']
         relative = WORK.relative_to(ROOT).as_posix()
         arm = subprocess.check_output([
@@ -170,7 +149,8 @@ def main():
             archive_sha256=sha256(archive), builder=builder,
             inputs={str(p.relative_to(ROOT)): sha256(p) for p in (
                 *patches, harness, Path(__file__), ROOT / 'tools/kernel_checks.py',
-                ROOT / 'tools/kernel_sources.py', ROOT / 'build/sources.lock.json')},
+                ROOT / 'tools/kernel_sources.py', ROOT / 'tools/native_source_variants.py',
+                ROOT / 'build/sources.lock.json')},
             sources={name: sha256(patched / name) for name in FILES},
             native=results, arm32=arm, arm32_binary_sha256=sha256(WORK / 'candidate-arm'), builds=builds,
             limits='Actual extcon/raw notifier functions, pthread-modeled SRCU and spinlocks, '

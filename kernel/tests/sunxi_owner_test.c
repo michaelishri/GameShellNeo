@@ -185,7 +185,7 @@ int main(void)
                                  (features_i & 2 ? BIT(SUNXI_MUSB_FL_HAS_RESET) : 0) |
                                  (features_i & 4 ? BIT(SUNXI_MUSB_FL_NO_CONFIGDATA) : 0);
         if ((fail == 1 && !(features_i & 1)) || (fail == 3 && !(features_i & 2))) continue;
-        struct clk clk = {0}; struct reset_control rst = {0}; struct phy phy = {0};
+        struct clk clk = {0}; struct reset_control rst = {0}; struct phy phy = {.mode = mode};
         struct extcon_dev extcon = {.host = mode == PHY_MODE_USB_HOST};
         struct otg otg = {0}; struct usb_phy xceiv = {.otg = &otg};
         struct device parent = {.data = &glue}, child = {.parent = &parent};
@@ -244,10 +244,13 @@ int main(void)
         /* Same parent, fresh child, no PHY event: sample current provider state. */
         struct musb next = {.controller = &child, .mregs = regs, .port_mode = mode};
         event_during_init = false; extcon.host = !extcon.host;
+        if (mode == PHY_MODE_USB_OTG) assert(phy.mode == PHY_MODE_USB_HOST);
         assert(!sunxi_musb_init(&next));
         assert(glue.musb == &next && glue.phy_mode == mode && !glue.work.disabled);
         before_reads = reads; sunxi_musb_enable(&next); run_work();
         assert(reads == before_reads + 1 && next.host == !!extcon.host && phy.powered == !!extcon.host);
+        /* Provider mode survives phy_exit/init; a cached reset is insufficient. */
+        assert(phy.mode == mode);
         extcon.selected = true;
         assert(!sunxi_musb_exit(&next)); check_idle(&next, features);
         assert(registrations == drains);

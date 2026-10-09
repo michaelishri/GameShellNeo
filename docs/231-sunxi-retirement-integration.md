@@ -61,6 +61,11 @@ It does not acquire a permanent power reference. Consumer cleanup must run
 before returning a probe error because driver-core link cleanup precedes
 failed-probe devres cleanup. Existing raw lookup APIs remain unchanged.
 
+The drain adds an SRCU reader pair to each extcon dispatch and per-provider
+SRCU state. Teardown pays the grace-period wait; normal notifications do not
+sleep merely to obtain that reader. This is a lifetime-correctness tradeoff,
+not a measured speed or energy optimization.
+
 ## Reproducible validation
 
 Run from this worktree, sequentially through the saved Task commands:
@@ -96,6 +101,24 @@ retains its own kernel, effective config, raw log, JSON report and hashes;
 subsequent suite runs cannot overwrite those accepted artifacts.
 
 Results are pending at this implementation checkpoint.
+
+## Review correction
+
+The first review found that restoring only `glue->phy_mode` did not restore
+Allwinner's persistent `data->dr_mode`. After an OTG child selected HOST, the
+provider retained HOST across PHY exit/init. Resetting the cache made the new
+child's ordinary default-mode request return early. Patch 0044 now also queues
+a PHY-mode update, applied by the worker when the new child is enabled.
+
+The model starts with the provider's configured default and explicitly checks
+that a previous OTG-to-HOST override survives until rebind. It then requires
+both the cached mode and provider mode to return to the default. An eighth
+negative control removes only the new pending-mode assignment and must fail.
+The duplicate native regression loops were also consolidated into
+`tools/native_source_variants.py`; both source suites still retain separate
+fixtures, source extraction and evidence. The initial in-progress UML build
+was stopped before executing tests when this correction was identified;
+its log is retained, with no accepted result for that candidate.
 
 ## Boundaries and next work
 

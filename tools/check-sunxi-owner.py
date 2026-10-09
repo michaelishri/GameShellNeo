@@ -5,12 +5,12 @@ import json
 import os
 from pathlib import Path
 import re
-import resource
 import subprocess
 import tarfile
 
 from kernel_checks import ROOT, archive_for, compile_objects, run, sha256
 from kernel_sources import atomic_json, locked
+from native_source_variants import run_variants
 
 EXPECTED = 'Sunxi child ownership: 240 actual-source scenarios passed'
 
@@ -97,6 +97,10 @@ def main():
             'no-work-reenable': replace_once(functions, '\tenable_work(&glue->work);\n', ''),
             'no-role-reset': replace_once(functions,
                 '\tglue->phy_mode = glue->initial_phy_mode;\n', ''),
+            'no-phy-mode-restore': replace_once(functions,
+                '\tglue->phy_mode = glue->initial_phy_mode;\n'
+                '\tset_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);',
+                '\tglue->phy_mode = glue->initial_phy_mode;'),
             'no-initial-state': replace_once(functions,
                 '\tset_bit(SUNXI_MUSB_FL_HOSTMODE_PEND, &glue->flags);\n\tenable_work',
                 '\tenable_work'),
@@ -107,28 +111,7 @@ def main():
         (WORK / 'sunxi_owner_definitions.h').write_text(definitions)
         header = WORK / 'sunxi_owner_functions.h'
         flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter']
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-        native = {}
-        try:
-            for name, value in variants.items():
-                header.write_text(value)
-                binary = WORK / name
-                run(['cc', *flags, '-I', str(WORK), str(harness), '-o', str(binary)])
-                result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=30)
-                (WORK / (name + '.log')).write_text(result.stdout + result.stderr)
-                if name == 'candidate':
-                    result.check_returncode()
-                    if result.stdout.strip() != EXPECTED:
-                        raise ValueError('Incomplete source scenario result')
-                elif result.returncode == 0 or 'Assertion' not in result.stderr:
-                    raise RuntimeError('Negative control did not fail an assertion: ' + name)
-                native[name] = dict(returncode=result.returncode, stdout=result.stdout.strip(),
-                                    stderr=result.stderr.strip(), extracted_sha256=sha256(header),
-                                    binary_sha256=sha256(binary),
-                                    log_sha256=sha256(WORK / (name + '.log')))
-                print(name + ': ' + (result.stdout.strip() or 'expected assertion failure'), flush=True)
-        finally:
-            header.write_text(functions)
+        native = run_variants(WORK, header, functions, variants, harness, flags, EXPECTED)
         relative = WORK.relative_to(ROOT).as_posix()
         builder = lock['builder']
         arm = subprocess.check_output([
@@ -157,7 +140,8 @@ def main():
             definitions_sha256=sha256(WORK / 'sunxi_owner_definitions.h'),
             inputs={str(p.relative_to(ROOT)): sha256(p) for p in (
                 *patches, harness, Path(__file__), ROOT / 'tools/kernel_checks.py',
-                ROOT / 'tools/kernel_sources.py', ROOT / 'build/sources.lock.json')},
+                ROOT / 'tools/kernel_sources.py', ROOT / 'tools/native_source_variants.py',
+                ROOT / 'build/sources.lock.json')},
             native=native, arm32=arm, arm32_binary_sha256=sha256(WORK / 'candidate-arm'), builds=builds,
             limits='Actual Sunxi child/worker hooks and parent initialization slice; '
                    'modeled workqueue, notifier selection/drain, power, register and PHY boundaries. '

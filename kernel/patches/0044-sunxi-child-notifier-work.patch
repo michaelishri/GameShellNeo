@@ -59,7 +59,7 @@ diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
  	set_bit(SUNXI_MUSB_FL_HOSTMODE_PEND, &glue->flags);
  	schedule_work(&glue->work);
  
-@@ -246,15 +247,24 @@
+@@ -246,15 +247,25 @@
  
  	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
  
@@ -72,6 +72,7 @@ diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
 +		       BIT(SUNXI_MUSB_FL_NO_CONFIGDATA);
 +	glue->musb = musb;
 +	glue->phy_mode = glue->initial_phy_mode;
++	set_bit(SUNXI_MUSB_FL_PHY_MODE_PEND, &glue->flags);
 +	set_bit(SUNXI_MUSB_FL_HOSTMODE_PEND, &glue->flags);
 +	enable_work(&glue->work);
 +
@@ -89,7 +90,7 @@ diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
  
  	musb->isr = sunxi_musb_interrupt;
  
-@@ -263,7 +273,11 @@
+@@ -263,7 +274,11 @@
  
  	return 0;
  
@@ -102,7 +103,7 @@ diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
  	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
  		reset_control_assert(glue->rst);
  error_clk_disable:
-@@ -278,9 +292,13 @@
+@@ -278,9 +293,13 @@
  {
  	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
  
@@ -118,7 +119,7 @@ diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
  	if (test_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags))
  		phy_power_off(glue->phy);
  
-@@ -299,8 +317,6 @@
+@@ -299,8 +318,6 @@
  static void sunxi_musb_enable(struct musb *musb)
  {
  	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
@@ -127,7 +128,7 @@ diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
  
  	/* musb_core does not call us in a balanced manner */
  	if (test_and_set_bit(SUNXI_MUSB_FL_ENABLED, &glue->flags))
-@@ -716,6 +732,7 @@
+@@ -716,6 +733,7 @@
  		dev_err(&pdev->dev, "Invalid or missing 'dr_mode' property\n");
  		return -EINVAL;
  	}
@@ -135,7 +136,7 @@ diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
  	pdata.platform_ops	= &sunxi_musb_ops;
  
  	cfg = of_device_get_match_data(&pdev->dev);
-@@ -726,6 +743,7 @@
+@@ -726,6 +744,7 @@
  
  	glue->dev = &pdev->dev;
  	INIT_WORK(&glue->work, sunxi_musb_work);

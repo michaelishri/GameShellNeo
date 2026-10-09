@@ -2,6 +2,22 @@
 
 Record deferred questions and activities here as they arise.
 
+**60-second battery device trial passed; host collection remains open,
+9 October 2026:** NEO-182's fresh preparation and battery rehearsal pass. One
+actual sleep succeeds on the device: all four CPU callbacks/timekeeping freeze,
+RTC wake, battery endpoints and restoration pass, with owner warning/display
+confirmation. PM finishes at 47/0. The host stops on an unterminated JSON reply;
+read-only collection recovers the same completed original without resubmitting
+sleep. Separate later Wi-Fi health and owner-triggered USB reconnection pass.
+The original lacks host route-proof flags: preserve it unchanged and do not
+treat it as a clean host pass or continuation anchor. Next: offline recorder
+handling for incomplete/malformed JSON, preserving failure evidence and the
+single-submission rule; cause of the incomplete reply is unestablished. Do not
+reopen the abandoned SSH-stall investigation. Obtain fresh qualification and
+readiness for a later clean repeat; keep the 60-second cap. The gauge change
+does not establish sleep power or endurance.
+[Report 244](docs/244-first-60-second-battery-rtc-trial.md).
+
 **First 60-second USB RTC trial passed, 9 October 2026:** NEO-181 completes
 fresh seven-debug preparation, matching awake rehearsal and one observed
 USB-connected trial on diagnostic.25. All four CPU callbacks and timekeeping

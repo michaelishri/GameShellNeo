@@ -2545,7 +2545,9 @@ result fails qualification; do not automatically repeat the command.
 The one-shot USB and battery tasks also support `ALARM_SECONDS=60`, with the
 same value required for their awake rehearsal and actual attempt. The first
 observed USB trial passes ([report 243](docs/243-first-60-second-usb-rtc-trial.md));
-the 60-second battery trial and repeatability remain pending. It requires a fresh
+the first battery device trial also passes, but its interrupted host collection
+leaves full workflow qualification and repeatability pending
+([report 244](docs/244-first-60-second-battery-rtc-trial.md)). It requires a fresh
 debug anchor, matching helper sources and conservative direct battery checks
 (more than 50% and at least 3.8 V before entry). It records immediate awake
 battery endpoints without deriving sleep energy. Durations above 60 seconds,

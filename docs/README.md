@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[244 — First 60-second battery RTC trial and collection limitation](244-first-60-second-battery-rtc-trial.md)
+records a successful device sleep, owner confirmation and separately verified
+recovery after the host stops on an incomplete JSON reply. The recovered
+original remains unchanged; full host-workflow qualification, repeatability
+and sleep energy remain open.
+
 [243 — First 60-second USB RTC-wake trial](243-first-60-second-usb-rtc-trial.md)
 records seven passing preparation checks, matching awake rehearsal and one
 owner-confirmed RTC wake with both routes recovered. All four CPUs participate,

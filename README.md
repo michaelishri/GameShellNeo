@@ -2387,6 +2387,49 @@ device is provisioned for NZ, use `task device:check ROUTE=usb ACTIVE_COUNTRY=AU
 That verifies the declared test setup and records both values; it does not
 qualify NZ operation or the radio firmware's country mapping.
 
+### Camera observation of the GameShell screen
+
+The MacBook's built-in camera can provide independent visual evidence while
+the GameShell sleeps, reboots or temporarily loses SSH. Position the GameShell
+screen clearly in view and keep the Mac open, awake and logged into its desktop.
+Set up the video-only helper once:
+
+```sh
+task mac:camera-setup
+task mac:camera-status
+task mac:camera-capture                  # One still after exposure settles
+task mac:camera-capture SECONDS=30 FPS=2  # A bounded sequence of JPEG frames
+```
+
+Setup compiles and signs `GameShellNeo Camera.app` in the Mac's private
+`~/.local/share/GameShellNeo/camera/` directory and requests normal macOS camera
+permission. Choose Allow on the Mac. If access was denied, enable the app in
+System Settings → Privacy & Security → Camera, then rerun setup. Repeated setup
+reuses an unchanged app. Changed helper source requires setup again and may
+require permission again. No login item or persistent camera service is installed.
+
+The helper selects the built-in `FaceTime HD Camera`, captures no microphone
+audio and closes its camera session on completion. `SECONDS=0` exports a still;
+sequences accept 1–300 seconds and 1–5 exported frames per second. The helper
+announces readiness only after saving its first image, following 1.5 seconds
+of exposure settling. Start an authorized hardware test after that readiness
+message when using a simultaneous observation sequence.
+
+Images, frame timestamps, camera readiness and session results are downloaded
+to `.local/diagnostics/<capture>/` for inspection. Successfully downloaded Mac
+captures are removed; failed or interrupted captures remain privately on the
+Mac for diagnosis. A watchdog bounds app lifetime even if the SSH observer
+disconnects; only one camera operation is admitted at a time. Camera commands
+do not modify the GameShell or initiate power tests.
+
+Treat clear images as display observations, and verify responsiveness and
+network/input recovery separately. An obscured, overexposed or unreadable
+screen is inconclusive. Exported frames and their Mac timestamps do not prove
+sub-second resume timing or power consumption. The camera cannot observe tests
+while the Mac itself sleeps. These commands provide capture tooling; visual
+review and other hardware acceptance gates remain explicit.
+[Report 166](docs/166-mac-camera-observation.md) records setup evidence and limits.
+
 ### Backing up the original card
 
 Insert the original card in the Mac while the GameShell runs from the DEV card.

@@ -16,6 +16,16 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[262 — Installed clock-runtime inventory](262-clock-runtime-inventory.md)
+identifies Python's time64 import and the installed libc's dispatch structure
+from verified binary copies. Repeatable awake inventory and offline report
+tasks pass; event-time vDSO attribution remains unproven.
+
+[261 — ARM clock paths and RAW discrepancy](261-arm-clock-path-source-analysis.md)
+traces physical versus virtual counter access, matching RAW conversion math,
+update ordering and HYP initialization against the pinned sources. It narrows
+the next comparison without assigning an erratum or clearing the original fault.
+
 [260 — Clock comparison and inspection provenance](260-clock-comparison-provenance.md)
 records a validated 15,000-sequence capture with one 750 ns RAW cross-path
 discrepancy. Explicit inspection revision pinning preserves the original

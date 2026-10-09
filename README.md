@@ -1061,6 +1061,29 @@ PM tasks still use current sources. Failed comparison inspections save
 `before-output.txt` or `after-output.txt`; `device:pm-inspect` saves
 `inspection-output.txt`, so the underlying remote error remains available.
 
+For installed clock-runtime attribution, use the saved awake inventory and
+offline report:
+
+```sh
+task device:clock-runtime INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+task report:clock-runtime CAPTURE=20261009T230039.014366Z
+```
+
+Use the new capture timestamp printed by the first task for subsequent runs.
+The inventory keeps the screen on, reads Python/libc/package/DT identity,
+downloads bounded hash-verified copies of the two public binaries, and checks
+device state and both network routes. It needs host `readelf`. The report uses
+the pinned Docker builder's ARM disassembler offline, with a read-only capture
+mount, and saves each attempt separately. No binary from the device is executed
+by the report. Raw results stay private under `.local/diagnostics/`.
+
+The first inventory confirms Python imports `__clock_gettime64`; mapped vDSO
+and static libc dispatch do not prove which branch served a recorded call.
+[Report 262](docs/262-clock-runtime-inventory.md) records the installed evidence
+and test results. [Report 261](docs/261-arm-clock-path-source-analysis.md)
+traces the pinned kernel counter/conversion paths and the remaining hypotheses.
+Neither task grants clock reliability or PM admission.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

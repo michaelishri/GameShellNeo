@@ -566,6 +566,18 @@ tasks:
       NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
     cmds: [python3 tools/check-clock-paths.py]
 
+  device:clock-runtime:
+    desc: Identify installed Python/libc and inspect hash-verified ELF copies; awake, no clock or PM changes
+    env:
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-clock-runtime.py]
+
+  report:clock-runtime:
+    desc: Disassemble verified runtime captures using the pinned offline builder; no device access
+    env:
+      NEO_CAPTURE: '{{.CAPTURE | default ""}}'
+    cmds: [python3 tools/report-clock-runtime.py]
+
   device:keypad-inspect:
     desc: Save keypad identity, USB persistence, input paths and power state without changing policy
     cmds: [python3 tools/check-keypad.py]

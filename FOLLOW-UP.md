@@ -2,6 +2,21 @@
 
 Record deferred questions and activities here as they arise.
 
+**Clock paths narrowed, 10 October 2026:** NEO-192 now has hash-verified live
+Python/libc inventory and offline disassembly. Python imports the time64 libc
+API; the installed libc contains the expected vDSO candidates and syscall403
+fallback, but the original event's branch remains unproven. The kernel reads
+the physical counter; direct ARM32 vDSO code reads the virtual counter. Normal
+RAW math agrees, and the observed HYP startup initializes CNTVOFF to zero.
+Do not assume a missing offset initialization, rounding error or A64 erratum.
+Next prepare a bounded native comparison with verified API layouts and explicit
+route attribution to reduce call-spacing ambiguity. Preserve the original
+MONOTONIC failure and RAW discrepancy; no driver/clocksource/guard change has
+been qualified. Runtime inventory, both routes and unchanged-state checks pass;
+full checks pass 24 runtime / 935 tooling tests (one optional skip), C and lint.
+[Kernel source analysis](docs/261-arm-clock-path-source-analysis.md) and
+[installed runtime evidence](docs/262-clock-runtime-inventory.md).
+
 **Clock-path discrepancy captured, 10 October 2026:** NEO-192's first completed
 Python/API versus explicit ARM time64 comparison records one RAW cross-path
 discrepancy in 15,000 sequences: Python reads 750 ns below the preceding kernel

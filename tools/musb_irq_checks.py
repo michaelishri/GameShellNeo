@@ -5,7 +5,8 @@ import tarfile
 PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
            '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch',
            '0037-musb-resume-request-ownership.patch', '0038-musb-probe-role-unwind.patch',
-           '0039-musb-core-irq-retirement.patch', '0040-musb-core-work-retirement.patch')
+           '0039-musb-core-irq-retirement.patch', '0040-musb-core-work-retirement.patch',
+           '0041-musb-runtime-pm-retirement.patch')
 
 
 def extract_source(archive, lock, queue, apply_queue, scratch):
@@ -60,14 +61,19 @@ def test_functions(core):
         raise ValueError('Every fail3 entry must own the core timer and work')
     if core.count('\tmusb_shutdown_work(musb);') != 2:
         raise ValueError('Terminal work shutdown must be confined to fail3 and remove')
+    if core.count('\tmusb_disable_runtime_pm(musb);') != 4:
+        raise ValueError('Expected remove and three PM-enabled failure entries')
     tail = init[init.index('fail3:\n'):]
     probe = ('static int probe_failure(struct musb *musb, struct device *dev)\n{\n'
              '\tint status = -EIO;\n' + tail + '\n}\n')
-    for name, label in (('probe_before_work', 'fail2_5:'), ('probe_before_pm', 'fail2:')):
+    for name, label in (('probe_before_work', 'fail2_5:'),
+                        ('probe_phy_init_failure', 'err_usb_phy_init:'),
+                        ('probe_before_pm', 'fail2:')):
         probe += ('static int ' + name + '(struct musb *musb, struct device *dev)\n{\n'
                   '\tint status = -EIO;\n' + init[init.index(label):] + '\n}\n')
     return ''.join(function(core, name) for name in
-                   ('musb_free_irq', 'musb_shutdown_irq', 'musb_shutdown_work', 'musb_release_session',
+                   ('musb_free_irq', 'musb_shutdown_irq', 'musb_shutdown_work',
+                    'musb_disable_runtime_pm', 'musb_release_session',
                     'musb_free', 'musb_remove')) + probe
 
 
@@ -96,7 +102,9 @@ def mutations(functions):
     result = {
         'late-remove': replace_once(functions, remove, late_remove),
         'early-remove': replace_once(functions, remove, early_remove),
-        'late-probe': replace_once(functions, 'fail3:\n\tmusb_shutdown_irq(musb);', 'fail3:\n'),
+        'late-probe': replace_once(functions,
+            'fail3:\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);',
+            'fail3:\n\tmusb_disable_runtime_pm(musb);'),
         'missing-free': replace_once(functions, '\tfree_irq(musb->nIrq, musb);', '\t(void)musb;'),
         'double-free': replace_once(functions, '\tmusb->nIrq = -ENODEV;\n', ''),
         'wait-under-lock': replace_once(functions, shutdown, locked),
@@ -116,8 +124,8 @@ def mutations(functions):
     result['missing-remove-work'] = replace_once(functions, remove,
         replace_once(remove, '\tmusb_shutdown_work(musb);\n', ''))
     result['missing-probe-work'] = replace_once(functions,
-        'fail3:\n\tmusb_shutdown_irq(musb);\n\tmusb_shutdown_work(musb);',
-        'fail3:\n\tmusb_shutdown_irq(musb);')
+        'fail3:\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);\n\tmusb_shutdown_work(musb);',
+        'fail3:\n\tmusb_disable_runtime_pm(musb);\n\tmusb_shutdown_irq(musb);')
     result['missing-session-put'] = replace_once(functions,
         '\t\tpm_runtime_put_noidle(musb->controller);', '\t\t(void)musb;')
     result['foreign-session-put'] = replace_once(functions, '\tif (musb->session) {', '\t{')
@@ -126,6 +134,31 @@ def mutations(functions):
         replace_once(remove, '\tmusb_shutdown_work(musb);',
                       '\tmusb_release_session(musb);\n\tmusb_shutdown_work(musb);'))
     result['session-put-before-pm-disable'] = replace_once(functions, remove,
-        replace_once(remove, '\tpm_runtime_disable(musb->controller);\n\tmusb_release_session(musb);',
-                      '\tmusb_release_session(musb);\n\tpm_runtime_disable(musb->controller);'))
+        replace_once(remove, '\tmusb_disable_runtime_pm(musb);',
+                      '\tmusb_release_session(musb);\n\tmusb_disable_runtime_pm(musb);'))
+    pm = function(functions, 'musb_disable_runtime_pm')
+    result['missing-pm-disable'] = replace_once(functions, pm,
+        replace_once(pm, '\tpm_runtime_disable(musb->controller);\n', ''))
+    result['late-pm-policy'] = replace_once(functions, pm,
+        replace_once(pm, '\tpm_runtime_disable(musb->controller);\n'
+                          '\tpm_runtime_dont_use_autosuspend(musb->controller);',
+                     '\tpm_runtime_dont_use_autosuspend(musb->controller);\n'
+                     '\tpm_runtime_disable(musb->controller);'))
+    late_pm = replace_once(remove, '\tmusb_disable_runtime_pm(musb);\n', '')
+    late_pm = replace_once(late_pm, '\tmusb_platform_exit(musb);',
+                           '\tmusb_platform_exit(musb);\n\tmusb_disable_runtime_pm(musb);')
+    result['late-remove-pm'] = replace_once(functions, remove, late_pm)
+    for name, label in (('fail3', 'fail3:'), ('phy-shutdown', 'fail2_5:'),
+                        ('phy-init', 'err_usb_phy_init:')):
+        result['missing-probe-pm-' + name] = functions.replace(
+            label + '\n\tmusb_disable_runtime_pm(musb);', label + '\n')
+    result['active-core-put'] = replace_once(functions, remove,
+        replace_once(remove, '\tpm_runtime_put_noidle(musb->controller);',
+                      '\tpm_runtime_put_sync(musb->controller);'))
+    result['missing-core-put'] = replace_once(functions, remove,
+        replace_once(remove, '\tpm_runtime_put_noidle(musb->controller);\n', ''))
+    result['duplicate-core-put'] = replace_once(functions, remove,
+        replace_once(remove, '\tpm_runtime_put_noidle(musb->controller);',
+                      '\tpm_runtime_put_noidle(musb->controller);\n'
+                      '\tpm_runtime_put_noidle(musb->controller);'))
     return result

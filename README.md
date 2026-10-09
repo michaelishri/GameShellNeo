@@ -1190,6 +1190,7 @@ The core IRQ/work retirement candidate has saved checks (run sequentially):
 task test:musb-irq             # Actual IRQ/work removal and failure tails, native/ARM32
 task test:musb-irq-kunit       # Real Linux shared IRQ removal and held-handler drain in UML
 task test:musb-work-kunit      # Real work/timer closure and session PM accounting in UML
+task test:musb-pm-kunit        # Real runtime-PM callback drain and teardown accounting in UML
 task check:musb-irq-drivers    # Source regressions and five ARM configurations
 ```
 
@@ -1200,7 +1201,10 @@ configuration and results under `.local/build/musb-irq-kunit/`. The existing
 suite retains its artifacts under `.local/build/musb-work-kunit/`. These suites
 run entirely on the development machine. [Report 227](docs/227-musb-core-irq-retirement.md)
 and [report 228](docs/228-musb-core-work-retirement.md) distinguish the implemented
-boundaries from wider teardown and hardware qualification.
+boundaries from wider teardown and hardware qualification. The PM suite stores
+its own accepted artifacts under `.local/build/musb-pm-kunit/`;
+[report 229](docs/229-musb-runtime-pm-retirement.md) covers callback retirement
+before backend resource release, including pending and running PM operations.
 
 For the CPI WFI s2idle candidate in diagnostic.24, use:
 

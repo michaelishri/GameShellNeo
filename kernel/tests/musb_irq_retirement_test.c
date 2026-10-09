@@ -22,8 +22,8 @@ static struct platform_device platform;
 static bool irq_live, peer_live, backend_live, clients_done, masks_set;
 static bool in_remove, need_masks;
 static int original_irq, frees, disarms, wake_error, wake_logs, host_frees;
-static int pm_usage, session_puts;
-static bool acquire_on_drain, pm_disabled;
+static int pm_usage, passive_puts, pm_disables;
+static bool acquire_on_drain, pm_disabled, pm_owned;
 static unsigned int cases;
 static void *musb_phy_callback;
 
@@ -66,6 +66,7 @@ static void free_irq(int irq, void *data)
 static void musb_platform_disable(struct musb *musb)
 {
 	assert(musb == &instance && backend_live && !musb->lock && clients_done);
+	assert(!pm_owned || pm_disabled);
 }
 
 static void musb_disable_interrupts(struct musb *musb)
@@ -83,10 +84,11 @@ static void musb_writeb(void *base, int offset, int value)
 static void musb_platform_exit(struct musb *musb)
 {
 	assert(musb == &instance && !irq_live && clients_done);
+	assert(!pm_owned || pm_disabled);
 	if (musb->irq_work.initialized) {
 		assert(musb->irq_work.disabled && musb->finish_resume_work.disabled);
 		assert(musb->deassert_reset_work.disabled && musb->otg_timer.shutdown);
-		assert(pm_usage == 2 + musb->session);
+		assert(pm_usage == 2 + musb->session + in_remove);
 	}
 	backend_live = false;
 }
@@ -100,6 +102,7 @@ static void musb_host_free(struct musb *musb)
 static void musb_dma_controller_destroy(void *dma)
 {
 	assert(dma && !irq_live);
+	assert(pm_disabled);
 	assert(instance.irq_work.disabled && instance.otg_timer.shutdown);
 }
 
@@ -145,17 +148,37 @@ static void timer_shutdown_sync(struct timer_list *timer)
 }
 static void pm_runtime_put_noidle(struct device *dev)
 {
-	assert(dev == &platform.dev && instance.irq_work.disabled && !instance.session);
-	assert(pm_disabled);
-	assert(pm_usage == 3);
+	assert(dev == &platform.dev && pm_disabled);
+	assert(!instance.irq_work.initialized || instance.irq_work.disabled);
+	assert(pm_usage > 2);
 	pm_usage--;
-	session_puts++;
+	passive_puts++;
 }
-static void pm_runtime_get_sync(struct device *dev) { (void)dev; }
-static void pm_runtime_dont_use_autosuspend(struct device *dev) { (void)dev; }
-static void pm_runtime_put_sync(struct device *dev) { (void)dev; }
-static void pm_runtime_disable(struct device *dev) { (void)dev; pm_disabled = true; }
-static void usb_phy_shutdown(void *phy) { (void)phy; }
+static void pm_runtime_get_sync(struct device *dev)
+{
+	assert(dev == &platform.dev && !pm_disabled);
+	pm_usage++;
+}
+static void pm_runtime_dont_use_autosuspend(struct device *dev)
+{
+	assert(dev == &platform.dev && pm_disabled);
+}
+static void pm_runtime_put_sync(struct device *dev)
+{
+	(void)dev;
+	assert(!"Teardown must use a passive core put");
+}
+static void pm_runtime_disable(struct device *dev)
+{
+	assert(dev == &platform.dev && !pm_disabled && !instance.lock && backend_live);
+	pm_disabled = true;
+	pm_disables++;
+}
+static void usb_phy_shutdown(void *phy)
+{
+	(void)phy;
+	assert(pm_disabled);
+}
 static void device_init_wakeup(struct device *dev, int value)
 {
 	assert(dev == &platform.dev && !value);
@@ -181,9 +204,11 @@ static void prepare(int irq, bool wake, int error, bool dma)
 		(struct delayed_work){ .initialized = true, .pending = true };
 	instance.otg_timer = (struct timer_list){ .initialized = true, .pending = true };
 	pm_usage = 2;
-	session_puts = 0;
+	passive_puts = pm_disables = 0;
 	acquire_on_drain = false;
 	pm_disabled = false;
+	pm_owned = false;
+	in_remove = false;
 }
 
 static void expect_released(bool owned, bool wake, int error)
@@ -211,6 +236,9 @@ int main(void)
 					instance.session = wake == 1;
 					pm_usage += instance.session;
 					in_remove = path == 0;
+					pm_owned = true;
+					if (!in_remove)
+						pm_usage++; /* probe's retained get */
 					clients_done = !in_remove;
 					if (in_remove)
 						musb_remove(&platform);
@@ -218,6 +246,7 @@ int main(void)
 						assert(probe_failure(&instance, &platform.dev) == -EIO);
 					assert(!backend_live && host_frees == 1);
 					assert(!instance.session && pm_usage == 2);
+					assert(pm_disables == 1);
 					expect_released(true, wake != 0, error);
 				}
 			/* The allocation finalizer can also retire an owned action once. */
@@ -229,7 +258,10 @@ int main(void)
 		}
 	for (dma = 0; dma < 2; dma++) {
 		prepare(-ENODEV, false, 0, dma);
+		pm_owned = true;
+		pm_usage++;
 		assert(probe_failure(&instance, &platform.dev) == -EIO);
+		assert(pm_disables == 1 && pm_usage == 2);
 		expect_released(false, false, 0);
 	}
 	prepare(-ENODEV, false, 0, false);
@@ -257,19 +289,23 @@ int main(void)
 			musb_release_session(&instance);
 			assert(instance.irq_work.disabled && instance.finish_resume_work.disabled);
 			assert(instance.deassert_reset_work.disabled && instance.otg_timer.shutdown);
-			assert(!instance.session && pm_usage == 2 && session_puts == owned);
+			assert(!instance.session && pm_usage == 2 && passive_puts == owned);
 			cases++;
 		}
-	for (int stage = 0; stage < 2; stage++) {
+	for (int stage = 0; stage < 3; stage++) {
 		prepare(-ENODEV, false, 0, false);
+		pm_owned = stage != 2;
+		pm_usage += pm_owned;
 		instance.irq_work.initialized = instance.finish_resume_work.initialized = false;
 		instance.deassert_reset_work.initialized = instance.otg_timer.initialized = false;
-		assert((stage ? probe_before_pm(&instance, &platform.dev) :
+		assert((stage == 2 ? probe_before_pm(&instance, &platform.dev) :
+			stage == 1 ? probe_phy_init_failure(&instance, &platform.dev) :
 			probe_before_work(&instance, &platform.dev)) == -EIO);
 		assert(!instance.otg_timer.shutdown && !instance.irq_work.disabled);
+		assert(pm_usage == 2 && pm_disables == (int)pm_owned);
 		cases++;
 	}
-	assert(cases == 42);
+	assert(cases == 43);
 	printf("MUSB core retirement: %u source scenarios passed\n", cases);
 	return 0;
 }

@@ -13,7 +13,7 @@ from kernel_sources import atomic_json, locked
 from musb_irq_checks import PATCHES, extract_source, mutations, test_functions
 
 WORK = ROOT / '.local/build/musb-irq-tests'
-EXPECTED = 'MUSB core retirement: 42 source scenarios passed'
+EXPECTED = 'MUSB core retirement: 43 source scenarios passed'
 
 
 def main():
@@ -39,6 +39,7 @@ def main():
             'late-timer-init': without_timer.replace('\t/* attach to the IRQ */',
                                                      timer + '\t/* attach to the IRQ */'),
             'extra-terminal-caller': core.read_text() + '\n\tmusb_shutdown_work(musb);\n',
+            'extra-pm-caller': core.read_text() + '\n\tmusb_disable_runtime_pm(musb);\n',
         }
         for name, text in source_controls.items():
             try:

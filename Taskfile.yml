@@ -267,6 +267,10 @@ tasks:
     desc: Test terminal MUSB work/timer shutdown with real Linux APIs in UML
     cmds: [bash tools/run-logged.sh musb-work-kunit python3 tools/check-musb-restart-kunit.py --suite work]
 
+  test:musb-pm-kunit:
+    desc: Test MUSB runtime-PM retirement and callback drain in an isolated UML kernel
+    cmds: [bash tools/run-logged.sh musb-pm-kunit python3 tools/check-musb-restart-kunit.py --suite pm]
+
   test:musb-irq:
     desc: Test actual core IRQ/work ownership and teardown ordering on native and ARM32
     cmds: [bash tools/run-logged.sh musb-irq python3 tools/check-musb-irq.py]

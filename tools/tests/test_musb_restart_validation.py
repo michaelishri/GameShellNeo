@@ -10,6 +10,7 @@ sys.path.insert(0, str(TOOLS))
 from musb_restart_kunit import CASES, checked_cases, replace_once
 from musb_irq_kunit import CASES as IRQ_CASES, checked_cases as irq_checked_cases
 from musb_work_kunit import CASES as WORK_CASES, checked_cases as work_checked_cases
+from musb_pm_kunit import CASES as PM_CASES, checked_cases as pm_checked_cases
 
 spec = importlib.util.spec_from_file_location('request_resume_checks', TOOLS / 'check-musb-request-resume.py')
 host = importlib.util.module_from_spec(spec)
@@ -127,3 +128,17 @@ class WorkEvidenceTests(IrqEvidenceTests):
             self.validate(irq.report, irq.log)
         with self.assertRaises(ValueError):
             irq.validate(self.report, self.log)
+
+
+class PmEvidenceTests(WorkEvidenceTests):
+    suite_name = 'musb-pm'
+    cases = PM_CASES
+    validate = staticmethod(pm_checked_cases)
+
+    def test_rejects_work_suite(self):
+        work = WorkEvidenceTests()
+        work.setUp()
+        with self.assertRaises(ValueError):
+            self.validate(work.report, work.log)
+        with self.assertRaises(ValueError):
+            work.validate(self.report, self.log)

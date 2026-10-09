@@ -17,7 +17,7 @@ from musb_restart_kunit import manifest_for
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--suite', choices=('restart', 'irq', 'work'), default='restart')
+    parser.add_argument('--suite', choices=('restart', 'irq', 'work', 'pm'), default='restart')
     args = parser.parse_args()
     support = importlib.import_module('musb_' + args.suite + '_kunit')
     stem = 'musb-' + args.suite

@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[229 — MUSB runtime-PM retirement](229-musb-runtime-pm-retirement.md)
+records core runtime callback retirement before backend resource release,
+source-bound teardown tests and real Linux runtime-PM tests. Independent
+backend and pending-resume producer lifetime remains under NEO-106.
+
 [228 — MUSB core work and timer retirement](228-musb-core-work-retirement.md)
 records permanent core-work/timer closure and session-reference accounting,
 with source tests and real Linux workqueue/timer/PM tests. Backend producer

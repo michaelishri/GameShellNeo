@@ -145,8 +145,13 @@ Original stage logs are `.local/build/{kernel,usb-policy-board,devicetree,
 prepare,image,image-verify}.log`; the full host check is
 `.local/diagnostic25-check-full.log`. Compression/checkpoint receipts are
 `.local/diagnostic25-pack.log` and `.local/diagnostic25-checkpoint.log`.
-Transfer awaits confirmation that the Mac is on regular Wi-Fi. No card has been
-written and no new-image hardware test has run.
+The owner confirmed regular Wi-Fi. `task mac:stage` uploaded the 269,523,036-byte
+archive and the saved flash helper to the Mac account's
+`.local/share/GameShellNeo` directory. Source-only verification on the Mac passed
+both compressed and complete decompressed image checksums. The private task log
+is `.local/diagnostic25-mac-stage.log`; staging performed no physical disk write.
+NEO-170 build and transfer are complete. Card-swap readiness has been requested;
+installation and new-image hardware qualification remain under NEO-108.
 
 ## Attended qualification
 

@@ -16,6 +16,18 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[252 — Charging-voltage evidence gap](252-charging-voltage-evidence-gap.md)
+identifies a driver-owned fresh-register read path and its PM/lifetime gates;
+cached controls and physical voltage accuracy remain distinct questions.
+
+[251 — Wi-Fi suspend failure audit](251-brcmfmac-suspend-failure-audit.md)
+finds unchecked mailbox read/acknowledgement errors and the all-ones failure
+sentinel, with a focused repair/test plan and separate recovery boundaries.
+
+[250 — MUSB failed-queue DMA ownership](250-musb-queue-failure-audit.md)
+proves the pre-callback rollback gap and records a separate channel-release
+ordering lead. CPI uses PIO; no board DMA fault or performance claim follows.
+
 [249 — Separating speaker confirmation timing](249-speaker-confirmation-timing.md)
 distinguishes input/prompt waits from amplifier startup and playback, adds
 bounded cue phase timestamps and an offline report task, and preserves audible

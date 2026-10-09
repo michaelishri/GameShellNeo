@@ -2,6 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
+**Three board tickets investigated offline, 10 October 2026:** NEO-106 has a
+demonstrated failed-queue DMA rollback gap and a separate channel-release versus
+mapping-lifetime lead ([report 250](docs/250-musb-queue-failure-audit.md)); NEO-186
+tracks the narrow rollback candidate. NEO-58's mailbox helper discards read and
+ACK errors, potentially decoding an all-ones transfer-failure sentinel as valid
+firmware flags ([report 251](docs/251-brcmfmac-suspend-failure-audit.md)); NEO-187
+tracks propagation into the existing worker failure path. NEO-10 can narrow
+cached-control provenance through a driver-owned bypass read, once PM/lifetime
+admission is designed ([report 252](docs/252-charging-voltage-evidence-gap.md));
+NEO-188 tracks that work. No cause is assigned to the historical radio or
+voltage observations, and no target hardware was contacted for these audits.
+
 **Speaker timing prepared offline, 10 October 2026:** NEO-185 adds fixed cue
 phase timestamps and `report:audio-timing`, without changing the waveform,
 volume, driver startup delay, prompt waits or playback cleanup. The report

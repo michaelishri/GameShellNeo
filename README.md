@@ -2538,9 +2538,30 @@ task mac:usb-inspect
 The rehearsal never writes the sleep state. Actual sleep requires matching
 helper sources, boot/image, RTC and late/noirq qualification, unchanged SDIO
 references, healthy USB/Wi-Fi and independent power-key protection. It arms a
-30-second RTC deadline, checks the wakeup counter, and submits at most once.
+30-second RTC deadline by default, checks the wakeup counter, and submits at most once.
 Keep USB connected and all controls untouched. An early wake or incomplete
 result fails qualification; do not automatically repeat the command.
+
+The one-shot USB and battery tasks also support `ALARM_SECONDS=60`, with the
+same value required for their awake rehearsal and actual attempt. This first
+extension is prepared but **not yet hardware-qualified**. It requires a fresh
+debug anchor, matching helper sources and conservative direct battery checks
+(more than 50% and at least 3.8 V before entry). It records immediate awake
+battery endpoints without deriving sleep energy. Durations above 60 seconds,
+extended cable-transition tests and extended automatic batches are rejected.
+
+```sh
+task test:sleep-protocol  # Offline duration, evidence and failure regressions
+task device:sleep-rehearse ALARM_SECONDS=60 QUALIFICATION=<fresh-history.json>
+# After a passing rehearsal and fresh observer readiness:
+task device:sleep-rtc ALARM_SECONDS=60 QUALIFICATION=<fresh-history.json> REHEARSAL=<run-id> ATTENDED=1
+```
+
+For battery-only use, add `ALARM_SECONDS=60` to both corresponding battery tasks
+below and retain `UNPLUGGED=1`. Service and collection budgets track the selected
+duration; they are not wake sources or sleeping battery protection. No card
+swap is required. [Report 242](docs/242-bounded-rtc-duration-protocol.md) records
+the limits, offline tests and pending USB-then-battery hardware sequence.
 
 Repeat testing has a bounded batch command. After a fresh same-source awake
 rehearsal and observer readiness, run up to four cycles together:

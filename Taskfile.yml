@@ -35,6 +35,7 @@ env:
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
+  NEO_SLEEP_ALARM_SECONDS: '{{.ALARM_SECONDS | default "30"}}'
   NEO_SLEEP_BATCH: '{{.BATCH | default ""}}'
   NEO_SLEEP_ATTENDED: '{{.ATTENDED | default "0"}}'
   NEO_SLEEP_CABLE_OBSERVATION: '{{.OBSERVATION | default ""}}'
@@ -208,6 +209,10 @@ tasks:
   test:awake-clock:
     desc: Simulate sleep during awake measurements and verify rejection/restoration; no device access
     cmds: [bash tools/run-logged.sh awake-clock python3 -m unittest discover -s tools/tests -p test_awake_clock.py -v]
+
+  test:sleep-protocol:
+    desc: Offline RTC duration, admission, evidence, restoration and transport regressions; no device access
+    cmds: [bash tools/run-logged.sh sleep-protocol python3 -m unittest discover -s tools/tests -p 'test_sleep_*.py' -v]
 
   test:nkmp:
     desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
@@ -612,15 +617,15 @@ tasks:
     cmds: [python3 tools/check-pm-stages.py --platform]
 
   device:sleep-rehearse:
-    desc: Awake RTC deadline/key-policy/trace rehearsal; QUALIFICATION required, no sleep submission
+    desc: Awake RTC rehearsal; QUALIFICATION required, ALARM_SECONDS=30 (default) or 60, no sleep submission
     cmds: [python3 tools/check-sleep-rtc.py --rehearse]
 
   device:sleep-battery-rehearse:
-    desc: Awake battery-only RTC rehearsal over Wi-Fi; USB physically absent, QUALIFICATION/UNPLUGGED required
+    desc: Awake battery-only RTC rehearsal; ALARM_SECONDS=30 or 60, QUALIFICATION/UNPLUGGED required
     cmds: [python3 tools/check-sleep-rtc.py --rehearse --connection battery]
 
   device:sleep-battery:
-    desc: One attended battery-only RTC-wake attempt over Wi-Fi; USB absent, QUALIFICATION/REHEARSAL/UNPLUGGED/ATTENDED required
+    desc: One attended battery RTC wake; ALARM_SECONDS=30 or 60 must match REHEARSAL, QUALIFICATION/UNPLUGGED/ATTENDED required
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake --connection battery]
 
   report:sleep-cable:
@@ -664,7 +669,7 @@ tasks:
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake --connection usb-attach]
 
   device:sleep-rtc:
-    desc: One attended real s2idle attempt; QUALIFICATION, REHEARSAL and fresh ATTENDED=1 required
+    desc: One attended s2idle attempt; ALARM_SECONDS=30 or 60 must match REHEARSAL, QUALIFICATION/ATTENDED required
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake]
 
   device:sleep-batch:

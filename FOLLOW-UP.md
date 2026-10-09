@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**60-second RTC tooling prepared, 9 October 2026:** NEO-180 adds an explicit
+one-shot 60-second option with matching duration-bound evidence, reserve checks
+and immediate pre/post battery endpoints. Offline regressions pass; no live
+trial has run. Next: fresh debug/rehearsal qualification and one observed USB
+trial, then a separate battery trial after its own qualification and physical
+unplug confirmation. Keep long warnings and collect original failed/uncertain
+results without resubmission. Durations above 60 seconds remain rejected.
+Gauge/voltage endpoints are coarse observations, not sleep energy; sleeping
+low-battery protection and endurance remain open.
+[Report 242](docs/242-bounded-rtc-duration-protocol.md).
+
 **Backlight comparison complete, 9 October 2026:** NEO-179's fresh battery-only
 lit/off/lit sequence passes all three 31-sample windows, with warning and
 brightness/audio restoration confirmed. Estimates are 1.042 → 1.015 → 1.027 W,

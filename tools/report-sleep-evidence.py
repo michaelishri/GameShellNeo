@@ -20,6 +20,8 @@ def assess(path):
                   limits='Offline RTC/trace/clock assessment only; original recovery result is unchanged.')
     try:
         result['measurement'] = sleep_rtc.validate_delivery(record)
+        if sleep_rtc.sleep_window.recorded(record) != sleep_rtc.SECONDS:
+            result['battery_observation'] = sleep_rtc.sleep_window.assess(record)
         lock = record.get('before', {}).get('image', {}).get('sources', {})
         if sleep_rtc.cpi_idle.enabled(lock):
             result['cpi_wfi'] = sleep_rtc.cpi_idle.assess(record.get('cpu_idle_before'),

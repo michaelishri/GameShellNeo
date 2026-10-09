@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[242 — Bounded RTC duration protocol](242-bounded-rtc-duration-protocol.md)
+prepares a capped 60-second one-shot option with matching rehearsal/history,
+duration-aware deadlines and immediate battery endpoints. Offline regressions
+pass; hardware qualification, longer durations and sleep energy remain pending.
+
 [241 — Diagnostic.25 backlight power comparison](241-diagnostic25-backlight-power-comparison.md)
 records a passing continuous battery-only lit/off/lit sequence, 31 samples
 per window, complete brightness/audio restoration and unchanged PM31/0.

@@ -186,6 +186,8 @@ def main():
         modes.add_argument('--'+name, action='store_true')
     args = parser.parse_args()
     if args.start or args.next:
+        if os.environ.get('NEO_SLEEP_ALARM_SECONDS', '30') != '30':
+            parser.error('Cable batches retain the 30-second alarm; extended durations require a fixed connection')
         if (os.environ.get('NEO_SLEEP_ATTENDED') != '1' or
                 os.environ.get('NEO_SLEEP_CABLE_ACTION') != '1'):
             parser.error('Describe this next cable step, confirm readiness, then set ATTENDED=1 CABLE_ACTION=1')

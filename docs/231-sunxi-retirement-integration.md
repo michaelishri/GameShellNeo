@@ -100,7 +100,29 @@ Evidence lives under `.local/build/sunxi-owner-tests/`,
 retains its own kernel, effective config, raw log, JSON report and hashes;
 subsequent suite runs cannot overwrite those accepted artifacts.
 
-Results are pending at this implementation checkpoint.
+The corrected source and compilation checks pass:
+
+| Check | Result |
+| --- | --- |
+| Sunxi source model, native and ARM32 | 240 scenarios each; eight negative controls rejected |
+| Extcon source model, native and ARM32 | 29 scenarios each; seven negative controls rejected |
+| Core retirement model, native and ARM32 | 43 scenarios each; 34 mutation controls and six source-boundary controls rejected |
+| Extcon ARM builds | Board/TREE, standalone module/TREE, TINY; five objects plus notifier/SRCU symbol checks |
+| Combined ARM builds | Project, host, dual-role, module, no-PM; 31 objects |
+| Repository checks | 16 runtime and 834 tooling tests pass; two optional skips; shell checks pass |
+| Production patch style | All three patches: zero checkpatch errors/warnings |
+
+Real-kernel execution passes too: **nine notifier cases and ten provider cases
+under each SRCU configuration (38 passing case executions)**. KASAN, lockdep,
+RCU and atomic-sleep diagnostics produced no rejected warnings. The final
+receipts match the current input hashes and production patch queue. All retained
+kernel/config/log/report hashes were rechecked, and each saved report was
+readmitted through the strict validator. Within each configuration, both suites
+used the identical kernel binary and kept separate accepted artifact directories.
+
+The initial
+sandboxed repository-check attempt could not run local socket fixtures; the
+same saved checks passed outside that sandbox. No remote connection was made.
 
 ## Review correction
 
@@ -119,6 +141,12 @@ The duplicate native regression loops were also consolidated into
 fixtures, source extraction and evidence. The initial in-progress UML build
 was stopped before executing tests when this correction was identified;
 its log is retained, with no accepted result for that candidate.
+
+Reviews against baseline `66e3b55` initially found one Spec defect and one
+Standards duplication judgement (no hard standards violation). Both were
+addressed in `1209f56`. Separate follow-up reviews report **Standards: zero
+remaining findings; Spec: zero remaining findings**. They explicitly leave
+final test admission to the retained evidence described above.
 
 ## Boundaries and next work
 
@@ -143,3 +171,18 @@ Core PM failure alone does not prove registers inaccessible. NEO-106 remains
 open. No sleep, charging, speed or energy improvement is established by this
 host-only integration; an eventual image needs a distinct identity and board
 qualification before promotion.
+
+
+## Final evidence receipts
+
+Validation completed 9 October 2026 (UTC), code at `1209f56`. Paths below are
+relative to `.local/build/` in this worktree; complete source/configuration and
+artifact identities are recorded inside each receipt.
+
+| Receipt | SHA-256 |
+| --- | --- |
+| `sunxi-owner-tests/evidence.json` | `1de2998d194920e8fab374f23cbed8e2adacf1201b2b135a104b168be0b14c49` |
+| `extcon-notifier-tests/compile-evidence.json` | `4f2b3cc9aa4e44c7f75e046d6497152681b9f13f6c6389c19b03c9c158668732` |
+| `musb-irq-tests/compile-evidence.json` | `34ac83522ee827f5d975cf88a905371e03e7d11044158629cd8943e8c50f2ece` |
+| `extcon-kunit/evidence-notifier-all.json` | `a8cb324c53af7c933721af7ee803ba046f794377790108bc8568b5f736e2b30c` |
+| `extcon-kunit/evidence-provider-all.json` | `2d22cfb06fa0add99995c4beb232c72e5eb4aaf609599d53dd04a97a65d03afc` |

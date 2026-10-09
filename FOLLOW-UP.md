@@ -2,6 +2,19 @@
 
 Record deferred questions and activities here as they arise.
 
+**Sleep collection handling fixed offline, 9 October 2026:** NEO-183 handles
+malformed JSON/encoding replies at the collection boundary and preserves
+bounded private failure evidence. The existing deadline and single sleep
+submission remain unchanged; only retrieval of the same original run can
+continue. Decoded protocol/identity/clock and completed-result failures remain
+fatal, with route proofs required before acceptance. All 147 sleep-protocol
+tests pass, including ten new regressions. No device was contacted, and device
+helpers/image and NEO-182's historical records are unchanged. NEO-182 remains
+open for fresh preparation and an attended clean battery repeat. The cause of
+the original incomplete reply is still unestablished; the abandoned SSH-stall
+investigation remains closed. Keep the 60-second cap.
+[Report 245](docs/245-sleep-collection-reply-recovery.md).
+
 **60-second battery device trial passed; host collection remains open,
 9 October 2026:** NEO-182's fresh preparation and battery rehearsal pass. One
 actual sleep succeeds on the device: all four CPU callbacks/timekeeping freeze,

@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[245 — Sleep collection reply recovery](245-sleep-collection-reply-recovery.md)
+records the host-only malformed-reply fix, bounded private failure capture and
+147 passing offline regressions. One sleep submission and the existing
+deadline remain enforced; NEO-182 still needs a clean attended repeat.
+
 [244 — First 60-second battery RTC trial and collection limitation](244-first-60-second-battery-rtc-trial.md)
 records a successful device sleep, owner confirmation and separately verified
 recovery after the host stops on an incomplete JSON reply. The recovered

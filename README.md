@@ -2535,6 +2535,20 @@ task device:sleep-collect RUN=<original-run-id> ROUTE=wifi
 task mac:usb-inspect
 ```
 
+During an active attempt, malformed JSON or invalid text encoding in a
+collection reply is saved privately, then the recorder continues retrieving
+that same run within the original deadline. Sleep is still submitted only
+once. Decoded identity, clock or result-validation errors stop the workflow.
+The first four bad replies retain up to 1 MiB each in
+`collection-bad-reply-*.bin`; `collection-bad-replies.jsonl` records each reply's
+length, SHA-256, decode offset and any capture truncation. These files are mode
+0600 and may contain device logs; keep them private. Failure to save this
+evidence stops collection. Manual `device:sleep-collect` saves a malformed
+reply and fails with the original run ID, without automatically retrying.
+[Report 245](docs/245-sleep-collection-reply-recovery.md) records the offline
+regressions; the interrupted historical battery trial remains unqualified as
+a complete host workflow.
+
 The rehearsal never writes the sleep state. Actual sleep requires matching
 helper sources, boot/image, RTC and late/noirq qualification, unchanged SDIO
 references, healthy USB/Wi-Fi and independent power-key protection. It arms a

@@ -19,6 +19,46 @@ from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_
 import sleep_rtc as diagnostic
 
 
+MAX_BAD_REPLY_FILES = 4
+MAX_BAD_REPLY_BYTES = 1024 * 1024
+
+
+class MalformedReply(ValueError):
+    """A reply that cannot be decoded, distinct from invalid result evidence."""
+    def __init__(self, raw, error):
+        self.raw = raw
+        self.kind = 'json' if isinstance(error, json.JSONDecodeError) else 'encoding'
+        self.offset = error.pos if self.kind == 'json' else error.start
+        super().__init__('Malformed sleep collection reply (' + self.kind + ')')
+
+
+def save_bad_reply(capture, error, token, route):
+    """Keep bounded private bytes and metadata; never replace accepted evidence.
+
+    Failure to save evidence is fatal. The caller must not continue collection
+    without recording the rejected reply. Raw replies may contain device logs.
+    """
+    saved, size = None, 0
+    for index in range(1, MAX_BAD_REPLY_FILES + 1):
+        name = f'collection-bad-reply-{index}.bin'
+        try:
+            fd = os.open(capture/name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        except FileExistsError:
+            continue
+        with os.fdopen(fd, 'wb') as stream:
+            size = stream.write(error.raw[:MAX_BAD_REPLY_BYTES])
+        saved = name
+        break
+    row = dict(run_id=token, route=route, error=error.kind, offset=error.offset,
+               offset_unit='characters' if error.kind == 'json' else 'bytes',
+               received_bytes=len(error.raw), sha256=hashlib.sha256(error.raw).hexdigest(),
+               saved_file=saved, saved_bytes=size, truncated=size < len(error.raw))
+    fd = os.open(capture/'collection-bad-replies.jsonl',
+                 os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as stream:
+        stream.write(json.dumps(row, sort_keys=True)+'\n')
+
+
 def pm_host():
     spec = importlib.util.spec_from_file_location('sleep_host_pm', ROOT/'tools/check-pm-stages.py')
     module = importlib.util.module_from_spec(spec)
@@ -129,11 +169,21 @@ def collect(config, token, route='usb'):
         + CLOCK_SOURCE + '\nprint(json.dumps(dict(result=value, clock=clock)))', base)
     with device(config, route) as client:
         with phase('clock.sample'):
-            envelope = json.loads(run(client, **command, display=False))
+            raw = run(client, **command, display=False)
+            try:
+                envelope = json.loads(raw)
+            except (json.JSONDecodeError, UnicodeDecodeError) as error:
+                raise MalformedReply(raw, error) from None
+            # Syntax recovery must never hide a decoded protocol/identity error.
+            if (not isinstance(envelope, dict) or set(envelope) != {'result', 'clock'} or
+                    not isinstance(envelope['result'], dict)):
+                raise ValueError('Invalid sleep collection envelope')
+            result = envelope['result']
+            if result.get('run_id') != token:
+                raise ValueError('Collected another run')
+            if result.get('event') not in ('started', 'complete', 'failed'):
+                raise ValueError('Invalid sleep collection event')
             clock_sample(envelope['clock'])
-        result = envelope['result']
-    if result.get('run_id') != token:
-        raise ValueError('Collected another run')
     return result
 
 
@@ -227,6 +277,12 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
             with phase('collection.attempt'):
                 value = collect(config, token, route)
                 collection_state(value)
+        except MalformedReply as error:
+            save_bad_reply(capture, error, token, route)
+            # Retry only retrieval of this exact ID, within the original budget.
+            # Do not publish partial JSON or repeat the submission above.
+            print('Malformed reply saved privately; collecting original RUN='+token, flush=True)
+            continue
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             with (capture/'collection-errors.txt').open('a') as output:
                 output.write(type(error).__name__+': '+str(error)+'\n')
@@ -336,7 +392,12 @@ def main():
             with capture_timing(capture):
                 token = os.environ.get('NEO_PM_RUN', '')
                 route = os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb')
-                value = collect(config, token, route)
+                try:
+                    value = collect(config, token, route)
+                except MalformedReply as error:
+                    save_bad_reply(capture, error, token, route)
+                    raise ValueError('Malformed reply saved privately; no sleep submitted. '
+                                     'Collect original RUN='+token) from None
                 (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
                 # Read-only postmortem, with no upload, policy cleanup or PM submission.
                 # Keep the original result even if the separate live snapshot fails.

@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**Backlight comparison complete, 9 October 2026:** NEO-179's fresh battery-only
+lit/off/lit sequence passes all three 31-sample windows, with warning and
+brightness/audio restoration confirmed. Estimates are 1.042 → 1.015 → 1.027 W,
+with unchanged PM31/0. The off result is lower than both lit references, but
+15.3 mW of lit-window drift prevents treating the difference as calibrated
+backlight-only power. This is characterization, not a new driver/policy change.
+The next step is the deliberately bounded longer-RTC protocol described in
+[report 240](docs/240-diagnostic25-battery-measurement-baseline.md); sleep
+energy, low-battery protection and broader repeatability remain open.
+[Report 241](docs/241-diagnostic25-backlight-power-comparison.md).
+
 **Diagnostic.25 awake battery baseline, 9 October 2026:** NEO-178's 61 samples
 over ten minutes pass, after a separate settling minute, with approximately
 264 mA / 1.05 W at the normal dim display. Raw summary recomputation and awake

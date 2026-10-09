@@ -48,6 +48,12 @@ screen on. [Report 240](docs/240-diagnostic25-battery-measurement-baseline.md)
 records the uncalibrated result and the planned backlight/sleep comparisons.
 It does not measure asleep consumption or establish an optimization gain.
 
+The subsequent [lit/off/lit comparison](docs/241-diagnostic25-backlight-power-comparison.md)
+passes all three windows: approximately **1.042 W → 1.015 W → 1.027 W**.
+Turning off the minimum-dim backlight gives a small directional reduction in
+the software readings, with battery/temperature drift still present. This
+does not establish calibrated backlight consumption or asleep power.
+
 Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
 and guards against sleep interrupting awake measurements. It requires all four
 CPUs to participate and independent timekeeping-freeze evidence. This candidate

@@ -16,6 +16,12 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[241 — Diagnostic.25 backlight power comparison](241-diagnostic25-backlight-power-comparison.md)
+records a passing continuous battery-only lit/off/lit sequence, 31 samples
+per window, complete brightness/audio restoration and unchanged PM31/0.
+The off window is 11.6–26.9 mW below the two lit references in uncalibrated
+software estimates; lit-window drift is 15.3 mW. Sleep power remains unmeasured.
+
 [240 — Diagnostic.25 battery baseline](240-diagnostic25-battery-measurement-baseline.md)
 records the passing 61-sample awake battery window, approximately 264 mA / 1.05 W
 with the dim display, unchanged PM31/0 and no screen or sleep operation. It

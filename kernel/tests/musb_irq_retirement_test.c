@@ -23,7 +23,7 @@ static bool irq_live, peer_live, backend_live, clients_done, masks_set;
 static bool in_remove, need_masks;
 static int original_irq, frees, disarms, wake_error, wake_logs, host_frees;
 static int pm_usage, session_puts;
-static bool acquire_on_drain;
+static bool acquire_on_drain, pm_disabled;
 static unsigned int cases;
 static void *musb_phy_callback;
 
@@ -86,7 +86,7 @@ static void musb_platform_exit(struct musb *musb)
 	if (musb->irq_work.initialized) {
 		assert(musb->irq_work.disabled && musb->finish_resume_work.disabled);
 		assert(musb->deassert_reset_work.disabled && musb->otg_timer.shutdown);
-		assert(!musb->session && pm_usage == 2);
+		assert(pm_usage == 2 + musb->session);
 	}
 	backend_live = false;
 }
@@ -146,6 +146,7 @@ static void timer_shutdown_sync(struct timer_list *timer)
 static void pm_runtime_put_noidle(struct device *dev)
 {
 	assert(dev == &platform.dev && instance.irq_work.disabled && !instance.session);
+	assert(pm_disabled);
 	assert(pm_usage == 3);
 	pm_usage--;
 	session_puts++;
@@ -153,7 +154,7 @@ static void pm_runtime_put_noidle(struct device *dev)
 static void pm_runtime_get_sync(struct device *dev) { (void)dev; }
 static void pm_runtime_dont_use_autosuspend(struct device *dev) { (void)dev; }
 static void pm_runtime_put_sync(struct device *dev) { (void)dev; }
-static void pm_runtime_disable(struct device *dev) { (void)dev; }
+static void pm_runtime_disable(struct device *dev) { (void)dev; pm_disabled = true; }
 static void usb_phy_shutdown(void *phy) { (void)phy; }
 static void device_init_wakeup(struct device *dev, int value)
 {
@@ -182,6 +183,7 @@ static void prepare(int irq, bool wake, int error, bool dma)
 	pm_usage = 2;
 	session_puts = 0;
 	acquire_on_drain = false;
+	pm_disabled = false;
 }
 
 static void expect_released(bool owned, bool wake, int error)
@@ -215,6 +217,7 @@ int main(void)
 					else
 						assert(probe_failure(&instance, &platform.dev) == -EIO);
 					assert(!backend_live && host_frees == 1);
+					assert(!instance.session && pm_usage == 2);
 					expect_released(true, wake != 0, error);
 				}
 			/* The allocation finalizer can also retire an owned action once. */
@@ -248,6 +251,10 @@ int main(void)
 			acquire_on_drain = owned && mode == 2;
 			musb_shutdown_work(&instance);
 			musb_shutdown_work(&instance);
+			assert(instance.session == owned && pm_usage == 2 + owned);
+			pm_runtime_disable(&platform.dev);
+			musb_release_session(&instance);
+			musb_release_session(&instance);
 			assert(instance.irq_work.disabled && instance.finish_resume_work.disabled);
 			assert(instance.deassert_reset_work.disabled && instance.otg_timer.shutdown);
 			assert(!instance.session && pm_usage == 2 && session_puts == owned);

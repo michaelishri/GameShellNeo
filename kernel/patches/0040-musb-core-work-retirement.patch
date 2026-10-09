@@ -6,14 +6,15 @@ initial cancellation. Permanently disable the three core delayed works and
 shut down the OTG timer after client/IRQ retirement, before resources go away.
 Initialize the timer alongside core work so every fail3 entry owns it.
 
-Once irq_work has stopped, balance its session reference without scheduling
-runtime-PM activity. This does not retire backend producers, pending resume
-callbacks or runtime-PM callbacks, and is not a complete removal protocol.
+Keep irq_work's session hold through the remaining outer PM puts. Balance it
+only after runtime PM is disabled, so releasing it cannot make a subsequent
+put invoke a callback after backend teardown. This does not retire backend
+producers or fix the existing general runtime-PM/resource ordering.
 
 diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
 --- a/drivers/usb/musb/musb_core.c
 +++ b/drivers/usb/musb/musb_core.c
-@@ -2219,6 +2219,21 @@
+@@ -2219,6 +2219,24 @@
  	musb_free_irq(musb);
  }
  
@@ -24,8 +25,11 @@ diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
 +	disable_delayed_work_sync(&musb->finish_resume_work);
 +	disable_delayed_work_sync(&musb->deassert_reset_work);
 +	disable_delayed_work_sync(&musb->irq_work);
++}
 +
-+	/* irq_work was the sole owner of this extra runtime-PM reference. */
++/* Preserve the session hold until all runtime-PM callbacks have been disabled. */
++static void musb_release_session(struct musb *musb)
++{
 +	if (musb->session) {
 +		musb->session = false;
 +		pm_runtime_put_noidle(musb->controller);
@@ -35,7 +39,7 @@ diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
  static void musb_free(struct musb *musb)
  {
  	/* this has multiple entry modes. it handles fault cleanup after
-@@ -2591,6 +2606,7 @@
+@@ -2591,6 +2609,7 @@
  	INIT_DELAYED_WORK(&musb->irq_work, musb_irq_work);
  	INIT_DELAYED_WORK(&musb->deassert_reset_work, musb_deassert_reset);
  	INIT_DELAYED_WORK(&musb->finish_resume_work, musb_host_finish_resume);
@@ -43,7 +47,7 @@ diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
  
  	/* setup musb parts of the core (especially endpoints) */
  	status = musb_core_init(plat->config->multipoint
-@@ -2598,8 +2614,6 @@
+@@ -2598,8 +2617,6 @@
  			: MUSB_CONTROLLER_HDRC, musb);
  	if (status < 0)
  		goto fail3;
@@ -52,7 +56,7 @@ diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
  
  	/* attach to the IRQ */
  	if (request_irq(nIrq, musb->isr, IRQF_SHARED, dev_name(dev), musb)) {
-@@ -2640,9 +2654,7 @@
+@@ -2640,9 +2657,7 @@
  
  fail3:
  	musb_shutdown_irq(musb);
@@ -63,7 +67,15 @@ diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
  	if (musb->dma_controller)
  		musb_dma_controller_destroy(musb->dma_controller);
  
-@@ -2711,6 +2723,7 @@
+@@ -2653,6 +2668,7 @@
+ 	pm_runtime_dont_use_autosuspend(musb->controller);
+ 	pm_runtime_put_sync(musb->controller);
+ 	pm_runtime_disable(musb->controller);
++	musb_release_session(musb);
+ 
+ fail2:
+ 	if (musb->irq_wake)
+@@ -2711,11 +2727,13 @@
  	musb_gadget_cleanup(musb);
  
  	musb_shutdown_irq(musb);
@@ -71,3 +83,9 @@ diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
  	musb_platform_exit(musb);
  
  	pm_runtime_dont_use_autosuspend(musb->controller);
+ 	pm_runtime_put_sync(musb->controller);
+ 	pm_runtime_disable(musb->controller);
++	musb_release_session(musb);
+ 	musb_phy_callback = NULL;
+ 	if (musb->dma_controller)
+ 		musb_dma_controller_destroy(musb->dma_controller);

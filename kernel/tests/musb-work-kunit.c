@@ -9,8 +9,27 @@ struct work_fixture {
 	struct device *device;
 	struct task_struct *shutdown_thread;
 	struct completion entered, release, stopped;
-	atomic_t calls[3], timer_calls, bad_access, timeouts;
+	atomic_t calls[3], timer_calls, bad_access, timeouts, pm_suspends;
 	bool block, resources_live, take_session, requeued;
+};
+
+static int fixture_pm_suspend(struct device *dev)
+{
+	struct work_fixture *f = dev_get_drvdata(dev);
+
+	atomic_inc(&f->pm_suspends);
+	if (!READ_ONCE(f->resources_live))
+		atomic_inc(&f->bad_access);
+	return 0;
+}
+
+static const struct dev_pm_ops fixture_pm_ops = {
+	.runtime_suspend = fixture_pm_suspend,
+};
+
+static const struct device_type fixture_device_type = {
+	.name = "musb-work-test",
+	.pm = &fixture_pm_ops,
 };
 
 static struct delayed_work *fixture_work(struct work_fixture *f, int index)
@@ -90,6 +109,8 @@ static int work_fixture_init(struct kunit *test)
 	if (IS_ERR(f->device))
 		return PTR_ERR(f->device);
 	f->musb.controller = f->device;
+	f->device->type = &fixture_device_type;
+	dev_set_drvdata(f->device, f);
 	pm_runtime_set_active(f->device);
 	pm_runtime_get_noresume(f->device);
 	pm_runtime_get_noresume(f->device);
@@ -108,9 +129,12 @@ static void work_fixture_exit(struct kunit *test)
 		kthread_stop(f->shutdown_thread);
 	musb_shutdown_work(&f->musb);
 	if (!IS_ERR_OR_NULL(f->device)) {
-		pm_runtime_disable(f->device);
+		if (pm_runtime_enabled(f->device))
+			pm_runtime_disable(f->device);
+		musb_release_session(&f->musb);
 		while (atomic_read(&f->device->power.usage_count) > 0)
 			pm_runtime_put_noidle(f->device);
+		f->device->type = NULL;
 		root_device_unregister(f->device);
 	}
 }
@@ -150,6 +174,8 @@ static int fixture_shutdown(void *data)
 	struct work_fixture *f = data;
 
 	musb_shutdown_work(&f->musb);
+	pm_runtime_disable(f->device);
+	musb_release_session(&f->musb);
 	WRITE_ONCE(f->resources_live, false);
 	complete(&f->stopped);
 	while (!kthread_should_stop())
@@ -205,15 +231,19 @@ static void work_session_accounting_test(struct kunit *test)
 	struct work_fixture *f = test->priv;
 	int foreign, owned;
 
+	pm_runtime_disable(f->device);
 	for (foreign = 2; foreign >= 0; foreign -= 2) {
 		for (owned = 0; owned <= 1; owned++) {
 			if (owned)
 				pm_runtime_get_noresume(f->device);
 			f->musb.session = owned;
 			musb_shutdown_work(&f->musb);
+			KUNIT_EXPECT_EQ(test, f->musb.session, (bool)owned);
+			KUNIT_EXPECT_EQ(test, atomic_read(&f->device->power.usage_count), foreign + owned);
+			musb_release_session(&f->musb);
 			KUNIT_EXPECT_FALSE(test, f->musb.session);
 			KUNIT_EXPECT_EQ(test, atomic_read(&f->device->power.usage_count), foreign);
-			musb_shutdown_work(&f->musb);
+			musb_release_session(&f->musb);
 			KUNIT_EXPECT_EQ(test, atomic_read(&f->device->power.usage_count), foreign);
 			KUNIT_EXPECT_EQ(test, f->device->power.request, RPM_REQ_NONE);
 		}
@@ -223,6 +253,33 @@ static void work_session_accounting_test(struct kunit *test)
 		}
 	}
 }
+
+static void check_pm_tail(struct kunit *test, bool early_release)
+{
+	struct work_fixture *f = test->priv;
+
+	/* Two existing holds model the Sunxi backend and remove's temporary get. */
+	pm_runtime_get_noresume(f->device);
+	f->musb.session = true;
+	musb_shutdown_work(&f->musb);
+	KUNIT_EXPECT_EQ(test, atomic_read(&f->device->power.usage_count), 3);
+	if (early_release) {
+		/* Deliberate negative control: reproduce the rejected first candidate. */
+		f->musb.session = false;
+		pm_runtime_put_noidle(f->device);
+	}
+	pm_runtime_put(f->device); /* backend exit's put before clock/reset teardown */
+	WRITE_ONCE(f->resources_live, false);
+	pm_runtime_put_sync(f->device); /* the remaining core put */
+	pm_runtime_disable(f->device);
+	musb_release_session(&f->musb);
+	KUNIT_EXPECT_EQ(test, atomic_read(&f->device->power.usage_count), 0);
+	KUNIT_EXPECT_EQ(test, atomic_read(&f->pm_suspends), early_release ? 1 : 0);
+	KUNIT_EXPECT_EQ(test, atomic_read(&f->bad_access), early_release ? 1 : 0);
+}
+
+static void work_pm_tail_test(struct kunit *test) { check_pm_tail(test, false); }
+static void work_pm_tail_control_test(struct kunit *test) { check_pm_tail(test, true); }
 
 static void work_fresh_instance_test(struct kunit *test)
 {
@@ -250,6 +307,8 @@ static struct kunit_case musb_work_cases[] = {
 	KUNIT_CASE(work_resume_running_test),
 	KUNIT_CASE(work_reset_running_test),
 	KUNIT_CASE(work_session_accounting_test),
+	KUNIT_CASE(work_pm_tail_test),
+	KUNIT_CASE(work_pm_tail_control_test),
 	KUNIT_CASE(work_fresh_instance_test),
 	{}
 };

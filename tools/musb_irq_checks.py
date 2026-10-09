@@ -67,7 +67,7 @@ def test_functions(core):
         probe += ('static int ' + name + '(struct musb *musb, struct device *dev)\n{\n'
                   '\tint status = -EIO;\n' + init[init.index(label):] + '\n}\n')
     return ''.join(function(core, name) for name in
-                   ('musb_free_irq', 'musb_shutdown_irq', 'musb_shutdown_work',
+                   ('musb_free_irq', 'musb_shutdown_irq', 'musb_shutdown_work', 'musb_release_session',
                     'musb_free', 'musb_remove')) + probe
 
 
@@ -122,7 +122,10 @@ def mutations(functions):
         '\t\tpm_runtime_put_noidle(musb->controller);', '\t\t(void)musb;')
     result['foreign-session-put'] = replace_once(functions, '\tif (musb->session) {', '\t{')
     result['duplicate-session-put'] = replace_once(functions, '\t\tmusb->session = false;\n', '')
-    early = replace_once(work, '\tdisable_delayed_work_sync(&musb->irq_work);\n', '')
-    early = early[:-2] + '\tdisable_delayed_work_sync(&musb->irq_work);\n}\n'
-    result['early-session-put'] = replace_once(functions, work, early)
+    result['early-session-put'] = replace_once(functions, remove,
+        replace_once(remove, '\tmusb_shutdown_work(musb);',
+                      '\tmusb_release_session(musb);\n\tmusb_shutdown_work(musb);'))
+    result['session-put-before-pm-disable'] = replace_once(functions, remove,
+        replace_once(remove, '\tpm_runtime_disable(musb->controller);\n\tmusb_release_session(musb);',
+                      '\tmusb_release_session(musb);\n\tpm_runtime_disable(musb->controller);'))
     return result

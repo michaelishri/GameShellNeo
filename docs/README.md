@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[266 — Kernel counter and timekeeping audit](266-kernel-counter-timekeeping-audit.md)
+checks syscall sequence protection, conversion math, physical-counter access,
+WFI and watchdog configuration. It identifies the missing event-time counter
+and conversion state, specifying bounded diagnostics without claiming a fix.
+
 [265 — Native clock comparison across all four CPUs](265-native-clock-cpu-coverage.md)
 records even CPU 0–3 coverage, verified diagnostic affinity restoration and
 270,000 readings without ordering discrepancies. Raw replay and unchanged

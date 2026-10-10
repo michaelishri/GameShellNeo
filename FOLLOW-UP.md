@@ -2,6 +2,20 @@
 
 Record deferred questions and activities here as they arise.
 
+**Kernel counter/timekeeping audit completed, 10 October 2026:** NEO-192's
+source review finds no missing sequence protection in the syscall readers and
+no counter-register rewrite in the CPI WFI callback. Sequence validation and
+negative-delta handling do not compare against previous returned timestamps,
+so a bad counter observation remains a plausible, unproven mechanism. The
+captured image has no clocksource watchdog; absent warnings cannot clear it.
+The archive, 27 upstream files, captured config and board inputs are verified.
+No GameShell access or runtime change occurred. Next prepare default-off kernel
+diagnostics that retain the actual consumed count, coherent conversion tuple
+and matching syscall result, with bounded storage and offline fault fixtures.
+Do not substitute another nearby timestamp or clamp/retry away the failure.
+NEO-192 remains unresolved; NEO-191/NEO-182 PM work stays pending.
+[Report 266](docs/266-kernel-counter-timekeeping-audit.md).
+
 **All-core native capture completed, 10 October 2026:** NEO-192 now has one
 bounded libc/syscall capture with verified CPU 0–3 coverage: 3,750 sequences /
 67,500 readings per core, 270,000 readings total, zero ordering discrepancies.
@@ -15,6 +29,7 @@ does not clear either prior clock fault. Next inspect the physical-counter and
 kernel-timekeeping paths for a concrete cause before another measurement.
 NEO-192 stays open; NEO-191/NEO-182 PM work stays pending.
 [Report 265](docs/265-native-clock-cpu-coverage.md).
+The source review proposed here is now recorded in report 266 above.
 
 **Native two-route capture completed, 10 October 2026:** NEO-192's explicit
 libc/syscall experiment retains 270,000 integer readings with zero ordering

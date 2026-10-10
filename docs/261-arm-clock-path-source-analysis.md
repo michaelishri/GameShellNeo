@@ -69,8 +69,8 @@ does not select a different RAW timekeeper.
 
 Python's normal API can reach a libc implementation that uses the vDSO or
 falls back to a syscall. The kernel's ARM vDSO provides both time64 and time32
-fallback helpers; its time64 fallback also invokes syscall 403. Presence of a
-A vDSO mapping or `CONFIG_VDSO=y` alone does not establish clock exports;
+fallback helpers; its time64 fallback also invokes syscall 403. A vDSO mapping
+or `CONFIG_VDSO=y` alone does not establish clock exports;
 those can be removed at boot. Even a resolved exported function does not prove
 the internal branch taken by an individual call. See the correction above.
 ([ARM fallbacks](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/arch/arm/include/asm/vdso/gettimeofday.h?id=1b357ecb321392158d507b04672ffee57bfa071d#n36).)

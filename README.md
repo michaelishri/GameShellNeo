@@ -1159,6 +1159,9 @@ these cross-core comparisons can establish about small offsets. This awake
 test neither blanks the display nor changes clocksource, governor, services or
 other processes' affinity. It does not clear the clock fault or admit PM tests.
 See [report 265](docs/265-native-clock-cpu-coverage.md).
+The subsequent [kernel source audit](docs/266-kernel-counter-timekeeping-audit.md)
+defines the missing counter/conversion evidence; further clean userspace
+captures alone do not establish the cause of the saved regressions.
 
 The candidate ADC width correction has its own saved checks:
 

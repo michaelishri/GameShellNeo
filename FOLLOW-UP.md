@@ -2,6 +2,26 @@
 
 Record deferred questions and activities here as they arise.
 
+**Kernel clock recorder prepared offline, 10 October 2026:** NEO-192 now has
+an isolated default-off candidate retaining the consumed counter, coherent
+conversion tuple, read CPU, final syscall result and bounded writer context.
+It preserves regressions and copy errors, rejects live/unstarted exports, and
+drains in-flight calls before releasing ownership. Five real-kernel UML cases
+pass with KASAN/lockdep and no warnings; actual serializer replay, ARM enabled
+and disabled builds, and hook-symbol checks pass. Full host checks pass:
+24 runtime / 967 tooling tests, one optional skip, both C checks and shell lint.
+The candidate is outside the image queue and no GameShell access occurred.
+Next review the hooks and prepare the userspace collector to join exact ABI
+results and Python/native integers to kernel ordinals and capture provenance.
+The root cause, deployment and PM admission remain unresolved; do not count a
+complete diagnostic record as healthy clocks. [Report 267](docs/267-kernel-clock-provenance-candidate.md).
+
+- [ ] Extend verified scratch-retention support to the newer isolated UML/ARM
+  suites, including `clock-provenance-tests` and `axp223-controls-tests`.
+  Existing pruning expects other suite names/layouts. Preserve accepted-run
+  receipts and failed-test evidence; do not apply its old layout assumptions
+  to these directories or remove a build still running.
+
 **Kernel counter/timekeeping audit completed, 10 October 2026:** NEO-192's
 source review finds no missing sequence protection in the syscall readers and
 no counter-register rewrite in the CPI WFI callback. Sequence validation and

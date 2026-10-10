@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[267 — Kernel clock-provenance candidate](267-kernel-clock-provenance-candidate.md)
+adds isolated, default-off syscall/counter recording, bounded writer context
+and offline tuple replay. It preserves regressions and separates kernel
+calculation evidence from the pending userspace correlation and live work.
+
 [266 — Kernel counter and timekeeping audit](266-kernel-counter-timekeeping-audit.md)
 checks syscall sequence protection, conversion math, physical-counter access,
 WFI and watchdog configuration. It identifies the missing event-time counter

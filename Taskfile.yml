@@ -582,6 +582,20 @@ tasks:
     desc: Build fixed ARM two/three-route clock comparator and run native/ARM fixtures offline; no device access
     cmds: [python3 tools/build-native-clocks.py]
 
+  test:clock-provenance:
+    desc: Test isolated kernel clock recorder with injected counter faults in offline UML; no device access
+    cmds: [bash tools/run-logged.sh clock-provenance python3 tools/check-clock-provenance.py]
+
+  check:clock-provenance:
+    desc: Run clock recorder UML tests and compile ARM timekeeping/syscall objects with diagnostics on and off
+    cmds: [bash tools/run-logged.sh clock-provenance-arm python3 tools/check-clock-provenance.py --compile-driver]
+
+  report:clock-provenance:
+    desc: Replay saved kernel clock tuples and preserve regressions; no device access or qualification
+    env:
+      NEO_CLOCK_RECORDS: '{{.FILE | default ""}}'
+    cmds: [python3 tools/clock_provenance.py]
+
   device:clock-native:
     desc: One awake native clock comparison with all raw readings retained; no clock/PM changes
     env:

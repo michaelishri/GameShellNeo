@@ -1163,6 +1163,23 @@ The subsequent [kernel source audit](docs/266-kernel-counter-timekeeping-audit.m
 defines the missing counter/conversion evidence; further clean userspace
 captures alone do not establish the cause of the saved regressions.
 
+The isolated kernel recorder has its own offline checks:
+
+```sh
+task test:clock-provenance       # UML: original conversion, scripted counter, KASAN/lockdep
+task check:clock-provenance      # Also compile ARM objects with diagnostics off/on
+task report:clock-provenance FILE=<saved-records.ndjson>
+```
+
+The kernel checks use the pinned local builder without network access; the
+report task replays a local file. None contacts the GameShell.
+The candidate remains outside the image patch queue;
+its capture option defaults off. Replay preserves backwards results and
+rejects inconsistent arithmetic, but does not qualify clocks or PM. The
+userspace collector and live integration remain separate work. See
+[report 267](docs/267-kernel-clock-provenance-candidate.md) for the record format,
+ownership, fixed limits, test evidence and instrumentation effects.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

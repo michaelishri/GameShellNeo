@@ -1,0 +1,221 @@
+From: GameShellNeo contributors
+Subject: [PATCH] timekeeping: isolated default-off clock provenance candidate
+
+Not part of the image queue. Keep original counter reads and conversion;
+record the accepted tuple and syscall result without monotonic clamping.
+
+---
+--- a/kernel/time/timekeeping.c
++++ b/kernel/time/timekeeping.c
+@@ -31,6 +31,7 @@
+ #include "tick-internal.h"
+ #include "ntp_internal.h"
+ #include "timekeeping_internal.h"
++#include "neo-clock-diag.h"
+ 
+ #define TK_CLEAR_NTP		(1 << 0)
+ #define TK_CLOCK_WAS_SET	(1 << 1)
+@@ -321,6 +322,7 @@
+ 	tk->tkr_raw.clock = clock;
+ 	tk->tkr_raw.mask = clock->mask;
+ 	tk->tkr_raw.cycle_last = tk->tkr_mono.cycle_last;
++	neo_clock_writer_read(tk, tk->tkr_mono.cycle_last, NEO_SETUP, 0, false);
+ 
+ 	/* Do the ns -> cycle conversion first, using original mult */
+ 	tmp = NTP_INTERVAL_LENGTH;
+@@ -404,6 +406,26 @@
+ 	return timekeeping_cycles_to_ns(tkr, tk_clock_read(tkr));
+ }
+ 
++static __always_inline u64 timekeeping_observed_ns(const struct timekeeper *tk,
++				  const struct tk_read_base *tkr,
++				  unsigned int seq, int clock)
++{
++#ifdef CONFIG_NEO_CLOCK_DIAG
++	if (neo_clock_target(clock))
++		return neo_clock_read(tk, tkr, seq, tk_clock_read, timekeeping_cycles_to_ns);
++#endif
++	return timekeeping_get_ns(tkr);
++}
++
++#ifdef CONFIG_NEO_CLOCK_DIAG_KUNIT_TEST
++/* Test the actual conversion and counter callback, not a duplicate formula. */
++u64 neo_clock_test_read(const struct timekeeper *tk, unsigned int seq, int clock)
++{
++	return timekeeping_observed_ns(tk,
++		clock == CLOCK_MONOTONIC_RAW ? &tk->tkr_raw : &tk->tkr_mono, seq, clock);
++}
++#endif
++
+ /**
+  * update_fast_timekeeper - Update the fast and NMI safe monotonic timekeeper.
+  * @tkr: Timekeeping readout base from which we take the update
+@@ -750,6 +772,7 @@
+ 	 * the cacheline optimized data layout of the timekeeper and requires
+ 	 * another indirection.
+ 	 */
++	neo_clock_publish(&tkd->timekeeper, tk, raw_read_seqcount(&tkd->seq), action);
+ 	memcpy(&tkd->timekeeper, tk, sizeof(*tk));
+ 	write_seqcount_end(&tkd->seq);
+ }
+@@ -769,6 +792,7 @@
+ 	cycle_now = tk_clock_read(&tk->tkr_mono);
+ 	delta = clocksource_delta(cycle_now, tk->tkr_mono.cycle_last, tk->tkr_mono.mask,
+ 				  tk->tkr_mono.clock->max_raw_delta);
++	neo_clock_writer_read(tk, cycle_now, NEO_FORWARD, delta, true);
+ 	tk->tkr_mono.cycle_last = cycle_now;
+ 	tk->tkr_raw.cycle_last  = cycle_now;
+ 
+@@ -866,9 +890,12 @@
+ 	do {
+ 		seq = read_seqcount_begin(&tk_core.seq);
+ 		base = ktime_add(tk->tkr_mono.base, *offset);
+-		nsecs = timekeeping_get_ns(&tk->tkr_mono);
++		nsecs = timekeeping_observed_ns(tk, &tk->tkr_mono, seq,
++					       offs == TK_OFFS_BOOT ? CLOCK_BOOTTIME : -1);
+ 
+ 	} while (read_seqcount_retry(&tk_core.seq, seq));
++	if (offs == TK_OFFS_BOOT)
++		neo_clock_accepted(CLOCK_BOOTTIME);
+ 
+ 	return ktime_add_ns(base, nsecs);
+ 
+@@ -964,10 +991,11 @@
+ 	do {
+ 		seq = read_seqcount_begin(&tk_core.seq);
+ 		ts->tv_sec = tk->xtime_sec;
+-		nsec = timekeeping_get_ns(&tk->tkr_mono);
++		nsec = timekeeping_observed_ns(tk, &tk->tkr_mono, seq, CLOCK_MONOTONIC);
+ 		tomono = tk->wall_to_monotonic;
+ 
+ 	} while (read_seqcount_retry(&tk_core.seq, seq));
++	neo_clock_accepted(CLOCK_MONOTONIC);
+ 
+ 	ts->tv_sec += tomono.tv_sec;
+ 	ts->tv_nsec = 0;
+@@ -1651,9 +1679,10 @@
+ 	do {
+ 		seq = read_seqcount_begin(&tk_core.seq);
+ 		ts->tv_sec = tk->raw_sec;
+-		nsecs = timekeeping_get_ns(&tk->tkr_raw);
++		nsecs = timekeeping_observed_ns(tk, &tk->tkr_raw, seq, CLOCK_MONOTONIC_RAW);
+ 
+ 	} while (read_seqcount_retry(&tk_core.seq, seq));
++	neo_clock_accepted(CLOCK_MONOTONIC_RAW);
+ 
+ 	ts->tv_nsec = 0;
+ 	timespec64_add_ns(ts, nsecs);
+@@ -1964,6 +1993,7 @@
+ 	 * usable source. The rtc part is handled separately in rtc core code.
+ 	 */
+ 	cycle_now = tk_clock_read(&tks->tkr_mono);
++	neo_clock_writer_read(tks, cycle_now, NEO_RESUME, 0, false);
+ 	nsec = clocksource_stop_suspend_timing(clock, cycle_now);
+ 	if (nsec > 0) {
+ 		ts_delta = ns_to_timespec64(nsec);
+@@ -2331,15 +2361,17 @@
+ 	struct timekeeper *real_tk = &tkd->timekeeper;
+ 	unsigned int clock_set = 0;
+ 	int shift = 0, maxshift;
+-	u64 offset, orig_offset;
++	u64 offset, orig_offset, observed_cycles;
+ 
+ 	/* Make sure we're fully resumed: */
+ 	if (unlikely(timekeeping_suspended))
+ 		return false;
+ 
+-	offset = clocksource_delta(tk_clock_read(&tk->tkr_mono),
++	observed_cycles = tk_clock_read(&tk->tkr_mono);
++	offset = clocksource_delta(observed_cycles,
+ 				   tk->tkr_mono.cycle_last, tk->tkr_mono.mask,
+ 				   tk->tkr_mono.clock->max_raw_delta);
++	neo_clock_writer_read(tk, observed_cycles, NEO_ADVANCE, offset, true);
+ 	orig_offset = offset;
+ 	/* Check if there's really nothing to do */
+ 	if (offset < real_tk->cycle_interval && mode == TK_ADV_TICK)
+--- a/kernel/time/posix-timers.c
++++ b/kernel/time/posix-timers.c
+@@ -29,6 +29,7 @@
+ 
+ #include "timekeeping.h"
+ #include "posix-timers.h"
++#include "neo-clock-diag.h"
+ 
+ /*
+  * Timers are managed in a hash table for lockless lookup. The hash key is
+@@ -1139,15 +1140,20 @@
+ 	const struct k_clock *kc = clockid_to_kclock(which_clock);
+ 	struct timespec64 kernel_tp;
+ 	int error;
++	bool valid;
++	struct neo_clock_call *observation;
+ 
+ 	if (!kc)
+ 		return -EINVAL;
+ 
++	observation = neo_clock_begin(which_clock, 64);
+ 	error = kc->clock_get_timespec(which_clock, &kernel_tp);
++	valid = !error;
+ 
+ 	if (!error && put_timespec64(&kernel_tp, tp))
+ 		error = -EFAULT;
+ 
++	neo_clock_end(observation, &kernel_tp, valid, error);
+ 	return error;
+ }
+ 
+@@ -1294,15 +1300,20 @@
+ 	const struct k_clock *kc = clockid_to_kclock(which_clock);
+ 	struct timespec64 ts;
+ 	int err;
++	bool valid;
++	struct neo_clock_call *observation;
+ 
+ 	if (!kc)
+ 		return -EINVAL;
+ 
++	observation = neo_clock_begin(which_clock, 32);
+ 	err = kc->clock_get_timespec(which_clock, &ts);
++	valid = !err;
+ 
+ 	if (!err && put_old_timespec32(&ts, tp))
+ 		err = -EFAULT;
+ 
++	neo_clock_end(observation, &ts, valid, err);
+ 	return err;
+ }
+ 
+--- a/kernel/time/Kconfig
++++ b/kernel/time/Kconfig
+@@ -222,3 +222,23 @@
+ 	  notion of time.
+ 
+ endmenu
++
++config NEO_CLOCK_DIAG
++	bool "GameShellNeo clock provenance diagnostic (experimental)"
++	depends on (ARM || UML) && POSIX_TIMERS && DEBUG_FS
++	default n
++	help
++	  Isolated bounded syscall/counter diagnostic. Disabled until explicitly
++	  armed through debugfs by the task whose clock calls will be recorded.
++	  This perturbs scheduling and does not fix or qualify clock behavior.
++	  Keep this option off in ordinary images.
++
++config NEO_CLOCK_DIAG_KUNIT_TEST
++	bool "Clock provenance diagnostic tests"
++	depends on NEO_CLOCK_DIAG && KUNIT=y
++	default n
++	help
++	  Run scripted counter and bounded recorder checks in an isolated kernel.
++	  Exercises the original conversion, sequence retries and file ownership.
++	  Includes real kernel locks and a concurrent stop/drain test.
++	  These tests do not qualify hardware counters or userspace copies.
+--- a/kernel/time/Makefile
++++ b/kernel/time/Makefile
+@@ -32,3 +32,5 @@
+ obj-$(CONFIG_TIME_NS)				+= namespace.o namespace_vdso.o
+ obj-$(CONFIG_TEST_CLOCKSOURCE_WATCHDOG)		+= clocksource-wdtest.o
+ obj-$(CONFIG_TIME_KUNIT_TEST)			+= time_test.o
++
++obj-$(CONFIG_NEO_CLOCK_DIAG) += neo-clock-diag.o

@@ -1088,7 +1088,7 @@ The native comparator and its read-only vDSO inventory use a tested ARM binary:
 
 ```sh
 task check:clock-native
-task device:clock-vdso BUILD=20261010T001344.437496Z RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+task device:clock-vdso BUILD=<new-build> RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
 ```
 
 Use the build/inventory timestamps produced on your checkout. The offline build
@@ -1120,7 +1120,7 @@ two-route experiment** instead:
 
 ```sh
 task check:clock-native
-task device:clock-native-pair BUILD=20261010T001344.437496Z RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+task device:clock-native-pair BUILD=<new-build> RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
 # After a completed comparison, use its printed timestamp:
 task report:clock-native CAPTURE=<completed-capture>
 ```
@@ -1135,6 +1135,30 @@ within each route, between adjacent routes and across sequence boundaries.
 There is no automatic downgrade from the three-route task or clock/PM setting
 change. A clean short run does not clear a historical fault or qualify sleep.
 See [report 264](docs/264-native-libc-syscall-comparison.md).
+
+For deliberate coverage of **all four CPUs**, use the separately selected mode:
+
+```sh
+task check:clock-native
+task device:clock-native-cpus BUILD=<new-build> RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+task report:clock-native CAPTURE=<completed-capture>
+```
+
+Replace `<new-build>` with the timestamp printed by the build task. The CPU
+mode takes the same 270,000 readings over 300 batches, selecting CPU 0, 1, 2,
+then 3 repeatedly. It temporarily pins only its own diagnostic thread and
+restores the original mask after capture, including returned failure paths.
+All four CPUs must already be allowed. Every batch records its affinity
+readback before and after sampling, and every clock sequence records both CPU
+endpoints; a mismatch or failed operation stops the capture without retries.
+The existing `device:clock-native-pair` stays unpinned.
+
+The report separately counts same-core and cyclic cross-core sequence
+boundaries, preserving negative readings. The 100 ms batch pauses limit what
+these cross-core comparisons can establish about small offsets. This awake
+test neither blanks the display nor changes clocksource, governor, services or
+other processes' affinity. It does not clear the clock fault or admit PM tests.
+See [report 265](docs/265-native-clock-cpu-coverage.md).
 
 The candidate ADC width correction has its own saved checks:
 

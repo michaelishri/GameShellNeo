@@ -26,7 +26,7 @@ host = load('native_clock_host_test', 'check-native-clocks.py')
 builder = load('native_clock_build_test', 'build-native-clocks.py')
 
 
-def records(count, *, two_path=False):
+def records(count, *, two_path=False, cpu_coverage=False):
     meta = dict(boot_id='boot', clocksource='arch_sys_counter', affinity=15)
     header = dict(type='header', schema=1, operation='native-clock-comparison', batches=300,
         per_batch=50, pause_ns=100000000, routes=list(report.ROUTES), clocks=list(report.CLOCKS),
@@ -42,6 +42,15 @@ def records(count, *, two_path=False):
         failure=dict(present=False, sequence=0, clock=0, position=0, stage=0, rc=0, errno=0, sec=0, nsec=0))
     rows = [dict(type='sample', index=i+1, clocks=[dict(cpu_before=i%4, cpu_after=i%4,
         ns=[2**55 + i*10000 + c*1000 + p*100 for p in range(len(header['routes']))]) for c in range(3)]) for i in range(count)]
+    if cpu_coverage:
+        header.update(operation='native-clock-libc-syscall-cpus', cpu_schedule=[0, 1, 2, 3],
+            cpu_batches=[dict(cpu=i % 4, before=1 << (i % 4), after=1 << (i % 4),
+                              begin_rc=0, end_rc=0) for i in range(300)])
+        footer['affinity_restore_rc'] = 0
+        for i, row in enumerate(rows):
+            row['requested_cpu'] = (i // 50) % 4
+            for family in row['clocks']:
+                family.update(cpu_before=row['requested_cpu'], cpu_after=row['requested_cpu'])
     return [header, *rows, footer]
 
 
@@ -50,9 +59,94 @@ def encode(rows):
 
 
 class NativeClockTests(unittest.TestCase):
-    def analyze(self, rows, *, two_path=False):
+    def analyze(self, rows, *, two_path=False, cpu_coverage=False):
         with patch.object(report, 'SAMPLES', 4):
-            return report.analyze(encode(rows), 'boot', '2.41', two_path=two_path)
+            return report.analyze(encode(rows), 'boot', '2.41', two_path=two_path, cpu_coverage=cpu_coverage)
+
+    def test_four_core_coverage_and_handoffs(self):
+        rows = records(15000, two_path=True, cpu_coverage=True)
+        value = report.analyze(encode(rows), 'boot', '2.41', two_path=True, cpu_coverage=True)
+        self.assertEqual(value['reads'], 270000)
+        self.assertEqual(value['discrepancy_sequences'], 0)
+        self.assertTrue(value['cpu_coverage_verified'])
+        self.assertTrue(value['diagnostic_affinity_restored'])
+        self.assertFalse(value['pm_admission'])
+        for stats in value['statistics'].values():
+            self.assertEqual(stats['cpu_before_counts'], {str(c): 3750 for c in range(4)})
+            self.assertEqual(stats['cpu_brackets_differ'], 0)
+            for core in range(4):
+                self.assertEqual(stats['cpu_transitions'][f'{core}->{core}']['count'], 3675)
+            self.assertEqual(stats['cpu_transitions']['0->1']['count'], 75)
+            self.assertEqual(stats['cpu_transitions']['1->2']['count'], 75)
+            self.assertEqual(stats['cpu_transitions']['2->3']['count'], 75)
+            self.assertEqual(stats['cpu_transitions']['3->0']['count'], 74)
+        # A regression across the first handoff must remain distinguishable
+        # from same-core ordering. Do not smooth or reset history on migration.
+        previous = rows[50]['clocks'][0]['ns'][-1]
+        rows[51]['clocks'][0]['ns'][0] = previous - 1
+        value = report.analyze(encode(rows), 'boot', '2.41', two_path=True, cpu_coverage=True)
+        self.assertEqual(value['statistics']['1']['cpu_transitions']['0->1']['negative'], 1)
+        self.assertEqual(value['first_events'][0]['reasons'], [dict(clock=1,
+            kind='interleaved_between', pair='kernel->libc', previous_ns=previous, delta_ns=-1,
+            previous_cpu=0, requested_cpu=1)])
+
+    def test_cpu_coverage_requires_real_schedule_masks_and_restoration(self):
+        for change in ('missing-batch', 'mask-before', 'mask-after', 'begin-error', 'end-error',
+                       'mask-bool', 'rc-bool', 'schedule', 'requested', 'requested-bool', 'cpu-before',
+                       'cpu-after', 'restore-missing', 'restore-failed', 'restore-bool', 'original-mask'):
+            rows = records(4, two_path=True, cpu_coverage=True)
+            batch = rows[0]['cpu_batches'][0]
+            if change == 'missing-batch': rows[0]['cpu_batches'].pop()
+            if change == 'mask-before': batch['before'] = 15
+            if change == 'mask-after': batch['after'] = 2
+            if change == 'begin-error': batch['begin_rc'] = 22
+            if change == 'end-error': batch['end_rc'] = 22
+            if change == 'mask-bool': batch['before'] = True
+            if change == 'rc-bool': batch['end_rc'] = False
+            if change == 'schedule': rows[0]['cpu_schedule'] = [3, 2, 1, 0]
+            if change == 'requested': rows[1]['requested_cpu'] = 1
+            if change == 'requested-bool': rows[1]['requested_cpu'] = False
+            if change == 'cpu-before': rows[1]['clocks'][1]['cpu_before'] = 1
+            if change == 'cpu-after': rows[1]['clocks'][1]['cpu_after'] = 1
+            if change == 'restore-missing': del rows[-1]['affinity_restore_rc']
+            if change == 'restore-failed': rows[-1]['affinity_restore_rc'] = 22
+            if change == 'restore-bool': rows[-1]['affinity_restore_rc'] = False
+            if change == 'original-mask':
+                rows[0]['before']['affinity'] = rows[-1]['after']['affinity'] = 7
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.analyze(rows, two_path=True, cpu_coverage=True)
+
+    def test_cpu_plan_cannot_silently_replace_unpinned_plan(self):
+        for two_path, cpu_coverage in ((False, True), (True, False)):
+            with self.assertRaises(ValueError):
+                self.analyze(records(4, two_path=True, cpu_coverage=True),
+                             two_path=two_path, cpu_coverage=cpu_coverage)
+        with self.assertRaises(ValueError):
+            self.analyze(records(4, two_path=True), two_path=True, cpu_coverage=True)
+        rows = records(4, two_path=True, cpu_coverage=True)
+        rows[0]['operation'] = 'native-clock-libc-syscall'
+        with self.assertRaises(ValueError): self.analyze(rows, two_path=True)
+
+    def test_cpu_execution_is_one_bounded_attempt_and_inspects_after_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            after = Mock(return_value={'state': 'after'})
+            client = MagicMock()
+            def command(_client, text, **kwargs):
+                if 'mktemp' in text: return b'/tmp/gameshellneo-native-clock.abcdefgh'
+                if 'sha256sum' in text: return ('a'*64 + ' file').encode()
+                self.assertIn('timeout --signal=TERM --kill-after=5 60 ', text)
+                self.assertTrue(text.endswith(' --libc-syscall-cpus'))
+                kwargs['output'].write(b'partial CPU failure evidence')
+                raise RuntimeError('affinity failed')
+            with patch.object(host, 'upload'), patch.object(host, 'run', side_effect=command) as run:
+                with self.assertRaisesRegex(RuntimeError, 'affinity failed'):
+                    host.execute(client, root, {'files': {'compare-clocks-native': 'a'*64}},
+                                 root, after, 'libc-syscall-cpus')
+            self.assertEqual(run.call_count, 3)
+            after.assert_called_once()
+            self.assertEqual((root / 'native-output.ndjson').read_bytes(), b'partial CPU failure evidence')
+            client.open_sftp.return_value.__enter__.return_value.remove.assert_not_called()
 
     def test_all_pair_readings_and_mode_identity(self):
         value = report.analyze(encode(records(15000, two_path=True)), 'boot', '2.41', two_path=True)
@@ -348,6 +442,40 @@ class NativeClockTests(unittest.TestCase):
                 report.main()
                 self.assertEqual(json.loads((output / 'analysis.json').read_text())['reads'], 72)
                 summary['operation'] = 'comparison'
+                (capture / 'summary.json').write_text(json.dumps(summary))
+                with self.assertRaisesRegex(ValueError, 'identity'):
+                    report.main()
+
+    def test_cpu_replay_requires_explicit_operation_and_rechecks_affinity(self):
+        import remote
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stamp = '20261010T010000.000000Z'
+            capture = root / 'diagnostics' / stamp
+            capture.mkdir(parents=True)
+            output = root / 'replay'; output.mkdir()
+            rows = records(4, two_path=True, cpu_coverage=True)
+            data = encode(rows)
+            (capture / 'native-output.ndjson').write_bytes(data)
+            (capture / 'before.json').write_text('{"boot_id":"boot"}')
+            summary = dict(complete=True, operation='libc-syscall-cpu-comparison',
+                observation_validated=True, raw_sha256=hashlib.sha256(data).hexdigest())
+            (capture / 'summary.json').write_text(json.dumps(summary))
+            with patch.dict(report.os.environ, {'NEO_CAPTURE': stamp}), patch.object(report, 'SAMPLES', 4), \
+                    patch.object(remote, 'LOCAL', root), patch.object(remote, 'evidence_directory', return_value=output):
+                report.main()
+                result = json.loads((output / 'analysis.json').read_text())
+                self.assertTrue(result['cpu_coverage_verified'])
+                self.assertEqual(result['reads'], 72)
+                summary['operation'] = 'libc-syscall-comparison'
+                (capture / 'summary.json').write_text(json.dumps(summary))
+                with self.assertRaisesRegex(ValueError, 'explicit'):
+                    report.main()
+                summary['operation'] = 'libc-syscall-cpu-comparison'
+                rows[0]['cpu_batches'][0]['after'] = 15
+                data = encode(rows)
+                summary['raw_sha256'] = hashlib.sha256(data).hexdigest()
+                (capture / 'native-output.ndjson').write_bytes(data)
                 (capture / 'summary.json').write_text(json.dumps(summary))
                 with self.assertRaisesRegex(ValueError, 'identity'):
                     report.main()

@@ -2,6 +2,20 @@
 
 Record deferred questions and activities here as they arise.
 
+**All-core native capture completed, 10 October 2026:** NEO-192 now has one
+bounded libc/syscall capture with verified CPU 0–3 coverage: 3,750 sequences /
+67,500 readings per core, 270,000 readings total, zero ordering discrepancies.
+The new explicit task pins only its own thread at batch boundaries, checks
+affinity and CPU endpoints, then restores the original mask. Saved replay
+agrees. Both network routes, PM53/0, battery restart count 1 and the original
+kernel checkpoint remain intact. Native/ARM fixtures and full checks pass:
+24 runtime / 958 tooling tests, one optional skip. Pinning changes the original
+scheduling conditions, and 100 ms pauses hide small cross-core offsets; this
+does not clear either prior clock fault. Next inspect the physical-counter and
+kernel-timekeeping paths for a concrete cause before another measurement.
+NEO-192 stays open; NEO-191/NEO-182 PM work stays pending.
+[Report 265](docs/265-native-clock-cpu-coverage.md).
+
 **Native two-route capture completed, 10 October 2026:** NEO-192's explicit
 libc/syscall experiment retains 270,000 integer readings with zero ordering
 discrepancies, and offline replay agrees. The mode verifies that time32/time64
@@ -15,6 +29,7 @@ Next define bounded CPU coverage and examine the physical-counter/timekeeper
 path for a concrete failure hypothesis. The original MONOTONIC fault and RAW
 −750 ns discrepancy remain open; NEO-191/NEO-182 PM work stays pending.
 [Report 264](docs/264-native-libc-syscall-comparison.md).
+The bounded coverage follow-up is now recorded in report 265 above.
 
 **vDSO clock exports unavailable, 10 October 2026:** NEO-192's prepared native
 three-route comparison stopped before sampling. A separate verified same-boot

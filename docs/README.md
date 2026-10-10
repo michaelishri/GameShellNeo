@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[265 — Native clock comparison across all four CPUs](265-native-clock-cpu-coverage.md)
+records even CPU 0–3 coverage, verified diagnostic affinity restoration and
+270,000 readings without ordering discrepancies. Raw replay and unchanged
+device state are verified; the original intermittent clock fault remains open.
+
 [264 — Native libc/syscall comparison](264-native-libc-syscall-comparison.md)
 records one complete 270,000-reading capture without ordering discrepancies.
 Raw replay agrees, both network routes and original fault evidence stay intact;

@@ -32,8 +32,9 @@ def validate_inventory(data, boot_id, libc_version):
     return value
 
 
-def analyze(data, boot_id, libc_version, *, two_path=False):
-    if type(two_path) is not bool:
+def analyze(data, boot_id, libc_version, *, two_path=False, cpu_coverage=False):
+    if (type(two_path) is not bool or type(cpu_coverage) is not bool or
+            (cpu_coverage and not two_path)):
         raise ValueError('Select an explicit clock-comparison plan')
     routes = PAIR_ROUTES if two_path else ROUTES
     names = NAMES[:2] if two_path else NAMES
@@ -51,6 +52,12 @@ def analyze(data, boot_id, libc_version, *, two_path=False):
                         vdso_time32_exported=False, vdso_handle_verified=True)
     else:
         expected.update(vdso_symbol='__vdso_clock_gettime64', vdso_version='LINUX_2.6', vdso_base_verified=True)
+    if cpu_coverage:
+        expected.update(operation='native-clock-libc-syscall-cpus', cpu_schedule=[0, 1, 2, 3],
+            cpu_batches=[dict(cpu=i % 4, before=1 << (i % 4), after=1 << (i % 4),
+                              begin_rc=0, end_rc=0) for i in range(300)])
+    elif ('cpu_schedule' in header or 'cpu_batches' in header or 'affinity_restore_rc' in footer):
+        raise ValueError('CPU coverage requires its explicit comparison plan')
     # Equality alone accepts booleans as integers; require matching JSON types too.
     if any(json.dumps(header.get(k), sort_keys=True) != json.dumps(v, sort_keys=True)
            for k, v in expected.items()):
@@ -64,9 +71,16 @@ def analyze(data, boot_id, libc_version, *, two_path=False):
             json.dumps(footer.get('failure'), sort_keys=True) != json.dumps(dict(present=False,
                 sequence=0, clock=0, position=0, stage=0, rc=0, errno=0, sec=0, nsec=0), sort_keys=True)):
         raise ValueError('Native capture incomplete or metadata changed')
+    if cpu_coverage and (mask != 15 or type(footer.get('affinity_restore_rc')) is not int or
+                         footer['affinity_restore_rc'] != 0):
+        raise ValueError('Four-core capture did not restore its original affinity')
     result = {str(c): dict(adjacent={}, within={}, between={}, interleaved_between={}, cpu_before_counts={},
         cpu_brackets_differ=0) for c in CLOCKS}
     previous = {}
+    previous_cpu = {}
+    if cpu_coverage:
+        for stats in result.values():
+            stats['cpu_transitions'] = {}
     events = []
     bad_sequences = 0
 
@@ -83,12 +97,20 @@ def analyze(data, boot_id, libc_version, *, two_path=False):
         if (row.get('type') != 'sample' or type(row.get('index')) is not int or row['index'] != index or
                 type(row.get('clocks')) is not list or len(row['clocks']) != 3):
             raise ValueError('Unordered or incomplete native samples')
+        target = ((index - 1) // 50) % 4
+        if cpu_coverage:
+            if type(row.get('requested_cpu')) is not int or row['requested_cpu'] != target:
+                raise ValueError('Sample does not follow the fixed CPU schedule')
+        elif 'requested_cpu' in row:
+            raise ValueError('CPU coverage requires its explicit comparison plan')
         reasons = []
         for clock, family in zip(CLOCKS, row['clocks']):
             stats = result[str(clock)]
             cpus = [family['cpu_before'], family['cpu_after']]
             if any(type(c) is not int or c not in range(4) or not mask & (1 << c) for c in cpus):
                 raise ValueError('CPU context outside process affinity')
+            if cpu_coverage and cpus != [target, target]:
+                raise ValueError('CPU observation differs from the requested core')
             counts = stats['cpu_before_counts']
             counts[str(cpus[0])] = counts.get(str(cpus[0]), 0) + 1
             stats['cpu_brackets_differ'] += int(cpus[0] != cpus[1])
@@ -108,6 +130,11 @@ def analyze(data, boot_id, libc_version, *, two_path=False):
                 if observe(stats['interleaved_between'], pair, delta):
                     reasons.append(dict(clock=clock, kind='interleaved_between', pair=pair,
                                         previous_ns=previous[last_key], delta_ns=delta))
+                if cpu_coverage:
+                    transition = str(previous_cpu[clock]) + '->' + str(target)
+                    observe(stats['cpu_transitions'], transition, delta)
+                    if delta < 0:
+                        reasons[-1].update(previous_cpu=previous_cpu[clock], requested_cpu=target)
             for route, name in enumerate(names):
                 ns = [n for r, n in zip(routes, readings) if r == route]
                 for p in range(1, len(ns)):
@@ -119,6 +146,7 @@ def analyze(data, boot_id, libc_version, *, two_path=False):
                     reasons.append(dict(clock=clock, kind='between', route=name,
                                         previous_ns=previous[key], delta_ns=ns[0] - previous[key]))
                 previous[key] = ns[-1]
+            previous_cpu[clock] = cpus[-1]
         if reasons:
             bad_sequences += 1
             if len(events) < 32:
@@ -127,6 +155,7 @@ def analyze(data, boot_id, libc_version, *, two_path=False):
         samples=SAMPLES, reads=SAMPLES*len(CLOCKS)*len(routes), discrepancy_sequences=bad_sequences,
         statistics=result, first_events=events, events_truncated=bad_sequences > len(events),
         all_readings_retained=True, metadata=meta, clock_reliability_qualified=False, pm_admission=False,
+        cpu_coverage_verified=cpu_coverage, diagnostic_affinity_restored=cpu_coverage,
         per_read_cpu_proven=False, vdso_internal_fallback_excluded=False)
 
 
@@ -143,7 +172,7 @@ def main():
         raise ValueError('Native capture exceeds its fixed bound')
     data = raw.read_bytes()
     if (summary.get('complete') is not True or summary.get('observation_validated') is not True or
-            summary.get('operation') not in ('comparison', 'libc-syscall-comparison') or
+            summary.get('operation') not in ('comparison', 'libc-syscall-comparison', 'libc-syscall-cpu-comparison') or
             hashlib.sha256(data).hexdigest() != summary.get('raw_sha256')):
         raise ValueError('Original completed capture or raw hash is missing/changed')
     before = json.loads((capture / 'before.json').read_text())
@@ -151,7 +180,8 @@ def main():
     # hash-verified installed runtime. Replay never re-executes a device helper.
     version = json.loads(data.splitlines()[0])['libc']
     result = analyze(data, before['boot_id'], version,
-                     two_path=summary['operation'] == 'libc-syscall-comparison')
+                     two_path=summary['operation'] != 'comparison',
+                     cpu_coverage=summary['operation'] == 'libc-syscall-cpu-comparison')
     os.umask(0o077)
     destination = evidence_directory()
     result['original_capture'] = name

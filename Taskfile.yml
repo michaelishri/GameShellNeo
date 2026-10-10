@@ -609,6 +609,15 @@ tasks:
       NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
     cmds: [python3 tools/check-native-clocks.py]
 
+  device:clock-native-cpus:
+    desc: One awake libc/syscall capture across four CPUs; temporarily pins only its own thread and restores affinity
+    env:
+      NEO_NATIVE_MODE: libc-syscall-cpus
+      NEO_NATIVE_BUILD: '{{.BUILD | default ""}}'
+      NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-native-clocks.py]
+
   report:clock-native:
     desc: Reclassify every hash-verified saved native reading offline; no device access
     env:

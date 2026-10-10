@@ -16,6 +16,7 @@ from kernel_checks import sha256
 from native_clock_report import analyze, validate_inventory
 
 OPERATIONS = {'compare': 'comparison', 'libc-syscall': 'libc-syscall-comparison',
+              'libc-syscall-cpus': 'libc-syscall-cpu-comparison',
               'inspect-vdso': 'vdso-inventory'}
 
 
@@ -145,7 +146,8 @@ def main():
             verify_remote_libc(client, inventory)
             version = inventory['libc'].removeprefix('glibc ')
             result = (validate_inventory(data, before['boot_id'], version) if mode == 'inspect-vdso' else
-                      analyze(data, before['boot_id'], version, two_path=mode == 'libc-syscall'))
+                      analyze(data, before['boot_id'], version, two_path=mode != 'compare',
+                              cpu_coverage=mode == 'libc-syscall-cpus'))
             (capture / 'analysis.json').write_text(json.dumps(result, indent=2) + '\n')
             load('native_clock_state', 'check-clock-observation.py').validate_state(before, after)
             pm.wifi_proof(config, after)

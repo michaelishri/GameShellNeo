@@ -15,6 +15,9 @@ from remote import ROOT, LOCAL, device, evidence_directory, run, upload
 from kernel_checks import sha256
 from native_clock_report import analyze, validate_inventory
 
+OPERATIONS = {'compare': 'comparison', 'libc-syscall': 'libc-syscall-comparison',
+              'inspect-vdso': 'vdso-inventory'}
+
 
 def load(name, filename):
     spec = importlib.util.spec_from_file_location(name, ROOT / 'tools' / filename)
@@ -66,8 +69,10 @@ def verify_remote_libc(client, inventory):
         raise ValueError('Installed libc changed since runtime inventory')
 
 
-def execute(client, build, receipt, capture, inspect_after, inspect_only=False):
+def execute(client, build, receipt, capture, inspect_after, mode='compare'):
     """Save raw output and always inspect after the one attempt, even on failure."""
+    if mode not in OPERATIONS:
+        raise ValueError('Unknown native diagnostic mode')
     directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-native-clock.XXXXXXXX',
                     display=False, timeout=15).decode().strip()
     if not re.fullmatch(r'/tmp/gameshellneo-native-clock\.[A-Za-z0-9]{8}', directory):
@@ -84,8 +89,8 @@ def execute(client, build, receipt, capture, inspect_after, inspect_only=False):
             raise ValueError('Staged native binary differs from verified build')
         with (capture / 'native-output.ndjson').open('wb') as output:
             args = ['timeout', '--signal=TERM', '--kill-after=5', '60', target]
-            if inspect_only:
-                args.append('--inspect-vdso')
+            if mode != 'compare':
+                args.append('--' + mode)
             data = run(client, shlex.join(args),
                        output=output, display=False, timeout=90)
     finally:
@@ -101,10 +106,10 @@ def execute(client, build, receipt, capture, inspect_after, inspect_only=False):
 def main():
     os.umask(0o077)
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
-    mode = os.environ.get('NEO_NATIVE_INSPECT_ONLY', '0')
-    if mode not in ('0', '1'):
+    mode = os.environ.get('NEO_NATIVE_MODE', 'compare')
+    if mode not in OPERATIONS:
         raise ValueError('Unknown native diagnostic mode')
-    inspect_only = mode == '1'
+    operation = OPERATIONS[mode]
     runtime = load('native_runtime_inputs', 'report-clock-runtime.py').verified_capture(
         os.environ.get('NEO_RUNTIME_CAPTURE', ''))
     inventory = json.loads((runtime / 'inventory.json').read_text())
@@ -114,7 +119,7 @@ def main():
     (capture / 'build-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     (capture / 'inputs.json').write_text(json.dumps(dict(build=build.name, runtime=runtime.name,
         host_sha256=sha256(Path(__file__)), analyzer_sha256=sha256(ROOT / 'tools/native_clock_report.py'),
-        libc=inventory['files']['libc'], operation='vdso-inventory' if inspect_only else 'comparison'), indent=2) + '\n')
+        libc=inventory['files']['libc'], operation=operation), indent=2) + '\n')
     pm = load('native_clock_pm', 'check-pm-stages.py')
     clock = load('native_clock_host', 'check-clock-paths.py')
     program = clock.inspection_program(pm, os.environ.get('NEO_CLOCK_INSPECTION_REVISION', ''), capture)
@@ -136,15 +141,16 @@ def main():
                 raise ValueError('A PM diagnostic is active')
             verify_remote_libc(client, inventory)
             data, after = execute(client, build, receipt, capture,
-                lambda: clock.inspect(client, program, capture, 'after'), inspect_only)
+                lambda: clock.inspect(client, program, capture, 'after'), mode)
             verify_remote_libc(client, inventory)
-            validator = validate_inventory if inspect_only else analyze
-            result = validator(data, before['boot_id'], inventory['libc'].removeprefix('glibc '))
+            version = inventory['libc'].removeprefix('glibc ')
+            result = (validate_inventory(data, before['boot_id'], version) if mode == 'inspect-vdso' else
+                      analyze(data, before['boot_id'], version, two_path=mode == 'libc-syscall'))
             (capture / 'analysis.json').write_text(json.dumps(result, indent=2) + '\n')
             load('native_clock_state', 'check-clock-observation.py').validate_state(before, after)
             pm.wifi_proof(config, after)
     summary = dict(complete=True, observation_validated=True, device_state_unchanged=True,
-        operation='vdso-inventory' if inspect_only else 'comparison',
+        operation=operation,
         usb_ssh_verified=True, wifi_ssh_verified=True, pm_admission=False, clock_reliability_qualified=False,
         discrepancy_sequences=result.get('discrepancy_sequences'), samples=result.get('samples', 0),
         raw_sha256=sha256(capture / 'native-output.ndjson'))

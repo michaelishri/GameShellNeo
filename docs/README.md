@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[264 — Native libc/syscall comparison](264-native-libc-syscall-comparison.md)
+records one complete 270,000-reading capture without ordering discrepancies.
+Raw replay agrees, both network routes and original fault evidence stay intact;
+limited CPU coverage and short duration leave the root cause unresolved.
+
 [263 — Native clock diagnostic and vDSO availability](263-native-clock-vdso-availability.md)
 records a stopped three-route comparison and a successful same-boot export
 inventory. The ARM kernel deliberately hides the clock exports for this timer

@@ -579,12 +579,22 @@ tasks:
     cmds: [python3 tools/report-clock-runtime.py]
 
   check:clock-native:
-    desc: Build fixed ARM libc/syscall/vDSO comparator and run native/ARM fixtures offline; no device access
+    desc: Build fixed ARM two/three-route clock comparator and run native/ARM fixtures offline; no device access
     cmds: [python3 tools/build-native-clocks.py]
 
   device:clock-native:
     desc: One awake native clock comparison with all raw readings retained; no clock/PM changes
     env:
+      NEO_NATIVE_MODE: compare
+      NEO_NATIVE_BUILD: '{{.BUILD | default ""}}'
+      NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-native-clocks.py]
+
+  device:clock-native-pair:
+    desc: One fixed awake libc/syscall comparison on the verified boot without vDSO clock exports
+    env:
+      NEO_NATIVE_MODE: libc-syscall
       NEO_NATIVE_BUILD: '{{.BUILD | default ""}}'
       NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
       NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
@@ -593,7 +603,7 @@ tasks:
   device:clock-vdso:
     desc: Inspect mapped vDSO clock exports without sampling clocks or changing the device
     env:
-      NEO_NATIVE_INSPECT_ONLY: '1'
+      NEO_NATIVE_MODE: inspect-vdso
       NEO_NATIVE_BUILD: '{{.BUILD | default ""}}'
       NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
       NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'

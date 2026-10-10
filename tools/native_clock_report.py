@@ -5,6 +5,7 @@ import os
 import re
 
 ROUTES = (0, 1, 2, 0, 2, 1, 2, 1, 0)
+PAIR_ROUTES = (0, 1, 0, 1, 0, 1)
 NAMES = ('libc', 'kernel', 'vdso')
 CLOCKS = (1, 4, 7)
 SAMPLES = 15000
@@ -31,17 +32,25 @@ def validate_inventory(data, boot_id, libc_version):
     return value
 
 
-def analyze(data, boot_id, libc_version):
+def analyze(data, boot_id, libc_version, *, two_path=False):
+    if type(two_path) is not bool:
+        raise ValueError('Select an explicit clock-comparison plan')
+    routes = PAIR_ROUTES if two_path else ROUTES
+    names = NAMES[:2] if two_path else NAMES
     if len(data) > MAX_BYTES:
         raise ValueError('Native capture exceeds its fixed bound')
     lines = data.splitlines()
     if len(lines) != SAMPLES + 2:
         raise ValueError('Incomplete native capture')
     header, footer = json.loads(lines[0]), json.loads(lines[-1])
-    expected = dict(type='header', schema=1, operation='native-clock-comparison', batches=300,
-        per_batch=50, pause_ns=100000000, routes=list(ROUTES), clocks=list(CLOCKS),
-        vdso_symbol='__vdso_clock_gettime64', vdso_version='LINUX_2.6', vdso_base_verified=True,
-        libc=libc_version)
+    expected = dict(type='header', schema=1,
+        operation='native-clock-libc-syscall' if two_path else 'native-clock-comparison', batches=300,
+        per_batch=50, pause_ns=100000000, routes=list(routes), clocks=list(CLOCKS), libc=libc_version)
+    if two_path:
+        expected.update(direct_vdso_called=False, vdso_time64_exported=False,
+                        vdso_time32_exported=False, vdso_handle_verified=True)
+    else:
+        expected.update(vdso_symbol='__vdso_clock_gettime64', vdso_version='LINUX_2.6', vdso_base_verified=True)
     # Equality alone accepts booleans as integers; require matching JSON types too.
     if any(json.dumps(header.get(k), sort_keys=True) != json.dumps(v, sort_keys=True)
            for k, v in expected.items()):
@@ -55,7 +64,7 @@ def analyze(data, boot_id, libc_version):
             json.dumps(footer.get('failure'), sort_keys=True) != json.dumps(dict(present=False,
                 sequence=0, clock=0, position=0, stage=0, rc=0, errno=0, sec=0, nsec=0), sort_keys=True)):
         raise ValueError('Native capture incomplete or metadata changed')
-    result = {str(c): dict(adjacent={}, within={}, between={}, cpu_before_counts={},
+    result = {str(c): dict(adjacent={}, within={}, between={}, interleaved_between={}, cpu_before_counts={},
         cpu_brackets_differ=0) for c in CLOCKS}
     previous = {}
     events = []
@@ -84,16 +93,23 @@ def analyze(data, boot_id, libc_version):
             counts[str(cpus[0])] = counts.get(str(cpus[0]), 0) + 1
             stats['cpu_brackets_differ'] += int(cpus[0] != cpus[1])
             readings = family['ns']
-            if (type(readings) is not list or len(readings) != len(ROUTES) or
+            if (type(readings) is not list or len(readings) != len(routes) or
                     any(type(n) is not int or not 0 <= n <= 2**63-1 for n in readings)):
                 raise ValueError('Invalid integer nanosecond evidence')
-            for p in range(1, len(ROUTES)):
-                pair = NAMES[ROUTES[p-1]] + '->' + NAMES[ROUTES[p]]
+            for p in range(1, len(routes)):
+                pair = names[routes[p-1]] + '->' + names[routes[p]]
                 if observe(stats['adjacent'], pair, readings[p] - readings[p-1]):
                     reasons.append(dict(clock=clock, kind='adjacent', position=p, pair=pair,
                                         delta_ns=readings[p] - readings[p-1]))
-            for route, name in enumerate(NAMES):
-                ns = [n for r, n in zip(ROUTES, readings) if r == route]
+            last_key = (clock, routes[-1])
+            if last_key in previous:
+                pair = names[routes[-1]] + '->' + names[routes[0]]
+                delta = readings[0] - previous[last_key]
+                if observe(stats['interleaved_between'], pair, delta):
+                    reasons.append(dict(clock=clock, kind='interleaved_between', pair=pair,
+                                        previous_ns=previous[last_key], delta_ns=delta))
+            for route, name in enumerate(names):
+                ns = [n for r, n in zip(routes, readings) if r == route]
                 for p in range(1, len(ns)):
                     if observe(stats['within'], name, ns[p] - ns[p-1]):
                         reasons.append(dict(clock=clock, kind='within', route=name,
@@ -107,7 +123,8 @@ def analyze(data, boot_id, libc_version):
             bad_sequences += 1
             if len(events) < 32:
                 events.append(dict(index=index, reasons=reasons, sample=row))
-    return dict(complete=True, samples=SAMPLES, reads=SAMPLES*27, discrepancy_sequences=bad_sequences,
+    return dict(complete=True, operation=expected['operation'], routes=list(routes),
+        samples=SAMPLES, reads=SAMPLES*len(CLOCKS)*len(routes), discrepancy_sequences=bad_sequences,
         statistics=result, first_events=events, events_truncated=bad_sequences > len(events),
         all_readings_retained=True, metadata=meta, clock_reliability_qualified=False, pm_admission=False,
         per_read_cpu_proven=False, vdso_internal_fallback_excluded=False)
@@ -126,14 +143,15 @@ def main():
         raise ValueError('Native capture exceeds its fixed bound')
     data = raw.read_bytes()
     if (summary.get('complete') is not True or summary.get('observation_validated') is not True or
-            summary.get('operation') != 'comparison' or
+            summary.get('operation') not in ('comparison', 'libc-syscall-comparison') or
             hashlib.sha256(data).hexdigest() != summary.get('raw_sha256')):
         raise ValueError('Original completed capture or raw hash is missing/changed')
     before = json.loads((capture / 'before.json').read_text())
     # The original host validation checked this header version against the
     # hash-verified installed runtime. Replay never re-executes a device helper.
     version = json.loads(data.splitlines()[0])['libc']
-    result = analyze(data, before['boot_id'], version)
+    result = analyze(data, before['boot_id'], version,
+                     two_path=summary['operation'] == 'libc-syscall-comparison')
     os.umask(0o077)
     destination = evidence_directory()
     result['original_capture'] = name

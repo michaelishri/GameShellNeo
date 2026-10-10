@@ -2,6 +2,20 @@
 
 Record deferred questions and activities here as they arise.
 
+**Native two-route capture completed, 10 October 2026:** NEO-192's explicit
+libc/syscall experiment retains 270,000 integer readings with zero ordering
+discrepancies, and offline replay agrees. The mode verifies that time32/time64
+vDSO clock exports remain unavailable and cannot silently replace the previous
+three-route plan. CPU endpoints cover only CPUs 1 and 2, with no differing
+endpoint pairs; this cannot qualify all cores or exclude migration between
+observations. Both network routes, PM53/0, battery restart count 1 and protected
+kernel evidence remain intact. Host/ARM fixtures and full checks pass:
+24 runtime / 953 tooling tests (one optional skip), existing C checks and lint.
+Next define bounded CPU coverage and examine the physical-counter/timekeeper
+path for a concrete failure hypothesis. The original MONOTONIC fault and RAW
+−750 ns discrepancy remain open; NEO-191/NEO-182 PM work stays pending.
+[Report 264](docs/264-native-libc-syscall-comparison.md).
+
 **vDSO clock exports unavailable, 10 October 2026:** NEO-192's prepared native
 three-route comparison stopped before sampling. A separate verified same-boot
 inventory resolves the actual vDSO mapping but none of its four clock exports,

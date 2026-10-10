@@ -1088,7 +1088,7 @@ The native comparator and its read-only vDSO inventory use a tested ARM binary:
 
 ```sh
 task check:clock-native
-task device:clock-vdso BUILD=20261009T232021.120014Z RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+task device:clock-vdso BUILD=20261010T001344.437496Z RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
 ```
 
 Use the build/inventory timestamps produced on your checkout. The offline build
@@ -1114,6 +1114,27 @@ reading when available; `task report:clock-native CAPTURE=<completed-capture>`
 reclassifies a completed comparison offline into a fresh report, checking the
 original raw-data hash. A vDSO inventory or stopped attempt cannot pass as a
 completed comparison. All raw results remain under ignored `.local/diagnostics/`.
+
+For this image's confirmed absence of clock exports, select the **explicit
+two-route experiment** instead:
+
+```sh
+task check:clock-native
+task device:clock-native-pair BUILD=20261010T001344.437496Z RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+# After a completed comparison, use its printed timestamp:
+task report:clock-native CAPTURE=<completed-capture>
+```
+
+This invokes `--libc-syscall` and records a distinct operation identity. It
+requires the verified mapped vDSO to have neither time32 nor time64 clock
+exports, then alternates libc and syscall403 three times per clock family.
+The fixed 15,000 sequences retain all 270,000 readings for MONOTONIC, RAW and
+BOOTTIME. Source/binary/libc checks, CPU endpoints, bounded runtime and protected
+before/after evidence use the existing workflow. The analyzer checks ordering
+within each route, between adjacent routes and across sequence boundaries.
+There is no automatic downgrade from the three-route task or clock/PM setting
+change. A clean short run does not clear a historical fault or qualify sleep.
+See [report 264](docs/264-native-libc-syscall-comparison.md).
 
 The candidate ADC width correction has its own saved checks:
 

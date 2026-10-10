@@ -15,6 +15,10 @@
 
 enum { LIBC, KERNEL, VDSO, NREADS = 9, NCLOCKS = 3, BATCHES = 300, PER_BATCH = 50 };
 static const int routes[NREADS] = {LIBC, KERNEL, VDSO, LIBC, VDSO, KERNEL, VDSO, KERNEL, LIBC};
+static const int pair_routes[] = {LIBC, KERNEL, LIBC, KERNEL, LIBC, KERNEL};
+struct plan { const char *operation; const int *routes; int reads; };
+static const struct plan three_plan = {"native-clock-comparison", routes, NREADS};
+static const struct plan pair_plan = {"native-clock-libc-syscall", pair_routes, 6};
 static const int clocks[NCLOCKS] = {1, 4, 7};
 struct raw { int rc, error; int64_t sec, nsec; };
 struct family { int before, after, valid; int64_t ns[NREADS]; };
@@ -34,7 +38,7 @@ static int convert(struct raw raw, int64_t *ns)
 }
 
 /* Only test fixtures supply alternate callbacks/bounds. Production is fixed. */
-static int capture(struct sequence *data, int count, int batch, reader_fn read_clock,
+static int capture(const struct plan *plan, struct sequence *data, int count, int batch, reader_fn read_clock,
                    cpu_fn cpu, pause_fn pause, void *ctx, struct failure *failure)
 {
     int i, c, p;
@@ -47,8 +51,8 @@ static int capture(struct sequence *data, int count, int batch, reader_fn read_c
                 *failure = (struct failure){1, i, c, -1, 1, {0}};
                 return i;
             }
-            for (p = 0; p < NREADS; ++p) {
-                struct raw raw = read_clock(ctx, routes[p], clocks[c]);
+            for (p = 0; p < plan->reads; ++p) {
+                struct raw raw = read_clock(ctx, plan->routes[p], clocks[c]);
                 if (convert(raw, &f->ns[p])) {
                     *failure = (struct failure){1, i, c, p, 2, raw};
                     return i;
@@ -57,7 +61,7 @@ static int capture(struct sequence *data, int count, int batch, reader_fn read_c
             }
             f->after = cpu(ctx);
             if (f->after < 0 || f->after > 3) {
-                *failure = (struct failure){1, i, c, NREADS, 3, {0}};
+                *failure = (struct failure){1, i, c, plan->reads, 3, {0}};
                 return i;
             }
         }
@@ -70,12 +74,13 @@ static int capture(struct sequence *data, int count, int batch, reader_fn read_c
 }
 
 #ifdef NEO_CLOCK_TEST
-struct fixture { int calls, cpus, pauses, fail_at, bad_cpu, fail_pause; int64_t tick; };
+struct fixture { const struct plan *plan; int calls, cpus, pauses, fail_at, bad_cpu, fail_pause; int64_t tick; };
 static struct raw fake_read(void *ctx, int route, int clock)
 {
     struct fixture *f = ctx;
-    assert(route == routes[f->calls % NREADS]);
-    assert(clock == clocks[(f->calls / NREADS) % NCLOCKS]);
+    assert(route == f->plan->routes[f->calls % f->plan->reads]);
+    assert(clock == clocks[(f->calls / f->plan->reads) % NCLOCKS]);
+    if (f->plan == &pair_plan) assert(route != VDSO);
     ++f->calls;
     if (f->calls == f->fail_at) return (struct raw){-1, ENOSYS, -1, -1};
     /* Deliberately decreasing values must survive, never be clamped/retried. */
@@ -83,22 +88,27 @@ static struct raw fake_read(void *ctx, int route, int clock)
 }
 static int fake_cpu(void *ctx) { struct fixture *f = ctx; ++f->cpus; return f->bad_cpu ? -1 : 2; }
 static int fake_pause(void *ctx) { struct fixture *f = ctx; ++f->pauses; return f->fail_pause; }
-int main(void)
+static void test_plan(const struct plan *plan)
 {
     struct sequence data[4] = {0}; struct failure error = {0};
-    struct fixture f = {.tick = 10000};
-    assert(capture(data, 4, 2, fake_read, fake_cpu, fake_pause, &f, &error) == 4);
-    assert(!error.present && f.calls == 108 && f.cpus == 24 && f.pauses == 2);
+    struct fixture f = {.plan = plan, .tick = 10000};
+    assert(capture(plan, data, 4, 2, fake_read, fake_cpu, fake_pause, &f, &error) == 4);
+    assert(!error.present && f.calls == 4*NCLOCKS*plan->reads && f.cpus == 24 && f.pauses == 2);
     assert(data[0].clock[0].ns[1] == data[0].clock[0].ns[0] - 1);
-    memset(data, 0, sizeof(data)); f = (struct fixture){.tick = 10000, .fail_at = 14};
-    assert(capture(data, 4, 2, fake_read, fake_cpu, fake_pause, &f, &error) == 0);
-    assert(f.calls == 14 && f.pauses == 0 && error.clock == 1 && error.position == 4);
+    memset(data, 0, sizeof(data)); f = (struct fixture){.plan = plan, .tick = 10000, .fail_at = plan->reads + 5};
+    assert(capture(plan, data, 4, 2, fake_read, fake_cpu, fake_pause, &f, &error) == 0);
+    assert(f.calls == plan->reads + 5 && f.pauses == 0 && error.clock == 1 && error.position == 4);
     assert(error.raw.rc == -1 && error.raw.error == ENOSYS && error.raw.sec == -1);
-    assert(data[0].clock[0].valid == 9 && data[0].clock[1].valid == 4);
-    memset(data, 0, sizeof(data)); f = (struct fixture){.bad_cpu = 1};
-    assert(capture(data, 4, 2, fake_read, fake_cpu, fake_pause, &f, &error) == 0 && f.calls == 0);
-    memset(data, 0, sizeof(data)); f = (struct fixture){.tick = 10000, .fail_pause = 1};
-    assert(capture(data, 4, 2, fake_read, fake_cpu, fake_pause, &f, &error) == 2 && f.pauses == 1);
+    assert(data[0].clock[0].valid == plan->reads && data[0].clock[1].valid == 4);
+    memset(data, 0, sizeof(data)); f = (struct fixture){.plan = plan, .bad_cpu = 1};
+    assert(capture(plan, data, 4, 2, fake_read, fake_cpu, fake_pause, &f, &error) == 0 && f.calls == 0);
+    memset(data, 0, sizeof(data)); f = (struct fixture){.plan = plan, .tick = 10000, .fail_pause = 1};
+    assert(capture(plan, data, 4, 2, fake_read, fake_cpu, fake_pause, &f, &error) == 2 && f.pauses == 1);
+}
+int main(void)
+{
+    test_plan(&three_plan);
+    test_plan(&pair_plan);
     int64_t ns;
     assert(!convert((struct raw){0, 0, INT64_C(1) << 33, 123}, &ns));
     assert(ns == (INT64_C(1) << 33)*1000000000 + 123);
@@ -106,7 +116,7 @@ int main(void)
     assert(convert((struct raw){0, 0, 0, 1000000000}, &ns));
     assert(convert((struct raw){0, 0, -1, 0}, &ns));
     assert(!convert((struct raw){0, 0, 0, 0}, &ns) && ns == 0);
-    puts("Native clock capture: fixed bounds, ordering, raw failures and overflow checks passed.");
+    puts("Native clock capture: both fixed plans, ordering, raw failures and overflow checks passed.");
     return 0;
 }
 #else
@@ -191,7 +201,9 @@ static void print_meta(struct metadata *m)
 int main(int argc, char **argv)
 {
     int inspect_only = argc == 2 && !strcmp(argv[1], "--inspect-vdso");
-    if (argc != 1 && !inspect_only) return 2;
+    int two_path = argc == 2 && !strcmp(argv[1], "--libc-syscall");
+    if (argc != 1 && !inspect_only && !two_path) return 2;
+    const struct plan *plan = two_path ? &pair_plan : &three_plan;
     if (getenv("LD_PRELOAD") || getenv("LD_AUDIT") || getenv("LD_LIBRARY_PATH")) {
         fputs("Loader environment is outside this comparison's attribution.\n", stderr); return 1;
     }
@@ -229,21 +241,38 @@ int main(int argc, char **argv)
     }
     void *symbol = handle ? dlvsym(handle, "__vdso_clock_gettime64", "LINUX_2.6") : NULL;
     Dl_info info;
-    if (!handle_verified || !symbol || !dladdr(symbol, &info) || (uintptr_t)info.dli_fbase != vdso_base) {
-        fputs("Cannot establish the mapped, versioned ARM time64 vDSO entry.\n", stderr); return 1;
+    if (two_path) {
+        /* This explicit experiment targets the observed no-clock-export boot.
+         * It never calls an unavailable entry or silently downgrades a plan. */
+        if (!handle_verified || symbol || dlvsym(handle, "__vdso_clock_gettime", "LINUX_2.6") ||
+            dlsym(handle, "__vdso_clock_gettime64") || dlsym(handle, "__vdso_clock_gettime")) {
+            fputs("Two-route comparison requires the verified vDSO with both clock exports absent.\n", stderr);
+            return 1;
+        }
+    } else {
+        if (!handle_verified || !symbol || !dladdr(symbol, &info) || (uintptr_t)info.dli_fbase != vdso_base) {
+            fputs("Cannot establish the mapped, versioned ARM time64 vDSO entry.\n", stderr); return 1;
+        }
+        vdso_clock = (int (*)(clockid_t, struct __kernel_timespec *))symbol;
     }
-    vdso_clock = (int (*)(clockid_t, struct __kernel_timespec *))symbol;
     struct metadata before = {0}, after = {0};
     if (metadata(&before)) { fputs("Metadata read failed before capture.\n", stderr); return 1; }
     struct sequence *data = calloc(BATCHES * PER_BATCH, sizeof(*data));
     if (!data) return 1;
     struct failure failure = {0};
-    int completed = capture(data, BATCHES * PER_BATCH, PER_BATCH, real_read, real_cpu, real_pause, NULL, &failure);
+    int completed = capture(plan, data, BATCHES * PER_BATCH, PER_BATCH, real_read, real_cpu, real_pause, NULL, &failure);
     int after_ok = metadata(&after) == 0;
-    printf("{\"type\":\"header\",\"schema\":1,\"operation\":\"native-clock-comparison\","
-           "\"batches\":300,\"per_batch\":50,\"pause_ns\":100000000,\"routes\":[0,1,2,0,2,1,2,1,0],"
-           "\"clocks\":[1,4,7],\"vdso_symbol\":\"__vdso_clock_gettime64\",\"vdso_version\":\"LINUX_2.6\","
-           "\"vdso_base_verified\":true,\"libc\":\"%s\",\"before\":", gnu_get_libc_version());
+    printf("{\"type\":\"header\",\"schema\":1,\"operation\":\"%s\","
+           "\"batches\":300,\"per_batch\":50,\"pause_ns\":100000000,\"routes\":[", plan->operation);
+    for (int p = 0; p < plan->reads; ++p) printf("%s%d", p ? "," : "", plan->routes[p]);
+    printf("],\"clocks\":[1,4,7],");
+    if (two_path)
+        printf("\"direct_vdso_called\":false,\"vdso_time64_exported\":false,"
+               "\"vdso_time32_exported\":false,\"vdso_handle_verified\":true,");
+    else
+        printf("\"vdso_symbol\":\"__vdso_clock_gettime64\",\"vdso_version\":\"LINUX_2.6\","
+               "\"vdso_base_verified\":true,");
+    printf("\"libc\":\"%s\",\"before\":", gnu_get_libc_version());
     print_meta(&before); puts("}");
     int rows = completed + (failure.present && failure.stage != 4);
     for (int i = 0; i < rows; ++i) {

@@ -26,16 +26,22 @@ host = load('native_clock_host_test', 'check-native-clocks.py')
 builder = load('native_clock_build_test', 'build-native-clocks.py')
 
 
-def records(count):
+def records(count, *, two_path=False):
     meta = dict(boot_id='boot', clocksource='arch_sys_counter', affinity=15)
     header = dict(type='header', schema=1, operation='native-clock-comparison', batches=300,
         per_batch=50, pause_ns=100000000, routes=list(report.ROUTES), clocks=list(report.CLOCKS),
         vdso_symbol='__vdso_clock_gettime64', vdso_version='LINUX_2.6', vdso_base_verified=True,
         libc='2.41', before=meta)
+    if two_path:
+        for name in ('vdso_symbol', 'vdso_version', 'vdso_base_verified'):
+            del header[name]
+        header.update(operation='native-clock-libc-syscall', routes=list(report.PAIR_ROUTES),
+            direct_vdso_called=False, vdso_time64_exported=False,
+            vdso_time32_exported=False, vdso_handle_verified=True)
     footer = dict(type='footer', complete=True, completed=count, after=deepcopy(meta),
         failure=dict(present=False, sequence=0, clock=0, position=0, stage=0, rc=0, errno=0, sec=0, nsec=0))
     rows = [dict(type='sample', index=i+1, clocks=[dict(cpu_before=i%4, cpu_after=i%4,
-        ns=[2**55 + i*10000 + c*1000 + p*100 for p in range(9)]) for c in range(3)]) for i in range(count)]
+        ns=[2**55 + i*10000 + c*1000 + p*100 for p in range(len(header['routes']))]) for c in range(3)]) for i in range(count)]
     return [header, *rows, footer]
 
 
@@ -44,9 +50,82 @@ def encode(rows):
 
 
 class NativeClockTests(unittest.TestCase):
-    def analyze(self, rows):
+    def analyze(self, rows, *, two_path=False):
         with patch.object(report, 'SAMPLES', 4):
-            return report.analyze(encode(rows), 'boot', '2.41')
+            return report.analyze(encode(rows), 'boot', '2.41', two_path=two_path)
+
+    def test_all_pair_readings_and_mode_identity(self):
+        value = report.analyze(encode(records(15000, two_path=True)), 'boot', '2.41', two_path=True)
+        self.assertEqual(value['reads'], 270000)
+        self.assertEqual(value['operation'], 'native-clock-libc-syscall')
+        self.assertEqual(value['discrepancy_sequences'], 0)
+        self.assertFalse(value['pm_admission'])
+        for stats in value['statistics'].values():
+            self.assertEqual(set(stats['within']), {'libc', 'kernel'})
+            self.assertEqual(stats['adjacent']['libc->kernel']['count'], 45000)
+            self.assertEqual(stats['adjacent']['kernel->libc']['count'], 30000)
+            self.assertEqual(stats['interleaved_between']['kernel->libc']['count'], 14999)
+        # Neither recorder can be silently relabeled as the other plan.
+        with self.assertRaises(ValueError): self.analyze(records(4, two_path=True))
+        with self.assertRaises(ValueError): self.analyze(records(4), two_path=True)
+
+    def test_pair_cross_route_and_cross_sequence_disagreement(self):
+        rows = records(4, two_path=True)
+        ns = rows[1]['clocks'][1]['ns']
+        ns[2] = ns[1] - 50
+        result = self.analyze(rows, two_path=True)
+        self.assertEqual(result['discrepancy_sequences'], 1)
+        self.assertEqual(result['statistics']['4']['adjacent']['kernel->libc']['min_ns'], -50)
+        self.assertTrue(all(v['negative'] == 0 for v in result['statistics']['4']['within'].values()))
+        rows = records(4, two_path=True)
+        previous = rows[1]['clocks'][0]['ns'][-1]
+        rows[2]['clocks'][0]['ns'][0] = previous - 50
+        result = self.analyze(rows, two_path=True)
+        reasons = result['first_events'][0]['reasons']
+        self.assertEqual(reasons, [dict(clock=1, kind='interleaved_between', pair='kernel->libc',
+                                       previous_ns=previous, delta_ns=-50)])
+
+    def test_pair_route_regression_preserved_for_each_route(self):
+        for route, name in enumerate(('libc', 'kernel')):
+            rows = records(4, two_path=True)
+            ns = rows[1]['clocks'][0]['ns']
+            ns[route+2] = ns[route] - 1
+            result = self.analyze(rows, two_path=True)
+            self.assertEqual(result['statistics']['1']['within'][name]['negative'], 1)
+            self.assertEqual(result['first_events'][0]['sample']['clocks'][0]['ns'], ns)
+
+    def test_pair_rejects_export_and_sampling_changes(self):
+        for change in ('time64', 'time32', 'called', 'handle', 'route', 'reads', 'complete', 'cpu'):
+            rows = records(4, two_path=True)
+            if change == 'time64': rows[0]['vdso_time64_exported'] = True
+            if change == 'time32': rows[0]['vdso_time32_exported'] = True
+            if change == 'called': rows[0]['direct_vdso_called'] = True
+            if change == 'handle': rows[0]['vdso_handle_verified'] = False
+            if change == 'route': rows[0]['routes'][1] = 2
+            if change == 'reads': rows[1]['clocks'][0]['ns'].pop()
+            if change == 'complete': rows[-1]['complete'] = False
+            if change == 'cpu': rows[1]['clocks'][0]['cpu_after'] = 4
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.analyze(rows, two_path=True)
+
+    def test_pair_execution_uses_only_explicit_selected_mode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            after = Mock(return_value={'state': 'after'})
+            client = MagicMock()
+            with patch.object(host, 'upload'), patch.object(host, 'run', side_effect=[
+                    b'/tmp/gameshellneo-native-clock.abcdefgh', ('a'*64 + ' file').encode(), b'raw']) as run:
+                data, state = host.execute(client, root, {'files': {'compare-clocks-native': 'a'*64}},
+                                           root, after, 'libc-syscall')
+            self.assertEqual(data, b'raw')
+            self.assertEqual(state, {'state': 'after'})
+            self.assertEqual(run.call_count, 3)
+            self.assertTrue(run.call_args.args[1].endswith(' --libc-syscall'))
+            after.assert_called_once()
+            client.open_sftp.return_value.__enter__.return_value.remove.assert_called_once()
+            with patch.object(host, 'run') as run, self.assertRaises(ValueError):
+                host.execute(client, root, {}, root, after, 'auto')
+            run.assert_not_called()
 
     def test_all_production_readings_classified_without_float_conversion(self):
         value = report.analyze(encode(records(15000)), 'boot', '2.41')
@@ -249,6 +328,29 @@ class NativeClockTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'hash'):
                     report.main()
                 destination.assert_not_called()
+
+    def test_pair_replay_requires_matching_saved_operation(self):
+        import remote
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stamp = '20261009T231750.335140Z'
+            capture = root / 'diagnostics' / stamp
+            capture.mkdir(parents=True)
+            output = root / 'replay'; output.mkdir()
+            data = encode(records(4, two_path=True))
+            (capture / 'native-output.ndjson').write_bytes(data)
+            (capture / 'before.json').write_text('{"boot_id":"boot"}')
+            summary = dict(complete=True, operation='libc-syscall-comparison',
+                observation_validated=True, raw_sha256=hashlib.sha256(data).hexdigest())
+            (capture / 'summary.json').write_text(json.dumps(summary))
+            with patch.dict(report.os.environ, {'NEO_CAPTURE': stamp}), patch.object(report, 'SAMPLES', 4), \
+                    patch.object(remote, 'LOCAL', root), patch.object(remote, 'evidence_directory', return_value=output):
+                report.main()
+                self.assertEqual(json.loads((output / 'analysis.json').read_text())['reads'], 72)
+                summary['operation'] = 'comparison'
+                (capture / 'summary.json').write_text(json.dumps(summary))
+                with self.assertRaisesRegex(ValueError, 'identity'):
+                    report.main()
 
 
 if __name__ == '__main__':

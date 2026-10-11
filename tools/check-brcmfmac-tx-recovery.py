@@ -206,16 +206,24 @@ def main():
     mode.add_argument('--baseline', action='store_true', help='Reproduce uncorrected TX error ownership')
     mode.add_argument('--poll-status', action='store_true', help='Qualify queued-TX polling status errors')
     mode.add_argument('--poll-baseline', action='store_true', help='Reproduce discarded polling status errors')
+    mode.add_argument('--watchdog-errors', action='store_true', help='Qualify watchdog errors and retirement')
+    mode.add_argument('--watchdog-baseline', action='store_true', help='Reproduce ignored watchdog errors')
     parser.add_argument('--native-only', action='store_true')
     parser.add_argument('--compile-drivers', action='store_true')
     parser.add_argument('--arm-attempt', help=argparse.SUPPRESS)
     args = parser.parse_args()
-    POLL_STATUS = args.poll_status or args.poll_baseline
+    watchdog_mode = args.watchdog_errors or args.watchdog_baseline
+    watchdog = module('watchdog_checks', 'brcmfmac_watchdog_checks.py') if watchdog_mode else None
+    POLL_STATUS = args.poll_status or args.poll_baseline or watchdog_mode
     if POLL_STATUS:
         CASES = CASES + POLL_CASES
         WORK = ROOT / '.local/build/brcmfmac-tx-poll'
+    if watchdog_mode:
+        WORK = ROOT / '.local/build/brcmfmac-watchdog'
     if args.arm_attempt:
         attempt = ROOT / args.arm_attempt
+        if watchdog:
+            watchdog.run_cases(attempt / 'watchdog', rx, arm=True)
         run_cases(attempt, arm=True)
         rx.run_cases(attempt / 'rx', arm=True, control=True)
         run_worker(attempt / 'worker', arm=True)
@@ -234,8 +242,10 @@ def main():
             '0039-brcmfmac-mailbox-errors.patch', '0048-brcmfmac-control-rx-retry.patch')]
         if not args.baseline:
             paths.append(ROOT / 'kernel/candidates/0049-brcmfmac-tx-recovery.patch')
-        if args.poll_status:
+        if args.poll_status or watchdog_mode:
             paths.append(ROOT / 'kernel/candidates/0050-brcmfmac-tx-poll-errors.patch')
+        if args.watchdog_errors:
+            paths.append(ROOT / 'kernel/candidates/0051-brcmfmac-watchdog-errors.patch')
         for path in paths:
             if path.name in {name for name, _ in queue}:
                 raise ValueError('TX test candidate unexpectedly entered image queue')
@@ -247,11 +257,21 @@ def main():
                   ROOT / 'tools/kernel-inputs.py', ROOT / 'tools/kernel_sources.py', ROOT / 'tools/kernel_checks.py',
                   ROOT / 'tools/check-brcmfmac-mailbox.py', ROOT / 'kernel/tests/brcmfmac_irq_test.c',
                   ROOT / 'kernel/tests/brcmfmac_rx_callers_test.c', ROOT / 'kernel/gameshellneo.config']
+        if watchdog:
+            paths += [watchdog.HARNESS, ROOT / 'tools/brcmfmac_watchdog_checks.py']
         hashes = {str(path.relative_to(ROOT)): sha256(path) for path in paths}
         atomic_json(attempt / 'inputs.json', hashes)
         with locked(WORK / '.source-lock'):
             source, _, metadata = ensure_source(ROOT, WORK, archive, lock, manifest, recorded_patches=queue)
         atomic_json(attempt / 'source.json', metadata)
+        if watchdog:
+            watch = attempt / 'watchdog'; watch.mkdir()
+            watchdog.extract_sources(source, watch, rx)
+            watchdog.run_cases(watch, rx)
+            if args.watchdog_baseline:
+                raise RuntimeError('Watchdog baseline unexpectedly passed; inspect before qualification')
+            watchdog.run_cases(watch, rx, sanitizer=True)
+            watchdog.negatives(watch, rx)
         extract_sources(source, attempt)
         run_cases(attempt)
         run_cases(attempt, sanitizer=True)
@@ -275,7 +295,7 @@ def main():
                 '--user', f'{os.getuid()}:{os.getgid()}', '--platform', lock['builder']['platform'],
                 '--entrypoint=python3', '-v', f'{ROOT}:/project', '-w', '/project',
                 lock['builder']['image'], 'tools/check-brcmfmac-tx-recovery.py',
-                *(['--poll-status'] if POLL_STATUS else []),
+                *(['--watchdog-errors'] if watchdog_mode else ['--poll-status'] if POLL_STATUS else []),
                 '--arm-attempt', str(attempt.relative_to(ROOT))], check=True, timeout=180)
         builds = {}
         if args.compile_drivers:
@@ -289,10 +309,13 @@ def main():
             raise ValueError('TX test inputs changed during execution')
         atomic_json(attempt / 'evidence.json', dict(schema=1, baseline=args.baseline or args.poll_baseline,
             poll_status=POLL_STATUS,
+            watchdog=watchdog_mode,
             native_complete=True, native_sanitizers=True, arm_complete=not args.native_only,
             inputs=hashes, source=metadata, cases=CASES, arm_build=builds,
             artifacts={str(path.relative_to(attempt)): sha256(path) for path in attempt.rglob('*') if path.is_file()},
-            limits='Actual recovery/control/data callers; scripted synchronous SDIO, packet queues, '
+            limits=('Actual watchdog/console/timer/cleanup bodies; scripted transport, clock, IRQ and '
+                    'timer operations plus deterministic host-boundary injections. ' if watchdog_mode else '') +
+                   'Actual recovery/control/data callers; scripted synchronous SDIO, packet queues, '
                    'header packing and packet prep/postprocessing. Actual worker bodies use scripted '
                    'packet-call boundaries; no complete-kernel concurrency or hardware qualification.'))
 

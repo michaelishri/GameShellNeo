@@ -2,16 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
-**NEO-58 watchdog audit lead, 12 October 2026:** the complete applied
-`brcmf_sdio_bus_watchdog()` still reads `SDIO_CCCR_INTx` with a null error
-destination, ignores the console wake result before a debug console read,
-and ignores the idle sleep result after stopping its timer. The thread has
-an outer `brcmf_sdiod_io_blocked()` gate, so audit both error propagation and
-the interval before later host acquisition; the outer gate alone does not
-prove concurrent producer retirement. Reproduce these paths before choosing
-a correction. NEO-198 only qualifies queued-TX polling/worker handoff. Keep
-this separate from clock-ready timeout/reset ownership and do not attribute
-an observed board fault without evidence.
+**NEO-58/199 watchdog ownership, 12 October 2026:** the actual-source baseline
+reproduces discarded polling/wake/console/idle errors and work published after
+bus retirement. Isolated candidate 0051 preserves the first transport failure,
+rechecks each host admission and publishes successful poll work under the host
+claim. Local console allocation/index failures retain healthy bus operation.
+The expanded qualification passes 50 normal / 131 debug watchdog cases,
+17 watchdog mutations, combined TX/RX/worker regressions and both full ARM
+objects. Final formatting-byte qualification and independent review are in
+progress; see [report 282](docs/282-brcmfmac-watchdog-errors.md). NEO-58 retains
+image integration, matching board qualification, clock-ready timeout and
+reset/reprobe ownership. No observed board fault is attributed to this finding.
 
 **NEO-58/198 polling status, 12 October 2026:** actual-source tests reproduce
 discarded queued-TX polling errors and I/O after a prior error arrives at host

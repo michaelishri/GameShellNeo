@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[282 — brcmfmac watchdog failure and late-work ownership](282-brcmfmac-watchdog-errors.md)
+separates transport from local console errors, serializes polling publication
+with bus retirement and records reproducible candidate qualification.
+
 [281 — brcmfmac queued-TX polling error ownership](281-brcmfmac-tx-poll-errors.md)
 reproduces discarded status errors and prepares an isolated first-error fix,
 actual-source caller/worker tests and preserved successful-path checks.

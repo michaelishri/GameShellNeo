@@ -6,6 +6,14 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+NEO-199's isolated watchdog-error candidate is documented in
+[report 282](docs/282-brcmfmac-watchdog-errors.md). Run
+`task test:brcmfmac-watchdog` for native/sanitizer/ARM watchdog, TX/RX and worker
+checks, or `task check:brcmfmac-watchdog-drivers` to include full board/debug ARM
+objects. `task test:brcmfmac-watchdog-baseline` intentionally reproduces the
+discarded errors and late-work failures. These commands run offline and leave
+the image queue unchanged; hardware qualification remains with NEO-58.
+
 NEO-198's isolated polling-status error candidate is documented in
 [report 281](docs/281-brcmfmac-tx-poll-errors.md). Use
 `task test:brcmfmac-tx-poll` for the extended TX/RX/worker checks or

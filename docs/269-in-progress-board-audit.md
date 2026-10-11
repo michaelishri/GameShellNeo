@@ -81,13 +81,52 @@ Broader USB host/boot coverage remains NEO-95; idle energy remains NEO-96;
 the newer clock fault remains NEO-192. Power-button wake and deep retention
 were outside the first RTC test and are not being counted as complete.
 
+## NEO-26: unavailable-network firmware crash diagnosis — complete
+
+The diagnostic question was to distinguish network availability from a driver
+or firmware failure and test a justified correction. It was not a requirement
+to reconstruct the proprietary firmware's missing source. The original and
+candidate evidence in [reports 46](46-wifi-transition-and-scan-recovery.md),
+[48](48-a0-firmware-trials.md), [49](49-connected-firmware-validation.md) and
+[52](52-diagnostic6-hardware-validation.md) now establishes that bounded scope.
+
+This audit re-read the original A/B/A JSONL at
+`20260929T060444.516561Z/wifi-scanning.jsonl`. Original firmware with normal
+offload records **8 crashes/8 SDIO removals**, host scanning records **0/0**,
+and restored offload records **8/8**, in three approximately 120-second
+windows on the same boot. Final restoration returns the offload flag to zero.
+Its SHA-256 is
+`f46cd6b92fe1cb843fdf344e97559008af9b4e40924b5c7787abe35f5175a92f`.
+The firmware halt/reprobe loop is associated with the offloaded scan path;
+the record does not identify a particular bad firmware instruction or prove
+that every host request is correct.
+
+The exact-A0 replacement retains the board NVRAM and ordinary scan policy.
+The original installed trial at `20260929T110411.924110Z/firmware-trial.jsonl`
+has SHA-256
+`35e97ea0f544c02cf90fba6a94f324ca89037ec86ec07bcfb11b7b854a7a223b`.
+It records four real software disconnect/reconnect cycles, a **120.178-second**
+generated-unavailable-network window, restoration, and **120.160 seconds**
+connected. Initial and final firmware-crash/SDIO-removal/PM-underflow counters
+are all zero, with one unchanged expected firmware identity. All seven
+independent Wi-Fi checkpoints, configuration restoration and the final
+installed result pass. These are retained hardware results, not new runs.
+
+Network visibility and recovery, offload isolation and the bounded replacement
+comparison answer NEO-26's diagnostic scope. Closing it does **not** assert a
+source-level repair inside the binary, arbitrary network reliability or
+qualification of abrupt loss of an associated AP's beacons. That distinct
+physical AP-loss requirement remains open in NEO-31, as the owner requested.
+NEO-55's delayed post-resume authentication is also a separate unresolved
+case. No Wi-Fi or firmware setting was changed during this audit.
+
 ## Remaining work at the initial audit
 
 | Ticket | Remaining question or action to establish completion |
 | --- | --- |
 | NEO-5 | Reconcile cold-boot count and hardware checklist; retain independent charging/reserve gates. |
 | NEO-10 | Integrate prepared owning-driver readback diagnostics; corroborate electrical voltage and exact unbranded-pack limits without guessed calibration. |
-| NEO-26 | Reconcile original scan-isolation and later exact-A0 evidence with the diagnostic scope. |
+| NEO-26 | Completed diagnosis reconciliation above; physical AP-loss stays in NEO-31. |
 | NEO-31 | Actual disappearance/reappearance of an associated AP, distinct from the accepted random-SSID simulation. |
 | NEO-55 | Explain the original delayed authentication; passing later handshakes alone do not identify its cause. |
 | NEO-58 | RX cleanup, clock-ready timeout, recovery ownership and integration of prepared fixes. |

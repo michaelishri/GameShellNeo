@@ -17,6 +17,14 @@ was hash-verified and reassessed from the original record. The later WFI image
 also provides independently checked freeze evidence. NEO-95/96 retain broader
 USB and energy gates; no fresh PM operation ran during this audit.
 
+NEO-26's bounded unavailable-network diagnosis is complete: the original A/B/A
+trace gives 8/0/8 firmware-crash and SDIO-removal counts, and the installed A0
+candidate's unavailable-network/reconnect record has zero radio faults with
+restored configuration and independent Wi-Fi proofs. These originals were
+re-read, not rerun. The binary's internal defect is not source-proven; actual
+associated-AP disappearance/recovery stays with NEO-31, and delayed resume
+authentication stays with NEO-55.
+
 **External camera verified, 12 October 2026:** NEO-193 selects the owner's
 Razer Kiyo through private `.env` configuration. A still and five-second,
 ten-frame sequence show readable console text; capture shutdown and remote

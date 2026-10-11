@@ -15,6 +15,44 @@ spec.loader.exec_module(config)
 
 
 class SuspendBuildTests(unittest.TestCase):
+    def test_current_image_composition_and_unknown_experiments(self):
+        import json
+        lock = json.loads((TOOLS.parent / 'build/sources.lock.json').read_text())
+        required = config.requirements({}, lock)
+        self.assertEqual(required['CONFIG_NEO_CLOCK_DIAG'], 'y')
+        self.assertTrue(keypad_supply.enabled(lock))
+        for value in (True, False):
+            variant = dict(lock, experiments=lock['experiments'] | {'clock_provenance': value})
+            self.assertTrue(keypad_supply.enabled(variant))
+        for extra in ({'clock_provenance': 1}, {'clock_provenance': 'true'},
+                      {'unqualified_experiment': True}, {'usb_absent_poll': False}):
+            variant = dict(lock, experiments=lock['experiments'] | extra)
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                config.requirements({}, variant)
+
+    def test_clock_diagnostic_opt_in_and_object_test_do_not_drop_other_gates(self):
+        lock = {'experiments': {'suspend_diagnostics': True, 'clock_provenance': True}}
+        requested = dict(CONFIG_USB_MUSB_GADGET='y', CONFIG_NEO_CLOCK_DIAG='y',
+                         CONFIG_NEO_CLOCK_DIAG_KUNIT_TEST='y')
+        required = config.requirements(requested, lock)
+        self.assertEqual(required['CONFIG_NEO_CLOCK_DIAG'], 'y')
+        self.assertEqual(required['CONFIG_NEO_CLOCK_DIAG_KUNIT_TEST'], 'n')
+        for key in ('CONFIG_ARM_ARCH_TIMER', 'CONFIG_DEBUG_FS', 'CONFIG_IKCONFIG_PROC',
+                    'CONFIG_POSIX_TIMERS', 'CONFIG_AEABI'):
+            self.assertEqual(required[key], 'y')
+        # The disabled test may change only the recorder, including when the
+        # fragment relies on the selector to assert its dependencies.
+        disabled = config.requirements(requested, lock, clock_diagnostics_test='disabled')
+        self.assertEqual(disabled, required | {'CONFIG_NEO_CLOCK_DIAG': 'n'})
+        self.assertEqual(config.requirements({}, {})['CONFIG_NEO_CLOCK_DIAG'], 'n')
+        self.assertEqual(config.requirements({}, {}, clock_diagnostics_test='enabled')
+                         ['CONFIG_NEO_CLOCK_DIAG'], 'y')
+        for value in ('true', 1, None):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                config.requirements({}, {'experiments': {'clock_provenance': value}})
+        with self.assertRaises(ValueError):
+            config.requirements({}, lock, clock_diagnostics_test='anything')
+
     def test_retention_is_explicit_and_isolated(self):
         self.assertFalse(keypad_supply.enabled({}))
         self.assertTrue(keypad_supply.enabled({'experiments': {

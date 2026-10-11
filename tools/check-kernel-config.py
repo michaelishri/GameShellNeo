@@ -9,10 +9,24 @@ from keypad_supply import enabled as keypad_retention
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def requirements(requested, lock):
+def requirements(requested, lock, *, clock_diagnostics_test=None):
     keypad_retention(lock)
     requested = dict(requested)
     experiments = lock.get('experiments', {})
+    clock = experiments.get('clock_provenance', False)
+    if type(clock) is not bool:
+        raise ValueError('Clock provenance must be an explicit boolean')
+    selected_clock = clock
+    if clock_diagnostics_test is not None:
+        if clock_diagnostics_test not in ('enabled', 'disabled'):
+            raise ValueError('Invalid isolated clock diagnostic test variant')
+        clock = clock_diagnostics_test == 'enabled'
+    requested.update(CONFIG_NEO_CLOCK_DIAG='y' if clock else 'n',
+                     CONFIG_NEO_CLOCK_DIAG_KUNIT_TEST='n')
+    if clock or selected_clock:
+        requested.update(CONFIG_ARM='y', CONFIG_AEABI='y', CONFIG_POSIX_TIMERS='y',
+                         CONFIG_DEBUG_FS='y', CONFIG_ARM_ARCH_TIMER='y',
+                         CONFIG_IKCONFIG='y', CONFIG_IKCONFIG_PROC='y')
     suspend_tests = experiments.get('suspend_diagnostics', False)
     if type(suspend_tests) is not bool:
         raise ValueError('Suspend diagnostics must be an explicit boolean')
@@ -45,6 +59,8 @@ def requirements(requested, lock):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('config', type=Path)
+    parser.add_argument('--clock-diagnostics-test', choices=('enabled', 'disabled'),
+                        help='Isolated object test only; retain all other project assertions')
     args = parser.parse_args()
     actual = dict(re.findall(r'^(CONFIG_\w+)=(.*)$', args.config.read_text(), re.M))
     requested = dict(re.findall(r'^(CONFIG_\w+)=(.*)$',
@@ -52,12 +68,14 @@ def main():
     requested.update(CONFIG_MMC_BLOCK='y', CONFIG_BLK_DEV_SD='y', CONFIG_SERIAL_8250_CONSOLE='y',
                      CONFIG_UNIX='y', CONFIG_INET='y', CONFIG_PROC_FS='y', CONFIG_SYSFS='y')
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
-    requested = requirements(requested, lock)
+    requested = requirements(requested, lock, clock_diagnostics_test=args.clock_diagnostics_test)
     errors = [f'{key}: requested {value}, resolved {actual.get(key, "n")}'
               for key, value in requested.items() if actual.get(key, 'n') != value]
     if errors:
         raise SystemExit('\n'.join(errors))
     print(f'Kernel configuration: {len(requested)} assertions passed')
+    if args.clock_diagnostics_test:
+        print('Isolated clock diagnostic object test; not image configuration qualification')
 
 
 if __name__ == '__main__':

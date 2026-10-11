@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qualify an isolated clock provenance diagnostic in a real UML kernel and ARM build."""
+"""Qualify the canonical clock diagnostic in a real UML kernel and ARM builds."""
 import argparse
 import difflib
 import hashlib
@@ -29,6 +29,13 @@ def added_file(name, text):
 
 def manifest(queue):
     return [dict(name=n, sha256=hashlib.sha256(data).hexdigest()) for n, data in queue]
+
+
+def diagnostic_queue(queue, canonical):
+    found = [(name, data) for name, data in queue if 'clock-provenance' in name]
+    if found and found != [canonical]:
+        raise ValueError('Active clock recorder differs from the canonical diagnostic')
+    return sorted(queue if found else queue + [canonical])
 
 
 def results_checked(report, log):
@@ -85,6 +92,7 @@ def main():
                   CANDIDATE / 'neo-clock-diag.h', CANDIDATE / 'neo-clock-diag.c', ROOT / 'tools/kernel_checks.py',
                   ROOT / 'tools/kernel_sources.py', ROOT / 'tools/kernel-inputs.py',
                   ROOT / 'tools/check-kernel-config.py', ROOT / 'kernel/gameshellneo.config',
+                  ROOT / 'tools/keypad_supply.py', ROOT / 'tools/cpi_idle.py',
                   ROOT / 'build/sources.lock.json', ROOT / 'tools/clock_provenance.py']
         input_hashes = {str(p.relative_to(ROOT)): sha256(p) for p in inputs}
         lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
@@ -97,12 +105,7 @@ def main():
         spec.loader.exec_module(module)
         queue = list(module.patches())
         active_manifest = manifest(queue)
-        if any('clock-provenance' in name for name, _ in queue):
-            raise ValueError('Diagnostic unexpectedly in active queue')
-        patch = (CANDIDATE / 'hooks.patch').read_bytes()
-        for name in ('neo-clock-diag.h', 'neo-clock-diag.c'):
-            patch += added_file('kernel/time/' + name, (CANDIDATE / name).read_text())
-        queue.append(('0040-clock-provenance-candidate.patch', patch))
+        queue = diagnostic_queue(queue, module.clock_provenance_patch())
         with locked(WORK / '.source-lock'):
             source, _, metadata = ensure_source(ROOT, WORK, archive, lock, manifest(queue), recorded_patches=queue)
         test_patch = added_file('kernel/time/neo-clock-diag-test.c', harness.read_text())
@@ -182,7 +185,8 @@ def main():
                 if enabled:
                     objects.append('kernel/time/neo-clock-diag.o')
                 record['arm_builds']['enabled' if enabled else 'disabled'] = build_objects(
-                    source, arm, lock, objects, extra, True, metadata, offline=True)
+                    source, arm, lock, objects, extra, True, metadata, offline=True,
+                    clock_diagnostics_test='enabled' if enabled else 'disabled')
             off = set()
             on = set()
             for mode, names in (('disabled', off), ('enabled', on)):

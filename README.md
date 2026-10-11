@@ -6,6 +6,12 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+Diagnostic.26 is being built with explicitly selected, bounded kernel clock
+instrumentation for NEO-192. It gives the pending clock investigation its own
+image/kernel identity and retains diagnostic.25 for recovery. It does not fix
+the clock fault or clear PM admission. [Report 272](docs/272-clock-provenance-image.md)
+records the composition, saved build commands and pending installation work.
+
 Diagnostic.25 is built and offline-verified with the reviewed NEO-108/163 USB
 deferred restart fix. [Report 232](docs/232-musb-restart-image-integration.md)
 records its separate build and qualification plan. Transfer, both archive/image
@@ -1163,7 +1169,7 @@ The subsequent [kernel source audit](docs/266-kernel-counter-timekeeping-audit.m
 defines the missing counter/conversion evidence; further clean userspace
 captures alone do not establish the cause of the saved regressions.
 
-The isolated kernel recorder has its own offline checks:
+The kernel recorder has its own offline checks:
 
 ```sh
 task test:clock-provenance       # UML: original conversion, scripted counter, KASAN/lockdep
@@ -1173,10 +1179,11 @@ task report:clock-provenance FILE=<saved-records.ndjson>
 
 The kernel checks use the pinned local builder without network access; the
 report task replays a local file. None contacts the GameShell.
-The candidate remains outside the image patch queue;
-its capture option defaults off. Replay preserves backwards results and
-rejects inconsistent arithmetic, but does not qualify clocks or PM. The
-userspace collector and live integration remain separate work. See
+Diagnostic.26 explicitly adds the canonical recorder to its image queue;
+ordinary builds without that selector omit it, and Kconfig defaults off.
+Replay preserves backwards results and rejects inconsistent arithmetic, but
+does not qualify clocks or PM. Installation and the first live capture remain
+pending; [report 272](docs/272-clock-provenance-image.md) records integration. See
 [report 267](docs/267-kernel-clock-provenance-candidate.md) for the record format,
 ownership, fixed limits, test evidence and instrumentation effects.
 

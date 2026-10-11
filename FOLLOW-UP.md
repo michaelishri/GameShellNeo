@@ -2,6 +2,23 @@
 
 Record deferred questions and activities here as they arise.
 
+- [ ] NEO-103 real-kernel concurrency preparation: the locked Linux 6.18.54
+  `arch/um/Kconfig` restricts `NR_CPUS` to 1. The later NEO-163 UML suite covers
+  endpoint restart/giveback ownership, not simultaneous IRQ-context gadget
+  callbacks and unbind on different CPUs. Do not count it as that missing
+  callback qualification. Prepare a separate SMP system-emulation runner (or
+  equivalent real-kernel environment) with non-sleeping callback handshakes,
+  original callback/UDC operations and bounded cleanup. The retained builder
+  inventory has QEMU user emulation but no QEMU system package; environment
+  preparation remains software work, not an owner/hardware blocker.
+
+**Clock image integration, 12 October 2026:** diagnostic.26 explicitly selects
+the canonical recorder and has its own kernel release, `6.18.54-gameshellneo25`.
+The prior image is checkpointed; host checks pass and the full build is running.
+After offline verification, arrange a DEV-card swap and one matching awake
+capture with fresh runtime identity. No clock correction, new PM admission or
+hardware qualification is claimed. [Report 272](docs/272-clock-provenance-image.md).
+
 **Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies
 kernel build ID/configuration, image/source/runtime hashes, same-process vDSO
 routes and task/namespace ownership before arming. Original results survive

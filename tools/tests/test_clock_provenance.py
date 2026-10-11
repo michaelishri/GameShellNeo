@@ -4,10 +4,12 @@ import importlib.util
 from pathlib import Path
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 import clock_provenance as cp
+import kernel_checks
 SPEC = importlib.util.spec_from_file_location('provenance_check', ROOT / 'tools/check-clock-provenance.py')
 CHECK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECK)
@@ -116,6 +118,37 @@ class ClockReplayTests(unittest.TestCase):
 
 
 class KernelResultsTests(unittest.TestCase):
+    def test_active_queue_uses_exact_canonical_recorder_once(self):
+        canonical = ('0040-clock-provenance.patch', b'canonical')
+        base = [('0001-board.patch', b'board')]
+        self.assertEqual(CHECK.diagnostic_queue(base, canonical), base + [canonical])
+        self.assertEqual(CHECK.diagnostic_queue(base + [canonical], canonical), base + [canonical])
+        for bad in ([canonical, canonical], [('0040-clock-provenance.patch', b'stale')],
+                    [('0040-clock-provenance-candidate.patch', b'canonical')]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                CHECK.diagnostic_queue(base + bad, canonical)
+
+    def test_clock_object_variants_keep_project_checks_and_label_evidence(self):
+        lock = dict(builder=dict(image='locked-test-image', platform='linux/amd64',
+                                 cross_compile='arm-linux-gnueabihf-'),
+                    linux=dict(localversion='-test'))
+        args = (ROOT / '.local/test-source', ROOT / '.local/test-clock-arm', lock,
+                ['kernel/time/timekeeping.o'])
+        for mode, value in (('enabled', 'y'), ('disabled', 'n')):
+            extra = [f'CONFIG_NEO_CLOCK_DIAG={value}', 'CONFIG_NEO_CLOCK_DIAG_KUNIT_TEST=n']
+            with patch.object(kernel_checks, 'run') as run, \
+                    patch.object(kernel_checks, 'check_overrides'), \
+                    patch.object(kernel_checks, 'sha256', return_value='fixture'):
+                record = kernel_checks.build_objects(*args, extra, True, {}, offline=True,
+                                                      clock_diagnostics_test=mode)
+                self.assertIn('check-kernel-config.py "$output/.config" --clock-diagnostics-test ' + mode,
+                              run.call_args.args[0][-1])
+                self.assertEqual(record['configuration_scope'], 'project-clock-diagnostics-' + mode + '-test')
+                for changes, project in (([], True), (extra, False)):
+                    with self.assertRaises(ValueError):
+                        kernel_checks.build_objects(*args, changes, project, {},
+                                                    clock_diagnostics_test=mode)
+
     def test_arm_hooks_resolve_and_disappear_when_disabled(self):
         names = CHECK.REQUIRED_HOOKS
         CHECK.validate_symbols(set(), names, names)

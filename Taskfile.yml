@@ -128,6 +128,7 @@ tasks:
       - task: test:usb-policy
       - task: test:clock-ranges
       - task: test:cpuidle-s2idle
+      - task: check:clock-provenance
       - task: build:kernel
       - task: test:usb-policy-board
       - task: check:dt
@@ -583,7 +584,7 @@ tasks:
     cmds: [python3 tools/build-native-clocks.py]
 
   test:clock-provenance:
-    desc: Test isolated kernel clock recorder with injected counter faults in offline UML; no device access
+    desc: Test canonical kernel clock recorder with injected counter faults in offline UML; no device access
     cmds: [bash tools/run-logged.sh clock-provenance python3 tools/check-clock-provenance.py]
 
   check:clock-provenance:

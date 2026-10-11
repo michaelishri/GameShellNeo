@@ -1,8 +1,9 @@
 From: GameShellNeo contributors
-Subject: [PATCH] timekeeping: isolated default-off clock provenance candidate
+Subject: [PATCH] timekeeping: default-off bounded clock provenance diagnostic
 
-Not part of the image queue. Keep original counter reads and conversion;
-record the accepted tuple and syscall result without monotonic clamping.
+Enabled in the image queue only by experiments.clock_provenance. Keep original
+counter reads and conversion; record the accepted tuple and syscall result
+without monotonic clamping. Kconfig defaults off; capture requires explicit arming.
 
 ---
 --- a/kernel/time/timekeeping.c

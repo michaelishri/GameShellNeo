@@ -15,7 +15,12 @@ PROPERTY = 'regulator-always-on'
 def enabled(lock):
     experiments = lock.get('experiments', {})
     cpi_idle.enabled(lock)
-    experiments = {k: v for k, v in experiments.items() if k != 'cpi_wfi_s2idle'}
+    if type(experiments.get('clock_provenance', False)) is not bool:
+        raise ValueError('Clock provenance must be an explicit boolean')
+    # The recorder changes no keypad or supply policy. Keep all other unknown
+    # experiment combinations rejected by the retention admission contract.
+    experiments = {k: v for k, v in experiments.items()
+                   if k not in ('cpi_wfi_s2idle', 'clock_provenance')}
     value = experiments.get('keypad_supply_retention', False)
     if type(value) is not bool or ('keypad_supply_retention' in experiments and
             (value is not True or experiments != {

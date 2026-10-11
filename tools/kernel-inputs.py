@@ -11,6 +11,18 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+CLOCK_PATCH = '0040-clock-provenance.patch'
+
+
+def clock_provenance_patch():
+    """Use one canonical implementation for image and isolated test builds."""
+    candidate = ROOT / 'kernel/candidates/clock-provenance'
+    patch = (candidate / 'hooks.patch').read_bytes()
+    for name in ('neo-clock-diag.h', 'neo-clock-diag.c'):
+        patch += ''.join(difflib.unified_diff(
+            [], (candidate / name).read_text().splitlines(True),
+            fromfile='/dev/null', tofile='b/kernel/time/' + name)).encode()
+    return CLOCK_PATCH, patch
 
 
 def patches():
@@ -27,6 +39,15 @@ def patches():
         parts.extend(difflib.unified_diff([], path.read_text().splitlines(True),
                                          fromfile='/dev/null', tofile=f'b/{name}'))
     queue['0003-gameshell-new-files.patch'] = ''.join(parts).encode()
+    lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
+    clock = lock.get('experiments', {}).get('clock_provenance', False)
+    if type(clock) is not bool:
+        raise ValueError('Clock provenance must be an explicit boolean')
+    if any('clock-provenance' in name for name in queue):
+        raise ValueError('Clock provenance patch must come from its canonical source')
+    if clock:
+        name, data = clock_provenance_patch()
+        queue[name] = data
     yield from sorted(queue.items())
 
 

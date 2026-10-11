@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[272 — Clock provenance image integration](272-clock-provenance-image.md)
+selects the canonical recorder for diagnostic.26, preserves recovery and
+documents build checks and the pending physical installation.
+
 [271 — Clock capture deployment and admission](271-clock-capture-deployment.md)
 adds kernel build-ID/runtime checks, same-process route inventory, bounded
 process ownership and original-result persistence; the old image is refused

@@ -2,6 +2,15 @@
 
 Record deferred questions and activities here as they arise.
 
+**Board completion audit, 12 October 2026:** NEO-100's BOOTTIME producer,
+consumers, installed simulations and real stopped-clock/resume contract are
+complete. Original image/test records were inspected and the sleep result's
+published hash, clock evidence, restoration and BOOTTIME sample age rechecked.
+Current focused runtime/consumer tests pass. NEO-192's later clock regression
+and PM admission remain unresolved; this closure does not qualify protection
+during sleep or clear the new fault. [Report 269](docs/269-in-progress-board-audit.md)
+tracks the broader 20-ticket audit and remaining preparation work.
+
 **External camera verified, 12 October 2026:** NEO-193 selects the owner's
 Razer Kiyo through private `.env` configuration. A still and five-second,
 ten-frame sequence show readable console text; capture shutdown and remote

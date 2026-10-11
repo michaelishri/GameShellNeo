@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[269 — In-progress board completion audit](269-in-progress-board-audit.md)
+reconciles ticket scope with original evidence, closes proved work and separates
+unfinished software from physical qualification.
+
 [268 — External Razer Kiyo screen observation](268-razer-kiyo-observation.md)
 records exact camera selection, the private default preference, readable still
 and sequence evidence, verified shutdown and the bounded launcher correction.

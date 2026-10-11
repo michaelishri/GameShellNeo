@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-194 local build ownership, 12 October 2026:** the diagnostic.26 host
+command ended with status 143 while its Docker kernel build remained running.
+The host log stopped advancing; Docker logs and process activity established
+continued compilation. Attached to that exact container, observed exit 0,
+then verified all 16 kernel artifacts before continuing image assembly. No
+duplicate build was started. Audit host-owned workflow locking, durable logs
+and per-stage container identity across parent interruption; a stopped client
+must not imply retired writers or permit a competing build. Reproduce and fix
+offline before claiming interruption-safe build ownership. This is separate
+from the abandoned SSH-stall work; no GameShell command was involved.
+
 - [ ] NEO-103 real-kernel concurrency preparation: the locked Linux 6.18.54
   `arch/um/Kconfig` restricts `NR_CPUS` to 1. The later NEO-163 UML suite covers
   endpoint restart/giveback ownership, not simultaneous IRQ-context gadget
@@ -14,8 +25,11 @@ Record deferred questions and activities here as they arise.
 
 **Clock image integration, 12 October 2026:** diagnostic.26 explicitly selects
 the canonical recorder and has its own kernel release, `6.18.54-gameshellneo25`.
-The prior image is checkpointed; host checks pass and the full build is running.
-After offline verification, arrange a DEV-card swap and one matching awake
+The prior image is checkpointed; host checks, full kernel build, all 16 kernel
+artifact checks, board policy and device-tree qualification pass. Image
+assembly, offline verification, packing and checkpointing are complete; the
+matching clock reader also passes the offline image/ABI admission check.
+Arrange transfer on confirmed regular Wi-Fi, a DEV-card swap and one matching awake
 capture with fresh runtime identity. No clock correction, new PM admission or
 hardware qualification is claimed. [Report 272](docs/272-clock-provenance-image.md).
 

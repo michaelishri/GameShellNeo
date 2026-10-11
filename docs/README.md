@@ -17,13 +17,13 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 [272 — Clock provenance image integration](272-clock-provenance-image.md)
-selects the canonical recorder for diagnostic.26, preserves recovery and
-documents build checks and the pending physical installation.
+records the built, offline-verified diagnostic.26 recorder image, matching
+reader admission, recovery checkpoint and pending physical installation.
 
 [271 — Clock capture deployment and admission](271-clock-capture-deployment.md)
 adds kernel build-ID/runtime checks, same-process route inventory, bounded
 process ownership and original-result persistence; the old image is refused
-offline, with instrumented-image integration still pending.
+offline; the matching instrumented image is now prepared in report 272.
 
 [270 — Exact-call userspace clock evidence](270-clock-userspace-boundary.md)
 adds the raw ARM ABI reader, bounded workload and kernel/native/Python replay,

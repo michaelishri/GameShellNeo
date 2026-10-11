@@ -6,11 +6,11 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.26 is being built with explicitly selected, bounded kernel clock
-instrumentation for NEO-192. It gives the pending clock investigation its own
+Diagnostic.26 is built, offline-verified, packed and checkpointed with explicitly
+selected, bounded kernel clock instrumentation for NEO-192. It gives the pending clock investigation its own
 image/kernel identity and retains diagnostic.25 for recovery. It does not fix
 the clock fault or clear PM admission. [Report 272](docs/272-clock-provenance-image.md)
-records the composition, saved build commands and pending installation work.
+records the artifact hashes, matching reader checks and pending installation work.
 
 Diagnostic.25 is built and offline-verified with the reviewed NEO-108/163 USB
 deferred restart fix. [Report 232](docs/232-musb-restart-image-integration.md)

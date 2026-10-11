@@ -94,11 +94,49 @@ The matching reader's native UBSan and ARM fixtures, raw-buffer replay and
 production library checks pass: build `20261011T130856.669104Z`, 27 ARM raw
 buffers, library SHA-256
 `41f2dbb4b4b88e1014a1693277a64a95df39b81823ee515e70b2ce5845e680c1`.
-The full kernel/image build is in progress; stage logs remain under
-`.local/build/`. No completed-image claim is made until assembly and offline
-verification finish.
+The full kernel build completed successfully, and the independent artifact
+check verifies all 16 recorded kernel/module files. The release is
+`6.18.54-gameshellneo25`, with ELF build ID
+`b3a11b878deea4cb8841713ce31e36e78f19e4f4`. The linked configuration enables
+the recorder and its timer/debugfs dependencies and excludes KUnit. Board
+policy tests also pass: 96 diagnostic scenarios, 4,665 policy cases and 160
+probe/unwind cases. Device-tree qualification passes, including six rejected
+altered/missing-property controls and no keypad-retention schema diagnostics.
 
-Once verified, a physical card swap is needed. Transfer should occur on
+The original host command ended while its Docker kernel container kept
+compiling. The continuing container was positively identified, observed to
+exit 0, and its artifacts reverified before proceeding. No duplicate kernel
+build was started. NEO-194 tracks the local build-ownership/logging gap.
+
+Image assembly and offline verification are complete. The matching root
+filesystem was rebuilt from the locked signed snapshots, rather than treating
+an older cache receipt as proof of the new inputs. Checks cover partition
+boundaries, bootloader readback, FAT16/ext4 fsck, U-Boot CRCs/addresses,
+kernel/DTB/module/radio hashes, private identity permissions and service policy.
+Packing and the `diagnostic26-clock-provenance` recovery checkpoint also pass.
+The prior diagnostic.25 artifacts/checkpoints remain retained.
+
+| Artifact | Size | SHA-256 |
+| --- | ---: | --- |
+| `GameShellNeo-0.1.0-diagnostic.26-cpi31-a4ba84485e9d.img` | 4,294,967,296 bytes | `a4ba84485e9de96d9b92ce0eb6f5ce1958163188c02a315d7f46d1da161c9df8` |
+| Matching `.img.gz` archive | 269,785,953 bytes | `2322707bff4f59ba984b54298bd2e8281c26f1cc987d4480a30d7871ca27e50c` |
+
+The raw image is under ignored `.local/artifacts/`; the archive and transfer
+manifest are under `.local/flash/`. The recovery checkpoint retains matching
+metadata and artifact references without duplicating the 4 GiB image. Stage
+logs remain under `.local/build/`.
+
+The existing `verified_inputs()` admission routine also passes against this
+exact completed image and reader build `20261011T130856.669104Z`. It checks
+the reader's original source/output hashes, ARM layout/import requirements,
+kernel artifacts/configuration/build ID, image manifest and freshly rehashed
+4 GiB image. Its saved result is
+`.local/build/diagnostic26-clock-deployment-preflight.json`.
+Runtime capture `20261009T230039.014366Z` was used only as historical offline
+ABI evidence; it does not replace the fresh boot/runtime identity needed
+after installation. No device was contacted by this check.
+
+A physical card swap is now needed. Transfer should occur on
 confirmed regular Wi-Fi. After installation, collect fresh boot/runtime
 identity and awake health evidence, inspect a fresh Kiyo baseline, and run
 one matching bounded awake clock capture. Preserve the original result even

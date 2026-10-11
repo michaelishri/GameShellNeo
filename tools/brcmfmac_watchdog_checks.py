@@ -17,7 +17,8 @@ def cases(debug, clock=False):
                    ('console_ram_allocation', 8), ('console_window_failure', 6),
                    ('console_transfer_allocation', 4), ('ram_helper', 8)]
     if clock:
-        groups += [('clock_request', 12), ('clock_watchdog', 24), ('clock_admission', 8)]
+        groups += [('clock_request', 12), ('clock_watchdog', 24), ('clock_admission', 8),
+                   ('clock_retirement', 1)]
     return [(group, str(index)) for group, count in groups for index in range(count)]
 
 
@@ -168,6 +169,15 @@ def negatives(attempt, shared, clock=False):
             '(true || time_after_eq(jiffies, READ_ONCE(bus->clk_pending_deadline)))', 'clock_watchdog', 0)
         add('lost_clock_deadline_recheck', watchdog,
             'time_after_eq(jiffies, bus->clk_pending_deadline) &&', 'true &&', 'clock_admission', 6)
+        publication = ('\t\t\tatomic_set(&bus->ipend, 1);\n'
+                       '\t\t\tbus->dpc_triggered = true;\n'
+                       '\t\t\tqueue_work(bus->brcmf_wq, &bus->datawork);\n')
+        add('lost_clock_pending_status', watchdog, publication,
+            publication.replace('atomic_set(&bus->ipend, 1);', 'atomic_set(&bus->ipend, 0);'),
+            'clock_watchdog', 1)
+        add('late_clock_publication', watchdog, publication,
+            '\t\t\tsdio_release_host(sdiod->func1);\n' + publication +
+            '\t\t\tsdio_claim_host(sdiod->func1);\n', 'clock_retirement', 0)
     results = {}
     try:
         for name, body, case, debug in variants:

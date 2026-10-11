@@ -196,7 +196,7 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
             (attempt / (label + '-' + name + '.log')).write_text(result.stdout + result.stderr)
             if name in ('candidate', 'candidate_debug'):
                 result.check_returncode()
-                count = 179 + (32 if POLL_STATUS else 0) + (24 if CLOCK_DEADLINE else 0) + 2 * (name == 'candidate_debug')
+                count = 179 + (32 if POLL_STATUS else 0) + (52 if CLOCK_DEADLINE else 0) + 2 * (name == 'candidate_debug')
                 if result.stdout.strip() != f'{count} IRQ service scenarios passed (0 characterize existing error limitations)':
                     raise ValueError('Unexpected TX worker coverage: ' + result.stdout)
             elif not result.returncode or 'Assertion' not in result.stderr:
@@ -205,7 +205,7 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
     finally:
         generated.write_text(good)
     atomic_json(attempt / (label + '-results.json'), results)
-    count = (211 if POLL_STATUS else 179) + (24 if CLOCK_DEADLINE else 0)
+    count = (211 if POLL_STATUS else 179) + (52 if CLOCK_DEADLINE else 0)
     print(f'{label} worker: {count}/{count+2} cases pass; {len(results)-2} mutations rejected', flush=True)
 
 

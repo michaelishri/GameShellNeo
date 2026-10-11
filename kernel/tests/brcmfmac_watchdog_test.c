@@ -466,35 +466,38 @@ static void console_success(unsigned index)
 }
 #endif
 #ifdef NEO_CLOCK_DEADLINE
+enum clock_request_scenario { REQUEST_PENDING, REQUEST_REPEATED, REQUEST_CANCELLED,
+	REQUEST_READY, REQUEST_SAVE_RESTORE, REQUEST_SYNC_EXPIRED, REQUEST_SCENARIOS };
 static void clock_request(unsigned index)
 {
-	begin(); assert(index < 12); unsigned mode = index % 6;
-	jiffies = index >= 6 ? ULONG_MAX - 500 : 100;
+	begin(); assert(index < 2 * REQUEST_SCENARIOS);
+	enum clock_request_scenario mode = index % REQUEST_SCENARIOS;
+	jiffies = index >= REQUEST_SCENARIOS ? ULONG_MAX - 500 : 100;
 	unsigned long start = jiffies, budget = msecs_to_jiffies(PMU_MAX_TRANSITION_DLY / 1000);
 	f.bus.clkstate = CLK_SDONLY;
 	sdio_claim_host(&f.func);
-	if (mode == 3) hw.clock_ready = true;
-	if (mode == 4) f.bus.sr_enabled = true;
+	if (mode == REQUEST_READY) hw.clock_ready = true;
+	if (mode == REQUEST_SAVE_RESTORE) f.bus.sr_enabled = true;
 	assert(brcmf_sdio_htclk(&f.bus, true, true) == 0);
-	if (mode == 3 || mode == 4) {
+	if (mode == REQUEST_READY || mode == REQUEST_SAVE_RESTORE) {
 		assert(f.bus.clkstate == CLK_AVAIL);
-		if (mode == 4) assert(!hw.clock_reads && !hw.clock_writes);
+		if (mode == REQUEST_SAVE_RESTORE) assert(!hw.clock_reads && !hw.clock_writes);
 	} else {
 		assert(f.bus.clkstate == CLK_PENDING && f.bus.clk_pending_deadline == start + budget);
 		assert(hw.clock_filter & SBSDIO_DEVCTL_CA_INT_ONLY);
-		if (mode == 1) {
+		if (mode == REQUEST_REPEATED) {
 			for (unsigned i = 0; i < 5; i++) {
 				jiffies += budget / 4;
 				assert(brcmf_sdio_htclk(&f.bus, true, true) == 0);
 				assert(f.bus.clk_pending_deadline == start + budget);
 			}
-		} else if (mode == 2) {
+		} else if (mode == REQUEST_CANCELLED) {
 			assert(brcmf_sdio_htclk(&f.bus, false, false) == 0);
 			assert(f.bus.clkstate == CLK_SDONLY && !hw.clock_filter);
 			jiffies += budget / 2;
 			assert(brcmf_sdio_htclk(&f.bus, true, true) == 0);
 			assert(f.bus.clk_pending_deadline == jiffies + budget);
-		} else if (mode == 5) {
+		} else if (mode == REQUEST_SYNC_EXPIRED) {
 			jiffies = start + budget;
 			assert(brcmf_sdio_htclk(&f.bus, true, false) == -EBADE);
 			assert((unsigned long)(jiffies - start - budget) <= 10);
@@ -502,21 +505,26 @@ static void clock_request(unsigned index)
 	}
 	sdio_release_host(&f.func); finish();
 }
+enum clock_watchdog_scenario { CLOCK_WAIT, CLOCK_WRAP, CLOCK_SR, CLOCK_AVAILABLE,
+	CLOCK_QUEUED, CLOCK_IDLE, CLOCK_PM_FAILED, CLOCK_IO_FAILED, CLOCK_SCENARIOS };
 static void clock_watchdog(unsigned index)
 {
-	begin(); assert(index < 24); unsigned mode = index / 3, phase = index % 3;
-	f.bus.clkstate = mode == 3 ? CLK_AVAIL : CLK_PENDING;
-	f.bus.clk_pending_deadline = mode == 1 ? 0 : 1100;
+	begin(); assert(index < 3 * CLOCK_SCENARIOS); unsigned phase = index % 3;
+	enum clock_watchdog_scenario mode = index / 3;
+	f.bus.clkstate = mode == CLOCK_AVAILABLE ? CLK_AVAIL : CLK_PENDING;
+	f.bus.clk_pending_deadline = mode == CLOCK_WRAP ? 0 : 1100;
 	jiffies = f.bus.clk_pending_deadline + phase - 1;
-	if (mode == 2) f.bus.sr_enabled = true;
-	if (mode == 4) f.bus.dpc_triggered = true;
-	if (mode == 5) { f.bus.idletime = 1; f.bus.idlecount = 1; }
-	if (mode == 6) f.dev.pm_failed = true;
-	if (mode == 7) f.dev.io_error = -EILSEQ;
-	bool notify = phase && mode != 2 && mode != 3 && mode != 4 && mode != 6 && mode != 7;
+	if (mode == CLOCK_SR) f.bus.sr_enabled = true;
+	if (mode == CLOCK_QUEUED) f.bus.dpc_triggered = true;
+	if (mode == CLOCK_IDLE) { f.bus.idletime = 1; f.bus.idlecount = 1; }
+	if (mode == CLOCK_PM_FAILED) f.dev.pm_failed = true;
+	if (mode == CLOCK_IO_FAILED) f.dev.io_error = -EILSEQ;
+	bool claim = phase && mode != CLOCK_SR && mode != CLOCK_AVAILABLE &&
+		mode != CLOCK_PM_FAILED && mode != CLOCK_IO_FAILED;
+	bool notify = claim && mode != CLOCK_QUEUED;
 	brcmf_sdio_bus_watchdog(&f.bus);
 	assert(hw.queue == (unsigned)notify);
-	assert(hw.claims == (unsigned)(phase && mode != 2 && mode != 3 && mode != 6 && mode != 7));
+	assert(hw.claims == (unsigned)claim);
 	assert(!hw.reads && !hw.clock_reads && !hw.clock_writes && !hw.wakes && !hw.sleeps);
 	assert(!hw.timer_adds && !hw.timer_mods && !hw.timer_deletes);
 	if (notify) assert(f.bus.dpc_triggered && f.bus.ipend == 1);
@@ -530,6 +538,15 @@ static void clock_admission(unsigned index)
 	brcmf_sdio_bus_watchdog(&f.bus);
 	assert(hw.claims == 1 && !hw.queue && !hw.reads && !hw.clock_reads && !hw.clock_writes);
 	assert(!hw.wakes && !hw.sleeps && !hw.quiesces); finish();
+}
+static void clock_retirement(unsigned index)
+{
+	begin(); assert(index == 0); f.bus.clkstate = CLK_PENDING;
+	f.bus.clk_pending_deadline = jiffies; hw.retire_after_release = true;
+	brcmf_sdio_bus_watchdog(&f.bus);
+	fatal(-EIO);
+	assert(hw.queue == 1 && !hw.reads && !hw.clock_reads && !hw.clock_writes);
+	finish();
 }
 #endif
 int main(int argc, char **argv)
@@ -557,6 +574,7 @@ int main(int argc, char **argv)
 	else if (!strcmp(argv[1], "clock_request")) clock_request(index);
 	else if (!strcmp(argv[1], "clock_watchdog")) clock_watchdog(index);
 	else if (!strcmp(argv[1], "clock_admission")) clock_admission(index);
+	else if (!strcmp(argv[1], "clock_retirement")) clock_retirement(index);
 #endif
 	else assert(false);
 	printf("%s %u passed\n", argv[1], index); return 0;

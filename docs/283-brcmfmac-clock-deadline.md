@@ -74,9 +74,15 @@ save/restore bypass and an expired synchronous handoff.
 The worker suite extracts actual ISR, pending-status, worker and DPC bodies,
 with scripted clock and packet-call boundaries. It checks unavailable and
 ready clocks before/at/after the deadline and across wrap, retained traffic,
-error preservation and once-only cleanup. Watchdog publication and worker
-consumption are controlled scheduling seams; they are not a full kernel
-scheduler or physical missing-interrupt experiment. Existing sleep regression
+error preservation and once-only cleanup. Additional consumer cases start
+from a software notification without invoking an ISR, explicitly checking
+zero hardware-interrupt count. They cover ready/unavailable clocks and both
+IRQ ownership modes; at-deadline read/filter failures must keep their transfer
+error rather than become timeout. A watchdog release-boundary injection
+checks another claimant retiring the bus immediately after publication.
+Watchdog publication and worker consumption remain controlled scheduling
+seams; they are not a full kernel scheduler or physical missing-interrupt
+experiment. Existing sleep regression
 tests execute actual KSO/clock/sleep bodies and retain the original 43-case
 successful transfer/delay/state transcript `a2658cef` within 95 scenarios.
 
@@ -87,3 +93,33 @@ energy saving or explanation of an observed Wi-Fi fault is claimed. NEO-58
 retains image integration and matching board qualification. NEO-192's clock
 fault still blocks live PM; this work does not reopen NEO-154 or attribute
 NEO-55's authentication delay.
+
+## Initial qualification and review
+
+Attempt `6fa74489560c4679ae31279b090773d4` completed the full driver Task:
+94/201 watchdog, 95 normal/debug sleep, 215 TX, 115 RX and 235/237 worker
+scenarios passed natively, under ASan/UBSan and on ARM32. All 26 watchdog,
+23 TX, four packet, five control-FIFO and 50 worker mutations failed
+assertions as required. Both complete ARM objects passed 182 configuration
+assertions. This attempt predates the explicit no-ISR consumer and
+release-boundary additions; it does not qualify those later tests.
+
+Independent review used `git diff d47ef98...c73602c`, a single NEO-200 commit.
+
+### Standards
+
+No documented-standard violations. One low-priority possible Primitive
+Obsession: unnamed numeric modes made the clock fixtures harder to audit.
+Named request and watchdog scenario enums replace those numbers; matrix
+indexing remains unchanged.
+
+### Spec
+
+One P2 partial-coverage finding: the initial deadline worker cases all
+invoked an ISR, while the watchdog fixture stopped after publication.
+The missing-interrupt consumer therefore had no direct no-ISR evidence.
+The added software-notification cases cover ready/never-ready clocks and
+OOB/in-band IRQ ownership, without claiming a full scheduler simulation.
+The initial review found no production correctness or scope-creep defect.
+
+Final validation and follow-up review of these additions remain pending.

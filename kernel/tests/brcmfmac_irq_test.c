@@ -520,7 +520,17 @@ static void pending_clock(bool oob, bool start_pending)
  finish();
 }
 #ifdef NEO_CLOCK_DEADLINE
-static void clock_deadline(unsigned phase, bool wrap, bool ready, bool oob)
+static void clock_notify(void)
+{
+ /* Consumer seam for the host-held publication checked by the watchdog suite.
+  * No ISR is invoked: a missing hardware interrupt must not prevent service.
+  */
+ sdio_claim_host(&f.func);
+ atomic_set(&f.bus.ipend, 1); f.bus.dpc_triggered = true;
+ queue_work(f.bus.brcmf_wq, &f.bus.datawork);
+ sdio_release_host(&f.func);
+}
+static void clock_deadline(unsigned phase, bool wrap, bool ready, bool oob, bool lost_irq)
 {
  setup(); f.bus.clkstate = CLK_PENDING; hw.clock_ready = ready;
  f.bus.clk_pending_deadline = wrap ? 0 : 1100;
@@ -528,7 +538,9 @@ static void clock_deadline(unsigned phase, bool wrap, bool ready, bool oob)
  f.dev.oob_irq_requested = oob; f.dev.sd_irq_requested = !oob;
  hw.status = I_HMB_FRAME_IND; hw.frames_remaining = 1;
  f.bus.ctrl_frame_stat = !ready;
- irq(oob); drain();
+ if (lost_irq) clock_notify(); else irq(oob);
+ drain();
+ assert(f.bus.sdcnt.intrcount == (unsigned)!lost_irq);
  if (ready) {
   assert(!f.dev.io_error && hw.frames == 1 && f.bus.clkstate == CLK_AVAIL);
   assert(!hw.stops && !hw.responses && !f.bus.ipend);
@@ -546,6 +558,27 @@ static void clock_deadline(unsigned phase, bool wrap, bool ready, bool oob)
   hw.pending_work = true; f.bus.dpc_triggered = true; drain();
   assert(hw.byte_reads == reads && hw.responses == 1 && hw.stops == 1);
  }
+ finish();
+}
+enum clock_transfer_failure { CLOCK_CSR_READ, CLOCK_FILTER_READ, CLOCK_FILTER_WRITE };
+static void clock_transfer_failure(enum clock_transfer_failure stage, bool wrap, bool oob)
+{
+ setup(); f.bus.clkstate = CLK_PENDING; hw.clock_ready = true;
+ f.bus.clk_pending_deadline = wrap ? 0 : 1100;
+ jiffies = f.bus.clk_pending_deadline;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = oob; f.dev.sd_irq_requested = !oob;
+ f.bus.ctrl_frame_stat = true; f.bus.txq.len = 1; f.bus.txbound = 1;
+ if (stage == CLOCK_FILTER_WRITE) hw.byte_write_error = true;
+ else hw.fail_byte_read_at = 1 + (stage == CLOCK_FILTER_READ);
+#ifdef DEBUG
+ if (hw.fail_byte_read_at) hw.fail_byte_read_at++; /* Initial diagnostic read. */
+#endif
+ clock_notify(); drain();
+ assert(!f.bus.sdcnt.intrcount && f.dev.io_error == -EIO && f.bus.io_error_handled);
+ assert(f.bus.ctrl_frame_err == -EIO && !f.bus.ctrl_frame_stat && f.bus.txq.len == 1);
+ assert(hw.responses == 1 && hw.wakes == 1 && hw.stops == 1 && !hw.frames);
+ assert(!hw.control_tx && !hw.data_tx && !f.bus.ipend && !f.bus.intstatus);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2));
  finish();
 }
 #endif
@@ -776,7 +809,13 @@ int main(void)
  for (unsigned phase = 0; phase < 3; phase++)
   for (unsigned wrap = 0; wrap < 2; wrap++)
    for (unsigned ready = 0; ready < 2; ready++)
-    for (unsigned oob = 0; oob < 2; oob++) clock_deadline(phase, wrap, ready, oob);
+    for (unsigned oob = 0; oob < 2; oob++) {
+     clock_deadline(phase, wrap, ready, oob, false);
+     if (phase) clock_deadline(phase, wrap, ready, oob, true);
+    }
+ for (unsigned stage = CLOCK_CSR_READ; stage <= CLOCK_FILTER_WRITE; stage++)
+  for (unsigned wrap = 0; wrap < 2; wrap++)
+   for (unsigned oob = 0; oob < 2; oob++) clock_transfer_failure(stage, wrap, oob);
 #endif
  printf("%u IRQ service scenarios passed (%u characterize existing error limitations)\n",
         scenarios, characterizations);

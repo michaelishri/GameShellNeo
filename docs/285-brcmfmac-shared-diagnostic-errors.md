@@ -96,8 +96,40 @@ happy transcript remains `a2658cef`), 215 TX, 115 RX and 263/289 normal/debug
 worker cases. All 18 diagnostic, 28 watchdog, 23 TX, four packet, five control
 and 51 worker mutations compile and fail assertions as intended.
 
-Complete board/debug ARM compilation, independent review and a final
-artifact/input rehash remain required before closing NEO-201.
+Full-driver attempt `154188bbb52047b4b9a2e337db4d15eb` also completed
+successfully, repeating those suites and building complete board/debug ARM
+objects. Each configuration passed 182 assertions; the compiler log contains
+no warnings or errors. Checkpatch on the production patch reports zero
+errors, warnings or checks.
+
+The review's test-readability change is being revalidated against that same
+production patch. Final review and artifact/input rehash remain required
+before closing NEO-201.
 No live device or image has changed. NEO-192
 still gates live PM work; NEO-154 remains abandoned and this finding does not
 attribute NEO-55's observed authentication delay.
+
+## Independent review
+
+The initial reviews used `git diff 4d9efd4...eab9776`, covering the caller audit
+and implementation commits.
+
+### Standards
+
+Zero documented-standard violations. One low-priority possible Primitive
+Obsession: the seven later-admission test boundaries used positional arithmetic
+to select callers, host claims and preceding RAM-read counts. A named boundary
+table was recommended to make the coverage easier to audit.
+
+### Spec
+
+Zero findings: no missing requirements, scope creep or incorrect implementation
+identified. The review independently checked startup timer/work/waiter
+initialization, null interface handling, IRQ registration/lock ownership and
+later diagnostic acquisitions. Full objects and final verification were still
+pending; the review did not treat those gates as completed.
+
+Initial totals: **Standards: zero hard violations, one possible smell.
+Spec: zero findings.** Named boundaries now explicitly map each caller to its
+host acquisition and preceding read count; revalidation and follow-up review
+are pending. No production patch changed for this adjustment.

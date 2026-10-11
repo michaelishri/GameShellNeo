@@ -162,18 +162,35 @@ static void shared_callers(unsigned index)
 	else assert(hw.ram_reads == hw.ram_fail_at);
 	shared_end(false);
 }
+enum diagnostic_boundary {
+	CHECKDIED_TRAP, DUMP_ASSERT, DUMP_TRAP, DUMP_CONSOLE_POINTER,
+	DUMP_CONSOLE_SIZE, DUMP_CONSOLE_INDEX, DUMP_CONSOLE_DATA, DIAGNOSTIC_BOUNDARIES
+};
 static void shared_later_admission(unsigned index)
 {
-	assert(index < 28); shared_begin(false);
-	unsigned path = index / 4, mode = index % 4;
-	const unsigned reads[] = {2, 2, 4, 5, 6, 7, 8};
+	static const struct {
+		bool dump;
+		unsigned host_claim, preceding_reads;
+	} boundaries[DIAGNOSTIC_BOUNDARIES] = {
+		[CHECKDIED_TRAP] = {false, 2, 2},
+		[DUMP_ASSERT] = {true, 2, 2},
+		[DUMP_TRAP] = {true, 3, 4},
+		[DUMP_CONSOLE_POINTER] = {true, 4, 5},
+		[DUMP_CONSOLE_SIZE] = {true, 5, 6},
+		[DUMP_CONSOLE_INDEX] = {true, 6, 7},
+		[DUMP_CONSOLE_DATA] = {true, 7, 8},
+	};
+	assert(index < DIAGNOSTIC_BOUNDARIES * 4); shared_begin(false);
+	enum diagnostic_boundary boundary = index / 4;
+	unsigned mode = index % 4;
 	hw.shared_flags |= SDPCM_SHARED_ASSERT_BUILT | SDPCM_SHARED_ASSERT | SDPCM_SHARED_TRAP;
-	hw.inject_claim = path < 2 ? 2 : path + 1;
+	hw.inject_claim = boundaries[boundary].host_claim;
 	hw.admission = mode == 3 ? ADMIT_NOMEDIUM : (enum admission_fault)mode;
 	struct seq_file seq = {0};
 	int expected = mode == 1 ? -EHOSTDOWN : mode == 3 ? -ENOMEDIUM : -EILSEQ;
-	int result = path ? brcmf_sdio_died_dump(&seq, &f.bus) : brcmf_sdio_checkdied(&f.bus);
-	assert(result == expected && hw.ram_reads == reads[path]);
+	int result = boundaries[boundary].dump ? brcmf_sdio_died_dump(&seq, &f.bus) :
+		brcmf_sdio_checkdied(&f.bus);
+	assert(result == expected && hw.ram_reads == boundaries[boundary].preceding_reads);
 	assert(!hw.quiesces && !hw.responses && !hw.controls);
 	shared_end(false);
 }

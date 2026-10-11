@@ -6,12 +6,15 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
-The isolated NEO-195 receive-recovery candidate has repeatable helper checks:
-`task test:brcmfmac-rx-recovery` and `task check:brcmfmac-rx-recovery-drivers`.
-The latter also compiles complete ARM brcmfmac objects. These commands do not
-access hardware or add the candidate to the image queue. Helper tests pass;
-caller/packet ownership qualification remains in progress in
-[report 275](docs/275-brcmfmac-rx-recovery.md).
+The isolated NEO-195 receive-recovery candidates pass helper, packet and worker
+checks. Use `task test:brcmfmac-rx-recovery` for the abort/flush fault matrix and
+`task test:brcmfmac-rx-callers` for packet ownership, worker quarantine and
+successful traffic. `task check:brcmfmac-rx-callers-drivers` also compiles complete
+board/debug ARM brcmfmac objects and repeats the checks with the mailbox fix.
+The commands use native sanitizers and the locked, network-disabled ARM builder;
+they do not access hardware or add candidates to the image queue. Results and
+remaining review/integration work are in [report 275](docs/275-brcmfmac-rx-recovery.md)
+and [report 276](docs/276-brcmfmac-rx-caller-qualification.md).
 
 Diagnostic.26 is built, offline-verified, packed and checkpointed with explicitly
 selected, bounded kernel clock instrumentation for NEO-192. It gives the pending clock investigation its own

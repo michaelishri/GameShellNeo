@@ -1,0 +1,35 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: clean up malformed RX packets before continuing
+
+Consume superframe parser outputs only after successful header validation.
+Free a glom-channel packet without a descriptor before continuing
+the receive loop. Both fixes apply whether FIFO recovery succeeds
+or fails. Isolated companion to the RX recovery candidate.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -1710,10 +1710,11 @@
+ 		errcode = brcmf_sdio_hdparse(bus, pfirst->data, &rd_new,
+ 					     BRCMF_SDIO_FT_SUPER);
+ 		sdio_release_host(bus->sdiodev->func1);
+-		bus->cur_read.len = rd_new.len_nxtfrm << 4;
+-
+-		/* Remove superframe header, remember offset */
+-		skb_pull(pfirst, rd_new.dat_offset);
++		/* Only consume header outputs after a successful parse. */
++		if (!errcode) {
++			bus->cur_read.len = rd_new.len_nxtfrm << 4;
++			skb_pull(pfirst, rd_new.dat_offset);
++		}
+ 		num = 0;
+ 
+ 		/* Validate all the subframe headers */
+@@ -2096,6 +2097,7 @@
+ 				sdio_claim_host(bus->sdiodev->func1);
+ 				brcmf_sdio_rxfail(bus, false, false);
+ 				sdio_release_host(bus->sdiodev->func1);
++				brcmu_pkt_buf_free_skb(pkt);
+ 			}
+ 			/* prepare the descriptor for the next read */
+ 			rd->len = rd->len_nxtfrm << 4;

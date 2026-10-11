@@ -80,6 +80,11 @@ static struct {
  bool pending_work, running_work, parked, inject_during_frames, hold_receive;
  bool in_irq, clock_pending, clock_ready, byte_write_error, release_irq_error;
  bool retire_on_spin, irq_retired;
+#ifdef NEO_RX_RECOVERY
+ int rx_error;
+ bool allow_tx;
+ unsigned data_tx, control_tx;
+#endif
 #ifdef NEO_MAILBOX_ERRORS
  u32 mailbox_data;
  int mailbox_read_error, mailbox_ack_error;
@@ -187,15 +192,34 @@ static void brcmf_sdio_readframes(struct brcmf_sdio *bus, uint limit)
  }
  if (hw.frames_remaining) hw.frames_remaining--;
  bus->rxpending = hw.frames_remaining != 0 || hw.hold_receive;
+#ifdef NEO_RX_RECOVERY
+ /* Packet cleanup is exercised separately by the actual RX caller suite. */
+ f.dev.io_error = hw.rx_error;
+#endif
 }
 static bool txctl_ok(struct brcmf_sdio *bus) { (void)bus; return true; }
 static bool data_ok(struct brcmf_sdio *bus) { (void)bus; return true; }
 static unsigned brcmu_pktq_mlen(struct pktq *q, uint mask)
 { (void)mask; return q->len; }
 static void brcmf_sdio_sendfromq(struct brcmf_sdio *bus, uint count)
-{ (void)bus; (void)count; assert(false); }
+{
+#ifdef NEO_RX_RECOVERY
+ assert(bus == &f.bus && count == 1 && hw.allow_tx && !f.dev.io_error);
+ assert(!hw.host_depth && hw.frames == 1); hw.data_tx++; bus->txq.len = 0;
+#else
+ (void)bus; (void)count; assert(false);
+#endif
+}
 static int brcmf_sdio_tx_ctrlframe(struct brcmf_sdio *bus, u8 *data, uint len)
-{ (void)bus; (void)data; (void)len; assert(false); return 0; }
+{
+#ifdef NEO_RX_RECOVERY
+ assert(bus == &f.bus && hw.allow_tx && !f.dev.io_error);
+ assert(hw.host_depth == 1 && hw.frames == 1 && !data && !len); hw.control_tx++;
+#else
+ (void)bus; (void)data; (void)len; assert(false);
+#endif
+ return 0;
+}
 static void brcmf_sdio_wait_event_wakeup(struct brcmf_sdio *bus)
 { assert(bus == &f.bus); hw.wakes++; }
 static bool queue_work(void *queue, struct work_struct *work)
@@ -584,6 +608,39 @@ static void mailbox_cases(void)
   for (unsigned skipped = 0; skipped < 2; skipped++) mailbox_success(valid[n], skipped);
 }
 #endif
+#ifdef NEO_RX_RECOVERY
+static void rx_completion(int error, bool oob, bool hard)
+{
+ setup(); hw.status = I_HMB_FRAME_IND; hw.frames_remaining = 1;
+ hw.rx_error = error; hw.allow_tx = !error;
+ f.bus.ctrl_frame_stat = true; f.bus.txbound = 1; f.bus.txq.len = 1;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = false;
+ f.dev.sd_irq_requested = !oob;
+ irq(hard); drain();
+ assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && !hw.mail);
+ assert(f.dev.io_error == error && f.bus.io_error_handled == !!error);
+ assert(!f.bus.ctrl_frame_stat && f.bus.ctrl_frame_err == error && hw.wakes == 1);
+ assert(!f.bus.ipend && !f.bus.intstatus);
+ if (!error) {
+  assert(f.dev.state == BRCMF_SDIOD_DATA && !hw.stops && !hw.responses);
+  assert(hw.data_tx == 1 && hw.control_tx == 1 && !f.bus.txq.len);
+  assert(hw.enables == oob && !hw.releases_irq);
+ } else {
+  assert(f.dev.state == BRCMF_SDIOD_DOWN && hw.stops == 1 && hw.responses == 1);
+  assert(!hw.data_tx && !hw.control_tx && f.bus.txq.len == 1);
+  assert(!hw.enables && !f.dev.sd_irq_requested);
+  assert(hw.releases_irq == (oob ? 0 : 2));
+  unsigned queued = hw.queue;
+  irq(false); irq(true); brcmf_sdio_trigger_dpc(&f.bus);
+  assert(hw.queue == queued);
+  hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+  assert(hw.stops == 1 && hw.responses == 1 && hw.wakes == 1);
+  assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && !hw.enables);
+  assert(f.dev.io_error == error && hw.releases_irq == (oob ? 0 : 2));
+ }
+ finish();
+}
+#endif
 int main(void)
 {
  for (unsigned hard = 0; hard < 2; hard++)
@@ -608,6 +665,12 @@ int main(void)
 #endif
 #ifdef NEO_MAILBOX_ERRORS
  mailbox_cases();
+#endif
+#ifdef NEO_RX_RECOVERY
+ const int faults[] = {0, -EIO, -ETIMEDOUT, -ENOMEDIUM};
+ for (unsigned e = 0; e < sizeof(faults) / sizeof(faults[0]); e++)
+  for (unsigned oob = 0; oob < 2; oob++)
+   for (unsigned hard = 0; hard < 2; hard++) rx_completion(faults[e], oob, hard);
 #endif
  printf("%u IRQ service scenarios passed (%u characterize existing error limitations)\n",
         scenarios, characterizations);

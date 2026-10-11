@@ -5,6 +5,11 @@ from [report 251](251-brcmfmac-suspend-failure-audit.md). This is an isolated
 candidate and partial validation, outside the verified diagnostic.26 image.
 No GameShell, firmware, network configuration or PM setting was changed.
 
+**Follow-on:** [report 276](276-brcmfmac-rx-caller-qualification.md) now records
+reproduction/fixes for both packet findings and completed native/ARM caller,
+worker, sanitizer and combined-mailbox driver checks. The pending statements
+below describe this initial helper-only milestone.
+
 ## Source defect and candidate
 
 The locked Linux 6.18.54 receive-error path can lose errors during its own

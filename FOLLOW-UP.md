@@ -2,17 +2,31 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-58/196 control allocation lead, 12 October 2026:** the locked
+`brcmf_sdio_read_control()` goes directly to `done` when `vzalloc(rxblen)` fails.
+Its caller has already read the frame header and then advances to the advertised
+next-frame length. Unlike body-read failure, allocation failure does not flush
+the unread FIFO body or request retransmission. Reproduce with a byte-position
+FIFO model before selecting the recovery policy; the packet test's scripted
+frame boundaries alone do not establish this behavior. Keep successful small
+control packets and an already-published control response intact. This is a
+separate lead, not a claimed fix or observed GameShell failure.
+
 **NEO-58/195 RX recovery candidate, 12 October 2026:** isolated candidate 0046
 preserves abort/terminate/count/NAK errors, refuses retransmission after an
 unverified flush and hands fatal recovery to the existing worker quarantine.
 The saved helper suite passes 44 native/ARM32 scenarios and 13 assertion-based
-negative controls, and full board/debug ARM brcmfmac compilation passes. Complete
-caller/packet tests are still pending. Diagnostic.26 is unchanged.
+negative controls. Candidate 0047 now fixes the reproduced missing-descriptor
+packet leak and use of failed superframe parser outputs. The actual-caller
+suite passes 53 native/ARM packet cases, native memory sanitizers, worker
+quarantine and successful-TX cases, negative controls, and four full board/debug
+ARM builds with/without the mailbox candidate. NEO-195 is ready for review;
+image integration and matching hardware qualification remain. Diagnostic.26
+is unchanged. [Report 276](docs/276-brcmfmac-rx-caller-qualification.md) records
+the caller results and their boundary-model limits.
 [Report 275](docs/275-brcmfmac-rx-recovery.md)
-records the remaining work, including two newly identified packet paths:
-unowned `pkt` after a glom-without-descriptor error, and consumption of
-uninitialized parse outputs before a superframe error is checked. Preserve
-these leads for focused reproduction; no observed GameShell fault is attributed.
+preserves the initial helper evidence and the two packet findings before
+their reproduction; no observed GameShell fault is attributed to either one.
 
 **NEO-194 local build ownership, 12 October 2026:** the diagnostic.26 host
 command ended with status 143 while its Docker kernel build remained running.

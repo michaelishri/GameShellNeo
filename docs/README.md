@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[276 — brcmfmac RX packet cleanup and worker qualification](276-brcmfmac-rx-caller-qualification.md)
+reproduces the malformed-packet defects, adds candidate 0047 and exercises
+packet ownership and worker quarantine with saved native/ARM fault tests.
+
 [275 — brcmfmac RX recovery error ownership](275-brcmfmac-rx-recovery.md)
 records the isolated candidate, 44 passing native/ARM helper cases, 13 negative
 controls and pending caller/packet qualification.

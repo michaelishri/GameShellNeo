@@ -7,12 +7,12 @@ reproduces discarded polling/wake/console/idle errors and work published after
 bus retirement. Isolated candidate 0051 preserves the first transport failure,
 rechecks each host admission and publishes successful poll work under the host
 claim. Local console allocation/index failures retain healthy bus operation.
-The expanded qualification passes 50 normal / 131 debug watchdog cases,
-17 watchdog mutations, combined TX/RX/worker regressions and both full ARM
-objects. Review then found RAM allocation could be misclassified as transport
-failure; an expanded actual-RAM-helper fixture reproduces 14 failing cases.
-The corrected errno/classification and 50/157-case qualification are in
-progress; see [report 282](docs/282-brcmfmac-watchdog-errors.md). NEO-58 retains
+Review found RAM allocation could be misclassified as transport failure; an
+expanded actual-RAM-helper fixture reproduced 14 failing cases. The corrected
+errno/classification now passes all 50 normal / 157 debug watchdog cases,
+20 watchdog mutations, combined TX/RX/worker regressions and both full ARM
+objects. Independent reviews have no outstanding findings; see
+[report 282](docs/282-brcmfmac-watchdog-errors.md). NEO-58 retains
 image integration, matching board qualification, clock-ready timeout and
 reset/reprobe ownership. No observed board fault is attributed to this finding.
 

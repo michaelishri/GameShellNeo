@@ -130,8 +130,78 @@ New cases cover both allocations with idle/queued work, window failures,
 lower allocation errors, balanced packet/host ownership and single/multi-window
 read/write success and failure. Three new mutations restore the incorrect
 allocation errno or either console misclassification. Corrected qualification
-is running as `960ec2622d13417e93c29e836fd210a3`; it is not yet claimed complete.
-Checkpatch reports zero errors, warnings or checks.
+completed as `960ec2622d13417e93c29e836fd210a3`:
+
+- All 50 normal / 157 debug watchdog cases pass natively, under ASan/UBSan
+  with leak detection, and on ARM32. All 20 watchdog mutations fail assertions.
+- All 215 TX, 115 RX and 211 normal / 213 debug worker cases pass in all
+  three modes. The 23 TX, four packet, five control-FIFO and 48 worker
+  mutations are rejected.
+- Both complete board/debug ARM objects build, each passing 182 configuration
+  assertions, with no compiler warnings or errors in the saved build log.
+- Checkpatch reports zero errors, warnings or checks.
+
+All 23 recorded inputs, 2,084 artifacts, both objects/configurations and the
+complete applied source inventory were rehashed after terminal success. They
+match the unchanged manifest. The receipt is
+`.local/build/brcmfmac-watchdog/final-verification.json`.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Evidence manifest | `8def1de5ac3672958af17d838db5e067c262e5ac731689d1cb4b1f0cd57f9253` |
+| Final candidate 0051 | `97586046f45c259d39cce2668407c98cd1260c95a319cbdb900e0a698a8ad9e6` |
+| Applied source tree | `2ddc414632af7e17aad2446868211ba9d924e1d67130c4e631bd99ee773f5fc4` |
+| Board object | `31938c7c6c437f6666757292b70a2446d5891a2b9d611e358ea56a38d7914f30` |
+| Debug object | `92d863bfd5c379bcdbc7c51faafba73c37aee2f77b41cd46b3364a737209fabe` |
+| Verification receipt | `5be31638e1e203a793a4a9e298760285349b6bc50ce7d113ac86ee19d6067a10` |
+
+## Standards
+
+Independent review used
+`git diff 1898229af8a24e2fb590bbb915342bb77ce1eada...6e6833cb9a662514de4ebbee9227a34b67a22e19`.
+
+No documented-standard violations or substantive baseline smells found in the
+full pinned diff through `6e6833c`.
+
+The correction fixes the allocation errno at its source and carries that
+distinction through console handling, consistent with `AGENTS.md`. The
+expanded fixture exercises the actual RAM helper, with allocation, window
+selection and transfers as explicit lower-level seams. Its ownership checks
+and focused negative controls fit the existing test structure.
+
+This report records the review defect, the 14-case reproduction and the limits
+of earlier passing runs. At review time it did not claim the corrected
+qualification was complete. The newly discovered shared-memory diagnostic
+issue is recorded separately in `FOLLOW-UP.md`, as required by the project's
+Ethos. Static review only; the reviewer performed no tests or hardware actions.
+
+**Standards: zero hard violations, zero possible smells.**
+
+## Spec
+
+The independent Spec review used the same full fixed diff and current NEO-199
+ticket. The previous P2 finding is resolved. No remaining or new Spec findings
+were identified.
+
+The RAM helper now reports its packet-allocation failure as `-ENOMEM`, and
+both console RAM-read paths keep resource exhaustion outside transport
+quarantine. This matches the inspected pinned MMC/Sunxi error paths; other
+RAM errors still reach fatal cleanup.
+
+The strengthened fixture executes the actual RAM helper and checks both console
+allocation points, nested host ownership, packet freeing, window/transfer
+failures, lower resource errors, and transfers crossing a window boundary. The
+three added mutations directly challenge the corrected errno and both console
+classification branches. Existing watchdog admission, publication, timer and
+retirement checks remain intact.
+
+No unrequested behavior or missing offline implementation requirement was
+found. The report preserves the original reproduction and states the controlled
+boundaries. The reviewer conditioned closure on completing the final corrected
+qualification and its evidence receipt. Image and board qualification remain
+separate.
+
+**Spec: one initial P2 finding resolved; zero outstanding findings.**
 
 ## Evidence boundaries
 

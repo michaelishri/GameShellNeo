@@ -4,12 +4,17 @@
 #include "brcmfmac_watchdog_test.c"
 #undef main
 
+#ifdef NEO_DIAGNOSTIC_BOUNDS
+#define main shared_fixture_main
+#include "brcmfmac_output_fixture.h"
+#else
 struct seq_file { unsigned unused; };
 #define seq_printf(seq, ...) do { assert(seq); hw.seq_lines++; } while (0)
 static int seq_write(struct seq_file *seq, const void *data, unsigned size)
 { assert(seq && data && size <= 16); hw.seq_bytes += size; return 0; }
 static void *vzalloc(unsigned size) { assert(size == 17); return calloc(1, size); }
 #define vfree free
+#endif
 static bool brcmf_chip_sr_capable(struct brcmf_chip *chip)
 { assert(chip == &f.chip); return chip->sr_capable; }
 

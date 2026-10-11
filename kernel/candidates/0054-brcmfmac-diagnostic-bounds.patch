@@ -1,0 +1,63 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: bound console and assertion diagnostic output
+
+Reject console offsets outside the firmware buffer before host pointer or
+length arithmetic. Reject oversized metadata locally and avoid allocation
+and payload access for an empty console. Preserve valid ring output,
+including its end-of-buffer cursor.
+
+Reserve a terminating byte outside each existing 80-byte assertion read so
+firmware text cannot make formatting read beyond the host stack buffer.
+Transport admission, first errors and cleanup ownership remain unchanged.
+Candidate only; integration and hardware qualification remain separate.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -3298,9 +3298,14 @@
+ 		return rv;
+ 	console_index = le32_to_cpu(sh_val);
+ 
++	/* Validate firmware metadata before pointer or length arithmetic. */
++	if (console_size > CONSOLE_BUFFER_MAX || console_index > console_size)
++		return -EINVAL;
++	if (!console_size)
++		return 0;
++
+ 	/* allocate buffer for console data */
+-	if (console_size <= CONSOLE_BUFFER_MAX)
+-		conbuf = vzalloc(console_size+1);
++	conbuf = vzalloc(console_size + 1);
+ 
+ 	if (!conbuf)
+ 		return -ENOMEM;
+@@ -3377,8 +3382,9 @@
+ 				  struct sdpcm_shared *sh)
+ {
+ 	int error = 0;
+-	char file[80] = "?";
+-	char expr[80] = "<???>";
++	/* Keep the full 80-byte firmware text and a separate terminator. */
++	char file[80 + 1] = "?";
++	char expr[80 + 1] = "<???>";
+ 
+ 	if ((sh->flags & SDPCM_SHARED_ASSERT_BUILT) == 0) {
+ 		brcmf_dbg(INFO, "firmware not built with -assert\n");
+@@ -3391,13 +3397,15 @@
+ 	sdio_claim_host(bus->sdiodev->func1);
+ 	if (sh->assert_file_addr != 0) {
+ 		error = brcmf_sdio_diag_read(bus,
+-					     sh->assert_file_addr, (u8 *)file, 80);
++					     sh->assert_file_addr, (u8 *)file,
++					     sizeof(file) - 1);
+ 		if (error < 0)
+ 			goto release_host;
+ 	}
+ 	if (sh->assert_exp_addr != 0) {
+ 		error = brcmf_sdio_diag_read(bus,
+-					     sh->assert_exp_addr, (u8 *)expr, 80);
++					     sh->assert_exp_addr, (u8 *)expr,
++					     sizeof(expr) - 1);
+ 		if (error < 0)
+ 			goto release_host;
+ 	}

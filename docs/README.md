@@ -16,6 +16,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[286 — brcmfmac diagnostic console and assertion output bounds](286-brcmfmac-diagnostic-output-bounds.md)
+
 [284 — brcmfmac shared-memory diagnostic admission audit](284-brcmfmac-shared-diagnostic-audit.md)
 
 [285 — brcmfmac shared diagnostic error handling](285-brcmfmac-shared-diagnostic-errors.md)

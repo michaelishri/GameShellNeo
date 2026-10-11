@@ -38,12 +38,15 @@ outside the image queue. NEO-58 retains integration, hardware qualification
 and startup/reset ownership. NEO-154 remains abandoned; no board fault is
 attributed to this source finding.
 
-**NEO-202 diagnostic output bounds, 12 October 2026:** NEO-201's source audit found
-that `brcmf_sdio_dump_console()` uses the firmware's console index without an
-explicit index-versus-size check, while `brcmf_sdio_assert_info()` can fill
-fixed string buffers before `%s` formatting without explicitly ensuring a
-terminator. Add malformed-metadata and bounded-output fixtures in a separate
-slice; no triggering firmware input or live fault is claimed. See report 284.
+**NEO-202 diagnostic output bounds, 12 October 2026:** actual-source offline
+tests reproduce invalid console cursor output and unterminated assertion
+buffer overreads. Isolated candidate 0054 checks size/index before allocation
+or output, avoids empty-console work and reserves terminators outside the
+existing 80-byte text reads. Valid ring output and transport ownership remain
+unchanged. The saved full-driver qualification is running; review and final
+verification remain pending. See [report 286](docs/286-brcmfmac-diagnostic-output-bounds.md).
+No triggering firmware input or live fault is claimed; candidate 0054 stays
+outside the image queue, with integration/hardware ownership in NEO-58.
 
 **NEO-58 firmware-startup error audit, 12 October 2026:** the callback still
 discards clock/setup transfer results outside NEO-201's shared-reader path.

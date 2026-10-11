@@ -6,6 +6,14 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+NEO-202's console and assertion output-bounds candidate is documented in
+[report 286](docs/286-brcmfmac-diagnostic-output-bounds.md). Run
+`task test:brcmfmac-output-bounds` for native/sanitizer/ARM output checks and
+combined Wi-Fi regressions, or `task check:brcmfmac-output-drivers` to include
+complete board/debug ARM objects. `task test:brcmfmac-output-baseline`
+intentionally reproduces the prior output defects. These offline commands
+do not access the GameShell; candidate 0054 stays outside the image queue.
+
 NEO-201's shared diagnostic candidate is documented in
 [report 285](docs/285-brcmfmac-shared-diagnostic-errors.md). Run
 `task test:brcmfmac-shared-diagnostics` for native/sanitizer/ARM diagnostic and

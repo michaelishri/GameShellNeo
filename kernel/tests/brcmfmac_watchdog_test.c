@@ -95,6 +95,11 @@ static struct {
 	bool shared;
 	u32 shared_address, shared_flags;
 	unsigned seq_lines, seq_bytes;
+#ifdef NEO_DIAGNOSTIC_BOUNDS
+	bool bounds;
+	u32 diagnostic_size, diagnostic_index;
+	char diagnostic_file[80], diagnostic_expression[80];
+#endif
 #endif
 } hw;
 static unsigned long jiffies = 100;
@@ -244,8 +249,25 @@ static int brcmf_sdiod_skbuff_read(struct brcmf_sdio_dev *dev, struct sdio_func 
 			u32 val = hw.ram_address == 0x2000 + offsetof(struct rte_console, log_le) ? 0x3000 :
 				hw.ram_address == 0x2000 + offsetof(struct rte_console, log_le.buf_size) ? 16 : 2;
 			memcpy(data, &val, 4);
+#ifdef NEO_DIAGNOSTIC_BOUNDS
+			if (hw.bounds && hw.ram_address == 0x2000 + offsetof(struct rte_console, log_le.buf_size))
+				memcpy(data, &hw.diagnostic_size, 4);
+			if (hw.bounds && hw.ram_address == 0x2000 + offsetof(struct rte_console, log_le.idx))
+				memcpy(data, &hw.diagnostic_index, 4);
+#endif
 		} else assert(hw.ram_address == 0x6000 || hw.ram_address == 0x6100 ||
 			     hw.ram_address == 0x6200 || hw.ram_address == 0x3000);
+#ifdef NEO_DIAGNOSTIC_BOUNDS
+		if (hw.bounds) {
+			if (hw.ram_address == 0x3000) {
+				assert(len == hw.diagnostic_size && len <= CONSOLE_BUFFER_MAX);
+				for (unsigned i = 0; i < len; i++) data[i] = 'A' + i % 23;
+			} else if (hw.ram_address == 0x6100 || hw.ram_address == 0x6200) {
+				assert(len <= 80);
+				memcpy(data, hw.ram_address == 0x6100 ? hw.diagnostic_file : hw.diagnostic_expression, len);
+			}
+		}
+#endif
 		return 0;
 	}
 #endif

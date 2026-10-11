@@ -229,12 +229,16 @@ def main():
     mode.add_argument('--clock-baseline', action='store_true', help='Reproduce an unbounded pending clock')
     mode.add_argument('--shared-diagnostics', action='store_true', help='Qualify shared diagnostic admission/errors')
     mode.add_argument('--shared-baseline', action='store_true', help='Reproduce ignored diagnostic wake/errors')
+    mode.add_argument('--diagnostic-bounds', action='store_true', help='Qualify bounded diagnostic output')
+    mode.add_argument('--bounds-baseline', action='store_true', help='Reproduce unchecked diagnostic output')
     parser.add_argument('--native-only', action='store_true')
     parser.add_argument('--compile-drivers', action='store_true')
     parser.add_argument('--arm-attempt', help=argparse.SUPPRESS)
     args = parser.parse_args()
-    shared_mode = args.shared_diagnostics or args.shared_baseline
-    SHARED_DIAGNOSTICS = args.shared_diagnostics
+    bounds_mode = args.diagnostic_bounds or args.bounds_baseline
+    bounds = module('diagnostic_output_checks', 'brcmfmac_output_checks.py') if bounds_mode else None
+    shared_mode = args.shared_diagnostics or args.shared_baseline or bounds_mode
+    SHARED_DIAGNOSTICS = args.shared_diagnostics or bounds_mode
     diagnostics = module('shared_diagnostic_checks', 'brcmfmac_shared_checks.py') if shared_mode else None
     CLOCK_DEADLINE = args.clock_deadline or args.clock_baseline or shared_mode
     watchdog_mode = args.watchdog_errors or args.watchdog_baseline or CLOCK_DEADLINE
@@ -257,6 +261,8 @@ def main():
                 watchdog.run_sleep(attempt / 'watchdog', rx, arm=True)
         if diagnostics:
             diagnostics.run_cases(attempt / 'watchdog', rx, arm=True)
+        if bounds:
+            bounds.run_cases(attempt / 'watchdog', rx, arm=True)
         run_cases(attempt, arm=True)
         rx.run_cases(attempt / 'rx', arm=True, control=True)
         run_worker(attempt / 'worker', arm=True)
@@ -281,8 +287,10 @@ def main():
             paths.append(ROOT / 'kernel/candidates/0051-brcmfmac-watchdog-errors.patch')
         if args.clock_deadline or shared_mode:
             paths.append(ROOT / 'kernel/candidates/0052-brcmfmac-clock-deadline.patch')
-        if args.shared_diagnostics:
+        if SHARED_DIAGNOSTICS:
             paths.append(ROOT / 'kernel/candidates/0053-brcmfmac-shared-diagnostics.patch')
+        if args.diagnostic_bounds:
+            paths.append(ROOT / 'kernel/candidates/0054-brcmfmac-diagnostic-bounds.patch')
         for path in paths:
             if path.name in {name for name, _ in queue}:
                 raise ValueError('TX test candidate unexpectedly entered image queue')
@@ -300,6 +308,8 @@ def main():
             paths += [ROOT / 'tools/check-brcmfmac-sleep.py', ROOT / 'kernel/tests/brcmfmac_sleep_test.c']
         if diagnostics:
             paths += [diagnostics.HARNESS, ROOT / 'tools/brcmfmac_shared_checks.py']
+        if bounds:
+            paths += [bounds.HARNESS, bounds.FIXTURE, ROOT / 'tools/brcmfmac_output_checks.py']
         hashes = {str(path.relative_to(ROOT)): sha256(path) for path in paths}
         atomic_json(attempt / 'inputs.json', hashes)
         with locked(WORK / '.source-lock'):
@@ -310,6 +320,14 @@ def main():
             watchdog.extract_sources(source, watch, rx, clock=CLOCK_DEADLINE)
             if diagnostics:
                 diagnostics.extract_sources(source, watch, rx)
+                if bounds:
+                    native_failures = bounds.run_cases(watch, rx, baseline=args.bounds_baseline)
+                    sanitizer_failures = bounds.run_cases(watch, rx, sanitizer=True, baseline=args.bounds_baseline)
+                    if args.bounds_baseline:
+                        if not native_failures and not sanitizer_failures:
+                            raise RuntimeError('Output baseline unexpectedly passed; inspect qualification')
+                        raise RuntimeError('Output baseline reproduced failures; original logs retained')
+                    bounds.negatives(watch, rx)
                 diagnostics.run_cases(watch, rx)
                 if args.shared_baseline:
                     raise RuntimeError('Shared baseline unexpectedly passed; inspect before qualification')
@@ -348,7 +366,7 @@ def main():
                 '--user', f'{os.getuid()}:{os.getgid()}', '--platform', lock['builder']['platform'],
                 '--entrypoint=python3', '-v', f'{ROOT}:/project', '-w', '/project',
                 lock['builder']['image'], 'tools/check-brcmfmac-tx-recovery.py',
-                *(['--shared-diagnostics'] if shared_mode else ['--clock-deadline'] if CLOCK_DEADLINE else ['--watchdog-errors'] if watchdog_mode else ['--poll-status'] if POLL_STATUS else []),
+                *(['--diagnostic-bounds'] if bounds_mode else ['--shared-diagnostics'] if shared_mode else ['--clock-deadline'] if CLOCK_DEADLINE else ['--watchdog-errors'] if watchdog_mode else ['--poll-status'] if POLL_STATUS else []),
                 '--arm-attempt', str(attempt.relative_to(ROOT))], check=True, timeout=180)
         builds = {}
         if args.compile_drivers:
@@ -365,10 +383,14 @@ def main():
             watchdog=watchdog_mode,
             clock_deadline=CLOCK_DEADLINE,
             shared_diagnostics=shared_mode,
+            diagnostic_bounds=bounds_mode,
             native_complete=True, native_sanitizers=True, arm_complete=not args.native_only,
             inputs=hashes, source=metadata, cases=CASES, arm_build=builds,
             artifacts={str(path.relative_to(attempt)): sha256(path) for path in attempt.rglob('*') if path.is_file()},
-            limits=('Actual shared/console/assert/trap diagnostic functions and RAM helper; '
+            limits=('Console sizes/indices and assertion bytes use controlled firmware-memory responses; '
+                    'bounded seq writes and real vsnprintf model output, not the kernel seq-file core. '
+                    'No malformed input is sent to a device. ' if bounds_mode else '') +
+                   ('Actual shared/console/assert/trap diagnostic functions and RAM helper; '
                     'scripted wake, transfers, allocations and host-boundary admissions. '
                     'Worker tests use a diagnostic-return seam, with separate actual diagnostic tests; '
                     'startup cleanup primitives are controlled and caller initialization is source-audited. '

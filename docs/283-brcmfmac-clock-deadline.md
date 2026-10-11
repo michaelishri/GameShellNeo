@@ -87,8 +87,8 @@ tests execute actual KSO/clock/sleep bodies and retain the original 43-case
 successful transfer/delay/state transcript `a2658cef` within 95 scenarios.
 
 Native, sanitizer and ARM checks, mutation controls, full ARM objects and
-independent Standards/Spec review are required before closing this offline
-ticket. Their final receipts will be recorded below. No hardware result,
+independent Standards/Spec review qualify this offline candidate as recorded
+below. No hardware result,
 energy saving or explanation of an observed Wi-Fi fault is claimed. NEO-58
 retains image integration and matching board qualification. NEO-192's clock
 fault still blocks live PM; this work does not reopen NEO-154 or attribute
@@ -122,4 +122,44 @@ The added software-notification cases cover ready/never-ready clocks and
 OOB/in-band IRQ ownership, without claiming a full scheduler simulation.
 The initial review found no production correctness or scope-creep defect.
 
-Final validation and follow-up review of these additions remain pending.
+Follow-up review of `d47ef98...2594704` found the named scenarios resolve the
+Standards suggestion and the no-ISR cases resolve the Spec coverage finding.
+Totals: **Standards: zero hard violations or remaining smells. Spec: zero
+remaining findings.** The production patch is unchanged between those pins.
+
+## Final qualification
+
+Strengthened attempt `a6c3292c8ea3413ba22262ece80b32e1` completed
+`task check:brcmfmac-clock-drivers` with exit status zero:
+
+| Suite | Native, ASan/UBSan and ARM32 result |
+| --- | --- |
+| Watchdog and clock requests | 95 normal / 202 debug cases pass |
+| Original sleep paths | 95 normal / debug cases pass; happy transcript unchanged |
+| TX / RX callers | 215 / 115 cases pass |
+| Worker and IRQ handling | 263 normal / 265 debug cases pass |
+
+All 28 watchdog, 23 TX, four packet, five control-FIFO and 50 worker mutation
+controls compile and fail assertions as intended. Both complete board/debug
+ARM objects build, each with 182 configuration assertions and no compiler
+warnings or errors. Checkpatch on the patch contents reports zero errors,
+warnings or checks. The earlier file-argument invocation inspected the tracked
+patch file as a Git change and reported its context whitespace; that output
+is retained separately and is not the patch-content check result.
+
+The 26 recorded inputs, 2,418 artifacts, both objects/configurations and the
+complete applied source inventory were rehashed after terminal success and
+match their saved hashes. Private receipt:
+`.local/build/brcmfmac-clock-deadline/final-verification.json`.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Evidence manifest | `f8ea1955d99292690be5cb6ca9dadda1282d3afaace9228ad8364820332653e0` |
+| Candidate 0052 | `930220c26cdf21d0d0cd3243bf624278c64c338602e4cde5c15267a8d86f03fb` |
+| Applied source tree | `dd6f0c88c73b5dd2459757cf9add69fa9a7c7e7277dc495432db029fc011eba6` |
+| Board object | `250afb76b2c2bf2bb2ef592e3212946a23751b08e44754e66887e9a7d9ce9ca7` |
+| Debug object | `8ceec587f69f8aebdb320811d14a6ee109393aa8b9d808c1a3afcf9fda603b89` |
+| Final verification receipt | `dda9fb69f99d1cb7404989e66af65e39c7223a3e40c34517c82a87417dc96ae2` |
+
+NEO-58 retains image integration, physical qualification and reset/reprobe.
+NEO-201 now tracks the separate shared-memory diagnostic wake/admission lead.

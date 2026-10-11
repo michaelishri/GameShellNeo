@@ -7,8 +7,9 @@ had no deadline. The baseline reproduces missing deadlines and notifications;
 candidate 0052 preserves one request budget and uses the existing watchdog
 to schedule a host-held worker check. Readiness is accepted, original transfer
 errors preserved, and unavailable clocks time out through existing cleanup.
-See [report 283](docs/283-brcmfmac-clock-deadline.md) for saved offline tests
-and qualification status. The candidate remains outside the image queue;
+The full native/sanitizer/ARM suite, complete board/debug objects and both
+independent reviews pass, including explicit no-IRQ worker consumption;
+see [report 283](docs/283-brcmfmac-clock-deadline.md). The candidate remains outside the image queue;
 NEO-58 retains integration, hardware qualification and reset/reprobe ownership.
 
 **NEO-58/199 watchdog ownership, 12 October 2026:** the actual-source baseline
@@ -22,10 +23,10 @@ errno/classification now passes all 50 normal / 157 debug watchdog cases,
 20 watchdog mutations, combined TX/RX/worker regressions and both full ARM
 objects. Independent reviews have no outstanding findings; see
 [report 282](docs/282-brcmfmac-watchdog-errors.md). NEO-58 retains
-image integration, matching board qualification, clock-ready timeout and
+image integration, matching board qualification and
 reset/reprobe ownership. No observed board fault is attributed to this finding.
 
-**NEO-58 shared-memory diagnostic lead, 12 October 2026:** the applied
+**NEO-58/201 shared-memory diagnostic lead, 12 October 2026:** the applied
 `brcmf_sdio_readshared()` claims the host but ignores `brcmf_sdio_bus_sleep()`
 before its first RAM access. Audit this diagnostic path and its callers'
 admission/error classification independently; NEO-199's periodic console

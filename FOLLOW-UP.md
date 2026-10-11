@@ -9,10 +9,19 @@ rechecks each host admission and publishes successful poll work under the host
 claim. Local console allocation/index failures retain healthy bus operation.
 The expanded qualification passes 50 normal / 131 debug watchdog cases,
 17 watchdog mutations, combined TX/RX/worker regressions and both full ARM
-objects. Final formatting-byte qualification and independent review are in
+objects. Review then found RAM allocation could be misclassified as transport
+failure; an expanded actual-RAM-helper fixture reproduces 14 failing cases.
+The corrected errno/classification and 50/157-case qualification are in
 progress; see [report 282](docs/282-brcmfmac-watchdog-errors.md). NEO-58 retains
 image integration, matching board qualification, clock-ready timeout and
 reset/reprobe ownership. No observed board fault is attributed to this finding.
+
+**NEO-58 shared-memory diagnostic lead, 12 October 2026:** the applied
+`brcmf_sdio_readshared()` claims the host but ignores `brcmf_sdio_bus_sleep()`
+before its first RAM access. Audit this diagnostic path and its callers'
+admission/error classification independently; NEO-199's periodic console
+watchdog fix does not cover it. This is a source finding, not attribution of
+a board failure or a reason to reopen the abandoned NEO-154 investigation.
 
 **NEO-58/198 polling status, 12 October 2026:** actual-source tests reproduce
 discarded queued-TX polling errors and I/O after a prior error arrives at host

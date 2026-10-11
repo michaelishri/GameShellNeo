@@ -43,7 +43,9 @@ fixture forces another claimant to retire the bus immediately afterward; this
 must leave no stale pending status or post-retirement publication.
 
 The console helper reports transport errors separately through an output
-parameter. Allocation/index failures retain the established behavior of
+parameter. The RAM helper now reports its packet-buffer allocation failure
+as `-ENOMEM`, rather than `-EIO`; console RAM resource failures leave that
+transport-error output clear. Allocation/index failures retain the behavior of
 disabling console polling while leaving healthy Wi-Fi operational. Successful
 console reads, pending-work handling, save/restore mode and idle scheduling
 remain part of the regression contract.
@@ -96,18 +98,48 @@ Attempt `44796ea271694efc96f3e5fefd9da8d3` completed the full driver Task:
   48 worker mutations rejected.
 - Both complete ARM `brcmfmac.o` objects build successfully.
 
-A checkpatch alignment correction changes only indentation. Final-byte
-qualification is running as `2c21befc166d4cd99120569b33476bc9`; it is not yet
-claimed complete here. Checkpatch on the corrected candidate reports zero
-errors, warnings or checks. Independent Standards and Spec reviews are pending
-against the completed NEO-198 baseline `1898229`.
+A checkpatch indentation correction was qualified by completed attempt
+`2c21befc166d4cd99120569b33476bc9`, with the same full passing counts. Neither
+of these attempts covers the later RAM-resource correction described below.
+
+## Review finding and stronger reproduction
+
+Independent review of `1898229...6066ede` found one Spec defect. The fixture
+replaced the entire RAM helper, but actual `brcmf_sdiod_ramrw()` can return
+`-EIO` when `dev_alloc_skb()` fails before its transfer. Classifying every
+RAM-helper error as transport therefore quarantines a healthy bus under local
+memory pressure. The prior passing tests did not cover this allocation.
+
+The revised fixture extracts the actual RAM helper. It controls packet
+allocation, window selection and SDIO transfers underneath it, uses real
+native allocations, and models the helper's recursive host claim. Against
+the reviewed pre-correction candidate, attempt `a61b81b417914f1382dec8f8ad135a6a`
+passes **50/50 normal** and **143/157 debug** cases. The 14 assertion failures
+cover both console RAM allocations, lower resource errors and the helper's
+read/write allocation errno. The originals remain preserved.
+
+The correction gives the helper allocation its proper `-ENOMEM` errno and
+keeps this resource error out of console transport quarantine. Pinned MMC
+scatterlist allocation and Sunxi DMA mapping also return `-ENOMEM` before
+submitting the affected command. Earlier chunks may have succeeded; this
+classification does not assert that no preceding I/O occurred. Console reads
+use function-1 RAM, and the helper stops on the first failure. No packet-FIFO
+recovery is inferred from this path.
+
+New cases cover both allocations with idle/queued work, window failures,
+lower allocation errors, balanced packet/host ownership and single/multi-window
+read/write success and failure. Three new mutations restore the incorrect
+allocation errno or either console misclassification. Corrected qualification
+is running as `960ec2622d13417e93c29e836fd210a3`; it is not yet claimed complete.
+Checkpatch reports zero errors, warnings or checks.
 
 ## Evidence boundaries
 
-Transport, bus-sleep internals, timer operations, IRQ retirement and scheduling
-are synchronous controlled seams. Host-acquisition and release hooks force
+Packet primitives, window selection, SDIO transfers, bus-sleep internals,
+timer operations, IRQ retirement and scheduling are synchronous controlled
+seams. RAM-helper and console control flow are actual source. Host hooks force
 specific ordering boundaries; they do not prove complete-kernel concurrency.
-Console allocation uses real native allocations and memory sanitizers, but
+Console and RAM-buffer allocation use real native allocations and sanitizers, but
 firmware RAM and its log contents are supplied by the fixture. Existing worker
 and packet regression suites run separately against the same applied source.
 

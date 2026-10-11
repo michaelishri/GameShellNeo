@@ -4,7 +4,9 @@ Subject: [PATCH] brcmfmac: preserve watchdog failure ownership
 Recheck I/O admission under each watchdog host claim. Stop on status,
 console wake/read and idle sleep transport failures using the existing
 host-serialized error cleanup. Keep local console allocation/format errors
-separate from transport errors and preserve successful scheduling.
+separate from transport errors and preserve successful scheduling. Report
+RAM-buffer allocation failure as ENOMEM, preserving resource exhaustion
+through the console path without retiring a healthy bus.
 Candidate only; later image and hardware qualification are separate.
 
 diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
@@ -33,7 +35,7 @@ diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/n
  			       sizeof(c->log_le));
 -	if (rv < 0)
 +	if (rv < 0) {
-+		*ioerr = rv;
++		*ioerr = rv == -ENOMEM ? 0 : rv;
  		return rv;
 +	}
  
@@ -45,7 +47,7 @@ diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/n
  	rv = brcmf_sdiod_ramrw(bus->sdiodev, false, addr, c->buf, c->bufsize);
 -	if (rv < 0)
 +	if (rv < 0) {
-+		*ioerr = rv;
++		*ioerr = rv == -ENOMEM ? 0 : rv;
  		return rv;
 +	}
  
@@ -174,3 +176,15 @@ diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/n
  }
  
  static void brcmf_sdio_dataworker(struct work_struct *work)
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+@@ -734,7 +734,7 @@
+ 	pkt = dev_alloc_skb(dsize);
+ 	if (!pkt) {
+ 		brcmf_err("dev_alloc_skb failed: len %d\n", dsize);
+-		return -EIO;
++		return -ENOMEM;
+ 	}
+ 	pkt->priority = 0;
+ 

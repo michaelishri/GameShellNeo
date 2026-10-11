@@ -13,7 +13,9 @@ def cases(debug):
               ('admission', 12 if debug else 8), ('between', 8 if debug else 4)]
     if debug:
         groups += [('console_failure', 27), ('console_queued_failure', 27),
-                   ('console_local', 4), ('console_success', 9)]
+                   ('console_local', 4), ('console_success', 9),
+                   ('console_ram_allocation', 8), ('console_window_failure', 6),
+                   ('console_transfer_allocation', 4), ('ram_helper', 8)]
     return [(group, str(index)) for group, count in groups for index in range(count)]
 
 
@@ -21,11 +23,13 @@ def extract_sources(source, attempt, shared):
     base = source / 'drivers/net/wireless/broadcom/brcm80211/brcmfmac'
     sdio, header, registers = ((base / 'sdio.c').read_text(), (base / 'sdio.h').read_text(),
                                (source / 'include/linux/mmc/sdio.h').read_text())
+    bcmsdh = (base / 'bcmsdh.c').read_text()
     types = ''.join(shared.declarations(sdio, 'struct ' + name + ' {')
                     for name in ('rte_log_le', 'rte_console', 'brcmf_console', 'brcmf_sdio_count'))
     constants = []
     for name in ('CBUF_LEN', 'CONSOLE_LINE_MAX', 'BRCMF_WD_POLL', 'INTR_STATUS_FUNC1',
-                 'INTR_STATUS_FUNC2', 'SDIO_CCCR_INTx'):
+                 'INTR_STATUS_FUNC2', 'SDIO_CCCR_INTx', 'SBSDIO_SB_OFT_ADDR_LIMIT',
+                 'SBSDIO_SB_OFT_ADDR_MASK', 'SBSDIO_SBWINDOW_MASK', 'SBSDIO_SB_ACCESS_2_4B_FLAG'):
         match = re.findall(r'^#define\s+' + name + r'\s+[^\n]+$', sdio + '\n' + header + '\n' + registers, re.M)
         if len(match) != 1:
             raise ValueError('Missing/ambiguous watchdog constant: ' + name)
@@ -35,7 +39,8 @@ def extract_sources(source, attempt, shared):
     body = function(header, 'static inline bool brcmf_sdiod_io_blocked(')
     for prefix in ('void brcmf_sdio_wd_timer(', 'static void brcmf_sdio_dpc_failed('):
         body += function(sdio, prefix)
-    body += '#ifdef DEBUG\n' + function(sdio, 'static int brcmf_sdio_readconsole(') + '#endif\n'
+    body += '#ifdef DEBUG\n' + function(bcmsdh, 'int\nbrcmf_sdiod_ramrw(')
+    body += function(sdio, 'static int brcmf_sdio_readconsole(') + '#endif\n'
     body += function(sdio, 'static void brcmf_sdio_bus_watchdog(')
     (attempt / 'brcmfmac_watchdog_functions.h').write_text(body)
 
@@ -67,6 +72,7 @@ def negatives(attempt, shared):
     good = path.read_text(); extract = shared.helpers.extract
     watchdog = extract.function(good, 'static void brcmf_sdio_bus_watchdog(')
     console = extract.function(good, 'static int brcmf_sdio_readconsole(')
+    ram = extract.function(good, 'int\nbrcmf_sdiod_ramrw(')
     variants = []
 
     def add(name, body, before, after, group, index, debug=False):
@@ -89,13 +95,17 @@ def negatives(attempt, shared):
     for index, gate in enumerate(errors):
         broken = watchdog[:gate.start()] + gate[0].replace('if (err)', 'if (false && err)') + watchdog[gate.end():]
         variants.append(('lost_failure_gate_' + str(index), extract.mutate_once(good, watchdog, broken), targets[index], True))
-    reports = list(re.finditer(r'\*ioerr = rv;', console))
+    reports = list(re.finditer(r'\*ioerr = rv == -ENOMEM \? 0 : rv;', console))
     if len(reports) != 2:
         raise ValueError('Unexpected console transport-error reports')
     for index, report in enumerate(reports):
         broken = console[:report.start()] + '*ioerr = 0;' + console[report.end():]
         variants.append(('lost_console_ioerr_' + str(index), extract.mutate_once(good, console, broken),
                          ('console_failure', str(9 * (index + 1))), True))
+        broken = console[:report.start()] + '*ioerr = rv;' + console[report.end():]
+        variants.append(('local_ram_as_transport_' + str(index), extract.mutate_once(good, console, broken),
+                         ('console_ram_allocation', str(index)), True))
+    add('ram_allocation_wrong_errno', ram, 'return -ENOMEM;', 'return -EIO;', 'ram_helper', 0, True)
     add('local_allocation_as_transport', console, 'return -ENOMEM;', 'return *ioerr = -ENOMEM;', 'console_local', 0, True)
     add('local_index_as_transport', console, 'return -EBADE;', 'return *ioerr = -EBADE;', 'console_local', 1, True)
     add('lost_poll_notification', watchdog, 'if (intstatus)', 'if (false && intstatus)', 'poll_success', 2)

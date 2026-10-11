@@ -27,6 +27,7 @@ typedef unsigned uint;
 #define msecs_to_jiffies(x) (x)
 #define jiffies_to_msecs(x) (x)
 #define BRCMF_FWCON_ON() (hw.fwcon)
+#define min_t(type, a, b) ((type)(a) < (type)(b) ? (type)(a) : (type)(b))
 #include "brcmfmac_watchdog_types.h"
 
 enum { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA };
@@ -61,22 +62,26 @@ enum admission_fault { ADMIT_IO_ERROR, ADMIT_PM_FAILED, ADMIT_BOTH, ADMIT_RETIRE
 static struct {
 	unsigned host, claims, releases, reads, ram_reads, wakes, sleeps;
 	unsigned queue, timer_deletes, timer_adds, timer_mods, states, controls, responses, quiesces, lines;
-	unsigned inject_claim, ram_fail_at, allocs;
+	unsigned inject_claim, ram_fail_at, allocs, ram_allocs, ram_alloc_fail_at, ram_frees;
+	u32 ram_address;
 	enum admission_fault admission;
 	int poll_error, wake_error, sleep_error, ram_error;
 	u8 poll_value, failed_value;
 	bool transport_failed, fwcon, alloc_fail, invalid_index, unchanged_index, partial_line;
 	bool retire_after_release;
+	bool window_failure, direct_ram;
 } hw;
 static unsigned long jiffies = 100;
 static void brcmf_sdio_dpc_failed(struct brcmf_sdio *bus, int error);
 static void access_ok(void)
 {
-	assert(hw.host == 1 && !f.dev.io_error && !f.dev.pm_failed && !hw.transport_failed);
+	assert(hw.host >= 1 && hw.host <= 2 && !f.dev.io_error && !f.dev.pm_failed && !hw.transport_failed);
 }
 static void sdio_claim_host(struct sdio_func *func)
 {
-	assert(func == &f.func && !hw.host); hw.host++; hw.claims++;
+	assert(func == &f.func && hw.host < 2);
+	if (hw.host++) return; /* The RAM helper recursively claims the same host. */
+	hw.claims++;
 	if (hw.inject_claim == hw.claims) {
 		if (hw.admission != ADMIT_PM_FAILED) f.dev.io_error = -EILSEQ;
 		if (hw.admission == ADMIT_PM_FAILED || hw.admission == ADMIT_BOTH) f.dev.pm_failed = true;
@@ -88,7 +93,9 @@ static void sdio_claim_host(struct sdio_func *func)
 }
 static void sdio_release_host(struct sdio_func *func)
 {
-	assert(func == &f.func && hw.host == 1); hw.host--; hw.releases++;
+	assert(func == &f.func && hw.host && hw.host <= 2);
+	if (--hw.host) return;
+	hw.releases++;
 	if (hw.retire_after_release) {
 		hw.retire_after_release = false;
 		sdio_claim_host(func); brcmf_sdio_dpc_failed(&f.bus, -EIO); sdio_release_host(func);
@@ -132,23 +139,60 @@ static void brcmf_sdiod_quiesce_irqs(struct brcmf_sdio_dev *dev)
 #ifdef DEBUG
 static void *kmalloc(size_t size, int flags)
 { assert(size == 16 && flags == GFP_ATOMIC); hw.allocs++; return hw.alloc_fail ? NULL : malloc(size); }
-static int brcmf_sdiod_ramrw(struct brcmf_sdio_dev *dev, bool write, u32 addr, u8 *data, uint len)
+struct sk_buff { u8 *data; unsigned len, capacity, priority; };
+static struct sk_buff *dev_alloc_skb(unsigned size)
 {
-	assert(dev == &f.dev && !write); access_ok(); hw.ram_reads++;
+	hw.ram_allocs++;
+	if (hw.ram_allocs == hw.ram_alloc_fail_at) return NULL;
+	struct sk_buff *pkt = calloc(1, sizeof(*pkt)); assert(pkt);
+	pkt->data = malloc(size ? size : 1); assert(pkt->data); pkt->capacity = size;
+	return pkt;
+}
+static void dev_kfree_skb(struct sk_buff *pkt)
+{ assert(pkt); free(pkt->data); free(pkt); hw.ram_frees++; }
+static void skb_put(struct sk_buff *pkt, unsigned size)
+{ assert(pkt->len + size <= pkt->capacity); pkt->len += size; }
+static void skb_trim(struct sk_buff *pkt, unsigned size)
+{ assert(size <= pkt->len); pkt->len = size; }
+static int ram_error(void)
+{
 	int error = hw.ram_reads == hw.ram_fail_at ? hw.ram_error : 0;
+	if (error && error != -ENOMEM) hw.transport_failed = true;
+	return error;
+}
+static int brcmf_sdiod_set_backplane_window(struct brcmf_sdio_dev *dev, u32 addr)
+{
+	assert(dev == &f.dev); access_ok(); hw.ram_reads++; hw.ram_address = addr;
+	return hw.window_failure ? ram_error() : 0;
+}
+static int brcmf_sdiod_skbuff_read(struct brcmf_sdio_dev *dev, struct sdio_func *func,
+				 u32 addr, struct sk_buff *pkt)
+{
+	assert(dev == &f.dev && func == &f.func);
+	assert(addr == ((hw.ram_address & SBSDIO_SB_OFT_ADDR_MASK) | SBSDIO_SB_ACCESS_2_4B_FLAG));
+	access_ok(); int error = ram_error(); unsigned len = pkt->len; u8 *data = pkt->data;
 	if (error) {
-		memset(data, hw.failed_value, len); hw.transport_failed = true; return error;
+		memset(data, hw.failed_value, len); return error;
 	}
-	if (addr == f.bus.console_addr + offsetof(struct rte_console, log_le)) {
+	if (hw.direct_ram) { memset(data, 0xa5, len); return 0; }
+	if (hw.ram_address == f.bus.console_addr + offsetof(struct rte_console, log_le)) {
 		assert(len == sizeof(struct rte_log_le));
 		struct rte_log_le log = {.buf = 0x3000, .buf_size = 16,
 			.idx = hw.invalid_index ? 17 : hw.unchanged_index ? 0 : 2};
 		memcpy(data, &log, len);
 	} else {
-		assert(addr == 0x3000 && len == 16); memset(data, 0, len);
+		assert(hw.ram_address == 0x3000 && len == 16); memset(data, 0, len);
 		data[0] = 'x'; data[1] = hw.partial_line ? 'y' : '\n';
 	}
 	return 0;
+}
+static int brcmf_sdiod_skbuff_write(struct brcmf_sdio_dev *dev, struct sdio_func *func,
+				  u32 addr, struct sk_buff *pkt)
+{
+	assert(dev == &f.dev && func == &f.func && hw.direct_ram);
+	assert(addr == ((hw.ram_address & SBSDIO_SB_OFT_ADDR_MASK) | SBSDIO_SB_ACCESS_2_4B_FLAG));
+	access_ok(); for (unsigned i = 0; i < pkt->len; i++) assert(pkt->data[i] == 0xa5);
+	return ram_error();
 }
 #endif
 
@@ -165,6 +209,7 @@ static void begin(void)
 static void finish(void)
 {
 	assert(!hw.host && hw.claims == hw.releases);
+	assert(hw.ram_frees == hw.ram_allocs - (hw.ram_alloc_fail_at && hw.ram_allocs >= hw.ram_alloc_fail_at));
 	free(f.bus.console.buf);
 }
 static void fatal(int error)
@@ -313,6 +358,49 @@ static void console_local(unsigned index)
 	assert(!f.bus.console_interval && hw.ram_reads == 1 && !hw.lines);
 	assert(hw.sleeps == (unsigned)!!(index & 2)); finish();
 }
+static void console_ram_allocation(unsigned index)
+{
+	begin(); assert(index < 8); console_setup();
+	hw.ram_alloc_fail_at = 1 + (index & 1);
+	if (index & 2) idle_setup();
+	f.bus.poll = index & 4; hw.poll_value = INTR_STATUS_FUNC1;
+	brcmf_sdio_bus_watchdog(&f.bus);
+	assert(!f.dev.io_error && f.dev.state == BRCMF_SDIOD_DATA && !hw.quiesces);
+	assert(!f.bus.console_interval && !hw.lines && hw.ram_allocs == hw.ram_alloc_fail_at);
+	assert(hw.ram_reads == hw.ram_alloc_fail_at - 1);
+	assert(hw.queue == (unsigned)!!(index & 4));
+	assert(hw.sleeps == (unsigned)((index & 2) && !(index & 4))); finish();
+}
+static void console_window_failure(unsigned index)
+{
+	begin(); assert(index < 6); console_setup(); idle_setup();
+	hw.window_failure = true; hw.ram_fail_at = 1 + (index & 1); hw.ram_error = errors[index / 2];
+	brcmf_sdio_bus_watchdog(&f.bus); fatal(hw.ram_error);
+	assert(hw.ram_reads == hw.ram_fail_at && !hw.sleeps && !hw.lines); finish();
+}
+static void console_transfer_allocation(unsigned index)
+{
+	begin(); assert(index < 4); console_setup(); idle_setup();
+	hw.ram_fail_at = 1 + (index & 1); hw.ram_error = -ENOMEM; hw.window_failure = index & 2;
+	brcmf_sdio_bus_watchdog(&f.bus);
+	assert(!f.dev.io_error && !hw.quiesces && !f.bus.console_interval);
+	assert(hw.sleeps == 1 && !hw.lines); finish();
+}
+static void ram_helper(unsigned index)
+{
+	begin(); assert(index < 8); hw.direct_ram = true;
+	bool write = index & 1; unsigned scenario = index / 2;
+	u8 data[32]; memset(data, write ? 0xa5 : 0x5a, sizeof(data));
+	if (!scenario) hw.ram_alloc_fail_at = 1;
+	if (scenario == 3) { hw.ram_fail_at = 2; hw.ram_error = -ETIMEDOUT; }
+	u32 address = scenario > 1 ? SBSDIO_SB_OFT_ADDR_LIMIT - 16 : 0x3000;
+	int err = brcmf_sdiod_ramrw(&f.dev, write, address, data, sizeof(data));
+	assert(err == (!scenario ? -ENOMEM : scenario == 3 ? -ETIMEDOUT : 0));
+	assert(hw.ram_reads == (!scenario ? 0u : scenario > 1 ? 2u : 1u));
+	if (!write) for (unsigned i = 0; i < sizeof(data); i++)
+		assert(data[i] == (!scenario || (scenario == 3 && i >= 16) ? 0x5a : 0xa5));
+	finish();
+}
 enum console_scenario { CONSOLE_LINE, CONSOLE_UNPUBLISHED, CONSOLE_UNCHANGED,
 	CONSOLE_PARTIAL, CONSOLE_REUSE, CONSOLE_DISABLED, CONSOLE_INTERVAL_OFF, CONSOLE_NOT_DUE,
 	CONSOLE_IDLE_KEEP_TIMER };
@@ -353,6 +441,10 @@ int main(int argc, char **argv)
 	else if (!strcmp(argv[1], "console_queued_failure")) console_failure(index, true);
 	else if (!strcmp(argv[1], "console_local")) console_local(index);
 	else if (!strcmp(argv[1], "console_success")) console_success(index);
+	else if (!strcmp(argv[1], "console_ram_allocation")) console_ram_allocation(index);
+	else if (!strcmp(argv[1], "console_window_failure")) console_window_failure(index);
+	else if (!strcmp(argv[1], "console_transfer_allocation")) console_transfer_allocation(index);
+	else if (!strcmp(argv[1], "ram_helper")) ram_helper(index);
 #endif
 	else assert(false);
 	printf("%s %u passed\n", argv[1], index); return 0;

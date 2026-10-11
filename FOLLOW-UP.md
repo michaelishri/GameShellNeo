@@ -2,11 +2,24 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-103 SMP guest qualification passed, 12 October 2026:** the saved
+`task check:musb-callback-kunit` runs the actual callback/UDC fixture
+on four ARM guest CPUs. Eighteen passing cases cover five entry points in hard-IRQ,
+timer-softirq and process contexts, two outstanding callbacks, request
+completion, rebind and unstarted-actor cleanup. Five host evidence/cleanup
+regression groups pass. Two guest attempts exposed fixture ordering/cleanup
+bugs, with original evidence retained. The corrected suite and the rerun after
+failed-artifact retention changes pass with KASAN/lockdep and clean exit/cleanup;
+none of the old failures is relabelled. The production patch is unchanged.
+Matching-board bind/unbind remains after clock admission clears; wider producer
+teardown stays in NEO-106. No GameShell operation occurred.
+[Report 274](docs/274-musb-callback-smp-validation.md).
+
 **NEO-103 SMP environment prepared, 12 October 2026:** saved
 `task setup:kernel-qemu` builds a separate pinned-snapshot ARM system emulator.
 Two virtual CPU threads, normal QMP exit and owned-container cleanup pass;
-offline refusal/timeout checks also pass. Next implement the actual SMP guest
-kernel callback/UDC suite. Existing single-CPU UML endpoint tests do not cover
+offline refusal/timeout checks also pass. The actual SMP guest kernel
+callback/UDC suite is now qualified above. Existing single-CPU UML endpoint tests do not cover
 that cross-CPU atomic callback boundary. No GameShell access occurred.
 [Report 273](docs/273-smp-kernel-test-environment.md).
 

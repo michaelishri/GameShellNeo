@@ -16,9 +16,13 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[274 — MUSB callback and UDC concurrency validation](274-musb-callback-smp-validation.md)
+records eighteen passing real callback/UDC ARM SMP cases with KASAN/lockdep,
+retained fixture failures and remaining matching-board qualification.
+
 [273 — SMP kernel test environment](273-smp-kernel-test-environment.md)
 prepares the missing ARM system emulator and verifies two virtual CPU threads
-and cleanup; the actual MUSB concurrency suite remains to be implemented.
+and cleanup; report 274 adds the completed MUSB concurrency suite.
 
 [271 — Clock capture deployment and admission](271-clock-capture-deployment.md)
 adds kernel build-ID/runtime checks, same-process route inventory, bounded

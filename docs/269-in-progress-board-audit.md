@@ -151,7 +151,7 @@ existing management access for other project work is unaffected.
 | NEO-98 | Wake-ownership candidate integration, remaining backend limits and hardware wake qualification. |
 | NEO-101 | End-to-end awake-profiler sleep interruption/cleanup and observer-cost qualification. |
 | NEO-102 | Startup candidate integration and matching hardware validation; complete teardown stays separate. |
-| NEO-103 | Complete-kernel callback concurrency and matching integration/hardware qualification. |
+| NEO-103 | Complete-kernel callback concurrency now passes in report 274; matching-board bind/unbind qualification remains after clock admission clears. |
 | NEO-106 | Complete producer/backend retirement, including separate DMA mapping-lifetime leads. |
 | NEO-117 | Direct charge acceptance during sleep with headroom and appropriate electrical qualification. |
 | NEO-154 | Closed as owner-abandoned above, with cause unresolved. |

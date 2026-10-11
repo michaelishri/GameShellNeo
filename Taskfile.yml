@@ -68,6 +68,10 @@ env:
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
 
 tasks:
+  check:musb-callback-kunit:
+    desc: Exercise real MUSB callback/UDC races on four emulated ARM CPUs
+    cmds: [bash tools/run-logged.sh musb-callback-kunit python3 tools/check-musb-callback-kunit.py]
+
   default:
     desc: List the shared project commands
     cmds: [task --list]

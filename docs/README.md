@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[268 — External Razer Kiyo screen observation](268-razer-kiyo-observation.md)
+records exact camera selection, the private default preference, readable still
+and sequence evidence, verified shutdown and the bounded launcher correction.
+
 [267 — Kernel clock-provenance candidate](267-kernel-clock-provenance-candidate.md)
 adds isolated, default-off syscall/counter recording, bounded writer context
 and offline tuple replay. It preserves regressions and separates kernel

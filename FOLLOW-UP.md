@@ -2,6 +2,14 @@
 
 Record deferred questions and activities here as they arise.
 
+**External camera verified, 12 October 2026:** NEO-193 selects the owner's
+Razer Kiyo through private `.env` configuration. A still and five-second,
+ten-frame sequence show readable console text; capture shutdown and remote
+cleanup are verified. Use this camera for subsequent authorized observations,
+checking fresh positioning before relying on it. No device test occurred and
+NEO-192 clock/PM admission remains unresolved.
+[Report 268](docs/268-razer-kiyo-observation.md).
+
 **Kernel clock recorder prepared offline, 10 October 2026:** NEO-192 now has
 an isolated default-off candidate retaining the consumed counter, coherent
 conversion tuple, read CPU, final syscall result and bounded writer context.

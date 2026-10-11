@@ -2571,14 +2571,14 @@ qualify NZ operation or the radio firmware's country mapping.
 
 ### Camera observation of the GameShell screen
 
-The MacBook's built-in camera can provide independent visual evidence while
+The MacBook's selected camera can provide independent visual evidence while
 the GameShell sleeps, reboots or temporarily loses SSH. Position the GameShell
 screen clearly in view and keep the Mac open, awake and logged into its desktop.
 Set up the video-only helper once:
 
 ```sh
 task mac:camera-setup
-task mac:camera-status
+task mac:camera-status                  # Permission and available video cameras
 task mac:camera-capture                  # One still after exposure settles
 task mac:camera-capture SECONDS=30 FPS=2  # A bounded sequence of JPEG frames
 ```
@@ -2590,8 +2590,13 @@ System Settings → Privacy & Security → Camera, then rerun setup. Repeated se
 reuses an unchanged app. Changed helper source requires setup again and may
 require permission again. No login item or persistent camera service is installed.
 
-The helper selects the built-in `FaceTime HD Camera`, captures no microphone
-audio and closes its camera session on completion. `SECONDS=0` exports a still;
+Set `NEO_CAMERA_NAME='Razer Kiyo'` in `.env` to select the owner's external camera,
+using its exact name from `task mac:camera-status`. Without a preference the
+default remains `FaceTime HD Camera` for existing setups. A missing or ambiguous
+camera fails explicitly; the helper never falls back to another camera.
+For a one-off override, use `python3 tools/mac-camera.py capture --camera 'Razer Kiyo'`.
+Status lists cameras without starting a capture session. The helper captures no
+microphone audio and closes its camera session on completion. `SECONDS=0` exports a still;
 sequences accept 1–300 seconds and 1–5 exported frames per second. The helper
 announces readiness only after saving its first image, following 1.5 seconds
 of exposure settling. Start an authorized hardware test after that readiness
@@ -2611,6 +2616,8 @@ sub-second resume timing or power consumption. The camera cannot observe tests
 while the Mac itself sleeps. These commands provide capture tooling; visual
 review and other hardware acceptance gates remain explicit.
 [Report 166](docs/166-mac-camera-observation.md) records setup evidence and limits.
+[Report 268](docs/268-razer-kiyo-observation.md) records the external Kiyo's
+verified still/sequence capture and readable screen with the current positioning.
 
 The owner's current authorization in `AGENTS.md` lets a verified camera
 sequence replace a separate human-ready/screen-return exchange for simple

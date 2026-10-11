@@ -1040,7 +1040,7 @@ tasks:
     cmds: [python3 tools/mac-camera.py setup]
 
   mac:camera-status:
-    desc: Read camera permission through the desktop helper without opening the camera
+    desc: List video cameras and permission through the desktop helper without opening a camera
     cmds: [python3 tools/mac-camera.py status]
 
   mac:camera-capture:

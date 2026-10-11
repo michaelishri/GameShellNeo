@@ -2,8 +2,9 @@
 
 12 October 2026 NZDT. NEO-201 follows the completed
 [clock-deadline candidate](283-brcmfmac-clock-deadline.md), under NEO-58.
-This is a source audit and test contract; no NEO-201 production fix or
-qualification is claimed yet.
+This records the initial source audit and test contract. The subsequent
+candidate and completed offline qualification are in
+[report 285](285-brcmfmac-shared-diagnostic-errors.md).
 
 ## Source identity
 

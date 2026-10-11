@@ -26,22 +26,19 @@ objects. Independent reviews have no outstanding findings; see
 image integration, matching board qualification and
 reset/reprobe ownership. No observed board fault is attributed to this finding.
 
-**NEO-58/201 shared-memory diagnostic lead, 12 October 2026:** the applied
-`brcmf_sdio_readshared()` claims the host but ignores `brcmf_sdio_bus_sleep()`
-before its first RAM access. Audit this diagnostic path and its callers'
-admission/error classification independently; NEO-199's periodic console
-watchdog fix does not cover it. This is a source finding, not attribution of
-a board failure or a reason to reopen the abandoned NEO-154 investigation.
-The caller audit in [report 284](docs/284-brcmfmac-shared-diagnostic-audit.md)
-also identifies firmware-startup failure callers, which need distinct cleanup
-ownership coverage before choosing the fix.
-Candidate 0053 and the saved 194-case diagnostic/combined regression suite
-now implement and cover that ownership contract; native, sanitizers and ARM
-emulation pass. Full objects and independent review are pending in
-[report 285](docs/285-brcmfmac-shared-diagnostic-errors.md). Integration and
-physical qualification remain with NEO-58.
+**NEO-58/201 shared-memory diagnostics, 12 October 2026:** the baseline
+reproduces ignored wake, missing admission and lost transport errors. Isolated
+candidate 0053 guards every diagnostic RAM read, preserves first-error and
+once-only cleanup ownership, keeps local failures local and publishes only
+validated shared metadata. Native, sanitizer and ARM tests pass 194 diagnostic
+cases plus the combined regression suites and meaningful mutations. Complete
+board/debug objects, final rehash and both independent reviews pass; see
+[report 285](docs/285-brcmfmac-shared-diagnostic-errors.md). The candidate remains
+outside the image queue. NEO-58 retains integration, hardware qualification
+and startup/reset ownership. NEO-154 remains abandoned; no board fault is
+attributed to this source finding.
 
-**Diagnostic output bounds, 12 October 2026:** NEO-201's source audit found
+**NEO-202 diagnostic output bounds, 12 October 2026:** NEO-201's source audit found
 that `brcmf_sdio_dump_console()` uses the firmware's console index without an
 explicit index-versus-size check, while `brcmf_sdio_assert_info()` can fill
 fixed string buffers before `%s` formatting without explicitly ensuring a

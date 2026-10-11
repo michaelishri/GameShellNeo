@@ -102,9 +102,9 @@ objects. Each configuration passed 182 assertions; the compiler log contains
 no warnings or errors. Checkpatch on the production patch reports zero
 errors, warnings or checks.
 
-The review's test-readability change is being revalidated against that same
-production patch. Final review and artifact/input rehash remain required
-before closing NEO-201.
+Final attempt `74880c6936b34d9288a1a21d213edd65` repeats all native, sanitizer,
+ARM and mutation checks successfully with the reviewed named boundary table.
+The production patch is unchanged from the completed full-driver build.
 No live device or image has changed. NEO-192
 still gates live PM work; NEO-154 remains abandoned and this finding does not
 attribute NEO-55's observed authentication delay.
@@ -129,7 +129,35 @@ initialization, null interface handling, IRQ registration/lock ownership and
 later diagnostic acquisitions. Full objects and final verification were still
 pending; the review did not treat those gates as completed.
 
-Initial totals: **Standards: zero hard violations, one possible smell.
-Spec: zero findings.** Named boundaries now explicitly map each caller to its
-host acquisition and preceding read count; revalidation and follow-up review
-are pending. No production patch changed for this adjustment.
+Named boundaries now explicitly map each caller to its host acquisition and
+preceding read count. Follow-up review of `4d9efd4...9c07ffa` confirms the
+Standards finding is resolved, preserves the zero-finding Spec conclusion and
+identifies no new findings. No production patch changed for this adjustment.
+
+Final totals: **Standards: zero hard violations or remaining smells.
+Spec: zero findings.**
+
+## Final verification
+
+After both Tasks terminated successfully, the final suite's 29 inputs and
+3,088 artifacts were rehashed. The full-build attempt's 3,088 artifacts,
+objects, configurations and full applied source inventory were also verified.
+Its one changed input is the diagnostic fixture: the old hash matches
+committed `eab9776`, and the final suite validates its reviewed replacement.
+The source metadata and production patch are identical across both attempts.
+The private receipt is
+`.local/build/brcmfmac-shared-diagnostics/final-verification.json`.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Final suite manifest | `7dc04355ee7417e3ebcfdd9941cd24d5bf1f83fc66866ac552c226a927ab0be8` |
+| Full-build manifest | `1f9cf22a4bf54093074edc60bf2bb37e098f9d05784a54a7a701c8ace99beec6` |
+| Candidate 0053 | `54fbbe6ed29994fc6f21afd37808f398582f0af7ba5d0a3748c72ed3fe86a16f` |
+| Applied source inventory | `8c34d677e654c5f78648bff7ff25076034c5d92021b55b79e709610e10dbdcef` |
+| Board object | `d19fba7e29b8e9739d3d8d75bb8659d2b52ede5164969f2f5769a2a52a186647` |
+| Debug object | `ebed6b8c5aac6d5b294904491ccf53c7286b66b27426cfb4389cfe80c809b839` |
+| Verification receipt | `7fa3a475519330a6825d7232abc9f7ebeea3f2aa7dc19e45f4517fd4873fe566` |
+
+NEO-201's offline candidate scope is complete. NEO-58 retains integration,
+hardware qualification and startup/reset ownership. NEO-202 tracks the
+separate console-index and assertion-string output-bounds lead.

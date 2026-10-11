@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[273 — SMP kernel test environment](273-smp-kernel-test-environment.md)
+prepares the missing ARM system emulator and verifies two virtual CPU threads
+and cleanup; the actual MUSB concurrency suite remains to be implemented.
+
 [271 — Clock capture deployment and admission](271-clock-capture-deployment.md)
 adds kernel build-ID/runtime checks, same-process route inventory, bounded
 process ownership and original-result persistence; the old image is refused

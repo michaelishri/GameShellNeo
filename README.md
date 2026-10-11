@@ -6,6 +6,12 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+For the pending MUSB callback concurrency tests, `task setup:kernel-qemu`
+prepares a separate ARM system-emulation container from the pinned signed
+snapshots and checks two virtual CPU threads with bounded cleanup. This is
+environment preparation, not a driver or hardware qualification. See
+[report 273](docs/273-smp-kernel-test-environment.md).
+
 Diagnostic.25 is built and offline-verified with the reviewed NEO-108/163 USB
 deferred restart fix. [Report 232](docs/232-musb-restart-image-integration.md)
 records its separate build and qualification plan. Transfer, both archive/image

@@ -2,6 +2,14 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-103 SMP environment prepared, 12 October 2026:** saved
+`task setup:kernel-qemu` builds a separate pinned-snapshot ARM system emulator.
+Two virtual CPU threads, normal QMP exit and owned-container cleanup pass;
+offline refusal/timeout checks also pass. Next implement the actual SMP guest
+kernel callback/UDC suite. Existing single-CPU UML endpoint tests do not cover
+that cross-CPU atomic callback boundary. No GameShell access occurred.
+[Report 273](docs/273-smp-kernel-test-environment.md).
+
 **Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies
 kernel build ID/configuration, image/source/runtime hashes, same-process vDSO
 routes and task/namespace ownership before arming. Original results survive

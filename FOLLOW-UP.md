@@ -32,6 +32,21 @@ before its first RAM access. Audit this diagnostic path and its callers'
 admission/error classification independently; NEO-199's periodic console
 watchdog fix does not cover it. This is a source finding, not attribution of
 a board failure or a reason to reopen the abandoned NEO-154 investigation.
+The caller audit in [report 284](docs/284-brcmfmac-shared-diagnostic-audit.md)
+also identifies firmware-startup failure callers, which need distinct cleanup
+ownership coverage before choosing the fix.
+
+**Diagnostic output bounds, 12 October 2026:** NEO-201's source audit found
+that `brcmf_sdio_dump_console()` uses the firmware's console index without an
+explicit index-versus-size check, while `brcmf_sdio_assert_info()` can fill
+fixed string buffers before `%s` formatting without explicitly ensuring a
+terminator. Add malformed-metadata and bounded-output fixtures in a separate
+slice; no triggering firmware input or live fault is claimed. See report 284.
+
+**NEO-58 firmware-startup error audit, 12 October 2026:** the callback still
+discards clock/setup transfer results outside NEO-201's shared-reader path.
+Trace them with function-2/IRQ/interface ownership and reset/reprobe cleanup;
+the completed active-worker candidates do not qualify startup failures.
 
 **NEO-58/198 polling status, 12 October 2026:** actual-source tests reproduce
 discarded queued-TX polling errors and I/O after a prior error arrives at host

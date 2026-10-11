@@ -1192,9 +1192,24 @@ The check runs host replay/cleanup tests, native and ARM fixtures, then builds
 the raw ARM syscall/libc reader in the pinned offline container. Replay joins
 kernel ordinals to raw ABI bytes and native/Python integers, preserving
 backwards values and boundary mismatches. A complete capture is not a healthy
-clock result. The device deployment/provenance wrapper and instrumented image
-remain pending; these commands do not contact the GameShell. See
+clock result. These commands do not contact the GameShell. See
 [report 270](docs/270-clock-userspace-boundary.md).
+
+The deployment wrapper has a separate test and a guarded device task:
+
+```sh
+task test:clock-deployment
+# Requires a built, verified and installed instrumented image:
+task device:clock-boundary BUILD=<reader-build> RUNTIME_CAPTURE=<runtime-inventory>
+```
+
+The wrapper verifies the running kernel build ID/configuration, image and
+runtime binaries, same-process clock routes and recorder ownership. It saves
+original partial results, supervises one owned process with a host deadline,
+and replays successful downloads independently. Diagnostic.25 is refused
+before device access; the instrumented image remains to be built. Neither a
+complete capture nor a clean window clears the original fault or admits PM.
+[Report 271](docs/271-clock-capture-deployment.md) details admission and cleanup.
 
 The candidate ADC width correction has its own saved checks:
 

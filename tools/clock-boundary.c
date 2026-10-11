@@ -11,6 +11,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <dlfcn.h>
+#include <link.h>
+#include <sys/auxv.h>
 
 enum { TIME64 = 0, TIME32 = 1, LIBC64 = 2 };
 struct kernel64 { int64_t sec, nsec; };
@@ -57,6 +60,39 @@ int neo_clock_layout(uint32_t *out, uint32_t count)
         sizeof(((struct timespec *)0)->tv_nsec), sizeof(void *), sizeof(long)};
     if (!out || count != sizeof(values) / sizeof(values[0])) return EINVAL;
     memcpy(out, values, sizeof(values));
+    return 0;
+}
+
+struct vdso_mapping { uintptr_t base; char name[128]; };
+static int find_vdso(struct dl_phdr_info *info, size_t size, void *context)
+{
+    struct vdso_mapping *v = context;
+    (void)size;
+    if ((uintptr_t)info->dlpi_addr != v->base) return 0;
+    if (info->dlpi_name && strlen(info->dlpi_name) < sizeof(v->name))
+        strcpy(v->name, info->dlpi_name);
+    return 1;
+}
+
+/* Same-process route inventory, outside the armed interval. No clock reads.
+ * Return evidence even when mapping identity cannot be established. */
+int neo_clock_vdso(uint32_t *out, uint32_t count)
+{
+    struct vdso_mapping v = {.base = getauxval(AT_SYSINFO_EHDR)};
+    struct link_map *map = NULL;
+    void *handle;
+    const char *symbols[] = {"__vdso_clock_gettime", "__vdso_clock_gettime64"};
+    if (!out || count != 4) return EINVAL;
+    memset(out, 0, 4 * sizeof(*out));
+    if (!v.base) return 0;
+    dl_iterate_phdr(find_vdso, &v);
+    out[0] = !!*v.name;
+    handle = *v.name ? dlopen(v.name, RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD) : NULL;
+    out[1] = handle && !dlinfo(handle, RTLD_DI_LINKMAP, &map) &&
+             map && (uintptr_t)map->l_addr == v.base;
+    if (out[1]) for (int i = 0; i < 2; ++i)
+        out[2 + i] = !!(dlsym(handle, symbols[i]) || dlvsym(handle, symbols[i], "LINUX_2.6"));
+    if (handle) dlclose(handle);
     return 0;
 }
 
@@ -128,6 +164,11 @@ int main(void)
     uint32_t layout[9];
     assert(!neo_clock_layout(layout, 9) && layout[0] == 1 && layout[1] == 56);
     assert(neo_clock_layout(layout, 8) == EINVAL);
+    assert(neo_clock_vdso(layout, 3) == EINVAL);
+    assert(!neo_clock_vdso(layout, 4));
+    for (int i = 0; i < 4; ++i) assert(layout[i] <= 1);
+    assert(!layout[1] || layout[0]);
+    assert(layout[1] || (!layout[2] && !layout[3]));
     for (wanted_route = 0; wanted_route < 3; ++wanted_route) {
         for (int i = 0; i < 3; ++i) {
             wanted_clock = clocks[i];

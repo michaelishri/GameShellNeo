@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies
+kernel build ID/configuration, image/source/runtime hashes, same-process vDSO
+routes and task/namespace ownership before arming. Original results survive
+postflight/replay failure; one transient unit is supervised with a separate
+host deadline and termination checks. Fourteen boundary / seventeen deployment
+cases, native/ARM checks and the full 24 runtime / 1,001 tooling suite pass.
+Real diagnostic.25 artifacts were refused offline because the recorder is
+absent. No device access occurred. Next compose, review and build the matching
+instrumented image before a card swap; root cause and PM admission stay open.
+[Report 271](docs/271-clock-capture-deployment.md).
+
 **Clock boundary tooling prepared, 12 October 2026:** NEO-192 now has a fixed
 384-call workload, raw ARM time32/time64 and libc buffers, independent C/Python
 integer conversion and exact kernel-ordinal replay. Backwards results, errors

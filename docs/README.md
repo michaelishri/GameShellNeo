@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[271 — Clock capture deployment and admission](271-clock-capture-deployment.md)
+adds kernel build-ID/runtime checks, same-process route inventory, bounded
+process ownership and original-result persistence; the old image is refused
+offline, with instrumented-image integration still pending.
+
 [270 — Exact-call userspace clock evidence](270-clock-userspace-boundary.md)
 adds the raw ARM ABI reader, bounded workload and kernel/native/Python replay,
 with preserved regressions and partial failures; deployment and the clock

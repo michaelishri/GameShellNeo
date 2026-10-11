@@ -236,6 +236,15 @@ class WorkloadTests(unittest.TestCase):
         self.assertEqual(raw, b'partial')
         self.assertTrue(users['closed'])
 
+    def test_descriptor_close_is_idempotent_even_after_ambiguous_error(self):
+        control = cb.KernelControl(42)
+        with patch.object(cb.os, 'close', side_effect=OSError('close interrupted')) as close:
+            with self.assertRaises(OSError):
+                control.close()
+            control.close()
+        close.assert_called_once_with(42)
+        self.assertIsNone(control.fd)
+
     def test_interrupt_stops_exports_and_returns_original_partial_evidence(self):
         control = FakeControl()
         def interrupted(*args):

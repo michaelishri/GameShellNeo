@@ -5,6 +5,10 @@ and correlation layer following [report 267](267-kernel-clock-provenance-candida
 It does **not** resolve the original clock fault or deploy a diagnostic image.
 No GameShell access, runtime change, sleep, reboot or card operation occurred.
 
+Subsequent [report 271](271-clock-capture-deployment.md) adds the deployment
+wrapper and its offline validation. Image integration and the underlying clock
+fault remain pending.
+
 ## Evidence now retained
 
 [The native reader](../tools/clock-boundary.c) performs exactly one of three

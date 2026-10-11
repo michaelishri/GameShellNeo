@@ -51,6 +51,15 @@ class NativeReader:
         self.call.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.POINTER(NativeObservation)]
         self.call.restype = ctypes.c_int
 
+    def vdso(self):
+        function = self.library.neo_clock_vdso
+        function.argtypes = [ctypes.POINTER(ctypes.c_uint32), ctypes.c_uint32]
+        function.restype = ctypes.c_int
+        out = (ctypes.c_uint32 * 4)()
+        if function(out, 4):
+            raise ValueError('vDSO inventory failed')
+        return dict(zip(('mapping_found', 'handle_verified', 'time32_exported', 'time64_exported'), out))
+
     def __call__(self, route, clock, out):
         if route not in ROUTES[:3] or clock not in (1, 4, 7):
             raise ValueError('Unsupported clock request')
@@ -88,7 +97,11 @@ class KernelControl:
             raise ExportError(type(error).__name__ + ': ' + str(error), bytes(data)) from error
 
     def close(self):
-        os.close(self.fd)
+        if self.fd is not None:
+            fd, self.fd = self.fd, None
+            # Do not retry an interrupted close: the descriptor may already
+            # have been released and reused. The failed close remains evidence.
+            os.close(fd)
 
 
 def collect(control, native, public, context):

@@ -21,7 +21,7 @@ def abi_sources(lock):
     spec.loader.exec_module(source)
     receipt = source.source_receipt(lock)
     version = lock['linux']['tag'][1:]
-    names = ('arch/arm/tools/syscall.tbl', 'include/vdso/time32.h')
+    names = ('arch/arm/tools/syscall.tbl', 'include/vdso/time32.h', 'include/linux/clocksource_ids.h')
     files = {}
     with tarfile.open(LOCAL / 'downloads' / ('linux-' + version + '.tar.xz'), 'r|xz') as archive:
         for member in archive:
@@ -35,6 +35,8 @@ def abi_sources(lock):
             'struct old_timespec32 { old_time32_t tv_sec; s32 tv_nsec; };' not in
             re.sub(r'\s+', ' ', files[names[1]])):
         raise ValueError('Pinned ARM time32 ABI differs')
+    if 'CSID_GENERIC = 0, CSID_ARM_ARCH_COUNTER,' not in re.sub(r'\s+', ' ', files[names[2]]):
+        raise ValueError('Pinned architectural clocksource ID differs')
     receipt['files'].update({name: hashlib.sha256(text.encode()).hexdigest() for name, text in files.items()})
     return receipt
 
@@ -42,7 +44,7 @@ def abi_sources(lock):
 def verify_elf(text):
     for marker in ('ELF32', 'little endian', 'ARM', 'Version5 EABI', 'hard-float ABI',
                    'DYN (Shared object file)', '__clock_gettime64@GLIBC_2.34', 'syscall@GLIBC_',
-                   'neo_clock_read', 'neo_clock_layout', 'BIND_NOW', 'GNU_RELRO'):
+                   'neo_clock_read', 'neo_clock_layout', 'neo_clock_vdso', 'BIND_NOW', 'GNU_RELRO'):
         if marker not in text:
             raise ValueError('Boundary library ELF lacks ' + marker)
 
@@ -79,6 +81,7 @@ def main():
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
     abi = abi_sources(lock)
     inputs = ['tools/clock-boundary.c', 'tools/clock_boundary.py', 'tools/clock_provenance.py',
+              'tools/clock_deployment.py', 'tools/capture-clock-boundary.py',
               'tools/build-clock-boundary.py', 'tools/check-clock-paths.py', 'build/sources.lock.json']
     hashes = {name: sha256(ROOT / name) for name in inputs}
     for name in inputs:
@@ -87,11 +90,11 @@ def main():
         path.write_bytes((ROOT / name).read_bytes())
     script = '''set -eu
 flags="-std=c11 -O2 -Wall -Wextra -Werror"
-cc $flags -fsanitize=undefined -fno-sanitize-recover=all -DNEO_CLOCK_TEST /out/tools/clock-boundary.c -o /out/test-host
+cc $flags -fsanitize=undefined -fno-sanitize-recover=all -DNEO_CLOCK_TEST /out/tools/clock-boundary.c -ldl -o /out/test-host
 /out/test-host > /out/host-fixtures.txt
-arm-linux-gnueabihf-gcc $flags -DNEO_CLOCK_TEST /out/tools/clock-boundary.c -o /out/test-arm
+arm-linux-gnueabihf-gcc $flags -DNEO_CLOCK_TEST /out/tools/clock-boundary.c -ldl -o /out/test-arm
 qemu-arm -L /usr/arm-linux-gnueabihf /out/test-arm > /out/arm-fixtures.txt
-arm-linux-gnueabihf-gcc $flags -fPIC -shared -Wl,-z,relro,-z,now,-z,noexecstack /out/tools/clock-boundary.c -o /out/clock-boundary.so
+arm-linux-gnueabihf-gcc $flags -fPIC -shared -Wl,-z,relro,-z,now,-z,noexecstack /out/tools/clock-boundary.c -ldl -o /out/clock-boundary.so
 arm-linux-gnueabihf-readelf -h -l -d -Ws /out/clock-boundary.so > /out/reader-readelf.txt
 arm-linux-gnueabihf-objdump -d /out/clock-boundary.so > /out/reader-disassembly.txt
 '''

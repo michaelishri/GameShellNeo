@@ -604,7 +604,19 @@ tasks:
     desc: Build ARM raw-clock reader with native/ARM fixtures offline; no device access
     cmds:
       - task: test:clock-boundary
+      - task: test:clock-deployment
       - python3 tools/build-clock-boundary.py
+
+  test:clock-deployment:
+    desc: Test kernel/runtime admission, original-result persistence and host deadline cleanup offline
+    cmds: [python3 -m unittest discover -s tools/tests -p test_clock_deployment.py -v]
+
+  device:clock-boundary:
+    desc: One awake clock capture on the matching instrumented image; existing diagnostic.25 is refused
+    env:
+      NEO_BOUNDARY_BUILD: '{{.BUILD | default ""}}'
+      NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
+    cmds: [python3 tools/check-clock-boundary.py]
 
   report:clock-boundary:
     desc: Correlate saved kernel clock ordinals with raw ABI and Python/native values; no device access

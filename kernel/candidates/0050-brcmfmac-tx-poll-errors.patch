@@ -5,7 +5,7 @@ Publish failed status reads before releasing the host so the caller can
 quarantine the worker. Recheck prior error ownership under the host claim;
 packet completion can race a separately claimed IRQ failure. Preserve
 completed packets, queued ownership and successful status handling.
-Candidate only; image integration and hardware qualification remain separate.
+Candidate only; image integration and hardware qualification are separate.
 
 diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
 --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c

@@ -80,6 +80,75 @@ native/sanitizer cases, then stops because the notification mutation leaves
 in a false condition so it must fail the intended runtime assertion. Compiler
 failure is not counted as successful fault detection.
 
+## Completed qualification
+
+Attempt `8c3d7bc1c0334359874e529af7cccff1` completed the full driver Task:
+
+- 215 TX cases and 115 RX cases pass natively, under ASan/UBSan with leak
+  detection, and on ARM32.
+- All 23 TX mutations, four packet mutations and five control-FIFO mutations
+  fail their intended runtime assertions.
+- 211 normal / 213 debug worker cases pass in all three execution modes;
+  all 48 worker mutations are rejected.
+- Both complete ARM `brcmfmac.o` builds pass, with no compiler errors/warnings;
+  each configuration passes the 182 project assertions.
+- All 1,362 retained artifacts and both object/configuration hashes were
+  rechecked after completion. Nineteen of 20 recorded inputs remain byte-identical.
+  The only subsequent input change shortens a patch commit-message line for
+  checkpatch. Its entire diff body is byte-identical; the receipt records both
+  patch hashes without rewriting the original manifest. Final checkpatch over
+  the patch's contents reports zero errors/warnings.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Evidence manifest | `672e6e73cfbcd3b450cc458d0d3b09bd18fe48a51247a569261ccbb3419c440d` |
+| Compiled patch metadata | `12d721125ae9c9e644c86666c48137f163ff1b11ae3499237d5ec095a6b765f6` |
+| Final candidate 0050 | `8717f38d998661e72c049b915dc5f07a73ac40983a556ef673ed9ed8260e828d` |
+| Unchanged diff body | `47b3cea74ac181fe536fc7dbc88c37e1cd8012976265651b51a999f07be32c56` |
+| Applied source tree | `60f5f6e43088995b526597a7dbe6cb50b150aa3b915a93d0ad9663fbbced928c` |
+| Board object | `a5dafe8790cb65bd6fc17dd927ba17203534562112727b195e98e0a6be2244cd` |
+| Debug object | `1870adc71b7ad3fd800b5b2959efd56f0e5d329714cbc42b6d137c684b64bfc1` |
+| Final verification receipt | `65f06abbe82272972e8dc9c5153549530b52a4ffb6713eca1369bcf0504de897` |
+
+The receipt is `.local/build/brcmfmac-tx-poll/final-verification.json`.
+
+## Standards
+
+The independent review was pinned to
+`git diff 49534eb4d6aa9654dab9abb4de75166df5a99a79...f5ec5c74b060343d82cc6b53597e13e4e157419c`.
+
+No documented-standard violations or substantive baseline smells were found.
+The candidate fixes driver error ownership, consistent with `AGENTS.md`, and
+stays focused on polling admission, error publication and access accounting.
+Named scenarios reuse the existing TX runner and cover the changed ordering
+boundary without unrelated abstractions. The report distinguishes reproduced
+failures, partial runs and pending qualification, including hardware and
+concurrency limits. Review was static; execution evidence is recorded above.
+
+**Standards: zero hard violations, zero possible smells; no outstanding finding.**
+
+## Spec
+
+The independent Spec review used the same fixed diff and current NEO-198 ticket.
+No Spec findings.
+
+No missing implementation requirement was identified. The polling path
+rechecks the existing error under the host claim, latches a new failure before
+release, and skips failed-status publication. Relevant error writers are
+host-serialized. Existing queue gates prevent further polling, dequeueing and
+flow unblocking. Completed packets retain their send results; untouched
+packets remain queued. DPC reacquires the host and performs established
+quarantine, including pending control completion.
+
+Successful polling, interrupt mode and recoverable TX behavior remain intact.
+No unrequested expansion or incorrect implementation was found. Cases and
+mutations cover ordering, errno/status variations, batches and worker handoff.
+The reviewer conditioned offline closure on the final qualification and
+evidence record, both now completed above. Image integration and matching
+hardware qualification remain separate.
+
+**Spec: zero findings; no outstanding finding.**
+
 ## Qualification boundaries
 
 Packet preparation/postprocessing, transport and queue primitives are scripted

@@ -16,10 +16,14 @@ from kernel_sources import atomic_json, ensure_source, locked
 BASE = 'drivers/net/wireless/broadcom/brcm80211/brcmfmac/'
 WORK = ROOT / '.local/build/brcmfmac-tx-recovery'
 HARNESS = ROOT / 'kernel/tests/brcmfmac_tx_recovery_test.c'
+POLL_STATUS = False
 CASES = [(group, str(index)) for group, count in (
     ('helper_failure', 24), ('helper_success', 3), ('helper_exhaustion', 1),
     ('helper_prior', 3), ('control_failure', 10), ('control_success', 32),
     ('control_prior', 3), ('data_failure', 20), ('data_success', 8), ('data_local', 3))
+    for index in range(count)]
+POLL_CASES = [(group, str(index)) for group, count in (
+    ('poll_failure', 72), ('poll_success', 12), ('poll_prior', 6), ('poll_interrupt', 18))
     for index in range(count)]
 
 
@@ -102,6 +106,22 @@ def negatives(attempt):
         ('lost_deflow_gate', queue, 'if (!READ_ONCE(bus->sdiodev->io_error) &&',
          'if (true &&', ('data_failure', '0')),
     ]
+    if POLL_STATUS:
+        cases += [
+            ('lost_poll_error_latch', queue, 'WRITE_ONCE(bus->sdiodev->io_error, ret);',
+             '(void)ret;', ('poll_failure', '0')),
+            ('lost_poll_admission', queue, 'ret = READ_ONCE(bus->sdiodev->io_error);',
+             'ret = 0;', ('poll_prior', '0')),
+            ('late_poll_latch', queue,
+             '\t\t\t\tif (ret)\n\t\t\t\t\tWRITE_ONCE(bus->sdiodev->io_error, ret);\n'
+             '\t\t\t}\n\t\t\tsdio_release_host(bus->sdiodev->func1);',
+             '\t\t\t}\n\t\t\tsdio_release_host(bus->sdiodev->func1);\n'
+             '\t\t\tif (ret)\n\t\t\t\tWRITE_ONCE(bus->sdiodev->io_error, ret);', ('poll_failure', '0')),
+            ('lost_poll_status_gate', queue, 'if (ret != 0)', 'if (false)', ('poll_failure', '8')),
+            ('lost_poll_notification', queue, 'if (intstatus & bus->hostintmask)',
+             'if (false && (intstatus & bus->hostintmask))', ('poll_success', '4')),
+            ('lost_poll_statistics', queue, 'bus->sdcnt.f2txdata++;', '', ('poll_success', '0')),
+        ]
     gates = list(re.finditer(r'if \(err\)\n\s*goto failed;', fail))
     if len(gates) != 4:
         raise ValueError('Unexpected TX recovery error gates')
@@ -158,6 +178,7 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
         for name, body in variants.items():
             generated.write_text(body); (attempt / (name + '.h')).write_text(body)
             defines = ['-DNEO_WORKER_ERRORS', '-DNEO_RX_RECOVERY', '-DNEO_MAILBOX_ERRORS', '-DNEO_TX_RECOVERY']
+            if POLL_STATUS: defines.append('-DNEO_TX_POLL')
             if name == 'candidate_debug': defines.append('-DDEBUG')
             binary = rx.compile_test(attempt, ROOT / 'kernel/tests/brcmfmac_irq_test.c',
                                      label + '-' + name, arm, sanitizer, defines)
@@ -165,7 +186,7 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
             (attempt / (label + '-' + name + '.log')).write_text(result.stdout + result.stderr)
             if name in ('candidate', 'candidate_debug'):
                 result.check_returncode()
-                count = 179 + 2 * (name == 'candidate_debug')
+                count = 179 + (32 if POLL_STATUS else 0) + 2 * (name == 'candidate_debug')
                 if result.stdout.strip() != f'{count} IRQ service scenarios passed (0 characterize existing error limitations)':
                     raise ValueError('Unexpected TX worker coverage: ' + result.stdout)
             elif not result.returncode or 'Assertion' not in result.stderr:
@@ -174,16 +195,25 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
     finally:
         generated.write_text(good)
     atomic_json(attempt / (label + '-results.json'), results)
-    print(f'{label} worker: 179/181 cases pass; {len(results)-2} mutations rejected', flush=True)
+    count = 211 if POLL_STATUS else 179
+    print(f'{label} worker: {count}/{count+2} cases pass; {len(results)-2} mutations rejected', flush=True)
 
 
 def main():
+    global POLL_STATUS, CASES, WORK
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--baseline', action='store_true', help='Reproduce uncorrected TX error ownership')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--baseline', action='store_true', help='Reproduce uncorrected TX error ownership')
+    mode.add_argument('--poll-status', action='store_true', help='Qualify queued-TX polling status errors')
+    mode.add_argument('--poll-baseline', action='store_true', help='Reproduce discarded polling status errors')
     parser.add_argument('--native-only', action='store_true')
     parser.add_argument('--compile-drivers', action='store_true')
     parser.add_argument('--arm-attempt', help=argparse.SUPPRESS)
     args = parser.parse_args()
+    POLL_STATUS = args.poll_status or args.poll_baseline
+    if POLL_STATUS:
+        CASES = CASES + POLL_CASES
+        WORK = ROOT / '.local/build/brcmfmac-tx-poll'
     if args.arm_attempt:
         attempt = ROOT / args.arm_attempt
         run_cases(attempt, arm=True)
@@ -204,6 +234,8 @@ def main():
             '0039-brcmfmac-mailbox-errors.patch', '0048-brcmfmac-control-rx-retry.patch')]
         if not args.baseline:
             paths.append(ROOT / 'kernel/candidates/0049-brcmfmac-tx-recovery.patch')
+        if args.poll_status:
+            paths.append(ROOT / 'kernel/candidates/0050-brcmfmac-tx-poll-errors.patch')
         for path in paths:
             if path.name in {name for name, _ in queue}:
                 raise ValueError('TX test candidate unexpectedly entered image queue')
@@ -223,7 +255,7 @@ def main():
         extract_sources(source, attempt)
         run_cases(attempt)
         run_cases(attempt, sanitizer=True)
-        if args.baseline:
+        if args.baseline or args.poll_baseline:
             raise RuntimeError('Baseline unexpectedly passed; inspect before qualification')
         negatives(attempt)
         receive = attempt / 'rx'; receive.mkdir()
@@ -243,6 +275,7 @@ def main():
                 '--user', f'{os.getuid()}:{os.getgid()}', '--platform', lock['builder']['platform'],
                 '--entrypoint=python3', '-v', f'{ROOT}:/project', '-w', '/project',
                 lock['builder']['image'], 'tools/check-brcmfmac-tx-recovery.py',
+                *(['--poll-status'] if POLL_STATUS else []),
                 '--arm-attempt', str(attempt.relative_to(ROOT))], check=True, timeout=180)
         builds = {}
         if args.compile_drivers:
@@ -254,7 +287,8 @@ def main():
                                             extra, True, metadata, offline=True)
         if hashes != {str(path.relative_to(ROOT)): sha256(path) for path in paths}:
             raise ValueError('TX test inputs changed during execution')
-        atomic_json(attempt / 'evidence.json', dict(schema=1, baseline=args.baseline,
+        atomic_json(attempt / 'evidence.json', dict(schema=1, baseline=args.baseline or args.poll_baseline,
+            poll_status=POLL_STATUS,
             native_complete=True, native_sanitizers=True, arm_complete=not args.native_only,
             inputs=hashes, source=metadata, cases=CASES, arm_build=builds,
             artifacts={str(path.relative_to(attempt)): sha256(path) for path in attempt.rglob('*') if path.is_file()},

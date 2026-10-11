@@ -87,7 +87,7 @@ static struct {
 #endif
 #ifdef NEO_TX_RECOVERY
  int tx_error;
- bool fail_control_tx;
+ bool fail_control_tx, pending_control_during_tx;
 #endif
 #ifdef NEO_MAILBOX_ERRORS
  u32 mailbox_data;
@@ -211,6 +211,7 @@ static void brcmf_sdio_sendfromq(struct brcmf_sdio *bus, uint count)
  assert(bus == &f.bus && count == 1 && hw.allow_tx && !f.dev.io_error);
  assert(!hw.host_depth && hw.frames == 1); hw.data_tx++; bus->txq.len = 0;
 #ifdef NEO_TX_RECOVERY
+ if (hw.pending_control_during_tx) bus->ctrl_frame_stat = true;
  if (!hw.fail_control_tx) f.dev.io_error = hw.tx_error;
 #endif
 #else
@@ -655,17 +656,18 @@ static void rx_completion(int error, bool oob, bool hard)
 }
 #endif
 #ifdef NEO_TX_RECOVERY
-static void tx_completion(int error, bool control, bool oob, bool hard)
+static void tx_completion(int error, bool control, bool oob, bool hard, bool pending_control)
 {
  setup(); hw.status = I_HMB_FRAME_IND; hw.frames_remaining = 1; hw.allow_tx = true;
  hw.tx_error = error; hw.fail_control_tx = control;
- f.bus.ctrl_frame_stat = true; f.bus.txbound = 1; f.bus.txq.len = 1;
+ hw.pending_control_during_tx = pending_control;
+ f.bus.ctrl_frame_stat = !pending_control; f.bus.txbound = 1; f.bus.txq.len = 1;
  f.dev.oob_irq_requested = oob; f.dev.irq_en = false; f.dev.sd_irq_requested = !oob;
  irq(hard); drain();
  assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && !hw.mail);
  assert(f.dev.io_error == error && f.bus.io_error_handled == !!error);
- assert(!f.bus.ctrl_frame_stat && f.bus.ctrl_frame_err == (control ? error : 0));
- assert(hw.wakes == 1 && hw.control_tx == 1);
+ assert(!f.bus.ctrl_frame_stat && f.bus.ctrl_frame_err == (control || pending_control ? error : 0));
+ assert(hw.wakes == 1 && hw.control_tx == (unsigned)!pending_control);
  assert(hw.data_tx == (unsigned)(!control || !error));
  assert(f.bus.txq.len == (unsigned)(control && error));
  assert(!f.bus.ipend && !f.bus.intstatus && hw.enables == oob);
@@ -678,7 +680,7 @@ static void tx_completion(int error, bool control, bool oob, bool hard)
   assert(hw.queue == queued);
   hw.pending_work = true; f.bus.dpc_triggered = true; drain();
   assert(hw.stops == 1 && hw.responses == 1 && hw.wakes == 1);
-  assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && hw.control_tx == 1);
+  assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && hw.control_tx == (unsigned)!pending_control);
   assert(hw.data_tx == (unsigned)!control && f.dev.io_error == error);
  } else {
   assert(f.dev.state == BRCMF_SDIOD_DATA && !hw.stops && !hw.responses);
@@ -722,7 +724,14 @@ int main(void)
  for (unsigned e = 0; e < sizeof(faults) / sizeof(faults[0]); e++)
   for (unsigned control = 0; control < 2; control++)
    for (unsigned oob = 0; oob < 2; oob++)
-    for (unsigned hard = 0; hard < 2; hard++) tx_completion(faults[e], control, oob, hard);
+    for (unsigned hard = 0; hard < 2; hard++) tx_completion(faults[e], control, oob, hard, false);
+#ifdef NEO_TX_POLL
+ const int poll_faults[] = {-EIO, -ETIMEDOUT, -EILSEQ, -ENOMEDIUM};
+ for (unsigned e = 0; e < sizeof(poll_faults) / sizeof(poll_faults[0]); e++)
+  for (unsigned pending = 0; pending < 2; pending++)
+   for (unsigned oob = 0; oob < 2; oob++)
+    for (unsigned hard = 0; hard < 2; hard++) tx_completion(poll_faults[e], false, oob, hard, pending);
+#endif
 #endif
  printf("%u IRQ service scenarios passed (%u characterize existing error limitations)\n",
         scenarios, characterizations);

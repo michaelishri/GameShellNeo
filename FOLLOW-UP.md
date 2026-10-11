@@ -2,6 +2,14 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-58/198 polling status, 12 October 2026:** actual-source tests reproduce
+discarded queued-TX polling errors and I/O after a prior error arrives at host
+acquisition: 137/215 baseline cases pass. Isolated candidate 0050 records the
+error before releasing the host and preserves prior-error ownership. Saved
+tests, original attempts and scope are in
+[report 281](docs/281-brcmfmac-tx-poll-errors.md). Full qualification/review is
+in progress; no image or device change and no observed board fault attributed.
+
 **NEO-58/197 TX recovery, 12 October 2026:** the actual-source baseline
 reproduces discarded abort/terminate/count failures and traffic after an
 unverified write-FIFO flush (44/107 pass). Isolated candidate 0049 now passes

@@ -6,6 +6,13 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+NEO-198's isolated polling-status error candidate is documented in
+[report 281](docs/281-brcmfmac-tx-poll-errors.md). Use
+`task test:brcmfmac-tx-poll` for the extended TX/RX/worker checks or
+`task check:brcmfmac-tx-poll-drivers` to include board/debug ARM builds.
+`task test:brcmfmac-tx-poll-baseline` intentionally reproduces the old failure.
+These commands do not access hardware or modify the image queue.
+
 NEO-197's isolated transmit-recovery candidate and saved fault tests are in
 [report 279](docs/279-brcmfmac-tx-recovery.md). Run
 `task test:brcmfmac-tx-recovery` for native/sanitizer/ARM TX, RX and worker

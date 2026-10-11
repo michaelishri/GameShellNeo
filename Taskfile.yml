@@ -68,6 +68,18 @@ env:
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
 
 tasks:
+  test:brcmfmac-tx-poll-baseline:
+    desc: Reproduce discarded TX polling status errors (expected assertion failures; no device access)
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-poll-baseline python3 tools/check-brcmfmac-tx-recovery.py --poll-baseline --native-only]
+
+  test:brcmfmac-tx-poll:
+    desc: Exercise polling status failures and TX/RX/worker regressions natively and on ARM
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-poll python3 tools/check-brcmfmac-tx-recovery.py --poll-status]
+
+  check:brcmfmac-tx-poll-drivers:
+    desc: Qualify polling status failures and compile complete board/debug ARM objects
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-poll-drivers python3 tools/check-brcmfmac-tx-recovery.py --poll-status --compile-drivers]
+
   test:brcmfmac-tx-recovery-baseline:
     desc: Reproduce ignored TX recovery errors (expected assertion failures; no device access)
     cmds: [bash tools/run-logged.sh brcmfmac-tx-recovery-baseline python3 tools/check-brcmfmac-tx-recovery.py --baseline --native-only]

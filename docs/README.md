@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[281 — brcmfmac queued-TX polling error ownership](281-brcmfmac-tx-poll-errors.md)
+reproduces discarded status errors and prepares an isolated first-error fix,
+actual-source caller/worker tests and preserved successful-path checks.
+
 [280 — brcmfmac TX recovery review and offline acceptance](280-brcmfmac-tx-review.md)
 records both review axes, resolved fixture cleanup and verified qualification
 reruns; integration and matching board checks remain with NEO-58.

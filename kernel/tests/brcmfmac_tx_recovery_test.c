@@ -60,7 +60,10 @@ static struct {
 	unsigned operations, current_ops, recoveries, count_reads, empty_poll;
 	unsigned fail_at, sends, send_failures, status_reads, packed, hwhdr;
 	unsigned preps, postps, completed, unblocked;
+	unsigned status_fail_at;
 	int error, prep_error, inject_after_prep;
+	int status_error, inject_poll_claim;
+	u32 status_value;
 	bool failed_access;
 	u8 failed_value;
 } hw;
@@ -79,9 +82,16 @@ static int recovery_access(void)
 	return error;
 }
 static void sdio_claim_host(struct sdio_func *func)
-{ assert(func == &f.f1 && !hw.host && !hw.locked); hw.host++; hw.claims++; }
+{
+	assert(func == &f.f1 && !hw.host && !hw.locked); hw.host++; hw.claims++;
+	if (hw.inject_poll_claim && hw.claims == 2) f.dev.io_error = hw.inject_poll_claim;
+}
 static void sdio_release_host(struct sdio_func *func)
-{ assert(func == &f.f1 && hw.host == 1); hw.host--; hw.releases++; }
+{
+	assert(func == &f.f1 && hw.host == 1);
+	if (hw.failed_access && hw.status_reads) assert(f.dev.io_error == hw.status_error);
+	hw.host--; hw.releases++;
+}
 static void brcmf_sdiod_func0_wb(struct brcmf_sdio_dev *dev, uint reg, u8 val, int *error)
 {
 	assert(dev == &f.dev && reg == SDIO_CCCR_ABORT && val == f.f2.num);
@@ -104,7 +114,11 @@ static u8 brcmf_sdiod_readb(struct brcmf_sdio_dev *dev, uint reg, int *error)
 static u32 brcmf_sdiod_readl(struct brcmf_sdio_dev *dev, uint reg, int *error)
 {
 	assert(dev == &f.dev && reg == f.core.base + SD_REG(intstatus));
-	access_ok(); hw.status_reads++; *error = 0; return I_HMB_FRAME_IND;
+	access_ok(); hw.status_reads++;
+	*error = hw.status_reads == hw.status_fail_at ? hw.status_error : 0;
+	fprintf(stderr, "status op=%u error=%d value=%u\n", hw.status_reads, *error, hw.status_value);
+	if (*error) hw.failed_access = true;
+	return hw.status_value;
 }
 static int send(void)
 {
@@ -190,7 +204,7 @@ static void begin(void)
 	f.bus.sdiodev = &f.dev; f.bus.sdio_core = &f.core; f.bus.tx_max = 16;
 	f.bus.tx_hdrlen = 12; f.bus.head_align = 4; f.bus.blocksize = 64;
 	f.bus.roundup = 32; f.bus.intr = true; f.bus.hostintmask = HOSTINTMASK;
-	hw.error = -EILSEQ; hw.empty_poll = 1;
+	hw.error = -EILSEQ; hw.empty_poll = 1; hw.status_value = I_HMB_FRAME_IND;
 }
 static void finish(void)
 {
@@ -310,6 +324,7 @@ static void data_case(unsigned index, bool fatal)
 	assert(hw.sends == (fatal ? 1 : f.bus.txglom ? 2 : 3));
 	assert(hw.recoveries == hw.send_failures);
 	assert(hw.status_reads == (!fatal && !f.bus.intr ? hw.sends : 0));
+	if (fatal) assert(hw.claims == 1 && hw.releases == 1);
 	assert(hw.unblocked == (unsigned)!fatal && f.bus.txoff == fatal);
 	unsigned successes = 0;
 	for (unsigned i = 0; i < 3; i++) {
@@ -339,6 +354,60 @@ static void data_local(unsigned index)
 	assert(!hw.sends && !hw.operations && !queue.qlen && hw.completed == 1);
 	assert(!f.packets[0].success && !f.bus.tx_seq); finish();
 }
+enum poll_scenario { POLL_FAILURE, POLL_SUCCESS, POLL_PRIOR, POLL_INTERRUPT };
+static void poll_case(unsigned index, enum poll_scenario scenario)
+{
+	const int errors[] = {-EIO, -ETIMEDOUT, -EILSEQ};
+	const u32 status[] = {0, UINT32_MAX, I_HMB_FRAME_IND};
+	begin(); f.bus.intr = scenario == POLL_INTERRUPT; f.bus.txoff = true;
+	f.bus.txglom = index & 1;
+	unsigned batch = f.bus.txglom ? 2 : 1, expected_polls;
+	if (scenario == POLL_FAILURE) {
+		assert(index < 72);
+		hw.send_failures = index / 2 % 2; hw.status_fail_at = index / 4 % 2 + 1;
+		hw.status_value = status[index / 8 % 3]; hw.status_error = errors[index / 24];
+	} else if (scenario == POLL_SUCCESS) {
+		assert(index < 12); hw.send_failures = index / 2 % 2;
+		hw.status_value = status[index / 4];
+	} else if (scenario == POLL_PRIOR) {
+		assert(index < 6); hw.inject_poll_claim = errors[index / 2];
+	} else {
+		assert(index < 18); hw.status_error = errors[index / 6];
+		hw.status_value = status[index / 2 % 3]; hw.status_fail_at = 1;
+	}
+	unsigned poll_failure_at = hw.status_fail_at;
+	hw.empty_poll = 3;
+	for (unsigned i = 0; i < 3; i++) __skb_queue_tail(&f.bus.txq.queue, &f.packets[i]);
+	unsigned count = brcmf_sdio_sendfromq(&f.bus, 3);
+	bool fatal = scenario == POLL_FAILURE || scenario == POLL_PRIOR;
+	unsigned expected = scenario == POLL_FAILURE ? min_t(unsigned, 3, batch * poll_failure_at) :
+			    scenario == POLL_PRIOR ? batch : 3;
+	expected_polls = scenario == POLL_PRIOR || scenario == POLL_INTERRUPT ? 0 :
+			 scenario == POLL_FAILURE ? poll_failure_at : f.bus.txglom ? 2 : 3;
+	int error = scenario == POLL_FAILURE ? hw.status_error :
+		    scenario == POLL_PRIOR ? hw.inject_poll_claim : 0;
+	assert(f.dev.io_error == error && count == expected && hw.completed == expected);
+	assert(hw.status_reads == expected_polls && hw.sends == (count + batch - 1) / batch);
+	assert(f.bus.sdcnt.f2txdata == hw.sends + hw.status_reads);
+	assert(hw.recoveries == hw.send_failures);
+	assert(f.bus.txq.queue.qlen == 3 - expected && hw.unblocked == (unsigned)!fatal && f.bus.txoff == fatal);
+	assert(f.bus.ipend == (unsigned)(!!(hw.status_value & HOSTINTMASK) &&
+		(expected_polls > (scenario == POLL_FAILURE ? 1u : 0u))));
+	unsigned successes = 0;
+	for (unsigned i = 0; i < 3; i++) {
+		assert(f.packets[i].completed == (i < expected) && f.packets[i].queued == (i >= expected));
+		assert(!f.packets[i].prepared);
+		assert(f.packets[i].success == (i < expected && (!hw.send_failures || i >= batch)));
+		successes += f.packets[i].success;
+	}
+	assert(f.bus.tx_seq == successes);
+	if (fatal) {
+		unsigned claims = hw.claims, sends = hw.sends;
+		assert(!brcmf_sdio_sendfromq(&f.bus, 3));
+		assert(hw.claims == claims && hw.sends == sends && hw.completed == expected);
+	}
+	finish();
+}
 int main(int argc, char **argv)
 {
 	assert(argc == 3); unsigned index = strtoul(argv[2], NULL, 10);
@@ -352,6 +421,10 @@ int main(int argc, char **argv)
 	else if (!strcmp(argv[1], "data_failure")) data_case(index, true);
 	else if (!strcmp(argv[1], "data_success")) data_case(index, false);
 	else if (!strcmp(argv[1], "data_local")) data_local(index);
+	else if (!strcmp(argv[1], "poll_failure")) poll_case(index, POLL_FAILURE);
+	else if (!strcmp(argv[1], "poll_success")) poll_case(index, POLL_SUCCESS);
+	else if (!strcmp(argv[1], "poll_prior")) poll_case(index, POLL_PRIOR);
+	else if (!strcmp(argv[1], "poll_interrupt")) poll_case(index, POLL_INTERRUPT);
 	else assert(false);
 	printf("%s %u passed\n", argv[1], index); return 0;
 }

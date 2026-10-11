@@ -99,10 +99,15 @@ static struct {
  u32 mailbox_data;
  int mailbox_read_error, mailbox_ack_error;
  unsigned mailbox_writes, crashes, console_reads;
+ int console_error;
+ bool console_retire;
 #endif
 } hw;
 static unsigned scenarios, characterizations;
 static void brcmf_sdio_isr(struct brcmf_sdio *bus, bool in_isr);
+#ifdef NEO_SHARED_DIAGNOSTICS
+static void brcmf_sdio_dpc_failed(struct brcmf_sdio *bus, int err);
+#endif
 
 static void access_ok(void)
 {
@@ -182,12 +187,17 @@ static void decoded_mailbox_ok(void)
 }
 static void brcmf_fw_crashed(struct device *dev)
 { assert(dev == &f.func.dev); decoded_mailbox_ok(); hw.crashes++; }
-static void brcmf_sdio_get_console_addr(struct brcmf_sdio *bus)
+static int brcmf_sdio_get_console_addr(struct brcmf_sdio *bus)
 {
  assert(bus == &f.bus); decoded_mailbox_ok();
 #ifdef DEBUG
  hw.console_reads++;
+#ifdef NEO_SHARED_DIAGNOSTICS
+ if (hw.console_error && hw.console_retire) brcmf_sdio_dpc_failed(bus, hw.console_error);
 #endif
+ return hw.console_error;
+#endif
+ return 0;
 }
 #endif
 static void brcmf_sdio_readframes(struct brcmf_sdio *bus, uint limit)
@@ -693,6 +703,25 @@ static void mailbox_cases(void)
  for (unsigned n = 0; n < sizeof(valid) / sizeof(valid[0]); n++)
   for (unsigned skipped = 0; skipped < 2; skipped++) mailbox_success(valid[n], skipped);
 }
+#if defined(NEO_SHARED_DIAGNOSTICS) && defined(DEBUG)
+static void diagnostic_mailbox_error(int error, bool retired, bool oob, bool hard)
+{
+ setup(); hw.mailbox_data = HMB_DATA_FWREADY | (SDPCM_PROT_VERSION << HMB_DATA_VERSION_SHIFT);
+ hw.status = I_HMB_HOST_INT | I_HMB_FRAME_IND; hw.frames_remaining = 1;
+ hw.console_error = error; hw.console_retire = retired;
+ f.bus.ctrl_frame_stat = true; f.bus.txbound = 1; f.bus.txq.len = 1;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = oob; f.dev.sd_irq_requested = !oob;
+ irq(hard); drain();
+ assert(hw.console_reads == 1 && f.dev.io_error == error && f.bus.io_error_handled);
+ assert(!hw.frames && !hw.control_tx && !hw.data_tx && hw.stops == 1);
+ assert(f.dev.state == BRCMF_SDIOD_DOWN && !f.bus.ctrl_frame_stat && f.bus.ctrl_frame_err == error);
+ assert(hw.wakes == 1 && hw.responses == 1 && !f.bus.ipend && !f.bus.intstatus);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2));
+ hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+ assert(hw.console_reads == 1 && hw.stops == 1 && hw.wakes == 1 && hw.responses == 1);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2)); finish();
+}
+#endif
 #endif
 #ifdef NEO_RX_RECOVERY
 static void rx_completion(int error, bool oob, bool hard)
@@ -785,6 +814,14 @@ int main(void)
 #endif
 #ifdef NEO_MAILBOX_ERRORS
  mailbox_cases();
+#if defined(NEO_SHARED_DIAGNOSTICS) && defined(DEBUG)
+ const int diagnostic_errors[] = {-EIO, -ETIMEDOUT, -EILSEQ};
+ for (unsigned e = 0; e < 3; e++)
+  for (unsigned retired = 0; retired < 2; retired++)
+   for (unsigned oob = 0; oob < 2; oob++)
+    for (unsigned hard = 0; hard < 2; hard++)
+     diagnostic_mailbox_error(diagnostic_errors[e], retired, oob, hard);
+#endif
 #endif
 #ifdef NEO_RX_RECOVERY
  const int faults[] = {0, -EIO, -ETIMEDOUT, -ENOMEDIUM};

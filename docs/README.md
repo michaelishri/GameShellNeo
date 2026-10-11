@@ -18,6 +18,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 [284 — brcmfmac shared-memory diagnostic admission audit](284-brcmfmac-shared-diagnostic-audit.md)
 
+[285 — brcmfmac shared diagnostic error handling](285-brcmfmac-shared-diagnostic-errors.md)
+
 [283 — brcmfmac asynchronous clock-readiness deadline](283-brcmfmac-clock-deadline.md)
 
 [282 — brcmfmac watchdog failure and late-work ownership](282-brcmfmac-watchdog-errors.md)

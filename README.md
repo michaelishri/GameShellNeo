@@ -6,6 +6,14 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+NEO-201's shared diagnostic candidate is documented in
+[report 285](docs/285-brcmfmac-shared-diagnostic-errors.md). Run
+`task test:brcmfmac-shared-diagnostics` for native/sanitizer/ARM diagnostic and
+combined Wi-Fi regressions, or `task check:brcmfmac-shared-drivers` to include
+complete board/debug ARM objects. `task test:brcmfmac-shared-baseline`
+intentionally reproduces the prior defects. These offline commands do not
+access the GameShell; the candidate remains outside the image queue.
+
 NEO-200's asynchronous clock-deadline candidate is documented in
 [report 283](docs/283-brcmfmac-clock-deadline.md). Run
 `task test:brcmfmac-clock-deadline` for offline native/sanitizer/ARM clock,

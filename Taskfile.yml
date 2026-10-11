@@ -68,6 +68,18 @@ env:
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
 
 tasks:
+  test:brcmfmac-shared-baseline:
+    desc: Reproduce ignored shared-diagnostic wake and transport errors (expected failures)
+    cmds: [bash tools/run-logged.sh brcmfmac-shared-baseline python3 tools/check-brcmfmac-tx-recovery.py --shared-baseline --native-only]
+
+  test:brcmfmac-shared-diagnostics:
+    desc: Qualify shared diagnostics and combined Wi-Fi regressions without hardware
+    cmds: [bash tools/run-logged.sh brcmfmac-shared-diagnostics python3 tools/check-brcmfmac-tx-recovery.py --shared-diagnostics]
+
+  check:brcmfmac-shared-drivers:
+    desc: Qualify shared diagnostics and build complete board/debug ARM drivers
+    cmds: [bash tools/run-logged.sh brcmfmac-shared-drivers python3 tools/check-brcmfmac-tx-recovery.py --shared-diagnostics --compile-drivers]
+
   test:brcmfmac-clock-baseline:
     desc: Reproduce unbounded asynchronous clock waits (expected failures; no hardware)
     cmds: [bash tools/run-logged.sh brcmfmac-clock-baseline python3 tools/check-brcmfmac-tx-recovery.py --clock-baseline --native-only]

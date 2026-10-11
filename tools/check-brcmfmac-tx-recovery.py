@@ -18,6 +18,7 @@ WORK = ROOT / '.local/build/brcmfmac-tx-recovery'
 HARNESS = ROOT / 'kernel/tests/brcmfmac_tx_recovery_test.c'
 POLL_STATUS = False
 CLOCK_DEADLINE = False
+SHARED_DIAGNOSTICS = False
 CASES = [(group, str(index)) for group, count in (
     ('helper_failure', 24), ('helper_success', 3), ('helper_exhaustion', 1),
     ('helper_prior', 3), ('control_failure', 10), ('control_success', 32),
@@ -181,6 +182,10 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
             variants[name] = extract.mutate_once(good, dpc, extract.mutate_once(dpc,
                 'time_after_eq(jiffies, bus->clk_pending_deadline)', replacement))
     variants['candidate_debug'] = good
+    if negative and SHARED_DIAGNOSTICS:
+        variants['lost_diagnostic_mailbox_error'] = rx.helpers.extract.mutate_once(good,
+            'ret = brcmf_sdio_get_console_addr(bus);\n\t\tif (ret)',
+            'ret = brcmf_sdio_get_console_addr(bus);\n\t\tif (false && ret)')
     label = 'arm' if arm else 'sanitizer' if sanitizer else 'native'
     results = {}
     try:
@@ -189,7 +194,8 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
             defines = ['-DNEO_WORKER_ERRORS', '-DNEO_RX_RECOVERY', '-DNEO_MAILBOX_ERRORS', '-DNEO_TX_RECOVERY']
             if POLL_STATUS: defines.append('-DNEO_TX_POLL')
             if CLOCK_DEADLINE: defines.append('-DNEO_CLOCK_DEADLINE')
-            if name == 'candidate_debug': defines.append('-DDEBUG')
+            if SHARED_DIAGNOSTICS: defines.append('-DNEO_SHARED_DIAGNOSTICS')
+            if name in ('candidate_debug', 'lost_diagnostic_mailbox_error'): defines.append('-DDEBUG')
             binary = rx.compile_test(attempt, ROOT / 'kernel/tests/brcmfmac_irq_test.c',
                                      label + '-' + name, arm, sanitizer, defines)
             result = rx.execute(binary, arm=arm)
@@ -197,6 +203,7 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
             if name in ('candidate', 'candidate_debug'):
                 result.check_returncode()
                 count = 179 + (32 if POLL_STATUS else 0) + (52 if CLOCK_DEADLINE else 0) + 2 * (name == 'candidate_debug')
+                if name == 'candidate_debug' and SHARED_DIAGNOSTICS: count += 24
                 if result.stdout.strip() != f'{count} IRQ service scenarios passed (0 characterize existing error limitations)':
                     raise ValueError('Unexpected TX worker coverage: ' + result.stdout)
             elif not result.returncode or 'Assertion' not in result.stderr:
@@ -206,11 +213,11 @@ def run_worker(attempt, arm=False, sanitizer=False, negative=False):
         generated.write_text(good)
     atomic_json(attempt / (label + '-results.json'), results)
     count = (211 if POLL_STATUS else 179) + (52 if CLOCK_DEADLINE else 0)
-    print(f'{label} worker: {count}/{count+2} cases pass; {len(results)-2} mutations rejected', flush=True)
+    print(f'{label} worker: {count}/{count+2+24*SHARED_DIAGNOSTICS} cases pass; {len(results)-2} mutations rejected', flush=True)
 
 
 def main():
-    global POLL_STATUS, CLOCK_DEADLINE, CASES, WORK
+    global POLL_STATUS, CLOCK_DEADLINE, SHARED_DIAGNOSTICS, CASES, WORK
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--baseline', action='store_true', help='Reproduce uncorrected TX error ownership')
@@ -220,11 +227,16 @@ def main():
     mode.add_argument('--watchdog-baseline', action='store_true', help='Reproduce ignored watchdog errors')
     mode.add_argument('--clock-deadline', action='store_true', help='Qualify bounded asynchronous clock readiness')
     mode.add_argument('--clock-baseline', action='store_true', help='Reproduce an unbounded pending clock')
+    mode.add_argument('--shared-diagnostics', action='store_true', help='Qualify shared diagnostic admission/errors')
+    mode.add_argument('--shared-baseline', action='store_true', help='Reproduce ignored diagnostic wake/errors')
     parser.add_argument('--native-only', action='store_true')
     parser.add_argument('--compile-drivers', action='store_true')
     parser.add_argument('--arm-attempt', help=argparse.SUPPRESS)
     args = parser.parse_args()
-    CLOCK_DEADLINE = args.clock_deadline or args.clock_baseline
+    shared_mode = args.shared_diagnostics or args.shared_baseline
+    SHARED_DIAGNOSTICS = args.shared_diagnostics
+    diagnostics = module('shared_diagnostic_checks', 'brcmfmac_shared_checks.py') if shared_mode else None
+    CLOCK_DEADLINE = args.clock_deadline or args.clock_baseline or shared_mode
     watchdog_mode = args.watchdog_errors or args.watchdog_baseline or CLOCK_DEADLINE
     watchdog = module('watchdog_checks', 'brcmfmac_watchdog_checks.py') if watchdog_mode else None
     POLL_STATUS = args.poll_status or args.poll_baseline or watchdog_mode
@@ -235,12 +247,16 @@ def main():
         WORK = ROOT / '.local/build/brcmfmac-watchdog'
     if CLOCK_DEADLINE:
         WORK = ROOT / '.local/build/brcmfmac-clock-deadline'
+    if shared_mode:
+        WORK = ROOT / '.local/build/brcmfmac-shared-diagnostics'
     if args.arm_attempt:
         attempt = ROOT / args.arm_attempt
         if watchdog:
             watchdog.run_cases(attempt / 'watchdog', rx, arm=True, clock=CLOCK_DEADLINE)
             if CLOCK_DEADLINE:
                 watchdog.run_sleep(attempt / 'watchdog', rx, arm=True)
+        if diagnostics:
+            diagnostics.run_cases(attempt / 'watchdog', rx, arm=True)
         run_cases(attempt, arm=True)
         rx.run_cases(attempt / 'rx', arm=True, control=True)
         run_worker(attempt / 'worker', arm=True)
@@ -263,8 +279,10 @@ def main():
             paths.append(ROOT / 'kernel/candidates/0050-brcmfmac-tx-poll-errors.patch')
         if args.watchdog_errors or CLOCK_DEADLINE:
             paths.append(ROOT / 'kernel/candidates/0051-brcmfmac-watchdog-errors.patch')
-        if args.clock_deadline:
+        if args.clock_deadline or shared_mode:
             paths.append(ROOT / 'kernel/candidates/0052-brcmfmac-clock-deadline.patch')
+        if args.shared_diagnostics:
+            paths.append(ROOT / 'kernel/candidates/0053-brcmfmac-shared-diagnostics.patch')
         for path in paths:
             if path.name in {name for name, _ in queue}:
                 raise ValueError('TX test candidate unexpectedly entered image queue')
@@ -280,6 +298,8 @@ def main():
             paths += [watchdog.HARNESS, ROOT / 'tools/brcmfmac_watchdog_checks.py']
         if CLOCK_DEADLINE:
             paths += [ROOT / 'tools/check-brcmfmac-sleep.py', ROOT / 'kernel/tests/brcmfmac_sleep_test.c']
+        if diagnostics:
+            paths += [diagnostics.HARNESS, ROOT / 'tools/brcmfmac_shared_checks.py']
         hashes = {str(path.relative_to(ROOT)): sha256(path) for path in paths}
         atomic_json(attempt / 'inputs.json', hashes)
         with locked(WORK / '.source-lock'):
@@ -288,6 +308,13 @@ def main():
         if watchdog:
             watch = attempt / 'watchdog'; watch.mkdir()
             watchdog.extract_sources(source, watch, rx, clock=CLOCK_DEADLINE)
+            if diagnostics:
+                diagnostics.extract_sources(source, watch, rx)
+                diagnostics.run_cases(watch, rx)
+                if args.shared_baseline:
+                    raise RuntimeError('Shared baseline unexpectedly passed; inspect before qualification')
+                diagnostics.run_cases(watch, rx, sanitizer=True)
+                diagnostics.negatives(watch, rx)
             watchdog.run_cases(watch, rx, clock=CLOCK_DEADLINE)
             if args.watchdog_baseline:
                 raise RuntimeError('Watchdog baseline unexpectedly passed; inspect before qualification')
@@ -321,7 +348,7 @@ def main():
                 '--user', f'{os.getuid()}:{os.getgid()}', '--platform', lock['builder']['platform'],
                 '--entrypoint=python3', '-v', f'{ROOT}:/project', '-w', '/project',
                 lock['builder']['image'], 'tools/check-brcmfmac-tx-recovery.py',
-                *(['--clock-deadline'] if CLOCK_DEADLINE else ['--watchdog-errors'] if watchdog_mode else ['--poll-status'] if POLL_STATUS else []),
+                *(['--shared-diagnostics'] if shared_mode else ['--clock-deadline'] if CLOCK_DEADLINE else ['--watchdog-errors'] if watchdog_mode else ['--poll-status'] if POLL_STATUS else []),
                 '--arm-attempt', str(attempt.relative_to(ROOT))], check=True, timeout=180)
         builds = {}
         if args.compile_drivers:
@@ -337,10 +364,16 @@ def main():
             poll_status=POLL_STATUS,
             watchdog=watchdog_mode,
             clock_deadline=CLOCK_DEADLINE,
+            shared_diagnostics=shared_mode,
             native_complete=True, native_sanitizers=True, arm_complete=not args.native_only,
             inputs=hashes, source=metadata, cases=CASES, arm_build=builds,
             artifacts={str(path.relative_to(attempt)): sha256(path) for path in attempt.rglob('*') if path.is_file()},
-            limits=('Actual HT clock and sleep bodies with scripted transfers and jiffies. '
+            limits=('Actual shared/console/assert/trap diagnostic functions and RAM helper; '
+                    'scripted wake, transfers, allocations and host-boundary admissions. '
+                    'Worker tests use a diagnostic-return seam, with separate actual diagnostic tests; '
+                    'startup cleanup primitives are controlled and caller initialization is source-audited. '
+                    if shared_mode else '') +
+                   ('Actual HT clock and sleep bodies with scripted transfers and jiffies. '
                     'Watchdog queue and worker notification tested at separate controlled seams; '
                     'no wall-clock scheduling guarantee. ' if CLOCK_DEADLINE else '') +
                    ('Actual watchdog/console/timer/cleanup bodies; scripted transport, clock, IRQ and '

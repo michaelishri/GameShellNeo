@@ -35,6 +35,11 @@ a board failure or a reason to reopen the abandoned NEO-154 investigation.
 The caller audit in [report 284](docs/284-brcmfmac-shared-diagnostic-audit.md)
 also identifies firmware-startup failure callers, which need distinct cleanup
 ownership coverage before choosing the fix.
+Candidate 0053 and the saved 194-case diagnostic/combined regression suite
+now implement and cover that ownership contract; native, sanitizers and ARM
+emulation pass. Full objects and independent review are pending in
+[report 285](docs/285-brcmfmac-shared-diagnostic-errors.md). Integration and
+physical qualification remain with NEO-58.
 
 **Diagnostic output bounds, 12 October 2026:** NEO-201's source audit found
 that `brcmf_sdio_dump_console()` uses the firmware's console index without an

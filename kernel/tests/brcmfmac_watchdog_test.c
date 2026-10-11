@@ -30,18 +30,22 @@ typedef unsigned uint;
 #define BRCMF_FWCON_ON() (hw.fwcon)
 #define min_t(type, a, b) ((type)(a) < (type)(b) ? (type)(a) : (type)(b))
 #include "brcmfmac_watchdog_types.h"
+#ifdef NEO_SHARED_DIAGNOSTICS
+#include "brcmfmac_shared_types.h"
+#endif
 #ifdef NEO_CLOCK_DEADLINE
 #include "brcmfmac_clock_constants.h"
 #define time_after(a, b) ((long)((b) - (a)) < 0)
 #define time_after_eq(a, b) ((long)((a) - (b)) >= 0)
 #endif
 
-enum { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA };
+enum { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA, BRCMF_SDIOD_NOMEDIUM };
 #ifndef NEO_CLOCK_DEADLINE
 enum { CLK_SDONLY, CLK_AVAIL };
 #endif
 struct sdio_func { unsigned num; };
 struct timer_list { unsigned long expires; };
+struct brcmf_chip { u32 rambase, ramsize, srsize; bool sr_capable; };
 struct brcmf_sdio_dev {
 	struct sdio_func *func1;
 	int io_error;
@@ -50,6 +54,7 @@ struct brcmf_sdio_dev {
 };
 struct brcmf_sdio {
 	struct brcmf_sdio_dev *sdiodev;
+	struct brcmf_chip *ci;
 	struct brcmf_sdio_count sdcnt;
 	bool sr_enabled, poll, intr, dpc_triggered, dpc_running, wd_active;
 	bool io_error_handled, ctrl_frame_stat;
@@ -67,8 +72,9 @@ static struct {
 	struct brcmf_sdio bus;
 	struct brcmf_sdio_dev dev;
 	struct sdio_func func;
+	struct brcmf_chip chip;
 } f;
-enum admission_fault { ADMIT_IO_ERROR, ADMIT_PM_FAILED, ADMIT_BOTH, ADMIT_RETIRED };
+enum admission_fault { ADMIT_IO_ERROR, ADMIT_PM_FAILED, ADMIT_BOTH, ADMIT_RETIRED, ADMIT_NOMEDIUM };
 enum clock_change { CLOCK_UNCHANGED, CLOCK_RESOLVED, CLOCK_SAVE_RESTORE, CLOCK_NEW_REQUEST, CLOCK_ALREADY_QUEUED };
 static struct {
 	unsigned host, claims, releases, reads, ram_reads, wakes, sleeps;
@@ -85,16 +91,22 @@ static struct {
 	u8 clock_filter;
 	unsigned clock_reads, clock_writes;
 	enum clock_change clock_change;
+#ifdef NEO_SHARED_DIAGNOSTICS
+	bool shared;
+	u32 shared_address, shared_flags;
+	unsigned seq_lines, seq_bytes;
+#endif
 } hw;
 static unsigned long jiffies = 100;
 static void brcmf_sdio_dpc_failed(struct brcmf_sdio *bus, int error);
 static void access_ok(void)
 {
-	assert(hw.host >= 1 && hw.host <= 2 && !f.dev.io_error && !f.dev.pm_failed && !hw.transport_failed);
+	assert(hw.host >= 1 && hw.host <= 4 && !f.dev.io_error && !f.dev.pm_failed && !hw.transport_failed);
+	assert(f.dev.state != BRCMF_SDIOD_NOMEDIUM);
 }
 static void sdio_claim_host(struct sdio_func *func)
 {
-	assert(func == &f.func && hw.host < 2);
+	assert(func == &f.func && hw.host < 4);
 	if (hw.host++) return; /* The RAM helper recursively claims the same host. */
 	hw.claims++;
 #ifdef NEO_CLOCK_DEADLINE
@@ -104,7 +116,8 @@ static void sdio_claim_host(struct sdio_func *func)
 	if (hw.clock_change == CLOCK_ALREADY_QUEUED) f.bus.dpc_triggered = true;
 #endif
 	if (hw.inject_claim == hw.claims) {
-		if (hw.admission != ADMIT_PM_FAILED) f.dev.io_error = -EILSEQ;
+		if (hw.admission != ADMIT_PM_FAILED && hw.admission != ADMIT_NOMEDIUM) f.dev.io_error = -EILSEQ;
+		if (hw.admission == ADMIT_NOMEDIUM) f.dev.state = BRCMF_SDIOD_NOMEDIUM;
 		if (hw.admission == ADMIT_PM_FAILED || hw.admission == ADMIT_BOTH) f.dev.pm_failed = true;
 		if (hw.admission == ADMIT_RETIRED) {
 			f.bus.io_error_handled = true; f.dev.state = BRCMF_SDIOD_DOWN;
@@ -114,7 +127,7 @@ static void sdio_claim_host(struct sdio_func *func)
 }
 static void sdio_release_host(struct sdio_func *func)
 {
-	assert(func == &f.func && hw.host && hw.host <= 2);
+	assert(func == &f.func && hw.host && hw.host <= 4);
 	if (--hw.host) return;
 	hw.releases++;
 	if (hw.retire_after_release) {
@@ -157,7 +170,7 @@ static void usleep_range(unsigned low, unsigned high)
 { assert(low <= high); jiffies += (low + 999) / 1000; }
 #endif
 static void timer_delete_sync(struct timer_list *timer)
-{ assert(timer == &f.bus.timer && hw.host == 1); hw.timer_deletes++; }
+{ assert(timer == &f.bus.timer && hw.host); hw.timer_deletes++; }
 static void add_timer(struct timer_list *timer)
 { assert(timer == &f.bus.timer && timer->expires == jiffies + BRCMF_WD_POLL); hw.timer_adds++; }
 static void mod_timer(struct timer_list *timer, unsigned long expires)
@@ -168,13 +181,13 @@ static bool queue_work(void *queue, unsigned *work)
 	hw.queue++; return true;
 }
 static void brcmf_sdiod_change_state(struct brcmf_sdio_dev *dev, unsigned state)
-{ assert(dev == &f.dev && hw.host == 1 && state == BRCMF_SDIOD_DOWN); dev->state = state; hw.states++; }
+{ assert(dev == &f.dev && hw.host && state == BRCMF_SDIOD_DOWN); dev->state = state; hw.states++; }
 static void brcmf_sdio_wait_event_wakeup(struct brcmf_sdio *bus)
-{ assert(bus == &f.bus && hw.host == 1 && !bus->ctrl_frame_stat && bus->ctrl_frame_err == f.dev.io_error); hw.controls++; }
+{ assert(bus == &f.bus && hw.host && !bus->ctrl_frame_stat && bus->ctrl_frame_err == f.dev.io_error); hw.controls++; }
 static void brcmf_sdio_dcmd_resp_wake(struct brcmf_sdio *bus)
-{ assert(bus == &f.bus && hw.host == 1); hw.responses++; }
+{ assert(bus == &f.bus && hw.host); hw.responses++; }
 static void brcmf_sdiod_quiesce_irqs(struct brcmf_sdio_dev *dev)
-{ assert(dev == &f.dev && hw.host == 1 && dev->io_error && f.bus.io_error_handled); hw.quiesces++; }
+{ assert(dev == &f.dev && hw.host && dev->io_error && f.bus.io_error_handled); hw.quiesces++; }
 #ifdef DEBUG
 static void *kmalloc(size_t size, int flags)
 { assert(size == 16 && flags == GFP_ATOMIC); hw.allocs++; return hw.alloc_fail ? NULL : malloc(size); }
@@ -214,6 +227,28 @@ static int brcmf_sdiod_skbuff_read(struct brcmf_sdio_dev *dev, struct sdio_func 
 		memset(data, hw.failed_value, len); return error;
 	}
 	if (hw.direct_ram) { memset(data, 0xa5, len); return 0; }
+#ifdef NEO_SHARED_DIAGNOSTICS
+	if (hw.shared) {
+		u32 last = f.chip.rambase + f.chip.ramsize - 4;
+		if (!f.chip.rambase && f.chip.sr_capable) last -= f.chip.srsize;
+		memset(data, 0, len);
+		if (hw.ram_address == last) {
+			assert(len == 4); memcpy(data, &hw.shared_address, 4);
+		} else if (hw.ram_address == hw.shared_address) {
+			struct sdpcm_shared_le sh = {.flags = hw.shared_flags, .trap_addr = 0x6000,
+				.assert_file_addr = 0x6100, .assert_exp_addr = 0x6200, .assert_line = 23,
+				.console_addr = 0x2000, .msgtrace_addr = 0x6300};
+			assert(len == sizeof(sh)); memcpy(data, &sh, len);
+		} else if (hw.ram_address >= 0x2000 && hw.ram_address < 0x2100) {
+			assert(len == 4);
+			u32 val = hw.ram_address == 0x2000 + offsetof(struct rte_console, log_le) ? 0x3000 :
+				hw.ram_address == 0x2000 + offsetof(struct rte_console, log_le.buf_size) ? 16 : 2;
+			memcpy(data, &val, 4);
+		} else assert(hw.ram_address == 0x6000 || hw.ram_address == 0x6100 ||
+			     hw.ram_address == 0x6200 || hw.ram_address == 0x3000);
+		return 0;
+	}
+#endif
 	if (hw.ram_address == f.bus.console_addr + offsetof(struct rte_console, log_le)) {
 		assert(len == sizeof(struct rte_log_le));
 		struct rte_log_le log = {.buf = 0x3000, .buf_size = 16,

@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[275 — brcmfmac RX recovery error ownership](275-brcmfmac-rx-recovery.md)
+records the isolated candidate, 44 passing native/ARM helper cases, 13 negative
+controls and pending caller/packet qualification.
+
 [272 — Clock provenance image integration](272-clock-provenance-image.md)
 records the built, offline-verified diagnostic.26 recorder image, matching
 reader admission, recovery checkpoint and pending physical installation.

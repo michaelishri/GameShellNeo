@@ -1,0 +1,168 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: retain failed RX recovery and stop worker I/O
+
+Do not retransmit or continue RX/TX after an unverified FIFO flush.
+Preserve abort/register errors and retry exhaustion in the existing worker
+error latch, then quarantine after the RX caller has cleaned up buffers.
+The successful recovery poll budget is unchanged. Candidate only.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -1245,56 +1245,74 @@
+ {
+ 	struct brcmf_sdio_dev *sdiod = bus->sdiodev;
+ 	struct brcmf_core *core = bus->sdio_core;
+-	uint retries = 0;
++	uint retries;
+ 	u16 lastrbc;
+ 	u8 hi, lo;
+ 	int err;
+ 
++	/* Host claimed. A previous cleanup error needs a fresh device lifetime. */
++	if (READ_ONCE(sdiod->io_error))
++		goto out;
++
+ 	brcmf_err("%sterminate frame%s\n",
+ 		  abort ? "abort command, " : "",
+ 		  rtx ? ", send NAK" : "");
+ 
+-	if (abort)
+-		brcmf_sdiod_abort(bus->sdiodev, bus->sdiodev->func2);
+-
+-	brcmf_sdiod_writeb(bus->sdiodev, SBSDIO_FUNC1_FRAMECTRL, SFC_RF_TERM,
+-			   &err);
++	if (abort) {
++		err = brcmf_sdiod_abort(sdiod, sdiod->func2);
++		if (err)
++			goto failed;
++	}
++
++	brcmf_sdiod_writeb(sdiod, SBSDIO_FUNC1_FRAMECTRL, SFC_RF_TERM, &err);
+ 	bus->sdcnt.f1regdata++;
+-
+-	/* Wait until the packet has been flushed (device/FIFO stable) */
++	if (err)
++		goto failed;
++
++	/* Keep the existing successful-hardware budget; reject failed reads. */
+ 	for (lastrbc = retries = 0xffff; retries > 0; retries--) {
+-		hi = brcmf_sdiod_readb(bus->sdiodev, SBSDIO_FUNC1_RFRAMEBCHI,
+-				       &err);
+-		lo = brcmf_sdiod_readb(bus->sdiodev, SBSDIO_FUNC1_RFRAMEBCLO,
+-				       &err);
+-		bus->sdcnt.f1regdata += 2;
++		hi = brcmf_sdiod_readb(sdiod, SBSDIO_FUNC1_RFRAMEBCHI, &err);
++		bus->sdcnt.f1regdata++;
++		if (err)
++			goto failed;
++		lo = brcmf_sdiod_readb(sdiod, SBSDIO_FUNC1_RFRAMEBCLO, &err);
++		bus->sdcnt.f1regdata++;
++		if (err)
++			goto failed;
+ 
+ 		if ((hi == 0) && (lo == 0))
+ 			break;
+ 
+-		if ((hi > (lastrbc >> 8)) && (lo > (lastrbc & 0x00ff))) {
++		if ((hi > (lastrbc >> 8)) && (lo > (lastrbc & 0x00ff)))
+ 			brcmf_err("count growing: last 0x%04x now 0x%04x\n",
+ 				  lastrbc, (hi << 8) + lo);
+-		}
+ 		lastrbc = (hi << 8) + lo;
+ 	}
+ 
+-	if (!retries)
++	if (!retries) {
+ 		brcmf_err("count never zeroed: last 0x%04x\n", lastrbc);
+-	else
+-		brcmf_dbg(SDIO, "flush took %d iterations\n", 0xffff - retries);
+-
++		err = -ETIMEDOUT;
++		goto failed;
++	}
++	brcmf_dbg(SDIO, "flush took %d iterations\n", 0xffff - retries);
++
++	/* Retransmission is valid only after a verified flush. */
+ 	if (rtx) {
+ 		bus->sdcnt.rxrtx++;
+ 		brcmf_sdiod_writel(sdiod, core->base + SD_REG(tosbmailbox),
+ 				   SMB_NAK, &err);
+-
+ 		bus->sdcnt.f1regdata++;
+-		if (err == 0)
+-			bus->rxskip = true;
+-	}
+-
+-	/* Clear partial in any case */
++		if (err)
++			goto failed;
++		bus->rxskip = true;
++	}
++	goto out;
++
++failed:
++	/* Defer worker quarantine until the caller has released its RX buffers. */
++	WRITE_ONCE(sdiod->io_error, err);
++out:
++	/* Clear partial in any case. */
+ 	bus->cur_read.len = 0;
+ }
+ 
+@@ -1915,7 +1933,8 @@
+ 	bus->rxpending = true;
+ 
+ 	for (rd->seq_num = bus->rx_seq, rxleft = maxframes;
+-	     !bus->rxskip && rxleft && bus->sdiodev->state == BRCMF_SDIOD_DATA;
++	     !bus->rxskip && rxleft && !READ_ONCE(bus->sdiodev->io_error) &&
++	     bus->sdiodev->state == BRCMF_SDIOD_DATA;
+ 	     rd->seq_num++, rxleft--) {
+ 
+ 		/* Handle glomming separately */
+@@ -2105,6 +2124,11 @@
+ 		rd->channel = SDPCM_EVENT_CHANNEL;
+ 	}
+ 
++	if (READ_ONCE(bus->sdiodev->io_error)) {
++		bus->rxpending = false;
++		rd->len = 0;
++		rd->len_nxtfrm = 0;
++	}
+ 	rxcount = maxframes - rxleft;
+ 	/* Message if we hit the limit */
+ 	if (!rxleft)
+@@ -2808,6 +2832,12 @@
+ 	/* On frame indication, read available frames */
+ 	if ((intstatus & I_HMB_FRAME_IND) && (bus->clkstate == CLK_AVAIL)) {
+ 		brcmf_sdio_readframes(bus, bus->rxbound);
++		/* RX callers own packet cleanup; retire the worker before any TX. */
++		err = READ_ONCE(sdiod->io_error);
++		if (err) {
++			sdio_claim_host(sdiod->func1);
++			goto failed;
++		}
+ 		if (!bus->rxpending)
+ 			intstatus &= ~I_HMB_FRAME_IND;
+ 	}
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/bcmsdh.c
+@@ -799,13 +799,15 @@
+ 
+ int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, struct sdio_func *func)
+ {
++	int err;
++
+ 	brcmf_dbg(SDIO, "Enter\n");
+ 
+-	/* Issue abort cmd52 command through F0 */
+-	brcmf_sdiod_func0_wb(sdiodev, SDIO_CCCR_ABORT, func->num, NULL);
++	/* Issue abort cmd52 command through F0 and preserve its result. */
++	brcmf_sdiod_func0_wb(sdiodev, SDIO_CCCR_ABORT, func->num, &err);
+ 
+ 	brcmf_dbg(SDIO, "Exit\n");
+-	return 0;
++	return err;
+ }
+ 
+ void brcmf_sdiod_sgtable_alloc(struct brcmf_sdio_dev *sdiodev)

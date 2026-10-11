@@ -2,6 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-58/195 RX recovery candidate, 12 October 2026:** isolated candidate 0046
+preserves abort/terminate/count/NAK errors, refuses retransmission after an
+unverified flush and hands fatal recovery to the existing worker quarantine.
+The saved helper suite passes 44 native/ARM32 scenarios and 13 assertion-based
+negative controls, and full board/debug ARM brcmfmac compilation passes. Complete
+caller/packet tests are still pending. Diagnostic.26 is unchanged.
+[Report 275](docs/275-brcmfmac-rx-recovery.md)
+records the remaining work, including two newly identified packet paths:
+unowned `pkt` after a glom-without-descriptor error, and consumption of
+uninitialized parse outputs before a superframe error is checked. Preserve
+these leads for focused reproduction; no observed GameShell fault is attributed.
+
 **NEO-194 local build ownership, 12 October 2026:** the diagnostic.26 host
 command ended with status 143 while its Docker kernel build remained running.
 The host log stopped advancing; Docker logs and process activity established

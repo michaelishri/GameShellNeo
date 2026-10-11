@@ -68,6 +68,14 @@ env:
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
 
 tasks:
+  test:brcmfmac-rx-recovery:
+    desc: Fault-test isolated RX recovery helper candidate; caller qualification remains separate
+    cmds: [bash tools/run-logged.sh brcmfmac-rx-recovery python3 tools/check-brcmfmac-rx-recovery.py]
+
+  check:brcmfmac-rx-recovery-drivers:
+    desc: Check RX helper faults and complete ARM brcmfmac objects; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-rx-recovery-drivers python3 tools/check-brcmfmac-rx-recovery.py --compile-drivers]
+
   default:
     desc: List the shared project commands
     cmds: [task --list]

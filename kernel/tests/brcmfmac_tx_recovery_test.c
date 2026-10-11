@@ -196,26 +196,40 @@ static void finish(void)
 {
 	assert(!hw.host && !hw.locked && hw.claims == hw.releases && hw.preps == hw.postps);
 }
-static int recovery_error(unsigned fault)
-{ return fault == 5 ? -ETIMEDOUT : fault ? hw.error : 0; }
-static void choose_fault(unsigned fault)
-{ hw.fail_at = fault <= 4 ? fault : 0; hw.empty_poll = fault == 5 ? 4 : 1; }
-static void helper_case(unsigned index)
+enum recovery_fault {
+	RECOVERY_NONE,
+	RECOVERY_ABORT,
+	RECOVERY_TERMINATE,
+	RECOVERY_COUNT_HIGH,
+	RECOVERY_COUNT_LOW,
+	RECOVERY_EXHAUSTED,
+};
+static const enum recovery_fault recovery_failures[] = {
+	RECOVERY_ABORT, RECOVERY_TERMINATE, RECOVERY_COUNT_HIGH,
+	RECOVERY_COUNT_LOW, RECOVERY_EXHAUSTED,
+};
+static int recovery_error(enum recovery_fault fault)
+{ return fault == RECOVERY_EXHAUSTED ? -ETIMEDOUT : fault != RECOVERY_NONE ? hw.error : 0; }
+static void choose_fault(enum recovery_fault fault)
 {
-	begin();
-	if (index < 24) {
-		const int errors[] = {-EIO, -ETIMEDOUT, -EILSEQ};
-		choose_fault(index / 6 + 1); hw.error = errors[index / 2 % 3];
-		hw.failed_value = index & 1 ? 0xff : 0;
-	} else if (index < 27) hw.empty_poll = index - 23;
-	else if (index == 27) choose_fault(5);
-	else { assert(index < 31); f.dev.io_error = -(int)(index - 27); }
-	int expected = index < 24 ? hw.error : index == 27 ? -ETIMEDOUT : f.dev.io_error;
+	hw.fail_at = 0; hw.empty_poll = 1;
+	switch (fault) {
+	case RECOVERY_NONE: break;
+	case RECOVERY_ABORT: hw.fail_at = 1; break;
+	case RECOVERY_TERMINATE: hw.fail_at = 2; break;
+	case RECOVERY_COUNT_HIGH: hw.fail_at = 3; break;
+	case RECOVERY_COUNT_LOW: hw.fail_at = 4; break;
+	case RECOVERY_EXHAUSTED: hw.empty_poll = 4; break;
+	default: assert(false);
+	}
+}
+static void check_helper(int expected, unsigned operations)
+{
 	sdio_claim_host(&f.f1); brcmf_sdio_txfail(&f.bus); sdio_release_host(&f.f1);
 	fprintf(stderr, "latched=%d expected=%d ops=%u\n", f.dev.io_error, expected, hw.operations);
 	assert(f.dev.io_error == expected);
-	assert(hw.operations == (index < 24 ? hw.fail_at : index < 28 ? 2 + 2 * (index == 27 ? 3 : hw.empty_poll) : 0));
-	assert(f.bus.sdcnt.tx_sderrs == (unsigned)(index < 28));
+	assert(hw.operations == operations);
+	assert(f.bus.sdcnt.tx_sderrs == (unsigned)(operations != 0));
 	assert(f.bus.sdcnt.f1regdata == (hw.operations ? hw.operations - 1 : 0));
 	if (expected) {
 		unsigned previous = hw.operations;
@@ -224,9 +238,32 @@ static void helper_case(unsigned index)
 	}
 	finish();
 }
+static void helper_failure(unsigned index)
+{
+	begin(); assert(index < 24);
+	const int errors[] = {-EIO, -ETIMEDOUT, -EILSEQ};
+	choose_fault(recovery_failures[index / 6]); hw.error = errors[index / 2 % 3];
+	hw.failed_value = index & 1 ? 0xff : 0;
+	check_helper(hw.error, hw.fail_at);
+}
+static void helper_success(unsigned index)
+{
+	begin(); assert(index < 3); hw.empty_poll = index + 1;
+	check_helper(0, 2 + 2 * hw.empty_poll);
+}
+static void helper_exhaustion(unsigned index)
+{
+	begin(); assert(index == 0); choose_fault(RECOVERY_EXHAUSTED);
+	check_helper(-ETIMEDOUT, 8);
+}
+static void helper_prior(unsigned index)
+{
+	begin(); assert(index < 3); f.dev.io_error = -(int)(index + 1);
+	check_helper(f.dev.io_error, 0);
+}
 static void control_failure(unsigned index)
 {
-	begin(); assert(index < 10); unsigned fault = index / 2 + 1;
+	begin(); assert(index < 10); enum recovery_fault fault = recovery_failures[index / 2];
 	choose_fault(fault); hw.failed_value = index & 1 ? 0xff : 0;
 	hw.send_failures = 1;
 	sdio_claim_host(&f.f1);
@@ -262,7 +299,7 @@ static void data_case(unsigned index, bool fatal)
 {
 	begin(); assert(index < (fatal ? 20u : 8u));
 	f.bus.intr = !(index & 1); f.bus.txglom = index & 2; f.bus.txoff = true;
-	unsigned fault = fatal ? index / 4 + 1 : 0;
+	enum recovery_fault fault = fatal ? recovery_failures[index / 4] : RECOVERY_NONE;
 	choose_fault(fault); hw.send_failures = fatal ? 1 : index / 4;
 	if (!fatal) hw.empty_poll = 3;
 	for (unsigned i = 0; i < 3; i++) __skb_queue_tail(&f.bus.txq.queue, &f.packets[i]);
@@ -305,7 +342,10 @@ static void data_local(unsigned index)
 int main(int argc, char **argv)
 {
 	assert(argc == 3); unsigned index = strtoul(argv[2], NULL, 10);
-	if (!strcmp(argv[1], "helper")) helper_case(index);
+	if (!strcmp(argv[1], "helper_failure")) helper_failure(index);
+	else if (!strcmp(argv[1], "helper_success")) helper_success(index);
+	else if (!strcmp(argv[1], "helper_exhaustion")) helper_exhaustion(index);
+	else if (!strcmp(argv[1], "helper_prior")) helper_prior(index);
 	else if (!strcmp(argv[1], "control_failure")) control_failure(index);
 	else if (!strcmp(argv[1], "control_success")) control_success(index);
 	else if (!strcmp(argv[1], "control_prior")) control_prior(index);

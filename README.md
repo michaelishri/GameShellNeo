@@ -12,8 +12,9 @@ NEO-197's isolated transmit-recovery candidate and saved fault tests are in
 checks, or `task check:brcmfmac-tx-recovery-drivers` to also compile complete
 board/debug ARM driver objects. `task test:brcmfmac-tx-recovery-baseline`
 deliberately reproduces the pre-candidate failures. These commands are offline;
-the candidate has passed full board/debug ARM compilation, remains outside the
-image queue and awaits independent review and later hardware qualification.
+the candidate has passed full board/debug ARM compilation and independent
+[review](docs/280-brcmfmac-tx-review.md), remains outside the image queue and
+awaits deliberate integration and matching hardware qualification.
 
 The isolated NEO-195 receive-recovery candidates pass helper, packet and worker
 checks. Use `task test:brcmfmac-rx-recovery` for the abort/flush fault matrix and

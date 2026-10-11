@@ -126,7 +126,8 @@ and their kernel configuration hashes were verified after completion.
 | Final verification receipt | `ba47f5288b175e216877e08a5c0caf7c79b87463d07b5fe41e08f599aa77aa14` |
 
 The receipt is `.local/build/brcmfmac-tx-recovery/final-verification.json`.
-The isolated offline candidate is ready for independent review.
+The isolated offline candidate completed independent review and a fixture
+cleanup rerun in [report 280](280-brcmfmac-tx-review.md).
 
 ## Evidence boundaries and remaining work
 
@@ -137,8 +138,8 @@ the packet suite exercises the actual callers separately. These checks do not
 establish complete-kernel concurrency, SG/DMA alignment correctness, physical
 FIFO behavior, RF stability, energy savings or the cause of NEO-55.
 
-Independent review, deliberate image integration and matching board
-qualification remain separate. The GameShell clock fault still blocks live PM
+Deliberate image integration and matching board qualification remain separate
+from the completed offline review. The GameShell clock fault still blocks live PM
 qualification; it is not bypassed. NEO-154's abandoned SSH-stall work remains
 abandoned.
 

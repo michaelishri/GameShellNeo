@@ -17,7 +17,8 @@ BASE = 'drivers/net/wireless/broadcom/brcm80211/brcmfmac/'
 WORK = ROOT / '.local/build/brcmfmac-tx-recovery'
 HARNESS = ROOT / 'kernel/tests/brcmfmac_tx_recovery_test.c'
 CASES = [(group, str(index)) for group, count in (
-    ('helper', 31), ('control_failure', 10), ('control_success', 32),
+    ('helper_failure', 24), ('helper_success', 3), ('helper_exhaustion', 1),
+    ('helper_prior', 3), ('control_failure', 10), ('control_success', 32),
     ('control_prior', 3), ('data_failure', 20), ('data_success', 8), ('data_local', 3))
     for index in range(count)]
 
@@ -78,10 +79,10 @@ def negatives(attempt):
     packet = extract.function(good, 'static int brcmf_sdio_txpkt(')
     queue = extract.function(good, 'static uint brcmf_sdio_sendfromq(')
     cases = [
-        ('lost_prior_error', fail, 'if (READ_ONCE(sdiodev->io_error))', 'if (false)', ('helper', '28')),
-        ('lost_error_latch', fail, 'WRITE_ONCE(sdiodev->io_error, err);', '', ('helper', '0')),
-        ('lost_exhaustion', fail, 'err = -ETIMEDOUT;', 'err = 0;', ('helper', '27')),
-        ('shortened_flush_budget', fail, 'i < 3', 'i < 2', ('helper', '26')),
+        ('lost_prior_error', fail, 'if (READ_ONCE(sdiodev->io_error))', 'if (false)', ('helper_prior', '0')),
+        ('lost_error_latch', fail, 'WRITE_ONCE(sdiodev->io_error, err);', '', ('helper_failure', '0')),
+        ('lost_exhaustion', fail, 'err = -ETIMEDOUT;', 'err = 0;', ('helper_exhaustion', '0')),
+        ('shortened_flush_budget', fail, 'i < 3', 'i < 2', ('helper_success', '2')),
         ('lost_control_admission', control, 'if (ret)\n\t\treturn ret;',
          'if (false && ret)\n\t\treturn ret;', ('control_prior', '0')),
         ('lost_control_retry_gate', control, 'if (READ_ONCE(bus->sdiodev->io_error))',
@@ -108,7 +109,7 @@ def negatives(attempt):
                 for name, body, before, after, case in cases}
     for index, gate in enumerate(gates):
         broken = fail[:gate.start()] + gate[0].replace('if (err)', 'if (false && err)') + fail[gate.end():]
-        variants['lost_recovery_gate_' + str(index)] = (extract.mutate_once(good, fail, broken), ('helper', str(index * 6)))
+        variants['lost_recovery_gate_' + str(index)] = (extract.mutate_once(good, fail, broken), ('helper_failure', str(index * 6)))
     results = {}
     try:
         for name, (body, case) in variants.items():

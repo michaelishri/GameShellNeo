@@ -7,8 +7,11 @@ reproduces discarded abort/terminate/count failures and traffic after an
 unverified write-FIFO flush (44/107 pass). Isolated candidate 0049 now passes
 the 107-case native/sanitizer/ARM caller suite, RX regressions, worker shutdown
 checks and assertion-based mutations. Both full ARM objects pass; independent
-review is next. [Report 279](docs/279-brcmfmac-tx-recovery.md) records exact scope
-and controlled test boundaries. No image or live device change. Adjacent lead:
+review and fixture cleanup are complete in
+[report 280](docs/280-brcmfmac-tx-review.md). NEO-197's offline scope is complete;
+NEO-58 retains integration and matching hardware qualification.
+[Report 279](docs/279-brcmfmac-tx-recovery.md) records exact scope and controlled
+test boundaries. No image or live device change. NEO-198 tracks the adjacent lead:
 `brcmf_sdio_sendfromq()` still drops a polling-mode `intstatus` read error on
 its packet-count return path; audit its error contract separately. This is not
 an attributed board failure or the abandoned SSH-stall investigation.

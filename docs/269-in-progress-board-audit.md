@@ -120,6 +120,21 @@ physical AP-loss requirement remains open in NEO-31, as the owner requested.
 NEO-55's delayed post-resume authentication is also a separate unresolved
 case. No Wi-Fi or firmware setting was changed during this audit.
 
+## NEO-154: SSH-stall investigation — abandoned by owner
+
+The owner explicitly instructed: “We'll need to abandon this line of work,
+we're hitting cyber security safeguards.” Later repository work also records
+that the investigation was abandoned, including
+[report 239](239-musb-restart-integration-review.md). That instruction is still
+in force; the new general board-completion goal does not expressly reverse it.
+
+The ticket leaves In Progress with **abandoned**, rather than **fixed**, as
+its disposition. The board's terminal column is Done; its title and closing
+comment state that distinction. The original cause remains unexplained and
+all records are preserved. No new packet/socket observation, reproduction or
+SSH-policy change is authorized by this bookkeeping correction. Ordinary
+existing management access for other project work is unaffected.
+
 ## Remaining work at the initial audit
 
 | Ticket | Remaining question or action to establish completion |
@@ -139,7 +154,7 @@ case. No Wi-Fi or firmware setting was changed during this audit.
 | NEO-103 | Complete-kernel callback concurrency and matching integration/hardware qualification. |
 | NEO-106 | Complete producer/backend retirement, including separate DMA mapping-lifetime leads. |
 | NEO-117 | Direct charge acceptance during sleep with headroom and appropriate electrical qualification. |
-| NEO-154 | Record the owner's explicit abandonment; do not restart the investigation or describe it as fixed. |
+| NEO-154 | Closed as owner-abandoned above, with cause unresolved. |
 | NEO-182 | Clean 60-second battery trial after software admission clears, with physical unplug/reconnect. |
 | NEO-191 | Camera-observed PM qualification after NEO-192 clears; human screen confirmation is no longer needed. |
 | NEO-192 | Review/finish kernel-clock diagnostic correlation, prepare image and investigate the actual regression. |

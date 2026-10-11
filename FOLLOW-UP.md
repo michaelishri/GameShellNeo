@@ -2,6 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
+**Clock boundary tooling prepared, 12 October 2026:** NEO-192 now has a fixed
+384-call workload, raw ARM time32/time64 and libc buffers, independent C/Python
+integer conversion and exact kernel-ordinal replay. Backwards results, errors
+and partial captures are retained; ambiguous call alignment is rejected.
+Thirteen Python tests, native/ARM fixtures and independent replay of 27 actual
+ARM fixture buffers pass. No device access or PM test occurred. Finish the
+deployment provenance/timeout wrapper and separately identified image before
+requesting a card swap. The root cause remains open; complete diagnostic data
+does not imply a healthy clock. [Report 270](docs/270-clock-userspace-boundary.md).
+
 **Board completion audit, 12 October 2026:** NEO-100's BOOTTIME producer,
 consumers, installed simulations and real stopped-clock/resume contract are
 complete. Original image/test records were inspected and the sleep result's

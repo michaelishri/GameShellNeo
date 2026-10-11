@@ -33,6 +33,10 @@ The complete userspace collector that correlates each raw returned timespec
 with a Python/native integer is a separate next step. Do not use this kernel
 record alone to absolve the user-copy or language-runtime boundary.
 
+Subsequent [report 270](270-clock-userspace-boundary.md) implements and checks
+the offline reader/workload/correlation layer. Its live deployment wrapper,
+image integration and the original fault's cause remain open.
+
 ## Reader and syscall evidence
 
 A selected syscall reserves one record with an ordinal, TID/TGID, clock ID and

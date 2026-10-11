@@ -1180,6 +1180,22 @@ userspace collector and live integration remain separate work. See
 [report 267](docs/267-kernel-clock-provenance-candidate.md) for the record format,
 ownership, fixed limits, test evidence and instrumentation effects.
 
+The userspace boundary layer has separate offline commands:
+
+```sh
+task test:clock-boundary
+task check:clock-boundary
+task report:clock-boundary KERNEL=<kernel.ndjson> USERS=<users.json>
+```
+
+The check runs host replay/cleanup tests, native and ARM fixtures, then builds
+the raw ARM syscall/libc reader in the pinned offline container. Replay joins
+kernel ordinals to raw ABI bytes and native/Python integers, preserving
+backwards values and boundary mismatches. A complete capture is not a healthy
+clock result. The device deployment/provenance wrapper and instrumented image
+remain pending; these commands do not contact the GameShell. See
+[report 270](docs/270-clock-userspace-boundary.md).
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

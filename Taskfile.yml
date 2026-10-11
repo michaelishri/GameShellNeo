@@ -596,6 +596,23 @@ tasks:
       NEO_CLOCK_RECORDS: '{{.FILE | default ""}}'
     cmds: [python3 tools/clock_provenance.py]
 
+  test:clock-boundary:
+    desc: Test exact-call raw ABI replay and partial-capture cleanup offline; no device access
+    cmds: [python3 -m unittest discover -s tools/tests -p test_clock_boundary.py -v]
+
+  check:clock-boundary:
+    desc: Build ARM raw-clock reader with native/ARM fixtures offline; no device access
+    cmds:
+      - task: test:clock-boundary
+      - python3 tools/build-clock-boundary.py
+
+  report:clock-boundary:
+    desc: Correlate saved kernel clock ordinals with raw ABI and Python/native values; no device access
+    env:
+      NEO_CLOCK_KERNEL: '{{.KERNEL | default ""}}'
+      NEO_CLOCK_USERS: '{{.USERS | default ""}}'
+    cmds: [python3 tools/clock_boundary.py]
+
   device:clock-native:
     desc: One awake native clock comparison with all raw readings retained; no clock/PM changes
     env:

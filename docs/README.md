@@ -16,6 +16,11 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[270 — Exact-call userspace clock evidence](270-clock-userspace-boundary.md)
+adds the raw ARM ABI reader, bounded workload and kernel/native/Python replay,
+with preserved regressions and partial failures; deployment and the clock
+fault's cause remain open.
+
 [269 — In-progress board completion audit](269-in-progress-board-audit.md)
 reconciles ticket scope with original evidence, closes proved work and separates
 unfinished software from physical qualification.

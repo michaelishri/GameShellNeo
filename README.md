@@ -6,6 +6,14 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+NEO-200's asynchronous clock-deadline candidate is documented in
+[report 283](docs/283-brcmfmac-clock-deadline.md). Run
+`task test:brcmfmac-clock-deadline` for offline native/sanitizer/ARM clock,
+sleep and packet/worker checks, or `task check:brcmfmac-clock-drivers` to
+include full board/debug ARM objects. `task test:brcmfmac-clock-baseline`
+intentionally reproduces the missing deadline. The candidate stays outside
+the image queue; integration and hardware qualification remain with NEO-58.
+
 NEO-199's isolated watchdog-error candidate is documented in
 [report 282](docs/282-brcmfmac-watchdog-errors.md). Run
 `task test:brcmfmac-watchdog` for native/sanitizer/ARM watchdog, TX/RX and worker

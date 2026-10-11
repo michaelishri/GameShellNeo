@@ -22,6 +22,7 @@ struct brcmf_sdio {
 	struct brcmf_chip *ci;
 	bool sr_enabled, sleeping, alp_only, clkstate_unknown, sleep_state_unknown;
 	uint clkstate;
+	unsigned long clk_pending_deadline;
 };
 static struct sdio_func func;
 static struct brcmf_sdio_dev dev = { .func1 = &func };
@@ -118,6 +119,7 @@ static void reset(uint state, bool sr)
 		.clkstate = state, .sr_enabled = sr };
 	chip.chip = 43430;
 	jiffies = 0;
+	bus.clk_pending_deadline = msecs_to_jiffies(PMU_MAX_TRANSITION_DLY / 1000);
 	planned = consumed = wd_starts = 0;
 	crc_disables = crc_enables = holds = releases = 0;
 	scenarios++;

@@ -2,6 +2,15 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-58/200 clock readiness, 12 October 2026:** asynchronous `CLK_PENDING`
+had no deadline. The baseline reproduces missing deadlines and notifications;
+candidate 0052 preserves one request budget and uses the existing watchdog
+to schedule a host-held worker check. Readiness is accepted, original transfer
+errors preserved, and unavailable clocks time out through existing cleanup.
+See [report 283](docs/283-brcmfmac-clock-deadline.md) for saved offline tests
+and qualification status. The candidate remains outside the image queue;
+NEO-58 retains integration, hardware qualification and reset/reprobe ownership.
+
 **NEO-58/199 watchdog ownership, 12 October 2026:** the actual-source baseline
 reproduces discarded polling/wake/console/idle errors and work published after
 bus retirement. Isolated candidate 0051 preserves the first transport failure,

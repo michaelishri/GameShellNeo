@@ -1,0 +1,84 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: bound asynchronous clock-readiness waits
+
+Retain the first pending request's transition deadline across repeated
+requests. Use the existing watchdog to schedule a due readiness check in
+the worker, under normal host/error ownership. Confirmed readiness can
+recover a lost IRQ; unavailable clocks time out through existing cleanup.
+No new timer, thread or periodic register poll is needed.
+Candidate only; image and board qualification remain separate.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -490,6 +490,7 @@
+ #endif				/* DEBUG */
+ 
+ 	uint clkstate;		/* State of sd and backplane clock(s) */
++	unsigned long clk_pending_deadline; /* Host-serialized request budget */
+ 	bool clkstate_unknown;	/* A failed transition needs revalidation */
+ 	s32 idletime;		/* Control for activity timeout */
+ 	s32 idlecount;		/* Activity timeout counter */
+@@ -805,6 +806,10 @@
+ 		return 0;
+ 	}
+ 
++	/* Repeated or synchronous requests must not renew a pending budget. */
++	timeout = bus->clkstate == CLK_PENDING ? bus->clk_pending_deadline :
++		jiffies + msecs_to_jiffies(PMU_MAX_TRANSITION_DLY / 1000);
++
+ 	/* A failed transfer may have changed the hardware despite its error. */
+ 	bus->clkstate_unknown = true;
+ 	if (on) {
+@@ -843,6 +848,7 @@
+ 			if (err)
+ 				return -EBADE;
+ 			brcmf_dbg(SDIO, "CLKCTL: set PENDING\n");
++			bus->clk_pending_deadline = timeout;
+ 			bus->clkstate = CLK_PENDING;
+ 			bus->clkstate_unknown = false;
+ 
+@@ -861,8 +867,6 @@
+ 		}
+ 
+ 		/* Otherwise, wait here (polling) for HT Avail */
+-		timeout = jiffies +
+-			  msecs_to_jiffies(PMU_MAX_TRANSITION_DLY/1000);
+ 		while (!SBSDIO_CLKAV(clkctl, bus->alp_only)) {
+ 			clkctl = brcmf_sdiod_readb(bus->sdiodev,
+ 						   SBSDIO_FUNC1_CHIPCLKCSR,
+@@ -2802,6 +2806,9 @@
+ 			if (err)
+ 				goto failed;
+ 			bus->clkstate = CLK_AVAIL;
++		} else if (time_after_eq(jiffies, bus->clk_pending_deadline)) {
++			err = -ETIMEDOUT;
++			goto failed;
+ 		}
+ 	}
+ 
+@@ -3929,6 +3936,24 @@
+ 	if (brcmf_sdiod_io_blocked(sdiod))
+ 		return;
+ 	brcmf_dbg(TIMER, "Enter\n");
++
++	/* A missing clock IRQ must not leave queued traffic waiting forever.
++	 * Only the worker reads readiness; keep the watchdog free of new I/O.
++	 */
++	if (!bus->sr_enabled && READ_ONCE(bus->clkstate) == CLK_PENDING &&
++	    time_after_eq(jiffies, READ_ONCE(bus->clk_pending_deadline))) {
++		sdio_claim_host(sdiod->func1);
++		if (brcmf_sdiod_io_blocked(sdiod))
++			goto release;
++		if (!bus->sr_enabled && bus->clkstate == CLK_PENDING &&
++		    time_after_eq(jiffies, bus->clk_pending_deadline) &&
++		    !bus->dpc_triggered) {
++			atomic_set(&bus->ipend, 1);
++			bus->dpc_triggered = true;
++			queue_work(bus->brcmf_wq, &bus->datawork);
++		}
++		goto release;
++	}
+ 
+ 	/* Poll period: check device if appropriate. */
+ 	if (!bus->sr_enabled &&

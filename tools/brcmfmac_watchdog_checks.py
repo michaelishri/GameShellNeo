@@ -7,7 +7,7 @@ from kernel_sources import atomic_json
 HARNESS = ROOT / 'kernel/tests/brcmfmac_watchdog_test.c'
 
 
-def cases(debug):
+def cases(debug, clock=False):
     groups = [('poll_failure', 9), ('poll_success', 8), ('retire_after_poll', 3), ('quiet', 5),
               ('idle_failure', 12 if debug else 6), ('idle_success', 7),
               ('admission', 12 if debug else 8), ('between', 8 if debug else 4)]
@@ -16,10 +16,12 @@ def cases(debug):
                    ('console_local', 4), ('console_success', 9),
                    ('console_ram_allocation', 8), ('console_window_failure', 6),
                    ('console_transfer_allocation', 4), ('ram_helper', 8)]
+    if clock:
+        groups += [('clock_request', 12), ('clock_watchdog', 24), ('clock_admission', 8)]
     return [(group, str(index)) for group, count in groups for index in range(count)]
 
 
-def extract_sources(source, attempt, shared):
+def extract_sources(source, attempt, shared, clock=False):
     base = source / 'drivers/net/wireless/broadcom/brcm80211/brcmfmac'
     sdio, header, registers = ((base / 'sdio.c').read_text(), (base / 'sdio.h').read_text(),
                                (source / 'include/linux/mmc/sdio.h').read_text())
@@ -37,6 +39,14 @@ def extract_sources(source, attempt, shared):
     (attempt / 'brcmfmac_watchdog_types.h').write_text('\n'.join(constants) + '\n' + types)
     function = shared.helpers.extract.function
     body = function(header, 'static inline bool brcmf_sdiod_io_blocked(')
+    if clock:
+        sleep = shared.module('clock_sleep_checks', 'check-brcmfmac-sleep.py')
+        includes = source / 'drivers/net/wireless/broadcom/brcm80211/include'
+        (attempt / 'brcmfmac_clock_constants.h').write_text(sleep.constants(
+            [header, (includes / 'chipcommon.h').read_text(), (includes / 'brcm_hw_ids.h').read_text(), sdio]))
+        (attempt / 'brcmfmac_sleep_constants.h').write_text((attempt / 'brcmfmac_clock_constants.h').read_text())
+        (attempt / 'brcmfmac_sleep_functions.h').write_text(sleep.functions(sdio))
+        body += function(sdio, 'static int brcmf_sdio_htclk(')
     for prefix in ('void brcmf_sdio_wd_timer(', 'static void brcmf_sdio_dpc_failed('):
         body += function(sdio, prefix)
     body += '#ifdef DEBUG\n' + function(bcmsdh, 'int\nbrcmf_sdiod_ramrw(')
@@ -45,15 +55,16 @@ def extract_sources(source, attempt, shared):
     (attempt / 'brcmfmac_watchdog_functions.h').write_text(body)
 
 
-def run_cases(attempt, shared, arm=False, sanitizer=False):
+def run_cases(attempt, shared, arm=False, sanitizer=False, clock=False):
     label = 'arm' if arm else 'sanitizer' if sanitizer else 'native'
     failures = []
     for debug in (False, True):
         kind = 'debug' if debug else 'normal'
         name = label + '-' + kind
-        binary = shared.compile_test(attempt, HARNESS, name, arm, sanitizer, ['-DDEBUG'] if debug else [])
+        defines = (['-DDEBUG'] if debug else []) + (['-DNEO_CLOCK_DEADLINE'] if clock else [])
+        binary = shared.compile_test(attempt, HARNESS, name, arm, sanitizer, defines)
         results = {}
-        for group, index in cases(debug):
+        for group, index in cases(debug, clock):
             result = shared.execute(binary, (group, index), arm)
             key = group + '-' + index
             results[key] = dict(returncode=result.returncode, output=result.stdout, error=result.stderr)
@@ -67,7 +78,27 @@ def run_cases(attempt, shared, arm=False, sanitizer=False):
         raise RuntimeError('Watchdog scenarios failed: ' + ', '.join(failures))
 
 
-def negatives(attempt, shared):
+def run_sleep(attempt, shared, arm=False, sanitizer=False):
+    label = 'arm' if arm else 'sanitizer' if sanitizer else 'native'
+    results = {}
+    for debug in (False, True):
+        name = label + '-sleep-' + ('debug' if debug else 'normal')
+        binary = shared.compile_test(attempt, ROOT / 'kernel/tests/brcmfmac_sleep_test.c',
+                                     name, arm, sanitizer, ['-DDEBUG'] if debug else [])
+        result = shared.execute(binary, arm=arm)
+        (attempt / (name + '.log')).write_text(result.stdout + result.stderr)
+        result.check_returncode()
+        lines = result.stdout.strip().splitlines()
+        if (len(lines) != 3 or
+                lines[0] != 'happy: 43 scenarios, transfer/delay/state transcript a2658cef' or
+                lines[-1] != 'with recovery: 95 scenarios passed'):
+            raise ValueError('Sleep regression coverage/transcript changed: ' + result.stdout)
+        results[name] = dict(returncode=result.returncode, output=result.stdout, error=result.stderr)
+    atomic_json(attempt / (label + '-sleep-results.json'), results)
+    print(f'{label} sleep: 95 normal/debug cases and original happy transcript pass', flush=True)
+
+
+def negatives(attempt, shared, clock=False):
     path = attempt / 'brcmfmac_watchdog_functions.h'
     good = path.read_text(); extract = shared.helpers.extract
     watchdog = extract.function(good, 'static void brcmf_sdio_bus_watchdog(')
@@ -82,12 +113,12 @@ def negatives(attempt, shared):
     add('lost_entry_gate', watchdog, 'if (brcmf_sdiod_io_blocked(sdiod))\n\t\treturn;',
         'if (false)\n\t\treturn;', 'poll_failure', 0)
     admissions = list(re.finditer(r'if \(brcmf_sdiod_io_blocked\(sdiod\)\)\n\s*goto release;', watchdog))
-    if len(admissions) != 3:
+    if len(admissions) != (4 if clock else 3):
         raise ValueError('Unexpected watchdog admission gates')
     for index, gate in enumerate(admissions):
         broken = watchdog[:gate.start()] + gate[0].replace('if (brcmf_sdiod_io_blocked(sdiod))', 'if (false)') + watchdog[gate.end():]
-        variants.append(('lost_claim_gate_' + str(index), extract.mutate_once(good, watchdog, broken),
-                         ('admission', str(index * 4)), True))
+        target = ('clock_admission', '0') if clock and not index else ('admission', str((index - int(clock)) * 4))
+        variants.append(('lost_claim_gate_' + str(index), extract.mutate_once(good, watchdog, broken), target, True))
     errors = list(re.finditer(r'if \(err\)\n\s*goto failed;', watchdog))
     if len(errors) != 4:
         raise ValueError('Unexpected watchdog failure gates')
@@ -122,11 +153,27 @@ def negatives(attempt, shared):
     add('lost_quarantine', watchdog, 'brcmf_sdio_dpc_failed(bus, err);', '(void)err;', 'poll_failure', 0)
     add('unclaimed_quarantine', watchdog, 'brcmf_sdio_dpc_failed(bus, err);',
         'sdio_release_host(sdiod->func1);\n\tbrcmf_sdio_dpc_failed(bus, err);', 'poll_failure', 0)
+    if clock:
+        request = extract.function(good, 'static int brcmf_sdio_htclk(')
+        add('missing_clock_budget', request, 'bus->clk_pending_deadline = timeout;',
+            '(void)timeout;', 'clock_request', 0)
+        add('renewed_clock_budget', request,
+            'bus->clkstate == CLK_PENDING ? bus->clk_pending_deadline :',
+            'false ? bus->clk_pending_deadline :', 'clock_request', 1)
+        add('missing_watchdog_clock_notification', watchdog,
+            'time_after_eq(jiffies, READ_ONCE(bus->clk_pending_deadline))',
+            '(false && time_after_eq(jiffies, READ_ONCE(bus->clk_pending_deadline)))', 'clock_watchdog', 1)
+        add('early_watchdog_clock_notification', watchdog,
+            'time_after_eq(jiffies, READ_ONCE(bus->clk_pending_deadline))',
+            '(true || time_after_eq(jiffies, READ_ONCE(bus->clk_pending_deadline)))', 'clock_watchdog', 0)
+        add('lost_clock_deadline_recheck', watchdog,
+            'time_after_eq(jiffies, bus->clk_pending_deadline) &&', 'true &&', 'clock_admission', 6)
     results = {}
     try:
         for name, body, case, debug in variants:
             path.write_text(body); (attempt / (name + '.h')).write_text(body)
-            binary = shared.compile_test(attempt, HARNESS, name, defines=['-DDEBUG'] if debug else [])
+            defines = (['-DDEBUG'] if debug else []) + (['-DNEO_CLOCK_DEADLINE'] if clock else [])
+            binary = shared.compile_test(attempt, HARNESS, name, defines=defines)
             result = shared.execute(binary, case)
             (attempt / (name + '.log')).write_text(result.stdout + result.stderr)
             if not result.returncode or 'Assertion' not in result.stderr:

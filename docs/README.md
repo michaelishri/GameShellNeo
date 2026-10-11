@@ -16,6 +16,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[283 — brcmfmac asynchronous clock-readiness deadline](283-brcmfmac-clock-deadline.md)
+
 [282 — brcmfmac watchdog failure and late-work ownership](282-brcmfmac-watchdog-errors.md)
 separates transport from local console errors, serializes polling publication
 with bus retirement and records reproducible candidate qualification.

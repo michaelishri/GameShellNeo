@@ -4,6 +4,7 @@
  */
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdatomic.h>
@@ -29,6 +30,10 @@ typedef unsigned int uint;
 static unsigned errors;
 #define brcmf_err(...) do { errors++; if (0) fprintf(stderr, __VA_ARGS__); } while (0)
 #include "brcmfmac_irq_types.h"
+#ifdef NEO_CLOCK_DEADLINE
+static unsigned long jiffies;
+#define time_after_eq(a, b) ((long)((a) - (b)) >= 0)
+#endif
 
 enum { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA };
 struct device { int unused; };
@@ -58,6 +63,7 @@ struct brcmf_sdio {
  unsigned ctrl_frame_len;
  int ctrl_frame_err;
  uint txbound, rxbound, txminmax, clkstate, hostintmask, flowcontrol, idlecount;
+ unsigned long clk_pending_deadline;
  u8 rx_seq, sdpcm_ver;
  struct pktq txq;
  struct { unsigned f1regdata, intrcount, fc_xoff, fc_xon, fc_rcvd; } sdcnt;
@@ -277,6 +283,9 @@ static void setup(void)
  f.dev.state = BRCMF_SDIOD_DATA;
  f.bus.sdiodev = &f.dev; f.bus.sdio_core = &f.core;
  f.bus.clkstate = CLK_AVAIL; f.bus.rxbound = 8; f.bus.intr = true;
+#ifdef NEO_CLOCK_DEADLINE
+ jiffies = 100; f.bus.clk_pending_deadline = 1100;
+#endif
  f.bus.hostintmask = HOSTINTMASK; f.bus.brcmf_wq = &hw;
  assert(SD_REG(intstatus) == 0x20);
 }
@@ -510,6 +519,36 @@ static void pending_clock(bool oob, bool start_pending)
  assert(hw.reads == reads + 1 && hw.sleeps == 2 && hw.runs == 2);
  finish();
 }
+#ifdef NEO_CLOCK_DEADLINE
+static void clock_deadline(unsigned phase, bool wrap, bool ready, bool oob)
+{
+ setup(); f.bus.clkstate = CLK_PENDING; hw.clock_ready = ready;
+ f.bus.clk_pending_deadline = wrap ? 0 : 1100;
+ jiffies = f.bus.clk_pending_deadline + phase - 1;
+ f.dev.oob_irq_requested = oob; f.dev.sd_irq_requested = !oob;
+ hw.status = I_HMB_FRAME_IND; hw.frames_remaining = 1;
+ f.bus.ctrl_frame_stat = !ready;
+ irq(oob); drain();
+ if (ready) {
+  assert(!f.dev.io_error && hw.frames == 1 && f.bus.clkstate == CLK_AVAIL);
+  assert(!hw.stops && !hw.responses && !f.bus.ipend);
+ } else {
+  if (!phase) {
+   assert(!f.dev.io_error && !hw.frames && !hw.stops && f.bus.clkstate == CLK_PENDING);
+   jiffies = f.bus.clk_pending_deadline;
+   irq(oob); drain();
+  }
+  assert(f.dev.io_error == -ETIMEDOUT && f.bus.io_error_handled && !hw.frames);
+  assert(f.dev.state == BRCMF_SDIOD_DOWN && !f.bus.ctrl_frame_stat);
+  assert(f.bus.ctrl_frame_err == -ETIMEDOUT && hw.responses == 1 && hw.wakes == 1 && hw.stops == 1);
+  assert(!f.bus.ipend && !f.bus.intstatus && !f.dev.sd_irq_requested);
+  unsigned reads = hw.byte_reads;
+  hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+  assert(hw.byte_reads == reads && hw.responses == 1 && hw.stops == 1);
+ }
+ finish();
+}
+#endif
 #endif
 #ifdef NEO_MAILBOX_ERRORS
 static void mailbox_seed(void)
@@ -732,6 +771,12 @@ int main(void)
    for (unsigned oob = 0; oob < 2; oob++)
     for (unsigned hard = 0; hard < 2; hard++) tx_completion(poll_faults[e], false, oob, hard, pending);
 #endif
+#endif
+#ifdef NEO_CLOCK_DEADLINE
+ for (unsigned phase = 0; phase < 3; phase++)
+  for (unsigned wrap = 0; wrap < 2; wrap++)
+   for (unsigned ready = 0; ready < 2; ready++)
+    for (unsigned oob = 0; oob < 2; oob++) clock_deadline(phase, wrap, ready, oob);
 #endif
  printf("%u IRQ service scenarios passed (%u characterize existing error limitations)\n",
         scenarios, characterizations);

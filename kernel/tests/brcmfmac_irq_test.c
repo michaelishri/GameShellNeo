@@ -85,6 +85,10 @@ static struct {
  bool allow_tx;
  unsigned data_tx, control_tx;
 #endif
+#ifdef NEO_TX_RECOVERY
+ int tx_error;
+ bool fail_control_tx;
+#endif
 #ifdef NEO_MAILBOX_ERRORS
  u32 mailbox_data;
  int mailbox_read_error, mailbox_ack_error;
@@ -206,6 +210,9 @@ static void brcmf_sdio_sendfromq(struct brcmf_sdio *bus, uint count)
 #ifdef NEO_RX_RECOVERY
  assert(bus == &f.bus && count == 1 && hw.allow_tx && !f.dev.io_error);
  assert(!hw.host_depth && hw.frames == 1); hw.data_tx++; bus->txq.len = 0;
+#ifdef NEO_TX_RECOVERY
+ if (!hw.fail_control_tx) f.dev.io_error = hw.tx_error;
+#endif
 #else
  (void)bus; (void)count; assert(false);
 #endif
@@ -215,6 +222,12 @@ static int brcmf_sdio_tx_ctrlframe(struct brcmf_sdio *bus, u8 *data, uint len)
 #ifdef NEO_RX_RECOVERY
  assert(bus == &f.bus && hw.allow_tx && !f.dev.io_error);
  assert(hw.host_depth == 1 && hw.frames == 1 && !data && !len); hw.control_tx++;
+#ifdef NEO_TX_RECOVERY
+ if (hw.fail_control_tx) {
+  f.dev.io_error = hw.tx_error;
+  return hw.tx_error;
+ }
+#endif
 #else
  (void)bus; (void)data; (void)len; assert(false);
 #endif
@@ -641,6 +654,39 @@ static void rx_completion(int error, bool oob, bool hard)
  finish();
 }
 #endif
+#ifdef NEO_TX_RECOVERY
+static void tx_completion(int error, bool control, bool oob, bool hard)
+{
+ setup(); hw.status = I_HMB_FRAME_IND; hw.frames_remaining = 1; hw.allow_tx = true;
+ hw.tx_error = error; hw.fail_control_tx = control;
+ f.bus.ctrl_frame_stat = true; f.bus.txbound = 1; f.bus.txq.len = 1;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = false; f.dev.sd_irq_requested = !oob;
+ irq(hard); drain();
+ assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && !hw.mail);
+ assert(f.dev.io_error == error && f.bus.io_error_handled == !!error);
+ assert(!f.bus.ctrl_frame_stat && f.bus.ctrl_frame_err == (control ? error : 0));
+ assert(hw.wakes == 1 && hw.control_tx == 1);
+ assert(hw.data_tx == (unsigned)(!control || !error));
+ assert(f.bus.txq.len == (unsigned)(control && error));
+ assert(!f.bus.ipend && !f.bus.intstatus && hw.enables == oob);
+ if (error) {
+  assert(f.dev.state == BRCMF_SDIOD_DOWN && hw.stops == 1 && hw.responses == 1);
+  assert(!f.dev.sd_irq_requested && !f.dev.irq_en);
+  assert(hw.releases_irq == (oob ? 0 : 2) && hw.disables == oob);
+  unsigned queued = hw.queue;
+  irq(false); irq(true); brcmf_sdio_trigger_dpc(&f.bus);
+  assert(hw.queue == queued);
+  hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+  assert(hw.stops == 1 && hw.responses == 1 && hw.wakes == 1);
+  assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && hw.control_tx == 1);
+  assert(hw.data_tx == (unsigned)!control && f.dev.io_error == error);
+ } else {
+  assert(f.dev.state == BRCMF_SDIOD_DATA && !hw.stops && !hw.responses);
+  assert(!hw.releases_irq && !hw.disables);
+ }
+ finish();
+}
+#endif
 int main(void)
 {
  for (unsigned hard = 0; hard < 2; hard++)
@@ -671,6 +717,12 @@ int main(void)
  for (unsigned e = 0; e < sizeof(faults) / sizeof(faults[0]); e++)
   for (unsigned oob = 0; oob < 2; oob++)
    for (unsigned hard = 0; hard < 2; hard++) rx_completion(faults[e], oob, hard);
+#endif
+#ifdef NEO_TX_RECOVERY
+ for (unsigned e = 0; e < sizeof(faults) / sizeof(faults[0]); e++)
+  for (unsigned control = 0; control < 2; control++)
+   for (unsigned oob = 0; oob < 2; oob++)
+    for (unsigned hard = 0; hard < 2; hard++) tx_completion(faults[e], control, oob, hard);
 #endif
  printf("%u IRQ service scenarios passed (%u characterize existing error limitations)\n",
         scenarios, characterizations);

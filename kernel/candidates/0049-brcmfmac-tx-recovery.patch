@@ -1,0 +1,161 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: stop TX after failed FIFO recovery
+
+Check abort, terminate and count reads before permitting another transfer.
+Preserve the first recovery error and existing successful polling/retry
+budgets. Complete caller-owned packets before worker quarantine, and do
+not unblock queues or retry control traffic after an unverified flush.
+Candidate only; image and hardware qualification remain separate.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -1327,22 +1327,41 @@
+ {
+ 	struct brcmf_sdio_dev *sdiodev = bus->sdiodev;
+ 	u8 i, hi, lo;
+-
+-	/* On failure, abort the command and terminate the frame */
++	int err;
++
++	/* Host claimed; preserve an earlier recovery failure. */
++	if (READ_ONCE(sdiodev->io_error))
++		return;
++
+ 	brcmf_err("sdio error, abort command and terminate frame\n");
+ 	bus->sdcnt.tx_sderrs++;
+ 
+-	brcmf_sdiod_abort(sdiodev, sdiodev->func2);
+-	brcmf_sdiod_writeb(sdiodev, SBSDIO_FUNC1_FRAMECTRL, SFC_WF_TERM, NULL);
++	err = brcmf_sdiod_abort(sdiodev, sdiodev->func2);
++	if (err)
++		goto failed;
++	brcmf_sdiod_writeb(sdiodev, SBSDIO_FUNC1_FRAMECTRL, SFC_WF_TERM,
++			   &err);
+ 	bus->sdcnt.f1regdata++;
+-
++	if (err)
++		goto failed;
++
++	/* Preserve the existing three-pair successful flush budget. */
+ 	for (i = 0; i < 3; i++) {
+-		hi = brcmf_sdiod_readb(sdiodev, SBSDIO_FUNC1_WFRAMEBCHI, NULL);
+-		lo = brcmf_sdiod_readb(sdiodev, SBSDIO_FUNC1_WFRAMEBCLO, NULL);
+-		bus->sdcnt.f1regdata += 2;
+-		if ((hi == 0) && (lo == 0))
+-			break;
+-	}
++		hi = brcmf_sdiod_readb(sdiodev, SBSDIO_FUNC1_WFRAMEBCHI, &err);
++		bus->sdcnt.f1regdata++;
++		if (err)
++			goto failed;
++		lo = brcmf_sdiod_readb(sdiodev, SBSDIO_FUNC1_WFRAMEBCLO, &err);
++		bus->sdcnt.f1regdata++;
++		if (err)
++			goto failed;
++		if (!hi && !lo)
++			return;
++	}
++	err = -ETIMEDOUT;
++failed:
++	/* Callers release packet ownership before DPC quarantines the bus. */
++	WRITE_ONCE(sdiodev->io_error, err);
+ }
+ 
+ /* return total length of buffer chain */
+@@ -2407,12 +2426,16 @@
+ 		goto done;
+ 
+ 	sdio_claim_host(bus->sdiodev->func1);
++	ret = READ_ONCE(bus->sdiodev->io_error);
++	if (ret)
++		goto release;
+ 	ret = brcmf_sdiod_send_pkt(bus->sdiodev, pktq);
+ 	bus->sdcnt.f2txdata++;
+ 
+ 	if (ret < 0)
+ 		brcmf_sdio_txfail(bus);
+ 
++release:
+ 	sdio_release_host(bus->sdiodev->func1);
+ 
+ done:
+@@ -2442,7 +2465,8 @@
+ 	tx_prec_map = ~bus->flowcontrol;
+ 
+ 	/* Send frames until the limit or some other event */
+-	for (cnt = 0; (cnt < maxframes) && data_ok(bus);) {
++	for (cnt = 0; cnt < maxframes && !READ_ONCE(bus->sdiodev->io_error) &&
++	     data_ok(bus);) {
+ 		pkt_num = 1;
+ 		if (bus->txglom)
+ 			pkt_num = min_t(u8, bus->tx_max - bus->tx_seq,
+@@ -2465,6 +2489,8 @@
+ 		ret = brcmf_sdio_txpkt(bus, &pktq, SDPCM_DATA_CHANNEL);
+ 
+ 		cnt += i;
++		if (READ_ONCE(bus->sdiodev->io_error))
++			break;
+ 
+ 		/* In poll mode, need to check for other events */
+ 		if (!bus->intr) {
+@@ -2483,7 +2509,8 @@
+ 	}
+ 
+ 	/* Deflow-control stack if needed */
+-	if ((bus->sdiodev->state == BRCMF_SDIOD_DATA) &&
++	if (!READ_ONCE(bus->sdiodev->io_error) &&
++	    bus->sdiodev->state == BRCMF_SDIOD_DATA &&
+ 	    bus->txoff && (pktq_len(&bus->txq) < TXLOW)) {
+ 		bus->txoff = false;
+ 		brcmf_proto_bcdc_txflowblock(bus->sdiodev->dev, false);
+@@ -2501,6 +2528,10 @@
+ 	int ret;
+ 
+ 	brcmf_dbg(SDIO, "Enter\n");
++
++	ret = READ_ONCE(bus->sdiodev->io_error);
++	if (ret)
++		return ret;
+ 
+ 	/* Back the pointer to make room for bus header */
+ 	frame -= bus->tx_hdrlen;
+@@ -2545,10 +2576,13 @@
+ 	do {
+ 		ret = brcmf_sdiod_send_buf(bus->sdiodev, frame, len);
+ 
+-		if (ret < 0)
++		if (ret < 0) {
+ 			brcmf_sdio_txfail(bus);
+-		else
++			if (READ_ONCE(bus->sdiodev->io_error))
++				return bus->sdiodev->io_error;
++		} else {
+ 			bus->tx_seq = (bus->tx_seq + 1) % SDPCM_SEQ_WRAP;
++		}
+ 	} while (ret < 0 && retries++ < TXRETRIES);
+ 
+ 	return ret;
+@@ -2870,6 +2904,10 @@
+ 		if (bus->ctrl_frame_stat) {
+ 			err = brcmf_sdio_tx_ctrlframe(bus,  bus->ctrl_frame_buf,
+ 						      bus->ctrl_frame_len);
++			if (READ_ONCE(sdiod->io_error)) {
++				err = READ_ONCE(sdiod->io_error);
++				goto failed;
++			}
+ 			bus->ctrl_frame_err = err;
+ 			wmb();
+ 			bus->ctrl_frame_stat = false;
+@@ -2887,6 +2925,11 @@
+ 		framecnt = bus->rxpending ? min(txlimit, bus->txminmax) :
+ 					    txlimit;
+ 		brcmf_sdio_sendfromq(bus, framecnt);
++		err = READ_ONCE(sdiod->io_error);
++		if (err) {
++			sdio_claim_host(sdiod->func1);
++			goto failed;
++		}
+ 	}
+ 
+ 	if ((bus->sdiodev->state != BRCMF_SDIOD_DATA) || (err != 0)) {

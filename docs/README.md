@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[279 — brcmfmac transmit FIFO recovery and caller ownership](279-brcmfmac-tx-recovery.md)
+reproduces ignored recovery failures and prepares the isolated TX candidate,
+packet-ownership tests and worker/RX regressions without device access.
+
 [278 — brcmfmac RX candidate review and offline acceptance](278-brcmfmac-rx-review.md)
 records both review axes, resolved fixture cleanup, qualification reruns and
 the separate parent integration/hardware boundaries for NEO-195/196.

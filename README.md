@@ -6,6 +6,15 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+NEO-197's isolated transmit-recovery candidate and saved fault tests are in
+[report 279](docs/279-brcmfmac-tx-recovery.md). Run
+`task test:brcmfmac-tx-recovery` for native/sanitizer/ARM TX, RX and worker
+checks, or `task check:brcmfmac-tx-recovery-drivers` to also compile complete
+board/debug ARM driver objects. `task test:brcmfmac-tx-recovery-baseline`
+deliberately reproduces the pre-candidate failures. These commands are offline;
+the candidate has passed full board/debug ARM compilation, remains outside the
+image queue and awaits independent review and later hardware qualification.
+
 The isolated NEO-195 receive-recovery candidates pass helper, packet and worker
 checks. Use `task test:brcmfmac-rx-recovery` for the abort/flush fault matrix and
 `task test:brcmfmac-rx-callers` for packet ownership, worker quarantine and

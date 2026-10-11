@@ -68,6 +68,18 @@ env:
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
 
 tasks:
+  test:brcmfmac-tx-recovery-baseline:
+    desc: Reproduce ignored TX recovery errors (expected assertion failures; no device access)
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-recovery-baseline python3 tools/check-brcmfmac-tx-recovery.py --baseline --native-only]
+
+  test:brcmfmac-tx-recovery:
+    desc: Exercise TX recovery and caller ownership natively and on ARM; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-recovery python3 tools/check-brcmfmac-tx-recovery.py]
+
+  check:brcmfmac-tx-recovery-drivers:
+    desc: Qualify TX/RX/mailbox recovery and build complete board/debug ARM driver objects
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-recovery-drivers python3 tools/check-brcmfmac-tx-recovery.py --compile-drivers]
+
   test:brcmfmac-control-rx-baseline:
     desc: Reproduce control FIFO defects before candidate 0048 (expected assertion failures)
     cmds: [bash tools/run-logged.sh brcmfmac-control-rx-baseline python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-cases --native-only]

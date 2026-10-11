@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-58/197 TX recovery, 12 October 2026:** the actual-source baseline
+reproduces discarded abort/terminate/count failures and traffic after an
+unverified write-FIFO flush (44/107 pass). Isolated candidate 0049 now passes
+the 107-case native/sanitizer/ARM caller suite, RX regressions, worker shutdown
+checks and assertion-based mutations. Both full ARM objects pass; independent
+review is next. [Report 279](docs/279-brcmfmac-tx-recovery.md) records exact scope
+and controlled test boundaries. No image or live device change. Adjacent lead:
+`brcmf_sdio_sendfromq()` still drops a polling-mode `intstatus` read error on
+its packet-count return path; audit its error contract separately. This is not
+an attributed board failure or the abandoned SSH-stall investigation.
+
 **NEO-58/196 control allocation recovery, 12 October 2026:** the byte-position
 FIFO harness now reproduces allocation failure leaving an unread control body
 without recovery, plus a stale next-frame hint after successful body-error NAK.

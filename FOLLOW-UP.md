@@ -2,15 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
-**NEO-58/196 control allocation lead, 12 October 2026:** the locked
-`brcmf_sdio_read_control()` goes directly to `done` when `vzalloc(rxblen)` fails.
-Its caller has already read the frame header and then advances to the advertised
-next-frame length. Unlike body-read failure, allocation failure does not flush
-the unread FIFO body or request retransmission. Reproduce with a byte-position
-FIFO model before selecting the recovery policy; the packet test's scripted
-frame boundaries alone do not establish this behavior. Keep successful small
-control packets and an already-published control response intact. This is a
-separate lead, not a claimed fix or observed GameShell failure.
+**NEO-58/196 control allocation recovery, 12 October 2026:** the byte-position
+FIFO harness now reproduces allocation failure leaving an unread control body
+without recovery, plus a stale next-frame hint after successful body-error NAK.
+Candidate 0048 adds flush/retry on allocation failure and a fresh header read
+after control retransmission, while preserving successful read-ahead and an
+already-published response. Saved control tests cover 62 new cases alongside
+the original 53, native memory sanitizers, recovery-stage failures and firmware
+replay at a scripted boundary. [Report 277](docs/277-brcmfmac-control-rx-recovery.md)
+records qualification and remaining review/integration/hardware scope. No
+observed GameShell fault is attributed, and the patch is outside diagnostic.26.
 
 **NEO-58/195 RX recovery candidate, 12 October 2026:** isolated candidate 0046
 preserves abort/terminate/count/NAK errors, refuses retransmission after an

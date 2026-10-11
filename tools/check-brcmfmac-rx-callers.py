@@ -23,6 +23,9 @@ CASES = [(group, str(index)) for group, count in (
     ('glom_header', 12), ('glom_pair', 2), ('glom_pair_success', 1),
     ('descriptor', 6), ('prior_error', 1))
     for index in range(count)]
+CONTROL_CASES = [(group, str(index)) for group, count in (
+    ('ctl_oom', 40), ('ctl_body', 12), ('ctl_success', 8), ('ctl_retries', 2))
+    for index in range(count)]
 
 
 def module(name, file):
@@ -85,11 +88,12 @@ def execute(binary, arguments=(), arm=False):
                           capture_output=True, text=True, timeout=30)
 
 
-def run_cases(attempt, arm=False, sanitizer=False):
+def run_cases(attempt, arm=False, sanitizer=False, control=False):
     label = 'arm' if arm else 'sanitizer' if sanitizer else 'native'
     binary = compile_test(attempt, HARNESS, label, arm, sanitizer)
     results = {}
-    for group, index in CASES:
+    cases = CASES + (CONTROL_CASES if control else [])
+    for group, index in cases:
         result = execute(binary, (group, index), arm)
         name = group + '-' + index
         results[name] = dict(returncode=result.returncode, output=result.stdout, error=result.stderr)
@@ -97,7 +101,7 @@ def run_cases(attempt, arm=False, sanitizer=False):
     atomic_json(attempt / (label + '-results.json'), results)
     failures = [name for name, value in results.items() if value['returncode'] or
                 value['output'].strip() != name.replace('-', ' ') + ' passed']
-    print(label + f' RX callers: {len(CASES)-len(failures)}/{len(CASES)} pass', flush=True)
+    print(label + f' RX callers: {len(cases)-len(failures)}/{len(cases)} pass', flush=True)
     if failures:
         raise RuntimeError('RX caller cases failed: ' + ', '.join(failures))
 
@@ -136,6 +140,43 @@ def packet_negatives(attempt):
         generated.write_text(good)
     atomic_json(attempt / 'packet-negatives.json', results)
     print(f'{len(results)} packet negative controls rejected', flush=True)
+
+
+def control_negatives(attempt):
+    generated = attempt / 'brcmfmac_rx_caller_functions.h'
+    good = generated.read_text()
+    change = helpers.extract.mutate_once
+    control = helpers.extract.function(good, 'static void\nbrcmf_sdio_read_control(')
+    read = helpers.extract.function(good, 'static uint brcmf_sdio_readframes(')
+    cases = [
+        ('lost_allocation_recovery', control, 'brcmf_sdio_rxfail(bus, false, true);',
+         '', ('ctl_oom', '0')),
+        ('lost_retry_header_clear', read, 'rd->len = bus->rxskip ? 0 : rd->len_nxtfrm << 4;',
+         'rd->len = rd->len_nxtfrm << 4;', ('ctl_body', '0')),
+        ('lost_successful_hint', read, 'rd->len = bus->rxskip ? 0 : rd->len_nxtfrm << 4;',
+         'rd->len = 0;', ('ctl_success', '4')),
+        ('lost_pending_response', control, 'brcmf_sdio_rxfail(bus, false, true);',
+         'bus->rxctl = NULL; bus->rxlen = 0; brcmf_sdio_rxfail(bus, false, true);', ('ctl_oom', '2')),
+        ('lost_allocation_error_count', control,
+         '\t\tbus->sdcnt.rxc_errors++;\n\t\tbrcmf_sdio_rxfail(bus, false, true);',
+         '\t\tbrcmf_sdio_rxfail(bus, false, true);', ('ctl_oom', '0')),
+    ]
+    results = {}
+    try:
+        for name, body, before, after, case in cases:
+            broken = change(good, body, change(body, before, after))
+            generated.write_text(broken)
+            (attempt / (name + '.h')).write_text(broken)
+            binary = compile_test(attempt, HARNESS, name)
+            result = execute(binary, case)
+            (attempt / (name + '.log')).write_text(result.stdout + result.stderr)
+            if not result.returncode or 'Assertion' not in result.stderr:
+                raise ValueError('Control negative did not fail an assertion: ' + name)
+            results[name] = dict(returncode=result.returncode, case=case, error=result.stderr)
+    finally:
+        generated.write_text(good)
+    atomic_json(attempt / 'control-negatives.json', results)
+    print(f'{len(results)} control FIFO negative controls rejected', flush=True)
 
 
 def run_dpc(attempt, mailbox, arm=False, sanitizer=False, negatives=False):
@@ -194,10 +235,17 @@ def main():
     parser.add_argument('--packet-fixes', action='store_true')
     parser.add_argument('--mailbox', action='store_true')
     parser.add_argument('--compile-drivers', action='store_true')
+    parser.add_argument('--control-cases', action='store_true',
+                        help='Include byte-position control FIFO scenarios; also allows baseline reproduction')
+    parser.add_argument('--control-fixes', action='store_true',
+                        help='Add candidate 0048 and its control FIFO qualification')
     parser.add_argument('--arm-attempt', help=argparse.SUPPRESS)
     args = parser.parse_args()
+    control = args.control_cases or args.control_fixes
+    if args.control_fixes and not args.packet_fixes:
+        parser.error('--control-fixes requires --packet-fixes')
     if args.arm_attempt:
-        run_cases(ROOT / args.arm_attempt, arm=True)
+        run_cases(ROOT / args.arm_attempt, arm=True, control=control)
         run_dpc(ROOT / args.arm_attempt, args.mailbox, arm=True)
         return
     os.umask(0o077)
@@ -214,6 +262,8 @@ def main():
             patches.append(ROOT / 'kernel/candidates/0047-brcmfmac-rx-packet-errors.patch')
         if args.mailbox:
             patches.append(ROOT / 'kernel/candidates/0039-brcmfmac-mailbox-errors.patch')
+        if args.control_fixes:
+            patches.append(ROOT / 'kernel/candidates/0048-brcmfmac-control-rx-retry.patch')
         for path in patches:
             if path.name in {name for name, _ in queue}:
                 raise ValueError('Caller candidate unexpectedly entered image queue')
@@ -235,10 +285,12 @@ def main():
         (attempt / 'brcmfmac_irq_types.h').write_text(irq.definitions(sdio, header))
         (attempt / 'brcmfmac_freezer_functions.h').write_text(irq.extracted(
             sdio, header, helpers.extract.function, bcmsdh, hardened=True, mailbox=args.mailbox))
-        run_cases(attempt)
-        run_cases(attempt, sanitizer=True)
+        run_cases(attempt, control=control)
+        run_cases(attempt, sanitizer=True, control=control)
         if args.packet_fixes:
             packet_negatives(attempt)
+        if args.control_fixes:
+            control_negatives(attempt)
         run_dpc(attempt, args.mailbox, negatives=True)
         run_dpc(attempt, args.mailbox, sanitizer=True)
         if not args.native_only:
@@ -246,7 +298,8 @@ def main():
                 '--user', f'{os.getuid()}:{os.getgid()}', '--platform', lock['builder']['platform'],
                 '--entrypoint=python3', '-v', f'{ROOT}:/project', '-w', '/project',
                 lock['builder']['image'], 'tools/check-brcmfmac-rx-callers.py',
-                '--arm-attempt', str(attempt.relative_to(ROOT)), *(['--mailbox'] if args.mailbox else [])]
+                '--arm-attempt', str(attempt.relative_to(ROOT)), *(['--mailbox'] if args.mailbox else []),
+                *(['--control-cases'] if control else [])]
             subprocess.run(command, check=True, timeout=180)
         builds = {}
         if args.compile_drivers:
@@ -261,8 +314,9 @@ def main():
             raise ValueError('RX caller test inputs changed during execution')
         record = dict(schema=1, native_complete=True, arm_complete=not args.native_only,
             packet_fixes=args.packet_fixes, mailbox=args.mailbox, inputs=hashes, source=metadata,
+            control_cases=control, control_fixes=args.control_fixes,
             arm_build=builds, native_sanitizers=True, dpc_complete=True,
-            cases=CASES, artifact_dir=str(attempt.relative_to(ROOT)),
+            cases=CASES + (CONTROL_CASES if control else []), artifact_dir=str(attempt.relative_to(ROOT)),
             artifacts={p.name: sha256(p) for p in attempt.iterdir() if p.is_file()},
             limits='Actual RX functions; userspace packet allocation/list and synchronous SDIO seams. '
                    'Actual DPC/IRQ/worker bodies have a scripted readframes boundary; packet tests '

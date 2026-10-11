@@ -68,6 +68,20 @@ env:
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
 
 tasks:
+  test:brcmfmac-control-rx-baseline:
+    desc: Reproduce control FIFO defects before candidate 0048 (expected assertion failures)
+    cmds: [bash tools/run-logged.sh brcmfmac-control-rx-baseline python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-cases --native-only]
+
+  test:brcmfmac-control-rx:
+    desc: Test control FIFO recovery and replay natively and on ARM; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-control-rx python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes]
+
+  check:brcmfmac-control-rx-drivers:
+    desc: Qualify control FIFO candidate with full ARM objects, alone and with mailbox fixes
+    cmds:
+      - bash tools/run-logged.sh brcmfmac-control-rx-drivers python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes --compile-drivers
+      - bash tools/run-logged.sh brcmfmac-control-rx-mailbox python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes --mailbox --compile-drivers
+
   test:brcmfmac-rx-callers:
     desc: Test RX packet cleanup and worker quarantine natively and on ARM; no device access
     cmds: [bash tools/run-logged.sh brcmfmac-rx-callers python3 tools/check-brcmfmac-rx-callers.py --packet-fixes]

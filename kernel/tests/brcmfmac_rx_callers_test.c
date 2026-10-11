@@ -77,6 +77,8 @@ static struct {
 	unsigned received, receive_fail_at, recovery_ops, recovery_fail_at, terms, naks;
 	unsigned reads_after_failure, empty_after, body_offset, record_count;
 	bool fail_control_alloc, forbid_packet_pull, frame_consumed, readahead;
+	bool fifo, nak_pending;
+	unsigned fifo_pos, fifo_end, fifo_size, partial_failure_bytes;
 	int recovery_error;
 	_Alignas(8) u8 frame[512];
 	struct sk_buff *records[32];
@@ -166,6 +168,7 @@ static int brcmf_sdio_dcmd_resp_wake(struct brcmf_sdio *bus)
 static void brcmf_rx_frame(void *dev, struct sk_buff *p, bool a, bool b)
 {
 	assert(dev == &f && !a && !b && !hw.host && !p->owner && p->len);
+	if (hw.fifo) assert(p->len == 52 && p->data[0] == 0x6b);
 	hw.delivered++; brcmu_pkt_buf_free_skb(p);
 }
 static void brcmf_rx_event(void *dev, struct sk_buff *p)
@@ -191,7 +194,13 @@ static void brcmf_sdiod_writeb(struct brcmf_sdio_dev *dev, uint addr, u8 value, 
 {
 	assert(dev == &f.dev && addr == SBSDIO_FUNC1_FRAMECTRL && value == SFC_RF_TERM);
 	*error = recovery_access(); hw.terms++;
-	if (!*error) hw.frame_consumed = true;
+	if (!*error) {
+		hw.frame_consumed = true;
+		if (hw.fifo) {
+			assert(hw.fifo_pos <= hw.fifo_end);
+			hw.fifo_pos = hw.fifo_end;
+		}
+	}
 }
 static u8 brcmf_sdiod_readb(struct brcmf_sdio_dev *dev, uint addr, int *error)
 {
@@ -202,15 +211,30 @@ static void brcmf_sdiod_writel(struct brcmf_sdio_dev *dev, u32 addr, u32 value, 
 {
 	assert(dev == &f.dev && addr == f.core.base + SD_REG(tosbmailbox) && value == SMB_NAK);
 	*error = recovery_access(); hw.naks++;
+	if (hw.fifo && !*error) {
+		assert(hw.fifo_pos == hw.fifo_end && !hw.nak_pending);
+		hw.nak_pending = true;
+	}
 }
 static int receive(void)
 {
 	transfer_ok(); assert(hw.received < 16);
 	return ++hw.received == hw.receive_fail_at ? -EILSEQ : 0;
 }
+static int fifo_read(u8 *buffer, unsigned len)
+{
+	assert(hw.fifo && !hw.nak_pending);
+	int ret = receive();
+	unsigned consumed = ret ? hw.partial_failure_bytes : len;
+	assert(consumed <= len && hw.fifo_pos + consumed <= hw.fifo_size);
+	memcpy(buffer, hw.frame + hw.fifo_pos, consumed);
+	hw.fifo_pos += consumed;
+	return ret;
+}
 static int brcmf_sdiod_recv_buf(struct brcmf_sdio_dev *dev, u8 *buffer, unsigned len)
 {
 	assert(dev == &f.dev);
+	if (hw.fifo) return fifo_read(buffer, len);
 	int ret = receive(); if (ret) return ret;
 	if (buffer == f.bus.rxhdr) {
 		assert(len == BRCMF_FIRSTREAD);
@@ -226,6 +250,7 @@ static int brcmf_sdiod_recv_buf(struct brcmf_sdio_dev *dev, u8 *buffer, unsigned
 static int brcmf_sdiod_recv_pkt(struct brcmf_sdio_dev *dev, struct sk_buff *p)
 {
 	assert(dev == &f.dev && !p->freed);
+	if (hw.fifo) return fifo_read(p->data, p->len);
 	int ret = receive(); if (ret) return ret;
 	unsigned offset = hw.readahead ? 0 : BRCMF_FIRSTREAD;
 	assert(offset + p->len <= sizeof(hw.frame));
@@ -371,6 +396,120 @@ static void success(unsigned kind)
 	finish();
 }
 
+static void control_fifo_begin(bool short_frame, bool busy, bool hint)
+{
+	begin(SDPCM_CONTROL_CHANNEL, short_frame ? 16 : 96);
+	hw.fifo = true; hw.fifo_end = short_frame ? BRCMF_FIRSTREAD : 96;
+	hw.fifo_size = hw.fifo_end + 64;
+	hw.frame[6] = hint ? 4 : 0;
+	u8 *next = hw.frame + hw.fifo_end;
+	put16(next, 64); put16(next + 2, (u16)~64);
+	next[4] = 1; next[5] = SDPCM_DATA_CHANNEL; next[7] = SDPCM_HDRLEN;
+	next[9] = 2; memset(next + SDPCM_HDRLEN, 0x6b, 64 - SDPCM_HDRLEN);
+	if (busy) {
+		f.bus.rxctl_orig = vzalloc(32); f.bus.rxctl = f.bus.rxctl_orig + 12;
+		f.bus.rxlen = 20; memset(f.bus.rxctl, 0x39, 20);
+	}
+}
+static void consume_response(void)
+{
+	if (!f.bus.rxctl) return;
+	vfree(f.bus.rxctl_orig); f.bus.rxctl_orig = f.bus.rxctl = NULL; f.bus.rxlen = 0;
+}
+static void pending_response_unchanged(u8 *original)
+{
+	assert(f.bus.rxctl == original);
+	if (original) assert(f.bus.rxlen == 20 && original[0] == 0x39 && original[19] == 0x39);
+	else assert(!f.bus.rxlen);
+}
+static void nak_handled_boundary(void)
+{
+	/* Firmware replay / mailbox acknowledgement is a scripted boundary here. */
+	assert(f.bus.rxskip && hw.nak_pending && !f.dev.io_error);
+	f.bus.rxskip = false; hw.nak_pending = false; hw.fifo_pos = 0;
+}
+static void receive_retry_and_next(bool short_frame)
+{
+	nak_handled_boundary(); hw.fail_control_alloc = false; f.bus.rxblen = 512;
+	hw.receive_fail_at = 0;
+	unsigned naks = hw.naks;
+	brcmf_sdio_readframes(&f.bus, 1);
+	assert(!f.dev.io_error && !f.bus.rxskip && hw.naks == naks);
+	assert(hw.fifo_pos == hw.fifo_end && f.bus.rxctl);
+	assert(f.bus.rxlen == (short_frame ? 4u : 84u) && f.bus.rxctl[0] == 0x5a);
+	consume_response();
+	brcmf_sdio_readframes(&f.bus, 1);
+	assert(hw.fifo_pos == hw.fifo_size && hw.delivered == 1 && !f.dev.io_error);
+}
+static void control_fifo_failure(unsigned index, bool body_failure)
+{
+	bool short_frame = !body_failure && (index & 1);
+	bool busy = body_failure ? (index & 1) : (index & 2);
+	bool no_buffer = !body_failure && (index & 4);
+	unsigned fault = body_failure ? index / 2 : index / 8;
+	control_fifo_begin(short_frame, busy, true);
+	u8 *original = f.bus.rxctl;
+	if (body_failure) {
+		hw.receive_fail_at = 2; hw.partial_failure_bytes = 8;
+	} else if (no_buffer) f.bus.rxblen = 0;
+	else hw.fail_control_alloc = true;
+	hw.recovery_fail_at = fault;
+	brcmf_sdio_readframes(&f.bus, 1);
+	fprintf(stderr, "FIFO=%u/%u next=%u recovery=%u NAK=%u skip=%u errno=%d\n",
+		hw.fifo_pos, hw.fifo_end, f.bus.cur_read.len, hw.recovery_ops,
+		hw.naks, f.bus.rxskip, f.dev.io_error);
+	pending_response_unchanged(original);
+	assert(hw.responses == 1 && hw.control_live == (unsigned)busy);
+	assert(!hw.delivered);
+	assert(f.dev.io_error == (fault ? -ENOMEDIUM : 0));
+	assert(!f.bus.cur_read.len && !f.bus.cur_read.len_nxtfrm);
+	if (!fault) {
+		assert(hw.fifo_pos == hw.fifo_end && hw.naks == 1 && f.bus.rxskip);
+		unsigned reads = hw.received, ops = hw.recovery_ops;
+		brcmf_sdio_readframes(&f.bus, 1); /* Wait for NAK acknowledgement. */
+		assert(hw.received == reads && hw.recovery_ops == ops);
+		consume_response(); receive_retry_and_next(short_frame);
+	} else {
+		assert(!f.bus.rxskip && !f.bus.rxpending && hw.recovery_ops == fault);
+		unsigned reads = hw.received;
+		brcmf_sdio_readframes(&f.bus, 1);
+		assert(hw.received == reads && hw.recovery_ops == fault);
+		consume_response();
+	}
+	assert(f.bus.sdcnt.rxc_errors == 1);
+	finish();
+}
+static void control_fifo_success(unsigned index)
+{
+	bool short_frame = index & 1, busy = index & 2, hint = index & 4;
+	control_fifo_begin(short_frame, busy, hint);
+	u8 *original = f.bus.rxctl;
+	brcmf_sdio_readframes(&f.bus, 1);
+	assert(hw.fifo_pos == hw.fifo_end && hw.responses == 1 && !hw.recovery_ops);
+	assert(!f.dev.io_error && !f.bus.sdcnt.rxc_errors && !f.bus.cur_read.len_nxtfrm);
+	assert(f.bus.cur_read.len == (hint ? 64u : 0u));
+	if (busy) pending_response_unchanged(original);
+	else assert(f.bus.rxctl && f.bus.rxctl[0] == 0x5a && f.bus.rxlen == (short_frame ? 4u : 84u));
+	consume_response();
+	brcmf_sdio_readframes(&f.bus, 1);
+	assert(hw.fifo_pos == hw.fifo_size && hw.delivered == 1 && !hw.recovery_ops);
+	finish();
+}
+static void control_fifo_repeated(unsigned index)
+{
+	bool short_frame = index != 0;
+	control_fifo_begin(short_frame, false, true); hw.fail_control_alloc = true;
+	for (unsigned i = 0; i < 3; i++) {
+		brcmf_sdio_readframes(&f.bus, 1);
+		assert(!f.dev.io_error && !f.bus.rxctl && !hw.control_live);
+		assert(!f.bus.cur_read.len && !f.bus.cur_read.len_nxtfrm);
+		assert(hw.naks == i + 1 && f.bus.rxskip && hw.fifo_pos == hw.fifo_end);
+		if (i < 2) nak_handled_boundary();
+	}
+	assert(f.bus.sdcnt.rxc_errors == 3);
+	receive_retry_and_next(short_frame); finish();
+}
+
 int main(int argc, char **argv)
 {
 	assert(argc == 3);
@@ -385,6 +524,10 @@ int main(int argc, char **argv)
 	else if (!strcmp(argv[1], "glom_pair_success")) glom_case(12, false);
 	else if (!strcmp(argv[1], "descriptor")) descriptor_case(index);
 	else if (!strcmp(argv[1], "prior_error")) previous_error();
+	else if (!strcmp(argv[1], "ctl_oom")) control_fifo_failure(index, false);
+	else if (!strcmp(argv[1], "ctl_body")) control_fifo_failure(index, true);
+	else if (!strcmp(argv[1], "ctl_success")) control_fifo_success(index);
+	else if (!strcmp(argv[1], "ctl_retries")) control_fifo_repeated(index);
 	else assert(false);
 	printf("%s %u passed\n", argv[1], index);
 	return 0;

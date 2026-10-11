@@ -16,6 +16,15 @@ they do not access hardware or add candidates to the image queue. Results and
 remaining review/integration work are in [report 275](docs/275-brcmfmac-rx-recovery.md)
 and [report 276](docs/276-brcmfmac-rx-caller-qualification.md).
 
+NEO-196 adds the isolated control-response retry candidate and byte-position
+FIFO tests in [report 277](docs/277-brcmfmac-control-rx-recovery.md). Use
+`task test:brcmfmac-control-rx` for its native/sanitizer/ARM checks, or
+`task check:brcmfmac-control-rx-drivers` to include the complete board/debug
+driver builds with and without the mailbox fix. The separate
+`task test:brcmfmac-control-rx-baseline` intentionally fails against the source
+without this correction, retaining the original reproduction. None of these
+commands changes the image queue or accesses the GameShell.
+
 Diagnostic.26 is built, offline-verified, packed and checkpointed with explicitly
 selected, bounded kernel clock instrumentation for NEO-192. It gives the pending clock investigation its own
 image/kernel identity and retains diagnostic.25 for recovery. It does not fix

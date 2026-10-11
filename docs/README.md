@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[277 — brcmfmac control-response allocation and retry framing](277-brcmfmac-control-rx-recovery.md)
+reproduces unread-body and stale-hint defects with a byte-position FIFO model
+and prepares the isolated control-recovery candidate and saved checks.
+
 [276 — brcmfmac RX packet cleanup and worker qualification](276-brcmfmac-rx-caller-qualification.md)
 reproduces the malformed-packet defects, adds candidate 0047 and exercises
 packet ownership and worker quarantine with saved native/ARM fault tests.

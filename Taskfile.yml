@@ -76,6 +76,10 @@ tasks:
     desc: Test control FIFO recovery and replay natively and on ARM; no device access
     cmds: [bash tools/run-logged.sh brcmfmac-control-rx python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes]
 
+  test:brcmfmac-control-rx-mailbox:
+    desc: Test control FIFO recovery together with mailbox fixes; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-control-rx-mailbox python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes --mailbox]
+
   check:brcmfmac-control-rx-drivers:
     desc: Qualify control FIFO candidate with full ARM objects, alone and with mailbox fixes
     cmds:

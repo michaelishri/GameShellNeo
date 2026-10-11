@@ -10,7 +10,8 @@ after control retransmission, while preserving successful read-ahead and an
 already-published response. Saved control tests cover 62 new cases alongside
 the original 53, native memory sanitizers, recovery-stage failures and firmware
 replay at a scripted boundary. [Report 277](docs/277-brcmfmac-control-rx-recovery.md)
-records qualification and remaining review/integration/hardware scope. No
+records qualification; [report 278](docs/278-brcmfmac-rx-review.md) completes the
+offline review. Integration/hardware scope remains with NEO-58. No
 observed GameShell fault is attributed, and the patch is outside diagnostic.26.
 
 **NEO-58/195 RX recovery candidate, 12 October 2026:** isolated candidate 0046
@@ -21,8 +22,9 @@ negative controls. Candidate 0047 now fixes the reproduced missing-descriptor
 packet leak and use of failed superframe parser outputs. The actual-caller
 suite passes 53 native/ARM packet cases, native memory sanitizers, worker
 quarantine and successful-TX cases, negative controls, and four full board/debug
-ARM builds with/without the mailbox candidate. NEO-195 is ready for review;
-image integration and matching hardware qualification remain. Diagnostic.26
+ARM builds with/without the mailbox candidate. NEO-195's offline candidate
+scope has completed review; image integration and matching hardware
+qualification remain with NEO-58. Diagnostic.26
 is unchanged. [Report 276](docs/276-brcmfmac-rx-caller-qualification.md) records
 the caller results and their boundary-model limits.
 [Report 275](docs/275-brcmfmac-rx-recovery.md)

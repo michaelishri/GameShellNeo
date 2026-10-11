@@ -116,8 +116,9 @@ with no compiler warnings or errors. Checkpatch is clean for 0048.
 
 The attempt root is `.local/build/brcmfmac-rx-callers/attempts/`. All recorded
 inputs, 553/601 retained artifacts respectively, and four driver objects were
-rehashed successfully after both commands finished. No code or candidate input
-changed afterward. Candidate 0048 has SHA-256
+rehashed successfully after both commands finished. These are the pre-review
+qualification inputs; the later fixture-only cleanup and reruns are recorded
+in [report 278](278-brcmfmac-rx-review.md). Candidate 0048 remains unchanged with SHA-256
 `a8a21a9c6ee4804e697a3fdfb634ef01d26dc25248aa8ec000982a20313be53c`.
 The additional `control-final-verification.json` receipt has SHA-256
 `6bbb4c7929d580872cf6040a75faf48fd25bb8ec6670517b74d2aaa18617bab7`.
@@ -129,8 +130,9 @@ The additional `control-final-verification.json` receipt has SHA-256
 | Control RX + mailbox board | `c8f3edf1dd0847e9a3386133dd1c9fdcf6ee6910c2bbb1d4f01df4ed76236cf9` |
 | Control RX + mailbox debug | `4aed3aef094126d4ff21fd99209a863c274e94b38e8b40143bde4723d7dcb992` |
 
-The offline candidate scope is ready for review. The original baseline failures
-remain preserved; the successful candidate runs do not alter their results.
+The offline candidate scope has completed review; see report 278 for both
+review axes and the follow-up qualification. The original baseline failures
+remain preserved; successful candidate runs do not alter their results.
 
 This does not explain NEO-55's authentication delay or the clock regression.
-Review, integration and matching image/hardware qualification remain separate.
+Integration and matching image/hardware qualification remain separate.

@@ -106,10 +106,29 @@ def run_cases(attempt, arm=False, sanitizer=False, control=False):
         raise RuntimeError('RX caller cases failed: ' + ', '.join(failures))
 
 
-def packet_negatives(attempt):
+def run_negative_cases(attempt, good, cases, group):
     generated = attempt / 'brcmfmac_rx_caller_functions.h'
-    good = generated.read_text()
     change = helpers.extract.mutate_once
+    results = {}
+    try:
+        for name, body, before, after, case in cases:
+            broken = change(good, body, change(body, before, after))
+            generated.write_text(broken)
+            (attempt / (name + '.h')).write_text(broken)
+            binary = compile_test(attempt, HARNESS, name)
+            result = execute(binary, case)
+            (attempt / (name + '.log')).write_text(result.stdout + result.stderr)
+            if not result.returncode or 'Assertion' not in result.stderr:
+                raise ValueError(group.capitalize() + ' negative control did not fail an assertion: ' + name)
+            results[name] = dict(returncode=result.returncode, case=case, error=result.stderr)
+    finally:
+        generated.write_text(good)
+    atomic_json(attempt / (group + '-negatives.json'), results)
+    return len(results)
+
+
+def packet_negatives(attempt):
+    good = (attempt / 'brcmfmac_rx_caller_functions.h').read_text()
     glom = helpers.extract.function(good, 'static u8 brcmf_sdio_rxglom(')
     read = helpers.extract.function(good, 'static uint brcmf_sdio_readframes(')
     cases = [
@@ -124,28 +143,12 @@ def packet_negatives(attempt):
         ('lost_next_frame_clear', read, '\t\trd->len_nxtfrm = 0;\n\t}',
          '\t}', ('prior_error', '0')),
     ]
-    results = {}
-    try:
-        for name, body, before, after, case in cases:
-            broken = change(good, body, change(body, before, after))
-            generated.write_text(broken)
-            (attempt / (name + '.h')).write_text(broken)
-            binary = compile_test(attempt, HARNESS, name)
-            result = execute(binary, case)
-            (attempt / (name + '.log')).write_text(result.stdout + result.stderr)
-            if not result.returncode or 'Assertion' not in result.stderr:
-                raise ValueError('Packet negative control did not fail an assertion: ' + name)
-            results[name] = dict(returncode=result.returncode, case=case, error=result.stderr)
-    finally:
-        generated.write_text(good)
-    atomic_json(attempt / 'packet-negatives.json', results)
-    print(f'{len(results)} packet negative controls rejected', flush=True)
+    count = run_negative_cases(attempt, good, cases, 'packet')
+    print(f'{count} packet negative controls rejected', flush=True)
 
 
 def control_negatives(attempt):
-    generated = attempt / 'brcmfmac_rx_caller_functions.h'
-    good = generated.read_text()
-    change = helpers.extract.mutate_once
+    good = (attempt / 'brcmfmac_rx_caller_functions.h').read_text()
     control = helpers.extract.function(good, 'static void\nbrcmf_sdio_read_control(')
     read = helpers.extract.function(good, 'static uint brcmf_sdio_readframes(')
     cases = [
@@ -161,22 +164,8 @@ def control_negatives(attempt):
          '\t\tbus->sdcnt.rxc_errors++;\n\t\tbrcmf_sdio_rxfail(bus, false, true);',
          '\t\tbrcmf_sdio_rxfail(bus, false, true);', ('ctl_oom', '0')),
     ]
-    results = {}
-    try:
-        for name, body, before, after, case in cases:
-            broken = change(good, body, change(body, before, after))
-            generated.write_text(broken)
-            (attempt / (name + '.h')).write_text(broken)
-            binary = compile_test(attempt, HARNESS, name)
-            result = execute(binary, case)
-            (attempt / (name + '.log')).write_text(result.stdout + result.stderr)
-            if not result.returncode or 'Assertion' not in result.stderr:
-                raise ValueError('Control negative did not fail an assertion: ' + name)
-            results[name] = dict(returncode=result.returncode, case=case, error=result.stderr)
-    finally:
-        generated.write_text(good)
-    atomic_json(attempt / 'control-negatives.json', results)
-    print(f'{len(results)} control FIFO negative controls rejected', flush=True)
+    count = run_negative_cases(attempt, good, cases, 'control')
+    print(f'{count} control FIFO negative controls rejected', flush=True)
 
 
 def run_dpc(attempt, mailbox, arm=False, sanitizer=False, negatives=False):

@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[278 — brcmfmac RX candidate review and offline acceptance](278-brcmfmac-rx-review.md)
+records both review axes, resolved fixture cleanup, qualification reruns and
+the separate parent integration/hardware boundaries for NEO-195/196.
+
 [277 — brcmfmac control-response allocation and retry framing](277-brcmfmac-control-rx-recovery.md)
 reproduces unread-body and stale-hint defects with a byte-position FIFO model
 and prepares the isolated control-recovery candidate and saved checks.

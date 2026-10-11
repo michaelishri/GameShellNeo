@@ -17,6 +17,7 @@ typedef unsigned uint;
 typedef unsigned long ulong;
 #define READ_ONCE(x) (x)
 #define WRITE_ONCE(x, y) ((x) = (y))
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define min_t(t, a, b) ((t)(a) < (t)(b) ? (t)(a) : (t)(b))
 #define roundup(x, y) ((((x) + (y) - 1) / (y)) * (y))
 #define le32_to_cpu(x) (x) /* Both tested hosts are little-endian. */
@@ -325,11 +326,27 @@ static void control_case(unsigned kind, bool fatal)
 	assert(hw.control_allocs == 1 && hw.control_frees == 1);
 	finish();
 }
-static void glom_case(unsigned kind, bool fatal)
+enum glom_scenario {
+	GLOM_TRANSFER_FAILURE,
+	GLOM_BAD_SUPERFRAME_CHECKSUM,
+	GLOM_BAD_SUBFRAME_CHECKSUM,
+	GLOM_SINGLE_SUCCESS,
+	GLOM_DESCRIPTOR_SUCCESS,
+	GLOM_EMPTY_HEADER,
+	GLOM_SHORT_HEADER,
+	GLOM_OVERSIZED_HEADER,
+	GLOM_DESCRIPTOR_IN_SUPERFRAME,
+	GLOM_WRONG_CHANNEL,
+	GLOM_BAD_PAYLOAD_OFFSET,
+	GLOM_BAD_SECOND_SUBFRAME,
+	GLOM_PAIR_SUCCESS,
+};
+static void glom_case(enum glom_scenario scenario, bool fatal)
 {
 	begin(SDPCM_GLOM_CHANNEL, 64);
-	bool good = kind == 3 || kind == 4 || kind == 12;
-	if (kind == 4) {
+	bool good = scenario == GLOM_SINGLE_SUCCESS || scenario == GLOM_DESCRIPTOR_SUCCESS ||
+		scenario == GLOM_PAIR_SUCCESS;
+	if (scenario == GLOM_DESCRIPTOR_SUCCESS) {
 		f.bus.glomd = brcmu_pkt_buf_get_skb(2);
 		put16(f.bus.glomd->data, 64);
 	} else {
@@ -338,27 +355,35 @@ static void glom_case(unsigned kind, bool fatal)
 	/* Valid superframe followed by a single 52-byte subframe. */
 	put16(hw.frame + 12, 52); put16(hw.frame + 14, (u16)~52);
 	hw.frame[17] = SDPCM_DATA_CHANNEL; hw.frame[19] = SDPCM_HDRLEN;
-	if (kind == 0) hw.receive_fail_at = 1;
-	if (kind == 1) { hw.frame[2] ^= 1; hw.forbid_packet_pull = true; }
-	if (kind == 2) hw.frame[14] ^= 1; /* Subframe checksum. */
-	if (kind == 5) { put16(hw.frame, 0); put16(hw.frame + 2, 0); }
-	if (kind == 6) { put16(hw.frame, 8); put16(hw.frame + 2, (u16)~8); }
-	if (kind == 7) { put16(hw.frame, 80); put16(hw.frame + 2, (u16)~80); }
-	if (kind == 8) hw.frame[5] |= 0x80; /* Descriptor flag in superframe. */
-	if (kind == 9) hw.frame[5] = SDPCM_DATA_CHANNEL;
-	if (kind == 10) hw.frame[7] = 65; /* Out-of-range payload offset. */
-	if (kind >= 5 && kind <= 10) hw.forbid_packet_pull = true;
-	if (kind == 11 || kind == 12) {
+	switch (scenario) {
+	case GLOM_TRANSFER_FAILURE: hw.receive_fail_at = 1; break;
+	case GLOM_BAD_SUPERFRAME_CHECKSUM: hw.frame[2] ^= 1; break;
+	case GLOM_BAD_SUBFRAME_CHECKSUM: hw.frame[14] ^= 1; break;
+	case GLOM_EMPTY_HEADER: put16(hw.frame, 0); put16(hw.frame + 2, 0); break;
+	case GLOM_SHORT_HEADER: put16(hw.frame, 8); put16(hw.frame + 2, (u16)~8); break;
+	case GLOM_OVERSIZED_HEADER: put16(hw.frame, 80); put16(hw.frame + 2, (u16)~80); break;
+	case GLOM_DESCRIPTOR_IN_SUPERFRAME: hw.frame[5] |= 0x80; break;
+	case GLOM_WRONG_CHANNEL: hw.frame[5] = SDPCM_DATA_CHANNEL; break;
+	case GLOM_BAD_PAYLOAD_OFFSET: hw.frame[7] = 65; break;
+	case GLOM_SINGLE_SUCCESS:
+	case GLOM_DESCRIPTOR_SUCCESS:
+	case GLOM_BAD_SECOND_SUBFRAME:
+	case GLOM_PAIR_SUCCESS: break;
+	}
+	/* Invalid superframe metadata must never be used to move packet data. */
+	if (!good && scenario != GLOM_TRANSFER_FAILURE && scenario != GLOM_BAD_SUBFRAME_CHECKSUM &&
+	    scenario != GLOM_BAD_SECOND_SUBFRAME) hw.forbid_packet_pull = true;
+	if (scenario == GLOM_BAD_SECOND_SUBFRAME || scenario == GLOM_PAIR_SUCCESS) {
 		struct sk_buff *p = brcmu_pkt_buf_get_skb(64); skb_queue_tail(&f.bus.glom, p);
 		put16(hw.frame, 128); put16(hw.frame + 2, (u16)~128);
 		put16(hw.frame + 64, 64); put16(hw.frame + 66, (u16)~64);
 		hw.frame[68] = 1; hw.frame[69] = SDPCM_EVENT_CHANNEL; hw.frame[71] = SDPCM_HDRLEN;
-		if (kind == 11) hw.frame[66] ^= 1;
+		if (scenario == GLOM_BAD_SECOND_SUBFRAME) hw.frame[66] ^= 1;
 	}
 	if (fatal) hw.recovery_fail_at = 1;
 	brcmf_sdio_readframes(&f.bus, 3);
 	assert(f.dev.io_error == (fatal ? -ENOMEDIUM : 0));
-	assert(hw.delivered == (good ? (kind == 12 ? 2u : 1u) : 0u));
+	assert(hw.delivered == (good ? (scenario == GLOM_PAIR_SUCCESS ? 2u : 1u) : 0u));
 	assert(f.bus.sdcnt.rxglomfail == (unsigned)!good);
 	finish();
 }
@@ -512,16 +537,30 @@ static void control_fifo_repeated(unsigned index)
 
 int main(int argc, char **argv)
 {
+	static const enum glom_scenario glom_errors[] = {
+		GLOM_TRANSFER_FAILURE, GLOM_BAD_SUPERFRAME_CHECKSUM, GLOM_BAD_SUBFRAME_CHECKSUM,
+	};
+	static const enum glom_scenario glom_valid[] = { GLOM_SINGLE_SUCCESS, GLOM_DESCRIPTOR_SUCCESS };
+	static const enum glom_scenario glom_headers[] = {
+		GLOM_EMPTY_HEADER, GLOM_SHORT_HEADER, GLOM_OVERSIZED_HEADER,
+		GLOM_DESCRIPTOR_IN_SUPERFRAME, GLOM_WRONG_CHANNEL, GLOM_BAD_PAYLOAD_OFFSET,
+	};
 	assert(argc == 3);
 	unsigned index = strtoul(argv[2], NULL, 10);
 	if (!strcmp(argv[1], "data")) data_case(index / 2, index & 1);
 	else if (!strcmp(argv[1], "control")) control_case(index / 2, index & 1);
-	else if (!strcmp(argv[1], "glom")) glom_case(index / 2, index & 1);
+	else if (!strcmp(argv[1], "glom")) {
+		assert(index < 2 * ARRAY_SIZE(glom_errors)); glom_case(glom_errors[index / 2], index & 1);
+	}
 	else if (!strcmp(argv[1], "success")) success(index);
-	else if (!strcmp(argv[1], "glom_success")) glom_case(index + 3, false);
-	else if (!strcmp(argv[1], "glom_header")) glom_case(index / 2 + 5, index & 1);
-	else if (!strcmp(argv[1], "glom_pair")) glom_case(11, index & 1);
-	else if (!strcmp(argv[1], "glom_pair_success")) glom_case(12, false);
+	else if (!strcmp(argv[1], "glom_success")) {
+		assert(index < ARRAY_SIZE(glom_valid)); glom_case(glom_valid[index], false);
+	}
+	else if (!strcmp(argv[1], "glom_header")) {
+		assert(index < 2 * ARRAY_SIZE(glom_headers)); glom_case(glom_headers[index / 2], index & 1);
+	}
+	else if (!strcmp(argv[1], "glom_pair")) glom_case(GLOM_BAD_SECOND_SUBFRAME, index & 1);
+	else if (!strcmp(argv[1], "glom_pair_success")) glom_case(GLOM_PAIR_SUCCESS, false);
 	else if (!strcmp(argv[1], "descriptor")) descriptor_case(index);
 	else if (!strcmp(argv[1], "prior_error")) previous_error();
 	else if (!strcmp(argv[1], "ctl_oom")) control_fifo_failure(index, false);

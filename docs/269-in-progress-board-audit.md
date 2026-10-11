@@ -24,7 +24,7 @@ All of that scope now has evidence:
   BOOTTIME freshness. The current 20 battery runtime and seven battery-sample
   tests pass, including stopped MONOTONIC, short/long sleep, invalid reads,
   stale consumers, schema/boot/clock mismatches and transport/image identity.
-- [Report 217](217-cpi-wfi-image-integration.md) records full integration;
+- [Report 217](217-wfi-s2idle-image-integration.md) records full integration;
   [report 218](218-diagnostic24-installation.md) records the installed image,
   exact-source checks and 12 installed guard simulations. This audit read the
   original `20261008T103435.489075Z/battery-policy.txt`: all 12 pass against
@@ -53,6 +53,34 @@ fault or admit another PM test. NEO-101 still owns awake-profiler interruption
 qualification; NEO-117/182 and the battery follow-ups retain their own physical
 criteria.
 
+## NEO-94: first attended RTC-wake qualification — complete
+
+This ticket's first diagnostic.17 attempt remains failed. Its original
+`20261003T031337.546862Z/result.json` was re-read and still reports
+`passed=false`. Closing the qualification task does not relabel that run.
+
+The subsequent diagnostic.18 run in
+[report 142](142-diagnostic18-first-rtc-wake-success.md) achieved the first
+qualified functional RTC wake and unattended USB/Wi-Fi recovery after the
+connection-lifecycle correction. This audit read the original
+`20261003T165839.817277Z/result.json` in the main checkout and verified SHA-256
+`e2d0873bccccb55d14d43edb0648686f6477585e1b152557960830b157b3a692`.
+The current offline RTC/trace/clock assessment passes. The original result
+has `passed=true`, both independent route proofs, memory verification and
+policy restoration, with no retained RTC/control/policy ownership. Report 142
+retains the owner's confirmation that the dim console returned untouched.
+
+The absence of timekeeping freeze in that older image was explicitly separated
+from functional RTC wake. The later diagnostic.24 original independently
+rechecked above also proves all-core WFI participation and timekeeping freeze.
+Thus neither of the original NEO-94 blockers leaves its first functional
+qualification milestone unfinished. Subsequent repeats and cable profiles are
+recorded in [report 239](239-musb-restart-integration-review.md).
+
+Broader USB host/boot coverage remains NEO-95; idle energy remains NEO-96;
+the newer clock fault remains NEO-192. Power-button wake and deep retention
+were outside the first RTC test and are not being counted as complete.
+
 ## Remaining work at the initial audit
 
 | Ticket | Remaining question or action to establish completion |
@@ -63,7 +91,7 @@ criteria.
 | NEO-31 | Actual disappearance/reappearance of an associated AP, distinct from the accepted random-SSID simulation. |
 | NEO-55 | Explain the original delayed authentication; passing later handshakes alone do not identify its cause. |
 | NEO-58 | RX cleanup, clock-ready timeout, recovery ownership and integration of prepared fixes. |
-| NEO-94 | Reconcile the first failed attempts with later qualified RTC-wake evidence. |
+| NEO-94 | Completed reconciliation above; historical failures remain unchanged. |
 | NEO-95 | Host sleep/wake and remaining repeat-boot USB coverage; completed cable tests are already retained. |
 | NEO-96 | Remaining awake overhead and battery energy comparison; supported WFI is implemented and functionally exercised. |
 | NEO-98 | Wake-ownership candidate integration, remaining backend limits and hardware wake qualification. |

@@ -11,6 +11,12 @@ and PM admission remain unresolved; this closure does not qualify protection
 during sleep or clear the new fault. [Report 269](docs/269-in-progress-board-audit.md)
 tracks the broader 20-ticket audit and remaining preparation work.
 
+NEO-94's first functional RTC-wake milestone is also complete: its original
+diagnostic.17 failure remains failed, while the published diagnostic.18 success
+was hash-verified and reassessed from the original record. The later WFI image
+also provides independently checked freeze evidence. NEO-95/96 retain broader
+USB and energy gates; no fresh PM operation ran during this audit.
+
 **External camera verified, 12 October 2026:** NEO-193 selects the owner's
 Razer Kiyo through private `.env` configuration. A still and five-second,
 ten-frame sequence show readable console text; capture shutdown and remote

@@ -43,8 +43,10 @@ tests reproduce invalid console cursor output and unterminated assertion
 buffer overreads. Isolated candidate 0054 checks size/index before allocation
 or output, avoids empty-console work and reserves terminators outside the
 existing 80-byte text reads. Valid ring output and transport ownership remain
-unchanged. The saved full-driver qualification is running; review and final
-verification remain pending. See [report 286](docs/286-brcmfmac-diagnostic-output-bounds.md).
+unchanged. Native, sanitizer and ARM output/combined regressions, meaningful
+mutations and both complete driver objects pass. On 21 October both review
+axes had zero findings and final input/artifact/source verification passed.
+See [report 286](docs/286-brcmfmac-diagnostic-output-bounds.md).
 No triggering firmware input or live fault is claimed; candidate 0054 stays
 outside the image queue, with integration/hardware ownership in NEO-58.
 

@@ -171,18 +171,28 @@ def release():
 
 
 def cancel_created(job, value):
-    # Non-force removal must fail if a delayed start has made it running.
-    docker('rm', job['id'], capture_output=True)
     target = directory(job)
     target.mkdir(parents=True, exist_ok=True)
+    receipt = target / 'cancellation.json'
+    if receipt.exists():
+        receipt = target / ('cancellation-' + uuid.uuid4().hex + '.json')
+    # Preserve the observed state (including a failed start) before removal.
+    # This is cancellation intent, not a fabricated terminal process result.
+    save(receipt, dict(schema=1, job=job, state=value['State'],
+                       requested_utc=timestamp()))
+    # Non-force removal refuses a running container. A delayed start could
+    # also finish between inspect and removal, so no complete-log or
+    # never-started claim follows from the earlier created-state snapshot.
+    docker('rm', job['id'], capture_output=True)
     log = target / 'container.log'
     if not log.exists():
         with log.open('wb') as stream:
             stream.flush()
             os.fsync(stream.fileno())
     save_result(job, dict(schema=1, job=job, state=value['State'],
-         exit_code=None, returncode=125, outcome='cancelled-before-start',
+         exit_code=None, returncode=125, outcome='cancelled-created-container',
          stop_requested=True, collected_utc=timestamp(),
+         log_complete=False, cancellation_evidence=receipt.name,
          log_sha256=file_hash(log)))
     release()
     return 125
@@ -272,10 +282,24 @@ def watch(job):
     # The daemon owns the retained log. Losing this observer leaves ACTIVE
     # intact, and resume reattaches to the same container without a new writer.
     executable = os.environ.get('NEO_BUILD_DOCKER') or shutil.which('docker')
-    result = subprocess.run([executable, 'logs', '--follow', job['id']])
-    if result.returncode:
-        raise RuntimeError('Container log observer stopped; retain ownership and inspect status')
+    subprocess.run([executable, 'logs', '--follow', job['id']])
+    # Another observer may have collected and removed this run just before
+    # attachment. Only verified collection or its durable result decides the
+    # exit status; an observer error alone never releases a live owner.
     return collect(job)
+
+
+def start(job):
+    value = inspect(job)
+    if not value or value['State']['Status'] != 'created':
+        raise RuntimeError('Container is not proven created; retaining build ownership')
+    logging = value['HostConfig']['LogConfig']
+    options = logging.get('Config') or {}
+    if (logging['Type'] != 'json-file' or options.get('max-size') not in (None, '', '-1') or
+            options.get('mode') not in (None, '', 'blocking')):
+        raise RuntimeError('Lossy Docker logging cannot preserve an interrupted full build log; '
+                           'stop the created stage and inspect the daemon logging policy')
+    docker('start', job['id'], capture_output=True)
 
 
 def run(stage, arguments):
@@ -311,12 +335,7 @@ def run(stage, arguments):
         job['id'] = created.stdout.strip()
         save(ACTIVE, job)
         save(directory(job) / 'job.json', job)
-        value = inspect(job)
-        options = value['HostConfig']['LogConfig'].get('Config') or {}
-        if options.get('max-size') not in (None, '', '-1'):
-            raise RuntimeError('Rotating Docker logs cannot preserve an interrupted full build log; '
-                               'stop the created stage and inspect the daemon logging policy')
-        docker('start', job['id'], capture_output=True)
+        start(job)
     return watch(job)
 
 
@@ -369,7 +388,7 @@ def main():
             previous = directory(job) / 'result.json'
             if previous.exists() and json.loads(previous.read_text()).get('stop_requested'):
                 raise RuntimeError('This late-created job was cancelled; use stop to retire it before a new build')
-            docker('start', job['id'], capture_output=True)
+            start(job)
     return collect(job, stopped=True) if args.action == 'stop' else watch(job)
 
 

@@ -50,6 +50,8 @@ matching name and labels. A foreign identity or unavailable Docker state
 blocks progress rather than authorizing cleanup.
 
 Containers keep daemon-owned JSON logs and are not automatically removed.
+One shared start gate rejects rotation and nonblocking delivery before both
+the original start and recovery of a created container.
 The foreground command follows those logs. Losing that observer leaves the
 ownership record and container available. `build:stage:status` reports state;
 `resume` follows the same running container, collects an exited container, or
@@ -63,10 +65,15 @@ container and releases admission. Evidence lives in
 `.local/build/container-stages/RUN/{job.json,container.log,result.json}`.
 Observation, collection and removal failures retain ownership. A removal
 retry preserves the first result and log; reconciliation records are additive.
-A never-started cancellation has `exit_code: null` and helper return code 125.
-Cancellation after an interrupted creation records an explicit incomplete-log
-outcome. A late creation can be recovered and retired but cannot restart a
-previously cancelled job.
+Created cancellation saves the original observed state and start error in a
+durable `cancellation.json` before removal; repeated snapshots are additive.
+It has `exit_code: null`, helper return code 125 and `log_complete: false`.
+A delayed start can change state between inspection and removal, so that
+snapshot does not establish that no process ever ran. Cancellation after an
+interrupted creation records an explicit incomplete-log outcome. A late
+creation can be recovered and retired but cannot restart a previously
+cancelled job. If one observer collects and removes a run before another can
+attach, the latter reconciles the same run's saved exit code.
 
 ## Reusable validation
 
@@ -83,7 +90,7 @@ spaces and copy the actual wrapper/helper/shim. Fixture cleanup checks only
 the recorded IDs and labels. Input hashes are saved before execution and
 rechecked after the run; original attempts are retained.
 
-Seven fixture groups cover:
+Eleven fixture groups cover:
 
 - Host process-group interruption while a container remains live, followed
   by recovery of the same container and exit zero.
@@ -92,13 +99,19 @@ Seven fixture groups cover:
 - Preserved stdout, stderr, exit code, environment, bind mount, user and
   working directory.
 - Failed start, unavailable daemon, foreign ID rejection, missing-ID
-  reconciliation and truthful never-started cancellation.
+  reconciliation and cancellation without an invented process exit.
 - Failed creation reservation, absent cancellation, a controlled late-create
   seam, refusal to restart that cancelled job and original-result retention.
 - Explicit running-container stop concurrent with the foreground observer,
   retaining its actual trapped exit 23 and stop intent.
 - Injected removal failure after terminal evidence is saved, continued
   admission exclusion and retry without changing original evidence.
+- Rotating and nonblocking Docker logging configurations, injected at actual
+  container creation; original and recovery starts must both refuse them.
+- Removal of a created container followed by a lost removal reply; its original
+  failed-start state must survive recovery without a fabricated exit code.
+- Pausing one log observer until a second has collected and removed the same
+  run; the late observer must return the saved success or failure code.
 
 Attempt `47faf1a11aad492e96d186bf51ffc391` passes all seven groups with unchanged
 recorded inputs. `test:build-workflow` passes 18 tests. The full host check
@@ -109,7 +122,54 @@ existing local SSH fixtures; rerunning with host socket access passes. Neither
 run contacts the GameShell. Logs are retained in
 `.local/build/{build-workflow.log,docker-ownership.log,neo194-check.log,neo194-check-host.log}`.
 
-Independent Standards/Spec review is pending.
+## Independent review and reproduced corrections
+
+The code-review skill ran Standards and Spec reviews independently against
+`57a6c225e0001dd0e2cb0e7d11713cc5f333f438...6c52ab3`. The initial reports found:
+
+### Standards
+
+Two documented-standard violations: created-container recovery bypassed the
+original logging gate, and created cancellation removed the container before
+preserving its observed state. The duplicated start paths were also a possible
+Duplicated Code smell; no additional actionable smell was reported.
+
+### Spec
+
+Two findings: the same logging-admission gap violated durable-output retention,
+and a late log observer could return helper failure 1 after another observer
+had already saved the actual container result. No unsolicited scope was found.
+
+### Corrections and regression evidence
+
+Three distinct review findings were accepted. A shared start gate now applies
+to original and recovered starts; cancellation state is saved before removal;
+and an attachment error reconciles the original durable result through the
+existing collection path. The logging audit also identified inherited
+nonblocking delivery as incompatible with a complete log; the same gate now
+rejects it. Created cancellation explicitly retains uncertainty about a delayed
+start and uses a null process exit/incomplete-log result.
+
+The expanded fixtures first ran against helper commit `6c52ab3` and failed at
+the intended assertions:
+
+| Regression | Original failing attempt | Observed defect |
+| --- | --- | --- |
+| `logging-rotation` | `09daa14be88747c6a51bbc68ee8efca7` | Resume started the rejected created container |
+| `logging-nonblocking` | `06370e7e4f80412c8ea1fbd16c793346` | Original start accepted nonblocking output |
+| `created-cancellation` | `93609d1907964b0f81013c1ca28e6a93` | Lost removal reply erased the created-state snapshot |
+| `attachment-race` | `977e19a2dd474378af40955379651145` | Late observer returned 1 for a saved exit of zero |
+
+All attempts and original failures remain private in
+`.local/build/docker-ownership/attempts/`. Individual regressions can be selected
+through `task test:docker-ownership CASE=attachment-race` (or another case name
+above). Final attempt `70fa425b12964c318190ceb27eccf920` passes all eleven groups;
+all five recorded input hashes still match. Its ownership records are retired,
+and final Docker inspection shows no fixture containers and the same unrelated
+containers as the initial inspection. The full host check passes again:
+24 runtime tests, 1,007 tooling tests (two existing optional skips), both C
+regressions and Bash syntax/ShellCheck. Its log is
+`.local/build/neo194-check-reviewed.log`. Review recheck is pending.
 
 ## Scope and limits
 
@@ -118,7 +178,8 @@ arbitrary daemon/storage failure recovery. Missing or mismatched Docker
 identity and uncollectable logs remain explicit recovery errors. Manual
 container/ledger deletion can destroy evidence and is not a supported way to
 resume a build. Docker logging that rotates the full log is refused before
-start. Retained logs consume host/Docker storage until collection; normal
+each start. Nonblocking delivery is also refused. Retained logs consume
+host/Docker storage until collection; normal
 artifact retention and disk preflight still apply.
 
 Recovery collects a container result, not the original outer Task. It does

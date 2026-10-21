@@ -269,7 +269,8 @@ def created_case(attempt):
         assert cancelled.returncode == 125 and not record.exists()
         path = workspace / '.local/build/container-stages' / job['run'] / 'result.json'
         saved = json.loads(path.read_text())
-        assert saved['exit_code'] is None and saved['outcome'] == 'cancelled-before-start'
+        assert saved['exit_code'] is None and saved['outcome'] == 'cancelled-created-container'
+        assert not saved['log_complete']
         assert saved['job']['id'] == job['id']
         assert owned(foreign_name, token)['Id'] == foreign
         return dict(case='created-recovery', failed_start_retains_ownership=True,
@@ -408,7 +409,144 @@ def removal_case(attempt):
             fixture_call(workspace, 'stop')
 
 
-def candidate():
+def logging_case(attempt, policy):
+    workspace = workspace_for(attempt, 'logging-' + policy)
+    image = json.loads((ROOT / 'build/sources.lock.json').read_text())['builder']['image']
+    record = workspace / '.local/build/container-active.json'
+    proxy = workspace / 'docker-with-log-policy'
+    flags = ['--log-opt', 'max-size=1k'] if policy == 'rotation' else ['--log-opt', 'mode=non-blocking']
+    proxy.write_text('#!' + sys.executable + '\nimport os, sys\n'
+                     'arguments = sys.argv[1:]\n'
+                     'if arguments[0] == "create": arguments[1:1] = ' + repr(flags) + '\n'
+                     'os.execv(' + repr(DOCKER) + ', [' + repr(DOCKER) + '] + arguments)\n')
+    proxy.chmod(0o700)
+    try:
+        failed = fixture_call(workspace, 'run', 'logging', '--', '--rm', '--network=none',
+            '--pull=never', '--entrypoint', '/bin/sh', image, '-c', 'echo must-not-start',
+            env=dict(os.environ, NEO_BUILD_DOCKER=str(proxy)))
+        (workspace.parent / 'run.log').write_text(failed.stdout + failed.stderr)
+        assert failed.returncode != 0 and record.exists(), 'Unsafe logging policy started the original job'
+        job = json.loads(record.read_text())
+        resumed = fixture_call(workspace, 'resume')
+        (workspace.parent / 'resume.log').write_text(resumed.stdout + resumed.stderr)
+        assert resumed.returncode != 0 and record.exists(), 'Created resume bypassed logging admission'
+        state = fixture_call(workspace, 'status')
+        assert state.returncode == 0 and json.loads(state.stdout)['container_state']['Status'] == 'created'
+        assert fixture_call(workspace, 'stop').returncode == 125 and not record.exists()
+        result = record.parent / 'container-stages' / job['run'] / 'result.json'
+        assert json.loads(result.read_text())['exit_code'] is None
+        assert b'must-not-start' not in result.with_name('container.log').read_bytes()
+        return dict(case='logging-' + policy, original_and_resume_refuse_lossy_logging=True,
+                    created_container_never_started=True)
+    finally:
+        if record.exists():
+            fixture_call(workspace, 'stop')
+
+
+def cancellation_case(attempt):
+    workspace = workspace_for(attempt, 'created-cancellation')
+    image = json.loads((ROOT / 'build/sources.lock.json').read_text())['builder']['image']
+    record = workspace / '.local/build/container-active.json'
+    proxy = workspace / 'docker-with-lost-removal-reply'
+    proxy.write_text('#!' + sys.executable + '\nimport os, subprocess, sys\n'
+                     'if sys.argv[1] == "rm":\n'
+                     '    subprocess.run([' + repr(DOCKER) + '] + sys.argv[1:], check=True)\n'
+                     '    sys.exit(99)\n'
+                     'os.execv(' + repr(DOCKER) + ', [' + repr(DOCKER) + '] + sys.argv[1:])\n')
+    proxy.chmod(0o700)
+    try:
+        failed = fixture_call(workspace, 'run', 'cancellation', '--', '--rm', '--network=none',
+            '--pull=never', '--entrypoint', '/missing-fixture-executable', image)
+        assert failed.returncode != 0 and record.exists()
+        job = json.loads(record.read_text())
+        interrupted = fixture_call(workspace, 'stop', env=dict(os.environ, NEO_BUILD_DOCKER=str(proxy)))
+        (workspace.parent / 'interrupted-stop.log').write_text(interrupted.stdout + interrupted.stderr)
+        assert interrupted.returncode != 0 and record.exists()
+        absent = docker('inspect', '--type', 'container', job['id'], check=False)
+        assert absent.returncode != 0 and 'No such' in absent.stderr
+        target = record.parent / 'container-stages' / job['run']
+        receipt = target / 'cancellation.json'
+        assert receipt.exists(), 'Removal lost the original created-state evidence'
+        original = receipt.read_bytes()
+        saved = json.loads(original)
+        assert saved['job']['id'] == job['id'] and '/missing-fixture-executable' in saved['state']['Error']
+        assert fixture_call(workspace, 'stop').returncode == 125 and not record.exists()
+        terminal = json.loads((target / 'result.json').read_text())
+        assert terminal['exit_code'] is None and not terminal['log_complete']
+        assert receipt.read_bytes() == original
+        return dict(case='created-cancellation', state_preserved_before_removal=True,
+                    lost_reply_retains_ownership=True, original_start_error_survives_recovery=True)
+    finally:
+        if record.exists():
+            fixture_call(workspace, 'stop')
+
+
+def attachment_case(attempt):
+    for code in (0, 7):
+        workspace = workspace_for(attempt, 'attachment-race-' + str(code))
+        image = json.loads((ROOT / 'build/sources.lock.json').read_text())['builder']['image']
+        record = workspace / '.local/build/container-active.json'
+        ready = workspace / 'observer-ready'
+        proceed = workspace / 'observer-proceed'
+        proxy = workspace / 'docker-with-delayed-observer'
+        proxy.write_text('#!' + sys.executable + '\nimport os, sys, time\nfrom pathlib import Path\n'
+                         'if sys.argv[1:3] == ["logs", "--follow"]:\n'
+                         '    Path(' + repr(str(ready)) + ').touch()\n'
+                         '    deadline = time.monotonic() + 15\n'
+                         '    while not Path(' + repr(str(proceed)) + ').exists():\n'
+                         '        if time.monotonic() >= deadline: sys.exit(98)\n'
+                         '        time.sleep(0.05)\n'
+                         'os.execv(' + repr(DOCKER) + ', [' + repr(DOCKER) + '] + sys.argv[1:])\n')
+        proxy.chmod(0o700)
+        parent = None
+        try:
+            with (workspace.parent / 'original-observer.log').open('wb') as output:
+                parent = subprocess.Popen([sys.executable, str(workspace / 'tools/docker-stage.py'),
+                    'run', 'attachment', '--', '--rm', '--network=none', '--pull=never',
+                    '--entrypoint', '/bin/sh', image, '-c', 'echo retained-output; exit ' + str(code)],
+                    cwd=workspace, env=dict(os.environ, NEO_BUILD_DOCKER=str(proxy)),
+                    stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
+                deadline = time.monotonic() + 12
+                while not ready.exists():
+                    if time.monotonic() >= deadline or parent.poll() is not None:
+                        raise RuntimeError('Delayed observer did not become ready')
+                    time.sleep(0.05)
+                job = json.loads(record.read_text())
+                resumed = fixture_call(workspace, 'resume')
+                assert resumed.returncode == code and not record.exists()
+                result = record.parent / 'container-stages' / job['run'] / 'result.json'
+                original = result.read_bytes()
+                proceed.touch()
+                observed = parent.wait(timeout=15)
+                assert observed == code, f'Late observer returned {observed} instead of saved exit {code}'
+                assert result.read_bytes() == original
+        finally:
+            proceed.touch()
+            if record.exists():
+                fixture_call(workspace, 'stop')
+            if parent is not None and parent.poll() is None:
+                os.killpg(parent.pid, signal.SIGKILL)
+                parent.wait(timeout=5)
+    return dict(case='attachment-race', removed_container_observers_reconcile_saved_exit=True,
+                success_and_failure_results_preserved=True)
+
+
+CASES = {
+    'interrupted-success': lambda attempt: candidate_case(attempt, 'interrupted-success', 0),
+    'interrupted-failure': lambda attempt: candidate_case(attempt, 'interrupted-failure', 7),
+    'command-contract': command_case,
+    'created-recovery': created_case,
+    'creation-reservation': reservation_case,
+    'running-stop': running_stop_case,
+    'removal-retry': removal_case,
+    'logging-rotation': lambda attempt: logging_case(attempt, 'rotation'),
+    'logging-nonblocking': lambda attempt: logging_case(attempt, 'nonblocking'),
+    'created-cancellation': cancellation_case,
+    'attachment-race': attachment_case,
+}
+
+
+def candidate(selected=None):
     os.umask(0o077)
     attempt = ROOT / '.local/build/docker-ownership/attempts' / uuid.uuid4().hex
     attempt.mkdir(parents=True)
@@ -418,11 +556,8 @@ def candidate():
         'tools/check-docker-stage.py', 'build/sources.lock.json')}
     (attempt / 'inputs.json').write_text(json.dumps(inputs, indent=2) + '\n')
     results = []
-    for name, code in (('interrupted-success', 0), ('interrupted-failure', 7)):
-        results.append(candidate_case(attempt, name, code))
-        (attempt / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
-        print(name + ' passed', flush=True)
-    for case in (command_case, created_case, reservation_case, running_stop_case, removal_case):
+    cases = {selected: CASES[selected]} if selected else CASES
+    for case in cases.values():
         results.append(case(attempt))
         (attempt / 'results.json').write_text(json.dumps(results, indent=2) + '\n')
         print(results[-1]['case'] + ' passed', flush=True)
@@ -432,6 +567,10 @@ def candidate():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--baseline', action='store_true')
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument('--baseline', action='store_true')
+    selection.add_argument('--case', choices=CASES, default=os.environ.get('NEO_DOCKER_OWNERSHIP_CASE') or None)
     options = parser.parse_args()
-    baseline() if options.baseline else candidate()
+    if options.case and options.case not in CASES:
+        parser.error('Unknown Docker ownership fixture case')
+    baseline() if options.baseline else candidate(options.case)

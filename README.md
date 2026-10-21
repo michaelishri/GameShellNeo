@@ -911,9 +911,11 @@ task build:stage:stop
 or starts the original created container if creation was interrupted. It never
 creates a replacement. `stop` verifies the exact container identity, requests
 termination with a ten-second grace period and collects the actual exit code.
-Both commands return the container's exit status; cancelling a job that never
-started returns 125 with `exit_code: null`, rather than inventing a process
-result. A cancelled late creation is retired with `stop` and cannot be resumed.
+Both commands return the container's exit status when established. Cancelling
+a container observed in created state, or an absent creation, returns 125 with
+`exit_code: null` and `log_complete: false`; it does not establish a process
+exit or rule out a delayed start. A cancelled late creation is retired with
+`stop` and cannot be resumed.
 
 The daemon retains container output across host interruption. Final collection
 saves `job.json`, `container.log` and `result.json` under
@@ -921,6 +923,10 @@ saves `job.json`, `container.log` and `result.json` under
 exit code and log SHA-256. Only after saving that evidence does the helper
 remove the verified container and release admission. Failed observations,
 log collection or removal retain ownership and private failure evidence.
+Created cancellation saves its observed state in `cancellation.json` before
+removal, so a lost removal reply cannot erase the original start error.
+Repeated cancellation snapshots are additive. Concurrent observers reconcile
+the same run's saved result if another observer already removed the container.
 The interrupted top-level stage log remains unchanged; use the recorded
 `container.log` for the complete container output. Recovery does not replay
 the outer Task or host-side postprocessing: inspect the result, then run the
@@ -933,15 +939,18 @@ the saved evidence and restore access before proceeding. Do not clear a lock
 or ledger, start another build or remove unrelated containers to bypass a
 blocked stage. These guarantees apply to logged commands in this checkout;
 direct Docker commands and older worktrees keep their existing behavior.
-Docker log rotation is rejected before starting a managed container so that
-an interrupted build's full output remains available. Logs may include private
-build inputs and stay outside Git.
+Docker log rotation and nonblocking log delivery are rejected before every
+start, including recovery of a created container, so that an interrupted
+build's full output remains available. Logs may include private build inputs
+and stay outside Git.
 
 `task test:docker-ownership` runs bounded fixtures using the locked, already
 cached builder with network access disabled. The historical reproduction
 `task test:docker-ownership-baseline` intentionally exits nonzero when the old
 wrapper admits a second writer. `task test:build-workflow` checks host-only
-workflow behavior. [Report 287](docs/287-docker-build-ownership.md) records the
+workflow behavior. `CASE=logging-rotation`, `logging-nonblocking`,
+`created-cancellation` or `attachment-race` selects an individual review
+regression. [Report 287](docs/287-docker-build-ownership.md) records the
 contract, evidence and recovery limits.
 
 To reclaim superseded driver compiler trees, first preview the named

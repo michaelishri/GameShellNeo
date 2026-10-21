@@ -66,6 +66,7 @@ env:
   NEO_COMPARISON_RETRY_INCOMPLETE: '{{.RETRY_INCOMPLETE | default "0"}}'
   NEO_CAMERA_SECONDS: '{{.SECONDS | default "0"}}'
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
+  NEO_DOCKER_OWNERSHIP_CASE: '{{.CASE | default ""}}'
 
 tasks:
   test:build-workflow:

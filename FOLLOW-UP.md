@@ -2,6 +2,29 @@
 
 Record deferred questions and activities here as they arise.
 
+**Branch integration review, 22 October 2026 (NEO-204):** reviewed cumulative
+work through NEO-194 and six already integrated histories are merged into main;
+23 merged branch references can be removed while preserving their worktrees
+and ignored evidence. Thirteen branches remain open. See
+[report 288](docs/288-branch-integration-review.md) for pins and review results.
+
+**NEO-205 candidate placement before retirement-branch merges:**
+`work/power-supply-unregister` and `work/sunxi-retirement` (including retirement
+ancestors) put candidates 0037–0045 in `kernel/patches/`, which
+`tools/kernel-inputs.py` automatically includes in production builds. Their
+reports 222/231 require a separately identified future image. Adapt candidate
+placement, native/KUnit/ARM queues and default build checks before merging;
+retain diagnostic.26's exact inputs and the separate hardware gates. Keep the
+older removal-lifetime/wake/startup branches and untracked removal audit until
+their unique changes have been reconciled; they are not wholly superseded.
+
+**NEO-206 SMP callback runner/build ownership compatibility:**
+`work/musb-callback-kernel` uses named and interactive Docker containers plus
+post-run inspect/stop/remove operations. Its saved logged Tasks conflict with
+NEO-194's supported foreground contract and managed collection. Adapt and test
+the shared lifecycle before merging; bypassing the wrapper would restore
+unowned writers. NEO-103's matching hardware bind/unbind gate remains separate.
+
 **NEO-58/200 clock readiness, 12 October 2026:** asynchronous `CLK_PENDING`
 had no deadline. The baseline reproduces missing deadlines and notifications;
 candidate 0052 preserves one request budget and uses the existing watchdog

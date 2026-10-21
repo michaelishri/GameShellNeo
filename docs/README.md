@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[288 — Branch integration review and cleanup](288-branch-integration-review.md)
+records the ready cumulative merge, acknowledged earlier histories, retained
+integration blockers, unchanged production patch queue and repeated host checks.
+
 [287 — Docker build ownership after host interruption](287-docker-build-ownership.md)
 records durable stage identity, blocked duplicate writers, original-container
 recovery and bounded offline fixture qualification; no image or device change.

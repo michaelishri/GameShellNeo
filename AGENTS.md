@@ -50,9 +50,11 @@ the snapshot below is a starting point, not admission for a hardware test.
   as well as the selected worktree's instructions. Sibling ClockworkPi/vendor
   repositories and `allwinner/` contain reference code and supplied documents.
 - Start with `git status --short`, `git branch --show-current`,
-  `git log -5 --oneline` and `git worktree list`. Main is older than several
-  active feature branches. A command, report or image present in one worktree
-  may be absent or different in another. Do not rebuild from main accidentally.
+  `git log -5 --oneline` and `git worktree list`. Main now includes the reviewed
+  cumulative development through NEO-194. Thirteen branches with unresolved
+  integration work remain; report 288 records their exact pins and blockers.
+  A command, report or image present in one worktree may be absent or different
+  in another. Select the intended source and image before rebuilding.
 - Consult the ticket's current description/comments, `FOLLOW-UP.md`, the
   selected worktree's `README.md`, `Taskfile.yml`, and matching numbered reports
   under `docs/`. Reports record historical observations, not current health.
@@ -63,15 +65,17 @@ the snapshot below is a starting point, not admission for a hardware test.
 
 Current worktrees are under the canonical checkout's `.local/worktrees/`:
 
-| Directory | Branch / purpose |
+| Directory | Preserved revision / purpose |
 | --- | --- |
-| `musb-restart-integration` | `work/musb-restart-integration`: established remote/camera tools, diagnostic.26 image and NEO-192 clock investigation; use this checkout for current hardware access |
-| `brcmfmac-tx-recovery` | `work/brcmfmac-diagnostic-bounds`: NEO-202 completed and pushed through `57a6c22`; Wi-Fi candidates through 0054 are offline-qualified and outside the image queue |
-| `build-stage-ownership` | `work/build-stage-ownership`: NEO-194 build ownership/logging changes are in progress; inspect its uncommitted work and saved results before continuing |
+| `musb-restart-integration` | `fa2a95d` (detached after branch cleanup): established remote/camera tools, diagnostic.26 image and NEO-192 clock investigation; use this checkout for current hardware access |
+| `brcmfmac-tx-recovery` | `57a6c22` (detached): NEO-202 completed; Wi-Fi candidates through 0054 are offline-qualified and outside the image queue |
+| `build-stage-ownership` | `0f53a71` (detached): completed NEO-194 implementation, independent reviews and original qualification evidence |
+| `merge-ready-branches` | detached reviewed main integration with the repeated host checks and Docker ownership evidence recorded in report 288 |
 
-Do not copy a feature's current validation claims onto another branch or image.
-The NEO-194 workflow must still finish documentation/review/final verification;
-its new recovery commands are not yet a project-wide released interface.
+Merged branch references are removed; their worktrees, ignored evidence and
+private configuration remain at their original revisions. Create a branch
+before making new commits in a detached worktree. Do not copy a feature's
+validation claims onto another branch or image.
 
 ## Private configuration and identities
 
@@ -154,7 +158,7 @@ its new recovery commands are not yet a project-wide released interface.
   Use the exact `NEO_CAMERA_NAME='Razer Kiyo'` preference in `.env`. The helper
   discovers built-in/external devices and requires one exact match; do not
   silently substitute the FaceTime camera. Current hardware tooling is in
-  `musb-restart-integration`; main's older helper cannot be assumed equivalent.
+  `musb-restart-integration`; main now contains the same reviewed camera helper.
 - Use camera observations for tests needing only visual confirmation of screen
   state/return, without another human-ready/confirmation exchange. Existing
   test authorization and health admission still apply. The camera cannot
@@ -245,11 +249,13 @@ recording is authorized by this workflow. The camera stops after each request.
   stopped. The NEO-194 baseline proves that a host command can disappear while
   its Docker container keeps writing. Do not start a duplicate build, clear a
   lock/ledger, delete active scratch, or stop unrelated containers on that basis.
-- NEO-194's current candidate in `build-stage-ownership` adds recorded stage
-  containers and `build:stage:status/resume/stop`. It has passing bounded offline
-  fixture groups and workflow tests, but review/documentation are still pending.
-  Recheck that worktree before using or publishing those changes. Other branches
-  still have the older wrapper and must not be assumed protected by this fix.
+- NEO-194 is complete and integrated in main: recorded stage containers and
+  `build:stage:status/resume/stop` retain logs/results and exclude duplicate
+  writers. Report 287 records qualification; report 288 repeats all twelve
+  Docker fixture groups on the merged source. Older preserved worktrees still
+  have their original wrapper and must not be assumed protected by this fix.
+  NEO-206 tracks the retained SMP callback runner's named/interactive-container
+  incompatibility; do not bypass ownership to make that runner work.
 - Wait for authoritative completion before changing a test's hashed inputs.
   A session observation timeout does not terminate it; poll the same handle or
   inspect the specific container/job. Preserve logs and terminal results. A

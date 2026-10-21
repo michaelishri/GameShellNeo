@@ -264,22 +264,31 @@ def created_case(attempt):
         pending = dict(job)
         del pending['id']
         record.write_text(json.dumps(pending))
-        cancelled = fixture_call(workspace, 'stop')
-        (workspace.parent / 'cancel.log').write_text(cancelled.stdout + cancelled.stderr)
-        assert cancelled.returncode == 125 and not record.exists()
-        path = workspace / '.local/build/container-stages' / job['run'] / 'result.json'
-        saved = json.loads(path.read_text())
-        assert saved['exit_code'] is None and saved['outcome'] == 'cancelled-created-container'
-        assert not saved['log_complete']
-        assert saved['job']['id'] == job['id']
+        deferred = fixture_call(workspace, 'stop')
+        (workspace.parent / 'deferred-stop.log').write_text(deferred.stdout + deferred.stderr)
+        assert deferred.returncode != 0 and record.exists()
+        path = workspace / '.local/build/container-stages' / job['run']
+        saved = json.loads((path / 'cancellation.json').read_text())
+        assert saved['start_state'] == 'pending' and '/missing-fixture-executable' in saved['state']['Error']
+        assert not (path / 'result.json').exists()
+        assert json.loads(record.read_text())['id'] == job['id']
         assert owned(foreign_name, token)['Id'] == foreign
         return dict(case='created-recovery', failed_start_retains_ownership=True,
                     unavailable_daemon_does_not_admit_writer=True,
                     foreign_identity_rejected=True, missing_id_reconciled_by_labels=True,
-                    unstarted_cancellation_not_reported_as_process_exit=True)
+                    unresolved_failure_retains_created_state=True)
     finally:
         if job and record.exists():
             record.write_text(json.dumps(job))
+            # This controlled fixture's entrypoint cannot execute, and its
+            # only start call has returned. Retire just this known test object;
+            # production recovery deliberately preserves unresolved starts.
+            value, = json.loads(docker('inspect', '--type', 'container', job['id']).stdout)
+            labels = value['Config']['Labels']
+            assert value['Id'] == job['id'] and value['State']['Status'] == 'created'
+            assert value['Config']['Entrypoint'] == ['/missing-fixture-executable']
+            assert all(labels['org.gameshellneo.build.' + key] == job[key] for key in ('workspace', 'stage', 'run'))
+            docker('rm', job['id'])
             fixture_call(workspace, 'stop')
         if foreign:
             state = owned(foreign_name, token)
@@ -449,6 +458,7 @@ def cancellation_case(attempt):
     record = workspace / '.local/build/container-active.json'
     proxy = workspace / 'docker-with-lost-removal-reply'
     proxy.write_text('#!' + sys.executable + '\nimport os, subprocess, sys\n'
+                     'if sys.argv[1] == "create": sys.argv[2:2] = ["--log-opt", "max-size=1k"]\n'
                      'if sys.argv[1] == "rm":\n'
                      '    subprocess.run([' + repr(DOCKER) + '] + sys.argv[1:], check=True)\n'
                      '    sys.exit(99)\n'
@@ -456,7 +466,8 @@ def cancellation_case(attempt):
     proxy.chmod(0o700)
     try:
         failed = fixture_call(workspace, 'run', 'cancellation', '--', '--rm', '--network=none',
-            '--pull=never', '--entrypoint', '/missing-fixture-executable', image)
+            '--pull=never', '--entrypoint', '/bin/sh', image, '-c', 'echo must-not-start',
+            env=dict(os.environ, NEO_BUILD_DOCKER=str(proxy)))
         assert failed.returncode != 0 and record.exists()
         job = json.loads(record.read_text())
         interrupted = fixture_call(workspace, 'stop', env=dict(os.environ, NEO_BUILD_DOCKER=str(proxy)))
@@ -469,13 +480,14 @@ def cancellation_case(attempt):
         assert receipt.exists(), 'Removal lost the original created-state evidence'
         original = receipt.read_bytes()
         saved = json.loads(original)
-        assert saved['job']['id'] == job['id'] and '/missing-fixture-executable' in saved['state']['Error']
+        assert saved['job']['id'] == job['id'] and saved['state']['Status'] == 'created'
+        assert saved['start_state'] == 'unrequested'
         assert fixture_call(workspace, 'stop').returncode == 125 and not record.exists()
         terminal = json.loads((target / 'result.json').read_text())
         assert terminal['exit_code'] is None and not terminal['log_complete']
         assert receipt.read_bytes() == original
         return dict(case='created-cancellation', state_preserved_before_removal=True,
-                    lost_reply_retains_ownership=True, original_start_error_survives_recovery=True)
+                    lost_reply_retains_ownership=True, original_created_state_survives_recovery=True)
     finally:
         if record.exists():
             fixture_call(workspace, 'stop')
@@ -531,6 +543,73 @@ def attachment_case(attempt):
                 success_and_failure_results_preserved=True)
 
 
+def delayed_start_case(attempt):
+    workspace = workspace_for(attempt, 'delayed-start')
+    image = json.loads((ROOT / 'build/sources.lock.json').read_text())['builder']['image']
+    record = workspace / '.local/build/container-active.json'
+    proceed = workspace / 'late-start-proceed'
+    finished = workspace / 'late-start-finished'
+    proxy = workspace / 'docker-with-delayed-start'
+    proxy.write_text('#!' + sys.executable + '\nimport os, subprocess, sys, time\nfrom pathlib import Path\n'
+                     'if sys.argv[1] == "start": sys.exit(99)\n'
+                     'if sys.argv[1] == "rm":\n'
+                     '    Path(' + repr(str(proceed)) + ').touch()\n'
+                     '    deadline = time.monotonic() + 12\n'
+                     '    while not Path(' + repr(str(finished)) + ').exists():\n'
+                     '        if time.monotonic() >= deadline: sys.exit(98)\n'
+                     '        time.sleep(0.05)\n'
+                     'os.execv(' + repr(DOCKER) + ', [' + repr(DOCKER) + '] + sys.argv[1:])\n')
+    proxy.chmod(0o700)
+    worker = None
+    try:
+        failed = fixture_call(workspace, 'run', 'delayed', '--', '--rm', '--network=none',
+            '--pull=never', '--entrypoint', '/bin/sh', image, '-c', 'echo delayed-output; exit 7',
+            env=dict(os.environ, NEO_BUILD_DOCKER=str(proxy)))
+        assert failed.returncode != 0 and record.exists()
+        job = json.loads(record.read_text())
+        # Controlled seam for a start RPC whose caller disappeared. Stop's
+        # removal seam lets that original request start and exit first.
+        code = ('import subprocess,time\nfrom pathlib import Path\n'
+                'deadline=time.monotonic()+20\n'
+                'while not Path(' + repr(str(proceed)) + ').exists():\n'
+                ' if time.monotonic()>=deadline: raise RuntimeError("Late start was not released")\n'
+                ' time.sleep(0.05)\n'
+                'subprocess.run([' + repr(DOCKER) + ',"start",' + repr(job['id']) + '],check=True)\n'
+                'subprocess.run([' + repr(DOCKER) + ',"wait",' + repr(job['id']) + '],check=True)\n'
+                'Path(' + repr(str(finished)) + ').touch()\n')
+        with (workspace.parent / 'late-start.log').open('wb') as output:
+            worker = subprocess.Popen([sys.executable, '-c', code], stdout=output,
+                                      stderr=subprocess.STDOUT, start_new_session=True)
+            stopped = fixture_call(workspace, 'stop', env=dict(os.environ, NEO_BUILD_DOCKER=str(proxy)))
+            (workspace.parent / 'stop.log').write_text(stopped.stdout + stopped.stderr)
+            assert stopped.returncode != 125 and record.exists(), 'Cancellation discarded the delayed terminal result'
+            state = fixture_call(workspace, 'status')
+            assert state.returncode == 0 and json.loads(state.stdout)['container_state']['Status'] == 'created'
+            assert fixture_call(workspace, 'resume').returncode != 0
+            receipt = record.parent / 'container-stages' / job['run'] / 'start.json'
+            original = receipt.read_bytes()
+            receipt.unlink()
+            assert fixture_call(workspace, 'stop').returncode != 125 and record.exists()
+            assert fixture_call(workspace, 'resume').returncode != 0 and record.exists()
+            receipt.write_bytes(original)
+            proceed.touch()
+            assert worker.wait(timeout=15) == 0
+        resumed = fixture_call(workspace, 'resume')
+        assert resumed.returncode == 7 and not record.exists()
+        target = record.parent / 'container-stages' / job['run']
+        result = json.loads((target / 'result.json').read_text())
+        assert result['exit_code'] == 7 and b'delayed-output' in (target / 'container.log').read_bytes()
+        return dict(case='delayed-start', unresolved_start_blocks_cancellation_and_restart=True,
+                    missing_legacy_metadata_retains_ownership=True,
+                    eventual_original_output_and_exit_preserved=True)
+    finally:
+        proceed.touch()
+        if worker is not None and worker.poll() is None:
+            worker.wait(timeout=15)
+        if record.exists():
+            fixture_call(workspace, 'stop')
+
+
 CASES = {
     'interrupted-success': lambda attempt: candidate_case(attempt, 'interrupted-success', 0),
     'interrupted-failure': lambda attempt: candidate_case(attempt, 'interrupted-failure', 7),
@@ -543,6 +622,7 @@ CASES = {
     'logging-nonblocking': lambda attempt: logging_case(attempt, 'nonblocking'),
     'created-cancellation': cancellation_case,
     'attachment-race': attachment_case,
+    'delayed-start': delayed_start_case,
 }
 
 

@@ -909,10 +909,17 @@ task build:stage:stop
 
 `resume` follows an existing running container, collects an exited container,
 or starts the original created container if creation was interrupted. It never
-creates a replacement. `stop` verifies the exact container identity, requests
+creates a replacement. A durable `start.json` receipt distinguishes a start
+that was never requested from an unresolved request. A nonzero CLI return or
+lost response leaves that request unresolved; another start and created-state
+removal are blocked. Missing start metadata in older records is also unknown.
+Once the original container is running or exited, normal recovery can collect
+its actual output and result. A created container that stays unresolved retains
+ownership for diagnosis. `status` includes this start state.
+`stop` verifies the exact container identity, requests
 termination with a ten-second grace period and collects the actual exit code.
 Both commands return the container's exit status when established. Cancelling
-a container observed in created state, or an absent creation, returns 125 with
+a created container with no start requested, or an absent creation, returns 125 with
 `exit_code: null` and `log_complete: false`; it does not establish a process
 exit or rule out a delayed start. A cancelled late creation is retired with
 `stop` and cannot be resumed.
@@ -949,7 +956,7 @@ cached builder with network access disabled. The historical reproduction
 `task test:docker-ownership-baseline` intentionally exits nonzero when the old
 wrapper admits a second writer. `task test:build-workflow` checks host-only
 workflow behavior. `CASE=logging-rotation`, `logging-nonblocking`,
-`created-cancellation` or `attachment-race` selects an individual review
+`created-cancellation`, `attachment-race` or `delayed-start` selects an individual review
 regression. [Report 287](docs/287-docker-build-ownership.md) records the
 contract, evidence and recovery limits.
 

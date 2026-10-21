@@ -49,6 +49,18 @@ from the foreground workflow. A missing ID can be reconciled only against the
 matching name and labels. A foreign identity or unavailable Docker state
 blocks progress rather than authorizing cleanup.
 
+One authoritative `start.json` receipt is initialized before publishing a new
+reservation. Immediately before a start request it changes durably from
+`unrequested` to `pending`; only a successful CLI acknowledgement changes it
+to `acknowledged`. Nonzero CLI results and lost replies remain unresolved.
+Older records without a receipt are unknown. Both start and created-cancel
+paths consult the same receipt: neither issues another start nor removes a
+created container unless its start is positively unrequested. Running or exited
+state permits ordinary recovery and actual-result collection. A created
+container that remains unresolved retains ownership for diagnosis; status
+reports its start state. This prevents a delayed request from completing in
+the inspection/removal gap and losing its terminal evidence.
+
 Containers keep daemon-owned JSON logs and are not automatically removed.
 One shared start gate rejects rotation and nonblocking delivery before both
 the original start and recovery of a created container.
@@ -67,9 +79,10 @@ Observation, collection and removal failures retain ownership. A removal
 retry preserves the first result and log; reconciliation records are additive.
 Created cancellation saves the original observed state and start error in a
 durable `cancellation.json` before removal; repeated snapshots are additive.
-It has `exit_code: null`, helper return code 125 and `log_complete: false`.
-A delayed start can change state between inspection and removal, so that
-snapshot does not establish that no process ever ran. Cancellation after an
+Only a positively unrequested start permits removal. Its result has
+`exit_code: null`, helper return code 125 and `log_complete: false`.
+Unresolved starts retain both ownership and the actual container rather than
+replacing a potentially available terminal result. Cancellation after an
 interrupted creation records an explicit incomplete-log outcome. A late
 creation can be recovered and retired but cannot restart a previously
 cancelled job. If one observer collects and removes a run before another can
@@ -90,7 +103,7 @@ spaces and copy the actual wrapper/helper/shim. Fixture cleanup checks only
 the recorded IDs and labels. Input hashes are saved before execution and
 rechecked after the run; original attempts are retained.
 
-Eleven fixture groups cover:
+Twelve fixture groups cover:
 
 - Host process-group interruption while a container remains live, followed
   by recovery of the same container and exit zero.
@@ -99,7 +112,7 @@ Eleven fixture groups cover:
 - Preserved stdout, stderr, exit code, environment, bind mount, user and
   working directory.
 - Failed start, unavailable daemon, foreign ID rejection, missing-ID
-  reconciliation and cancellation without an invented process exit.
+  reconciliation and preservation of an unresolved created state.
 - Failed creation reservation, absent cancellation, a controlled late-create
   seam, refusal to restart that cancelled job and original-result retention.
 - Explicit running-container stop concurrent with the foreground observer,
@@ -109,9 +122,12 @@ Eleven fixture groups cover:
 - Rotating and nonblocking Docker logging configurations, injected at actual
   container creation; original and recovery starts must both refuse them.
 - Removal of a created container followed by a lost removal reply; its original
-  failed-start state must survive recovery without a fabricated exit code.
+  state must survive recovery without a fabricated exit code.
 - Pausing one log observer until a second has collected and removed the same
   run; the late observer must return the saved success or failure code.
+- A delayed original start that can finish in the cancellation/removal gap;
+  unresolved and missing legacy metadata must block cancellation/restart,
+  followed by collection of the original output and actual exit 7.
 
 Attempt `47faf1a11aad492e96d186bf51ffc391` passes all seven groups with unchanged
 recorded inputs. `test:build-workflow` passes 18 tests. The full host check
@@ -163,13 +179,29 @@ the intended assertions:
 All attempts and original failures remain private in
 `.local/build/docker-ownership/attempts/`. Individual regressions can be selected
 through `task test:docker-ownership CASE=attachment-race` (or another case name
-above). Final attempt `70fa425b12964c318190ceb27eccf920` passes all eleven groups;
-all five recorded input hashes still match. Its ownership records are retired,
+above). The eleven-group checkpoint `70fa425b12964c318190ceb27eccf920` passed;
+all five recorded input hashes matched at that checkpoint. Its ownership records are retired,
 and final Docker inspection shows no fixture containers and the same unrelated
 containers as the initial inspection. The full host check passes again:
 24 runtime tests, 1,007 tooling tests (two existing optional skips), both C
 regressions and Bash syntax/ShellCheck. Its log is
-`.local/build/neo194-check-reviewed.log`. Review recheck is pending.
+`.local/build/neo194-check-reviewed.log`.
+
+The Standards recheck at `568ad1e` cleared both original violations and the
+duplicated-start smell. The Spec recheck cleared its original two findings but
+identified one remaining delayed-start cancellation race: an explicit null
+result preserved uncertainty but could still discard available terminal
+evidence. New case `delayed-start` reproduced this against `568ad1e` in attempt
+`e94fd18abd134143a6d96ea4ca073b40`. The durable start receipt above now excludes
+removal and repeated start while a request is unresolved. Failed-executable
+fixture cleanup is explicitly confined to its known, nonexecuting test object;
+production recovery retains that ambiguous created state. The corrected
+twelve-group attempt `87f5a037f59c472ab0607ba0655ac940` passes, all five input
+hashes match, and no ownership records remain. Full host checks pass again
+(24 runtime, 1,007 tooling with two optional skips, C regressions and shell
+checks); see `.local/build/neo194-check-start-receipt.log`. Docker Engine/client
+29.8.1 (daemon commit `464cd50`) was used for these fixtures. Final review
+recheck is pending.
 
 ## Scope and limits
 

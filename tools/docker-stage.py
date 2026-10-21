@@ -140,6 +140,26 @@ def save_result(job, value):
     save(target, value)
 
 
+def record_start(job, state):
+    # One receipt is authoritative even if ACTIVE/job.json publication was
+    # interrupted. Missing receipts in older records are deliberately unknown.
+    save(directory(job) / 'start.json', dict(schema=1, workspace=WORKSPACE,
+         run=job['run'], id=job.get('id'), state=state, recorded_utc=timestamp()))
+
+
+def start_state(job):
+    receipt = directory(job) / 'start.json'
+    if not receipt.exists():
+        return 'unknown'
+    value = json.loads(receipt.read_text())
+    if (value.get('schema') != 1 or value.get('workspace') != WORKSPACE or
+            value.get('run') != job['run'] or
+            value.get('state') not in ('unrequested', 'pending', 'acknowledged') or
+            (value.get('id') is not None and value['id'] != job.get('id'))):
+        raise RuntimeError('Invalid start receipt; retaining build ownership')
+    return value['state']
+
+
 def recover_named():
     found = docker('inspect', '--type', 'container', NAME, check=False,
                    capture_output=True, text=True)
@@ -178,11 +198,14 @@ def cancel_created(job, value):
         receipt = target / ('cancellation-' + uuid.uuid4().hex + '.json')
     # Preserve the observed state (including a failed start) before removal.
     # This is cancellation intent, not a fabricated terminal process result.
+    state = start_state(job)
     save(receipt, dict(schema=1, job=job, state=value['State'],
-                       requested_utc=timestamp()))
-    # Non-force removal refuses a running container. A delayed start could
-    # also finish between inspect and removal, so no complete-log or
-    # never-started claim follows from the earlier created-state snapshot.
+                       start_state=state, requested_utc=timestamp()))
+    if state != 'unrequested':
+        raise RuntimeError('Original start is unresolved or already acknowledged; '
+                           'retain the created container and inspect status before recovery')
+    # Only a positively unrequested start is safe to cancel. A nonzero CLI
+    # result or a created snapshot cannot exclude a delayed daemon request.
     docker('rm', job['id'], capture_output=True)
     log = target / 'container.log'
     if not log.exists():
@@ -299,7 +322,12 @@ def start(job):
             options.get('mode') not in (None, '', 'blocking')):
         raise RuntimeError('Lossy Docker logging cannot preserve an interrupted full build log; '
                            'stop the created stage and inspect the daemon logging policy')
+    if start_state(job) != 'unrequested':
+        raise RuntimeError('Original start is unresolved or already acknowledged; '
+                           'retaining ownership without issuing another start')
+    record_start(job, 'pending')
     docker('start', job['id'], capture_output=True)
+    record_start(job, 'acknowledged')
 
 
 def run(stage, arguments):
@@ -327,6 +355,7 @@ def run(stage, arguments):
         job = dict(schema=1, workspace=WORKSPACE, name=NAME, stage=stage,
                    run=uuid.uuid4().hex, created_utc=timestamp())
         save(directory(job) / 'job.json', job)
+        record_start(job, 'unrequested')
         save(ACTIVE, job)  # Publish reservation before sending a create request.
         labels = [item for key in ('workspace', 'stage', 'run')
                   for item in ('--label', PREFIX + key + '=' + job[key])]
@@ -360,6 +389,7 @@ def main():
         if args.action == 'status':
             value = inspect(job) if job else None
             print(json.dumps(dict(active=job, container_state=value['State'] if value else None,
+                                  start_state=start_state(job) if job else None,
                                   container_name=NAME), indent=2))
             return 0
         if not job:

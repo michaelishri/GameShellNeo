@@ -2,6 +2,7 @@
 """Prepare attended RTC-wake attempts/batches, or an awake rehearsal."""
 import argparse
 import fcntl
+import hashlib
 import importlib.util
 import json
 import os
@@ -13,8 +14,49 @@ import uuid
 
 import paramiko
 from private_config import load_env
+from host_timing import phase, timed_capture, collection_state, clock_sample, CLOCK_SOURCE, capture_timing
 from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
 import sleep_rtc as diagnostic
+
+
+MAX_BAD_REPLY_FILES = 4
+MAX_BAD_REPLY_BYTES = 1024 * 1024
+
+
+class MalformedReply(ValueError):
+    """A reply that cannot be decoded, distinct from invalid result evidence."""
+    def __init__(self, raw, error):
+        self.raw = raw
+        self.kind = 'json' if isinstance(error, json.JSONDecodeError) else 'encoding'
+        self.offset = error.pos if self.kind == 'json' else error.start
+        super().__init__('Malformed sleep collection reply (' + self.kind + ')')
+
+
+def save_bad_reply(capture, error, token, route):
+    """Keep bounded private bytes and metadata; never replace accepted evidence.
+
+    Failure to save evidence is fatal. The caller must not continue collection
+    without recording the rejected reply. Raw replies may contain device logs.
+    """
+    saved, size = None, 0
+    for index in range(1, MAX_BAD_REPLY_FILES + 1):
+        name = f'collection-bad-reply-{index}.bin'
+        try:
+            fd = os.open(capture/name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        except FileExistsError:
+            continue
+        with os.fdopen(fd, 'wb') as stream:
+            size = stream.write(error.raw[:MAX_BAD_REPLY_BYTES])
+        saved = name
+        break
+    row = dict(run_id=token, route=route, error=error.kind, offset=error.offset,
+               offset_unit='characters' if error.kind == 'json' else 'bytes',
+               received_bytes=len(error.raw), sha256=hashlib.sha256(error.raw).hexdigest(),
+               saved_file=saved, saved_bytes=size, truncated=size < len(error.raw))
+    fd = os.open(capture/'collection-bad-replies.jsonl',
+                 os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as stream:
+        stream.write(json.dumps(row, sort_keys=True)+'\n')
 
 
 def pm_host():
@@ -36,22 +78,55 @@ def saved_result(item, connection='usb'):
     return value
 
 
-def receipt(path, before, connection='usb'):
+def receipt(path, before, connection='usb', seconds=diagnostic.SECONDS):
+    diagnostic.sleep_window.duration(seconds, connection)
     summary = json.loads(path.read_text())
     records = [saved_result(item) for item in summary['cycles']]
-    sleeps = [saved_result(item, connection) for item in summary.get('sleeps', [])]
+    batch = summary.get('cable_batch')
+    sleeps, rehearsals, observations = [], [], []
+    for index, item in enumerate(summary.get('sleeps', [])):
+        if batch is None:
+            sleeps.append(saved_result(item, connection))
+            continue
+        if index >= len(diagnostic.sleep_cable_batch.SEQUENCE):
+            raise ValueError('Cable batch is already complete')
+        profile = diagnostic.sleep_cable_batch.SEQUENCE[index]
+        value = saved_result(item, diagnostic.sleep_connection.endpoint(profile, 'rtc-wake', 'after'))
+        awake = saved_result(dict(capture=item['rehearsal']), diagnostic.sleep_connection.endpoint(profile))
+        source = (ROOT/Path(item['capture'])).resolve(strict=True)
+        observer_path = source.with_name('result-cable-observation.json')
+        observed = json.loads(observer_path.read_text())
+        if (observed.get('original_sha256') != hashlib.sha256(source.read_bytes()).hexdigest() or
+                observed.get('run_id') != value['run_id'] or observed.get('connection') != profile or
+                observed.get('assessment_sources') != diagnostic.sources() or
+                observed.get('automated_passed') is not True or observed.get('attended_case_passed') is not True or
+                observed.get('observer_action') != 'during-dark' or observed.get('observer_display') != 'normal'):
+            raise ValueError('Cable predecessor lacks its successful original observer report')
+        # Device admission binds this explicit human attestation to its own
+        # unchanged result, not to mutable host-only route proof fields.
+        observations.append(dict(run_id=value['run_id'], device_sha256=diagnostic.digest(value),
+                                 action='during-dark', display='normal'))
+        sleeps.append(value)
+        rehearsals.append(awake)
     if len(sleeps) >= diagnostic.MAX_SLEEP_CHAIN:
         raise ValueError('Sleep history reached its admission limit')
     qualified = diagnostic.history(diagnostic.pm_module(), records, sleeps, before,
-                                   json.loads((ROOT/'build/sources.lock.json').read_text()), connection)
+                                   json.loads((ROOT/'build/sources.lock.json').read_text()), connection,
+                                   batch, rehearsals, observations, seconds)
     by_id = {r['run_id']: r for r in records+sleeps}
     entries = lambda tokens: [dict(run_id=token, sha256=diagnostic.digest(by_id[token])) for token in tokens]
-    return dict(boot_id=before['boot_id'], connection=connection, runs=entries(qualified['runs']),
-                sleeps=entries(qualified['sleep_runs']))
+    proof = dict(boot_id=before['boot_id'], connection=connection, alarm_seconds=seconds, runs=entries(qualified['runs']),
+                 sleeps=entries(qualified['sleep_runs']))
+    if batch is not None:
+        proof.update(cable_batch=batch, cable_observations=observations,
+                     rehearsals=[dict(run_id=r['run_id'], sha256=diagnostic.digest(r)) for r in rehearsals])
+    return proof
 
 
-def service(directory, token, mode, rehearsal, connection='usb'):
+def service(directory, token, mode, rehearsal, connection='usb', observer=None, seconds=diagnostic.SECONDS):
     diagnostic.sleep_connection.profile(connection)
+    diagnostic.sleep_window.duration(seconds, connection)
+    budgets = diagnostic.sleep_window.budget(seconds)
     if not re.fullmatch(r'/tmp/gameshellneo-sleep\.[A-Za-z0-9]+', directory):
         raise ValueError('Unexpected sleep helper path')
     diagnostic.policy.run_id(token)
@@ -59,20 +134,26 @@ def service(directory, token, mode, rehearsal, connection='usb'):
         raise ValueError('Unknown experiment mode')
     script = directory+'/sleep_rtc.py'
     command = ['sudo', '-n', 'systemd-run', '--quiet', '--collect',
-        '--unit=gameshellneo-sleep-test', '--property=RuntimeMaxSec=180',
+        '--unit=gameshellneo-sleep-test', '--property=RuntimeMaxSec='+str(budgets['service_seconds']),
         '--property=TimeoutStopSec=10', '--property=UMask=0077',
         '--property=ExecStopPost=/usr/bin/python3 -B '+script+' --recover --run-id '+token,
         '/usr/bin/systemd-inhibit', '--what=handle-power-key:sleep:idle', '--mode=block',
         '--who=GameShellNeo PM diagnostic', '--why=Guarded RTC sleep qualification',
         '/usr/bin/python3', '-B', script, '--'+mode, '--run-id', token,
         '--lock', directory+'/sources.lock.json', '--receipt', directory+'/qualification.json',
-        '--connection', connection]
+        '--connection', connection, '--alarm-seconds', str(seconds)]
     if diagnostic.sleep_connection.endpoint(connection) == 'battery':
         command += ['--cable-absent-confirmed']
     if diagnostic.sleep_connection.transition(connection):
         command += ['--cable-action-confirmed']
     if mode == 'rtc-wake':
         command += ['--attended', '--rehearsal', diagnostic.policy.run_id(rehearsal)]
+    if observer is not None:
+        if mode != 'rtc-wake' or connection != 'usb' or seconds != diagnostic.SECONDS:
+            raise ValueError('TCP observer requires a connected-USB actual sleep')
+        from tcp_supervisor import prefix
+        index = command.index('/usr/bin/systemd-inhibit')
+        command[index:index] = prefix(observer)
     return command
 
 
@@ -83,16 +164,32 @@ def collect(config, token, route='usb'):
     # Read saved evidence without uploading/replacing the original helper.
     base = '/var/lib/gameshellneo/sleep-tests/'+token
     command = python_command(
-        'from pathlib import Path; import sys; p=Path(sys.argv[1]); '
-        'f=p/"result.json"; f=f if f.exists() else p/"started.json"; print(f.read_text())', base)
+        'from pathlib import Path; import sys, json; p=Path(sys.argv[1]); '
+        'f=p/"result.json"; f=f if f.exists() else p/"started.json"; value=json.loads(f.read_text())\n'
+        + CLOCK_SOURCE + '\nprint(json.dumps(dict(result=value, clock=clock)))', base)
     with device(config, route) as client:
-        result = json.loads(run(client, **command, display=False))
-    if result.get('run_id') != token:
-        raise ValueError('Collected another run')
+        with phase('clock.sample'):
+            raw = run(client, **command, display=False)
+            try:
+                envelope = json.loads(raw)
+            except (json.JSONDecodeError, UnicodeDecodeError) as error:
+                raise MalformedReply(raw, error) from None
+            # Syntax recovery must never hide a decoded protocol/identity error.
+            if (not isinstance(envelope, dict) or set(envelope) != {'result', 'clock'} or
+                    not isinstance(envelope['result'], dict)):
+                raise ValueError('Invalid sleep collection envelope')
+            result = envelope['result']
+            if result.get('run_id') != token:
+                raise ValueError('Collected another run')
+            if result.get('event') not in ('started', 'complete', 'failed'):
+                raise ValueError('Invalid sleep collection event')
+            clock_sample(envelope['clock'])
     return result
 
 
-def validate_result(value, token, before, mode, connection='usb'):
+def validate_result(value, token, before, mode, connection='usb', seconds=diagnostic.SECONDS):
+    if diagnostic.sleep_window.recorded(value) != seconds:
+        raise ValueError('Returned result has another alarm duration')
     if value.get('connection', 'usb') != connection:
         raise ValueError('Returned result has another connection profile')
     if value.get('run_id') != token or value['before']['boot_id'] != before['boot_id']:
@@ -131,8 +228,11 @@ def usb_proof(config, expected_boot):
         raise ValueError('Independent USB proof reached another boot')
 
 
-def experiment(config, capture, qualification, mode, rehearsal, connection='usb'):
+@timed_capture('sleep.experiment')
+def experiment(config, capture, qualification, mode, rehearsal, connection='usb', observer=None,
+               seconds=diagnostic.SECONDS):
     diagnostic.sleep_connection.profile(connection)
+    diagnostic.sleep_window.duration(seconds, connection)
     route = 'usb' if connection == 'usb' else 'wifi'
     token = uuid.uuid4().hex
     helper = pm_host()
@@ -141,14 +241,14 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
         (capture/'before.json').write_text(json.dumps(before, indent=2)+'\n')
         diagnostic.pm_module().validate(before, json.loads((ROOT/'build/sources.lock.json').read_text()),
                                         diagnostic.sleep_connection.endpoint(connection, mode))
-        proof = receipt(Path(qualification), before, connection)
+        proof = receipt(Path(qualification), before, connection, seconds)
         helper.wifi_proof(config, before)
         if diagnostic.sleep_connection.transition(connection) and diagnostic.sleep_connection.endpoint(connection, mode) == 'usb':
             usb_proof(config, before['boot_id'])
         if run(client, 'systemctl show gameshellneo-sleep-test -p LoadState --value', display=False).decode().strip() != 'not-found':
             raise ValueError('An earlier sleep unit exists; collect it without resubmission')
         directory = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-sleep.XXXXXXXX', display=False).decode().strip()
-        command = service(directory, token, mode, rehearsal, connection)
+        command = service(directory, token, mode, rehearsal, connection, observer, seconds)
         (capture/'qualification.json').write_text(json.dumps(proof, indent=2)+'\n')
         (capture/'source.json').write_text(json.dumps(diagnostic.sources(), indent=2)+'\n')
         with client.open_sftp() as sftp:
@@ -156,22 +256,33 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
                 upload(sftp, ROOT/'tools'/(name+'.py'), directory+'/'+name+'.py')
             upload(sftp, ROOT/'build/sources.lock.json', directory+'/sources.lock.json')
             upload(sftp, capture/'qualification.json', directory+'/qualification.json')
-        (capture/'run.json').write_text(json.dumps(dict(run_id=token, mode=mode, connection=connection, route=route, helper=directory))+'\n')
-        print('RTC sleep run:', token, 'mode:', mode, flush=True)
+        (capture/'run.json').write_text(json.dumps(dict(run_id=token, mode=mode, connection=connection,
+            alarm_seconds=seconds, budgets=diagnostic.sleep_window.budget(seconds), route=route, helper=directory))+'\n')
+        print('RTC sleep run:', token, 'mode:', mode, 'alarm seconds:', seconds, flush=True)
         if diagnostic.sleep_connection.transition(connection):
             print('Cable scenario:', connection, '; follow the on-screen instructions only during actual sleep.', flush=True)
             if mode == 'rehearse':
                 print('Awake rehearsal: keep the starting cable state unchanged.', flush=True)
         try:
-            run(client, shlex.join(command), display=False, timeout=20)
+            with phase('pm.submit'):
+                run(client, shlex.join(command), display=False, timeout=20)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             (capture/'submission-error.txt').write_text(type(error).__name__+': '+str(error)+'\n')
             # Submission can have succeeded before transport loss. Collect this ID only.
-    timeout = time.monotonic()+210
+    timeout = time.monotonic()+diagnostic.sleep_window.budget(seconds)['collection_seconds']
     while time.monotonic() < timeout:
-        time.sleep(5)
+        with phase('collection.wait'):
+            time.sleep(5)
         try:
-            value = collect(config, token, route)
+            with phase('collection.attempt'):
+                value = collect(config, token, route)
+                collection_state(value)
+        except MalformedReply as error:
+            save_bad_reply(capture, error, token, route)
+            # Retry only retrieval of this exact ID, within the original budget.
+            # Do not publish partial JSON or repeat the submission above.
+            print('Malformed reply saved privately; collecting original RUN='+token, flush=True)
+            continue
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             with (capture/'collection-errors.txt').open('a') as output:
                 output.write(type(error).__name__+': '+str(error)+'\n')
@@ -181,12 +292,14 @@ def experiment(config, capture, qualification, mode, rehearsal, connection='usb'
             continue
         if diagnostic.sleep_connection.transition(connection):
             print('Original cable wake observation:', json.dumps(value.get('wake_observation')), flush=True)
-        validate_result(value, token, before, mode, connection)
-        helper.wifi_proof(config, value['after'])
-        with device(config, route) as client:
-            boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
-        if boot != before['boot_id']:
-            raise ValueError('Boot changed after collection')
+        validate_result(value, token, before, mode, connection, seconds)
+        with phase('proof.wifi'):
+            helper.wifi_proof(config, value['after'])
+        with phase('proof.final'):
+            with device(config, route) as client:
+                boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
+            if boot != before['boot_id']:
+                raise ValueError('Boot changed after collection')
         final_usb = diagnostic.sleep_connection.endpoint(connection, mode, 'after') == 'usb'
         if final_usb and route != 'usb':
             usb_proof(config, before['boot_id'])
@@ -250,7 +363,14 @@ def main():
     modes.add_argument('--clock-inspect', action='store_true')
     modes.add_argument('--connection-inspect', action='store_true')
     parser.add_argument('--connection', choices=('usb', 'battery', 'usb-remove', 'usb-attach'), default='usb')
+    parser.add_argument('--alarm-seconds', type=int, default=os.environ.get('NEO_SLEEP_ALARM_SECONDS', '30'))
     args = parser.parse_args()
+    try:
+        diagnostic.sleep_window.duration(args.alarm_seconds, args.connection)
+        if args.alarm_seconds != diagnostic.SECONDS and not (args.rehearse or args.rtc_wake):
+            raise ValueError('Extended duration supports one-shot rehearsal or RTC wake only; no batch')
+    except ValueError as error:
+        parser.error(str(error))
     if args.connection != 'usb' and (args.rtc_batch or args.clock_inspect or args.connection_inspect or args.collect):
         parser.error('Special connection profiles require one-shot rehearsal or RTC wake; collect using ROUTE=wifi')
     if diagnostic.sleep_connection.transition(args.connection) and os.environ.get('NEO_SLEEP_CABLE_ACTION') != '1':
@@ -269,21 +389,27 @@ def main():
                          os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb'))
             return
         if args.collect:
-            token = os.environ.get('NEO_PM_RUN', '')
-            route = os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb')
-            value = collect(config, token, route)
-            (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
-            # Read-only postmortem, with no upload, policy cleanup or PM submission.
-            # Keep the original result even if the separate live snapshot fails.
-            with device(config, route) as client:
-                snapshot = json.loads(run(client, **python_command(
-                    (ROOT/'tools/sleep_recovery.py').read_text(), token), display=False))
-            (capture/'recovery-snapshot.json').write_text(json.dumps(snapshot, indent=2)+'\n')
-            (capture/'collection.json').write_text(json.dumps(dict(route=route,
-                run_id=token, original_event=value.get('event'),
-                same_boot=snapshot['boot_id'] == value.get('before', {}).get('boot_id')))+'\n')
-            print('Original evidence recovered via '+route+'; this does not qualify recovery or retry sleep.')
-            return
+            with capture_timing(capture):
+                token = os.environ.get('NEO_PM_RUN', '')
+                route = os.environ.get('NEO_SLEEP_COLLECT_ROUTE', 'usb')
+                try:
+                    value = collect(config, token, route)
+                except MalformedReply as error:
+                    save_bad_reply(capture, error, token, route)
+                    raise ValueError('Malformed reply saved privately; no sleep submitted. '
+                                     'Collect original RUN='+token) from None
+                (capture/'result.json').write_text(json.dumps(value, indent=2)+'\n')
+                # Read-only postmortem, with no upload, policy cleanup or PM submission.
+                # Keep the original result even if the separate live snapshot fails.
+                with device(config, route) as client:
+                    snapshot = json.loads(run(client, **python_command(
+                        (ROOT/'tools/sleep_recovery.py').read_text(), token), display=False))
+                (capture/'recovery-snapshot.json').write_text(json.dumps(snapshot, indent=2)+'\n')
+                (capture/'collection.json').write_text(json.dumps(dict(route=route,
+                    run_id=token, original_event=value.get('event'),
+                    same_boot=snapshot['boot_id'] == value.get('before', {}).get('boot_id')))+'\n')
+                print('Original evidence recovered via '+route+'; this does not qualify recovery or retry sleep.')
+                return
         qualification = os.environ.get('NEO_SLEEP_QUALIFICATION', '')
         if not qualification:
             raise ValueError('Supply QUALIFICATION=path/to/strict-reference-history.json')
@@ -295,7 +421,8 @@ def main():
                   int(os.environ.get('NEO_PM_CYCLES', '4')))
         else:
             value = experiment(config, capture, Path(qualification),
-                               'rtc-wake' if args.rtc_wake else 'rehearse', rehearsal, args.connection)
+                               'rtc-wake' if args.rtc_wake else 'rehearse', rehearsal, args.connection,
+                               seconds=args.alarm_seconds)
             if args.rtc_wake and not diagnostic.sleep_connection.transition(args.connection):
                 continuation = json.loads(Path(qualification).read_text())
                 continuation['sleeps'] = continuation.get('sleeps', []) + [dict(capture=str(capture/'result.json'))]

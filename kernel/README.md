@@ -3,11 +3,63 @@
 Base: Linux **6.18.54**, source and upstream configuration hashes in
 [the lock](../build/sources.lock.json). Only CPI v3.1 is targeted.
 
+Diagnostic.24 integrates patches **0027/0028** and the default-off CPI WFI
+overlay driver. Patch 0027 enables valid state-0 s2idle entry and updates its
+scheduler return contract; it changes global core behavior even with the new
+driver disabled. Patch 0028 supplies Kbuild/Kconfig integration. This image
+explicitly enables the board option and integrates the BOOTTIME battery prerequisite.
+The source regression exercises 618 native/ARM32 scenarios, eleven native
+negative controls, four ARM compilation configurations and WFI disassembly.
+Hardware qualification is still pending. Remove these patches when equivalent upstream
+state-0 support and suitable board registration are verified. See
+[report 134](../docs/134-cpi-wfi-s2idle-candidate.md) and the integrated image's
+[report 217](../docs/217-wfi-s2idle-image-integration.md).
+
 `tools/kernel-inputs.py --export DIRECTORY` creates the complete patch queue
 and content manifest. Existing-source changes live in `patches/`; new source
 files and bindings live in `overlay/` and become the third generated patch.
 The same queue is applied by `--apply SOURCE` for local compilation. Input
 changes require a fresh source extraction; do not silently reuse a patched tree.
+
+The isolated [0038 failed-queue DMA rollback candidate](candidates/0038-musb-queue-dma-rollback.patch)
+is kept under `candidates/`, outside that exporter and the image queue. Its
+`test:musb-queue-dma` and `check:musb-queue-dma-drivers` tasks exercise actual
+mapping/queue functions and separately compile the candidate. It is not an
+installed change or complete controller teardown. See
+[report 253](../docs/253-musb-queue-dma-rollback-candidate.md) for evidence and
+the source-suite/image integration still required before promotion.
+
+The isolated [AXP223 control diagnostic](candidates/axp223-controls/driver.patch)
+is composed with its adjacent helper by `test:axp223-controls` and
+`check:axp223-controls-driver`. It is default-off, outside the image queue and
+has no charger writes. Real UML regmap/PM/debugfs tests and full ARM compilation
+are required before promotion. [Report 255](../docs/255-axp223-control-provenance-diagnostic.md)
+records validation status, lifetime admission and the remaining hardware gates.
+
+The isolated [0039 mailbox-error candidate](candidates/0039-brcmfmac-mailbox-errors.patch)
+checks the Wi-Fi mailbox read and ACK before decoding status, then sends errors
+through patch 0018's existing worker cleanup. It also lives outside the active
+queue. `test:brcmfmac-mailbox` and `check:brcmfmac-mailbox-drivers` exercise the
+actual helper/worker and compile a separate source queue with this candidate.
+See [report 254](../docs/254-brcmfmac-mailbox-error-candidate.md) for validation
+and integration limits. Remove the candidate when equivalent upstream handling
+is verified; it supplies no automatic Wi-Fi recovery or firmware modification.
+
+Patch 0036 is installed in diagnostic.22 and retained in diagnostic.23. It
+masks unused low-register bits in the shared 9–16-bit ADC helper while retaining
+16-bit values, read order and error propagation. The saved
+`test:axp-adc-width` / `check:axp-adc-drivers` tasks exercise actual source and
+its callers; [report 192](../docs/192-axp-adc-width-correction.md) records the
+evidence and remaining hardware/coherence/accuracy limits. Remove it when an
+equivalent correction is verified in the selected upstream source.
+
+The diagnostic.23 configuration disables `CONFIG_LEGACY_PTYS`, retaining
+`CONFIG_UNIX98_PTYS`, virtual/framebuffer and serial-console support. On
+diagnostic.22, 256 legacy slave devices account for 512 of the user manager's
+588 unit records. This removes their allocation at the kernel source rather
+than filtering udev events or changing SSH/PAM behavior. There is no additional
+kernel patch. [Report 198](../docs/198-legacy-pty-startup-candidate.md) records
+the baseline, build checks and pending installed-image startup comparison.
 
 | Patch | Purpose | Qualification and removal condition |
 | --- | --- | --- |

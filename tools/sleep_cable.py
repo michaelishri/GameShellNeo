@@ -51,8 +51,11 @@ def console(record, token):
     record['cable_console'] = dict(prompts=[], restored=False)
     try:
         remove = record['connection'] == 'usb-remove'
+        batch = record.get('qualification', {}).get('cable_batch')
+        heading = ('Cycle %d / 4' % (len(record['qualification']['sleep_runs'])+1)
+                   if batch is not None else 'One cable change')
         prompt(record, 'instructions',
-               'When the screen goes dark:', 'Wait 10 seconds, then ONCE:',
+               heading, 'When the screen goes dark:', 'Wait 10 seconds, then ONCE:',
                'UNPLUG USB at the GameShell.' if remove else 'CONNECT USB to the Mac.',
                'Leave USB unplugged.' if remove else 'Leave USB connected.',
                '', 'If the screen returns early,', 'DO NOT change the cable.',

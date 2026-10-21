@@ -14,6 +14,7 @@ import uuid
 
 import paramiko
 from private_config import load_env
+from host_timing import phase, timed_capture, collection_state
 from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
 
 
@@ -64,15 +65,31 @@ def service_command(directory, stage, run_id, keypad_trace=False, keypad_persist
                 ['--power-key-input'] if power_key_input else [])
 
 
-def inline(client, *args):
-    # Inline inspection/recovery also needs the same saved keypad helper.
+INLINE_HELPERS = ('battery_sample', 'cpi_idle', 'kernel_evidence', 'keypad_pm', 'keypad_input',
+                  'speaker_audio', 'wifi_trace', 'power_key', 'rtc_alarm', 'pm_platform')
+INLINE_FILES = tuple(name + '.py' for name in INLINE_HELPERS) + ('test-pm-stages.py',)
+
+
+def inline_program(sources):
+    if set(sources) != set(INLINE_FILES):
+        raise ValueError('Incomplete inline diagnostic source bundle')
     program = 'import sys, types\n'
-    for name in ('keypad_pm', 'keypad_input', 'speaker_audio', 'wifi_trace', 'power_key', 'rtc_alarm', 'pm_platform'):
+    for name in INLINE_HELPERS:
+        source = sources[name + '.py']
         program += ('keypad_helper = types.ModuleType(' + repr(name) + ')\n'
-                    'exec(' + repr((ROOT / 'tools' / (name + '.py')).read_text()) + ', keypad_helper.__dict__)\n'
+                    'keypad_helper.__source_sha256__ = ' + repr(hashlib.sha256(source.encode()).hexdigest()) + '\n'
+                    'exec(' + repr(source) + ', keypad_helper.__dict__)\n'
                     'sys.modules[' + repr(name) + '] = keypad_helper\n')
-    program += (ROOT / 'tools/test-pm-stages.py').read_text()
-    return run(client, **python_command(program, *args), display=False, timeout=40)
+    source = sources['test-pm-stages.py']
+    program += '__source_sha256__ = ' + repr(hashlib.sha256(source.encode()).hexdigest()) + '\n' + source
+    return program
+
+
+def inline(client, *args, output=None):
+    # PM operations always use current sources. Historical bundles are limited
+    # to the separate awake clock diagnostic's explicit --inspect command.
+    program = inline_program({name: (ROOT / 'tools' / name).read_text() for name in INLINE_FILES})
+    return run(client, **python_command(program, *args), output=output, display=False, timeout=40)
 
 
 def wifi_proof(config, snapshot):
@@ -87,6 +104,7 @@ def collect(config, run_id):
         return json.loads(inline(client, '--collect', run_id))
 
 
+@timed_capture('pm.cycle')
 def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None, keypad_input=False, keypad_audio=False,
           keypad_quirk=None, wifi_trace=False, power_key=False, power_key_input=False):
     with device(config, 'usb') as client:
@@ -104,6 +122,9 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
                                   keypad_quirk, wifi_trace, power_key, power_key_input)
         with client.open_sftp() as sftp:
             upload(sftp, ROOT / 'tools/test-pm-stages.py', directory + '/test-pm-stages.py')
+            upload(sftp, ROOT / 'tools/battery_sample.py', directory + '/battery_sample.py')
+            upload(sftp, ROOT / 'tools/cpi_idle.py', directory + '/cpi_idle.py')
+            upload(sftp, ROOT / 'tools/kernel_evidence.py', directory + '/kernel_evidence.py')
             upload(sftp, ROOT / 'tools/keypad_pm.py', directory + '/keypad_pm.py')
             upload(sftp, ROOT / 'tools/keypad_input.py', directory + '/keypad_input.py')
             upload(sftp, ROOT / 'tools/speaker_audio.py', directory + '/speaker_audio.py')
@@ -114,7 +135,7 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
             if power_key_input:
                 for name in ('power_key_policy', 'power_key_input', 'power_key_pm'):
                     upload(sftp, ROOT/'tools'/(name+'.py'), directory+'/'+name+'.py')
-                names = ('test-pm-stages', 'keypad_pm', 'keypad_input', 'speaker_audio',
+                names = ('test-pm-stages', 'battery_sample', 'cpi_idle', 'kernel_evidence', 'keypad_pm', 'keypad_input', 'speaker_audio',
                          'power_key', 'power_key_policy', 'power_key_input', 'power_key_pm')
                 (capture/'source.json').write_text(json.dumps({name: hashlib.sha256(
                     (ROOT/'tools'/(name+'.py')).read_bytes()).hexdigest() for name in names}, indent=2)+'\n')
@@ -124,14 +145,18 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
         # Submission may itself lose SSH after systemd accepted it. Never retry
         # submission: recover this exact ID and fail incomplete evidence.
         try:
-            run(client, shlex.join(command), display=False, timeout=20)
+            with phase('pm.submit'):
+                run(client, shlex.join(command), display=False, timeout=20)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             (capture / 'submission-error.txt').write_text(type(error).__name__ + '\n')
     deadline = time.monotonic() + (480 if keypad_input or power_key_input else 180)
     while time.monotonic() < deadline:
-        time.sleep(5)
+        with phase('collection.wait'):
+            time.sleep(5)
         try:
-            result = collect(config, run_id)
+            with phase('collection.attempt'):
+                result = collect(config, run_id)
+                collection_state(result)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             with (capture / 'collection-errors.txt').open('a') as output:
                 output.write(type(error).__name__ + ': ' + str(error) + '\n')
@@ -159,13 +184,15 @@ def cycle(config, capture, lock, stage, keypad_trace=False, keypad_persist=None,
         if power_key_input:
             from power_key_pm import validate_result
             validate_result(result)
-        wifi_proof(config, result['after'])
+        with phase('proof.wifi'):
+            wifi_proof(config, result['after'])
         # A fresh USB SSH collection above and independent Wi-Fi proof below
         # are required; kernel return alone is insufficient.
-        with device(config, 'usb') as client:
-            boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
-        if boot != before['boot_id']:
-            raise ValueError('USB SSH reached a different boot after the PM test')
+        with phase('proof.final'):
+            with device(config, 'usb') as client:
+                boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
+            if boot != before['boot_id']:
+                raise ValueError('USB SSH reached a different boot after the PM test')
         result.update(usb_ssh_verified=True, wifi_ssh_verified=True)
         (capture / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
         print(stage, 'debug stage passed; both SSH routes verified.', flush=True)
@@ -431,7 +458,13 @@ def main():
     mode.add_argument('--platform', action='store_true')
     parser.add_argument('--power-key', action='store_true')
     parser.add_argument('--power-key-input', action='store_true')
+    parser.add_argument('--inspect-route', choices=('usb', 'wifi'),
+                        default=os.environ.get('NEO_PM_INSPECT_ROUTE'),
+                        help='Transport for read-only --inspect, default usb')
     args = parser.parse_args()
+    if args.inspect_route is not None and (
+            not args.inspect or args.inspect_route not in ('usb', 'wifi')):
+        parser.error('Inspection route requires --inspect and usb or wifi')
     os.umask(0o077)
     config = load_env()
     capture = evidence_directory()
@@ -453,8 +486,11 @@ def main():
         print('PM unit stopped and owned debug controls restored.')
         return
     if args.inspect:
-        with device(config, 'usb') as client:
-            data = inline(client, '--inspect')
+        route = args.inspect_route or 'usb'
+        (capture / 'route.json').write_text(json.dumps(dict(operation='pm.inspect', route=route)) + '\n')
+        with device(config, route) as client:
+            with (capture / 'inspection-output.txt').open('wb') as output:
+                data = inline(client, '--inspect', output=output)
         (capture / 'inspection.json').write_bytes(data)
         value = json.loads(data)
         print(json.dumps({key: value[key] for key in ('kernel', 'boot_id', 'pm', 'pm_test_delay', 'rsb')}, indent=2))

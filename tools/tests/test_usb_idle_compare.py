@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from awake_fixtures import proof, window
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 spec = importlib.util.spec_from_file_location('usb_idle',
@@ -87,7 +88,7 @@ class ComparisonTests(unittest.TestCase):
                 path.write_text(json.dumps({'event': 'sample'}) + '\n')
                 with self.assertRaises(ValueError):
                     compare.measurement(capture, 'idle', [], path.name, 300)
-                complete = dict(event='complete', passed=True, duration_seconds=300.01)
+                complete = dict(event='complete', passed=True, duration_seconds=300.01, awake_proof=proof(301))
                 path.write_text(json.dumps(dict(event='ready', seconds=600)) + '\n' + json.dumps(complete) + '\n')
                 with self.assertRaises(ValueError):
                     compare.measurement(capture, 'idle', [], path.name, 300)
@@ -143,11 +144,13 @@ class ComparisonTests(unittest.TestCase):
             capture = local / 'diagnostics/comparison'
             capture.mkdir(parents=True)
             phase = dict(mode='experimental', boot_id='old', passed=True, before=state(), after=state())
+            phase['before']['awake_window'] = window(0, boot='old')
+            phase['after']['awake_window'] = window(600, boot='old')
             for kind, filename, seconds in (('idle', 'idle-sample.jsonl', 300), ('profile', 'power-profile.jsonl', 120)):
                 child = local / 'diagnostics' / kind
                 child.mkdir()
                 ready = dict(event='ready', seconds=seconds, utc=datetime.now(timezone.utc).isoformat())
-                complete = dict(event='complete', passed=True, duration_seconds=seconds)
+                complete = dict(event='complete', passed=True, duration_seconds=seconds, awake_proof=proof(seconds, boot='old'))
                 (child / filename).write_text(json.dumps(ready) + '\n' + json.dumps(complete) + '\n')
                 phase[kind] = dict(capture=str(child), summary=complete)
             value = dict(passed=False, phases=[phase], baseline=state())

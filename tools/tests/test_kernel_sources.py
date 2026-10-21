@@ -1,5 +1,6 @@
 """Protect legacy evidence, source identity, isolation and interrupted compaction."""
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -82,6 +83,71 @@ else:
 
     def run_compact(self, apply=True):
         return compact.compact(self.root, self.work.name, apply=apply)
+
+    def historical_queue(self):
+        data = b'--- a/Makefile\n+++ b/Makefile\n@@ -1 +1 @@\n-kernel fixture\n+historical fixture\n'
+        # The original tiny tar fixture lacks a newline; preserve that exact
+        # source contract in the patch rather than accepting fuzzy application.
+        data = data.replace(b'-kernel fixture\n', b'-kernel fixture\n\\ No newline at end of file\n')
+        manifest = [dict(name='0001-historical.patch', sha256=hashlib.sha256(data).hexdigest())]
+        directory = self.work / 'patches'; directory.mkdir()
+        (directory / 'manifest.json').write_text(json.dumps(manifest))
+        (directory / manifest[0]['name']).write_bytes(data)
+        for scratch in self.builds:
+            (scratch / 'source/Makefile').write_text('historical fixture\n')
+            (scratch / 'source/.gameshellneo-patches.json').write_text(json.dumps(manifest, indent=2)+'\n')
+        return manifest, data
+
+    def test_recorded_queue_reconstructs_old_source_and_preserves_outputs(self):
+        manifest, _ = self.historical_queue()
+        before = compact.evidence_plan(self.root, self.work)[1:]
+        # The current checkout exports a different queue and cannot authorize
+        # compaction of these historical trees.
+        with self.assertRaisesRegex(ValueError, 'Legacy source differs'):
+            self.run_compact()
+        result = compact.compact(self.root, self.work.name, recorded=True, apply=True)
+        self.assertTrue(result['verified'])
+        self.assertEqual(result['patch_source'], 'recorded-export')
+        self.assertEqual(compact.evidence_plan(self.root, self.work)[1:], before)
+        for scratch in self.builds:
+            self.assertTrue((scratch/'source').is_symlink())
+            self.assertEqual((scratch/'source/Makefile').read_text(), 'historical fixture\n')
+            self.assertEqual(json.loads((scratch/'source/.gameshellneo-patches.json').read_text()), manifest)
+        self.assertTrue(compact.compact(self.root, self.work.name, recorded=True, apply=True)['verified'])
+
+    def test_recorded_patch_corruption_and_unsafe_exports_prevent_replacement(self):
+        manifest, data = self.historical_queue()
+        directory = self.work/'patches'; path = directory/manifest[0]['name']
+        for failure in ('corrupt', 'symlink', 'duplicate', 'escape', 'extra'):
+            with self.subTest(failure=failure):
+                if failure == 'corrupt': path.write_bytes(data+b'changed')
+                elif failure == 'symlink':
+                    path.rename(self.root/'outside.patch'); path.symlink_to(self.root/'outside.patch')
+                elif failure == 'duplicate':
+                    (directory/'manifest.json').write_text(json.dumps(manifest*2))
+                elif failure == 'escape':
+                    (directory/'manifest.json').write_text(json.dumps([manifest[0] | {'name': '../outside.patch'}]))
+                else: (directory/'extra.patch').write_bytes(data)
+                with self.assertRaises(ValueError):
+                    compact.compact(self.root, self.work.name, recorded=True, apply=True)
+                self.assertTrue(all(not (p/'source').is_symlink() for p in self.builds))
+                if path.is_symlink(): path.unlink()
+                path.write_bytes(data)
+                (directory/'manifest.json').write_text(json.dumps(manifest))
+                (directory/'extra.patch').unlink(missing_ok=True)
+
+    def test_recorded_source_mismatch_still_prevents_all_replacements(self):
+        self.historical_queue()
+        (self.builds[1]/'source/Makefile').write_text('local edit')
+        with self.assertRaisesRegex(ValueError, 'Legacy source differs'):
+            compact.compact(self.root, self.work.name, recorded=True, apply=True)
+        self.assertTrue(all(not (p/'source').is_symlink() for p in self.builds))
+
+    def test_recorded_patch_identity_is_checked_before_cached_source_reuse(self):
+        manifest, data = self.historical_queue()
+        with self.assertRaisesRegex(ValueError, 'patch bytes'):
+            sources.ensure_source(self.root, self.work, self.archive, self.lock, manifest,
+                recorded_patches=[(manifest[0]['name'], data+b'changed')])
 
     def test_preview_apply_idempotence_and_evidence_preservation(self):
         saved = (self.work / 'matrix-evidence.json').read_bytes()

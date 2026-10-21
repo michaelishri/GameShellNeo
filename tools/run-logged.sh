@@ -9,6 +9,10 @@ umask 077
 mkdir -p .local/build/logs
 exec 9>.local/build/workflow.lock
 flock -n 9 || { echo 'Another build stage is running; wait for it to finish.' >&2; exit 1; }
+# Admission precedes log rotation and every host-side build preparation.
+export NEO_BUILD_DOCKER="${NEO_BUILD_DOCKER:-$(command -v docker || true)}" NEO_BUILD_STAGE="$name"
+python3 tools/docker-stage.py admit
+export PATH="$PWD/tools/build-bin:$PATH"
 log=".local/build/$name.log"
 if [[ -f $log ]]; then
     mv "$log" ".local/build/logs/$name-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"

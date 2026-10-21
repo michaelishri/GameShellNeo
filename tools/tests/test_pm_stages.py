@@ -155,6 +155,7 @@ class Controls(unittest.TestCase):
         program = '''
 import runpy, sys, time
 from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]).parent))
 scope = runpy.run_path(sys.argv[1], run_name='pm_worker')
 fn = scope['stage_controls'] if sys.argv[3] == 'start' else scope['restore']
 g = scope['restore'].__globals__
@@ -193,6 +194,27 @@ else:
 
 
 class Evidence(unittest.TestCase):
+    def test_disabled_supply_wake_is_image_bound_and_required_for_both_paths(self):
+        good, lock = healthy_fixture()
+        lock['features'] = {'usb_system_wakeup': False, 'power_supply_system_wakeup': False,
+                            'sleep_cable_irq_policy': 'masked-cable-v2'}
+        good['usb_system_wakeup'] = ['disabled']
+        good['power_supply_system_wakeup'] = {'axp20x-usb': 'disabled', 'axp22x-ac': 'disabled'}
+        pm.validate(good, lock)
+        for name in ('axp20x-usb', 'axp22x-ac'):
+            for state in ('enabled', None, ''):
+                bad = deepcopy(good); bad['power_supply_system_wakeup'][name] = state
+                with self.subTest(name=name, state=state), self.assertRaisesRegex(ValueError, 'Power-supply wake'):
+                    pm.validate(bad, lock)
+        for values in (None, {}, {'axp20x-usb': 'disabled'},
+                       good['power_supply_system_wakeup'] | {'other': 'disabled'}):
+            with self.assertRaisesRegex(ValueError, 'Power-supply wake'):
+                pm.validate(good | {'power_supply_system_wakeup': values}, lock)
+        for state in (True, 0, None):
+            bad_lock = deepcopy(lock); bad_lock['features']['power_supply_system_wakeup'] = state
+            bad = deepcopy(good); bad['image']['sources'] = bad_lock
+            with self.assertRaisesRegex(ValueError, 'Power-supply wake'): pm.validate(bad, bad_lock)
+
     def test_cable_irq_policy_is_bound_to_installed_image_and_kernel(self):
         good, lock = healthy_fixture()
         lock['features'] = {'usb_system_wakeup': False,
@@ -227,6 +249,25 @@ class Evidence(unittest.TestCase):
     def test_preflight_accepts_only_the_isolated_healthy_image(self):
         good, lock = healthy_fixture()
         pm.validate(good, lock)
+        for fault in ({'count': 1}, None, False):
+            with self.subTest(clock_fault=fault), self.assertRaisesRegex(ValueError, 'clock fault'):
+                pm.validate(good | {'battery': good['battery'] | {'clock_fault': fault}}, lock)
+        with self.assertRaisesRegex(ValueError, 'battery_freshness'):
+            pm.validate(good | dict(battery_age_seconds=None), lock)
+        clock_lock = deepcopy(lock)
+        clock_lock['features'] = {'battery_sample_clock': 'CLOCK_BOOTTIME'}
+        clock_good = deepcopy(good)
+        clock_good['image']['sources'] = clock_lock
+        clock_good.update(boot_id='boot', boottime_seconds=102)
+        clock_good['battery'].update(schema_version=2, sample_clock='CLOCK_BOOTTIME',
+                                    boot_id='boot', boottime_seconds=100)
+        pm.validate(clock_good, clock_lock)
+        for change in ({'boottime_seconds': 3700}, {'boottime_seconds': None}, {'boot_id': None},
+                       {'battery_age_seconds': 0}, {'battery': good['battery']}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                pm.validate(clock_good | change, clock_lock)
+        with self.assertRaisesRegex(ValueError, 'battery_freshness'):
+            pm.validate(clock_good | dict(boottime_seconds=3700, battery_age_seconds=3600), clock_lock)
         wake_lock = deepcopy(lock)
         wake_lock['features'] = {'usb_system_wakeup': False}
         wake_good = deepcopy(good)

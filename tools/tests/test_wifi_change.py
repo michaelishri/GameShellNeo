@@ -108,6 +108,28 @@ class WifiTransactionTests(unittest.TestCase):
                 host.update_address(env, original, address)
         self.assertEqual(env.read_bytes(), original)
 
+    def test_shared_env_symlink_survives_atomic_address_update(self):
+        shared = self.root / 'shared.env'
+        original = b'# shared\nGAMESHELL_WIFI_PSK="literal $(secret)"\nGAMESHELL_IP=192.0.2.1\n'
+        shared.write_bytes(original)
+        worktree = self.root / 'worktree'
+        worktree.mkdir()
+        link = worktree / '.env'
+        link.symlink_to('../shared.env')
+        host.update_address(link, original, '192.0.2.9')
+        expected = original.replace(b'192.0.2.1', b'192.0.2.9')
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(shared.read_bytes(), expected)
+        self.assertEqual(link.read_bytes(), expected)
+        self.assertEqual(shared.stat().st_mode & 0o777, 0o600)
+        edited = expected.replace(b'literal $(secret)', b'new credentials')
+        shared.write_bytes(edited)
+        self.assertEqual(link.read_bytes(), edited)
+        with self.assertRaisesRegex(ValueError, '.env changed'):
+            host.update_address(link, expected, '192.0.2.10')
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(shared.read_bytes(), edited)
+
     def test_private_sftp_staging_is_exclusively_writable_and_read_back(self):
         sftp = MagicMock()
         stream = sftp.open.return_value.__enter__.return_value

@@ -1,0 +1,85 @@
+From: GameShellNeo contributors
+Subject: [PATCH] brcmfmac: propagate mailbox read and acknowledgement failures
+
+Return mailbox transport errors separately from decoded interrupt bits. A
+failed read may return all ones; do not interpret that sentinel as firmware
+halt, NAK completion, readiness or flow-control state. Stop before decoding
+when acknowledgement fails too, since its completion is uncertain.
+
+Count attempted accesses and let the host-owned DPC failure path quarantine
+the transport before dispatching queued frames or control requests. Preserve
+valid mailbox semantics and the existing cold-restart policy without retries.
+
+Isolated NEO-187 candidate; depends on the current worker-error patch 0018.
+Not part of the active image queue. Hardware qualification remains pending.
+
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -1148,7 +1148,7 @@
+ }
+ #endif /* DEBUG */
+ 
+-static u32 brcmf_sdio_hostmail(struct brcmf_sdio *bus)
++static int brcmf_sdio_hostmail(struct brcmf_sdio *bus, u32 *status)
+ {
+ 	struct brcmf_sdio_dev *sdiod = bus->sdiodev;
+ 	struct brcmf_core *core = bus->sdio_core;
+@@ -1159,16 +1159,22 @@
+ 
+ 	brcmf_dbg(SDIO, "Enter\n");
+ 
+-	/* Read mailbox data and ack that we did so */
++	*status = 0;
++
++	/* Decode only a successfully read and acknowledged mailbox. */
+ 	hmb_data = brcmf_sdiod_readl(sdiod,
+ 				     core->base + SD_REG(tohostmailboxdata),
+ 				     &ret);
+ 
+-	if (!ret)
+-		brcmf_sdiod_writel(sdiod, core->base + SD_REG(tosbmailbox),
+-				   SMB_INT_ACK, &ret);
+-
+-	bus->sdcnt.f1regdata += 2;
++	bus->sdcnt.f1regdata++;
++	if (ret)
++		return ret;
++
++	brcmf_sdiod_writel(sdiod, core->base + SD_REG(tosbmailbox),
++			   SMB_INT_ACK, &ret);
++	bus->sdcnt.f1regdata++;
++	if (ret)
++		return ret;
+ 
+ 	/* dongle indicates the firmware has halted/crashed */
+ 	if (hmb_data & HMB_DATA_FWHALT) {
+@@ -1238,7 +1244,8 @@
+ 		brcmf_err("Unknown mailbox data content: 0x%02x\n",
+ 			  hmb_data);
+ 
+-	return intstatus;
++	*status = intstatus;
++	return 0;
+ }
+ 
+ static void brcmf_sdio_rxfail(struct brcmf_sdio *bus, bool abort, bool rtx)
+@@ -2680,6 +2687,7 @@
+ {
+ 	struct brcmf_sdio_dev *sdiod = bus->sdiodev;
+ 	u32 newstatus = 0;
++	u32 mailbox_status;
+ 	u32 intstat_addr = bus->sdio_core->base + SD_REG(intstatus);
+ 	unsigned long intstatus;
+ 	uint txlimit = bus->txbound;	/* Tx frames to send before resched */
+@@ -2774,7 +2782,10 @@
+ 	/* Handle host mailbox indication */
+ 	if (intstatus & I_HMB_HOST_INT) {
+ 		intstatus &= ~I_HMB_HOST_INT;
+-		intstatus |= brcmf_sdio_hostmail(bus);
++		err = brcmf_sdio_hostmail(bus, &mailbox_status);
++		if (err)
++			goto failed;
++		intstatus |= mailbox_status;
+ 	}
+ 
+ 	sdio_release_host(bus->sdiodev->func1);

@@ -94,6 +94,8 @@ static void wake_up_all(int *wait) { (void)wait; assert(active->lock); }
 	     (nextw = nextp == (head) ? NULL : container_of(nextp, struct musb_pending_work, member)), \
 	     (void)nextw, 1); p = nextp)
 static bool list_empty(struct list_head *h) { return h->next == h; }
+#define list_first_entry_or_null(h, type, member) \
+	(list_empty(h) ? NULL : container_of((h)->next, type, member))
 static void list_del(struct list_head *n) { n->prev->next = n->next; n->next->prev = n->prev; }
 static void devm_kfree(struct device *d, void *p) { (void)d; (void)p; }
 static struct musb *dev_to_musb(struct device *d) { assert(d == active->controller); return active; }

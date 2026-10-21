@@ -11,6 +11,8 @@ import subprocess
 import sys
 import time
 
+from awake_clock import AwakeRun
+
 
 def worker(processes):
     found = [row for row in processes.values() if row['comm'] == 'sugov:0']
@@ -42,6 +44,7 @@ def main():
     spec = importlib.util.spec_from_file_location('power_profile', directory / 'profile-power.py')
     profile = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(profile)
+    awake = AwakeRun()
     initial = profile.health()
     target = worker(profile.processes())
     configuration = profile.capabilities()
@@ -50,6 +53,7 @@ def main():
     fixed = ('boot_id', 'online_cpus', 'brightness', 'bl_power', 'governor')
 
     def checked():
+        awake.check()
         health = profile.health()
         current = profile.capabilities()
         current.pop('cpufreq_time_in_state', None)
@@ -97,7 +101,8 @@ def main():
                             str(directory / 'kallsyms.txt'), '-i', str(directory / 'perf.data')],
                            stdout=output, stderr=subprocess.STDOUT, check=True, timeout=30)
         require_samples((directory / 'perf-report.txt').read_text())
-        profile.emit('complete', passed=True, final=final, worker_after=worker(profile.processes()))
+        profile.emit('complete', passed=True, final=final, worker_after=worker(profile.processes()),
+                     awake_proof=awake.finish())
     finally:
         # The upload directory belongs to the SSH account; make only these captures downloadable.
         for name in artifacts:

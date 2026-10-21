@@ -21,16 +21,26 @@ modprobe libcomposite
 if ! mountpoint -q /sys/kernel/config; then mount -t configfs none /sys/kernel/config; fi
 mapfile -t controllers < <(find /sys/class/udc -mindepth 1 -maxdepth 1 -printf '%f\n')
 [[ ${#controllers[@]} == 1 ]] || { echo 'Expected one USB device controller' >&2; exit 1; }
-# Product wake sources are POWER/RTC. USB may detach during system sleep.
+# Stay asleep on cable insertion: the supply-class controls are independent
+# of the USB data controller. Leave POWER/RTC and the shared PMIC IRQ alone.
 # This selects device policy; it does not undo MUSB's probe-time IRQ wake ref.
-wakeup=/sys/class/udc/${controllers[0]}/device/power/wakeup
-[[ -f $wakeup && -w $wakeup ]] || { echo 'Missing USB wake policy control' >&2; exit 1; }
-case $(cat "$wakeup") in
-    enabled|disabled) ;;
-    *) echo 'Unexpected USB wake policy' >&2; exit 1 ;;
-esac
-printf 'disabled\n' > "$wakeup"
-[[ $(cat "$wakeup") == disabled ]] || { echo 'USB wake policy readback failed' >&2; exit 1; }
+wakeups=("/sys/class/udc/${controllers[0]}/device/power/wakeup"
+         /sys/class/power_supply/axp20x-usb/power/wakeup
+         /sys/class/power_supply/axp22x-ac/power/wakeup)
+# power_supply registration publishes the device before creating wake control.
+# Validate all controls before writing; the existing service reports/retries a
+# failed start, and diagnostics reject missing policy. No per-edge work needed.
+for wakeup in "${wakeups[@]}"; do
+    [[ -f $wakeup && -w $wakeup ]] || { echo "Missing wake policy control: $wakeup" >&2; exit 1; }
+    case $(cat "$wakeup") in
+        enabled|disabled) ;;
+        *) echo "Unexpected wake policy: $wakeup" >&2; exit 1 ;;
+    esac
+done
+for wakeup in "${wakeups[@]}"; do
+    printf 'disabled\n' > "$wakeup"
+    [[ $(cat "$wakeup") == disabled ]] || { echo "Wake policy readback failed: $wakeup" >&2; exit 1; }
+done
 if [[ -d $gadget ]]; then
     [[ $(cat "$gadget/UDC") == "${controllers[0]}" ]] && exit 0
     stop_gadget

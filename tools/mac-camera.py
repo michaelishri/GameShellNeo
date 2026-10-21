@@ -26,12 +26,20 @@ def options(argv=None):
     parser.add_argument('--seconds', type=int, default=0,
                         help='0 saves one still; 1..300 records a bounded frame sequence')
     parser.add_argument('--fps', type=int, default=2, help='Export 1..5 frames per second')
+    parser.add_argument('--camera', help='Exact camera name; defaults to NEO_CAMERA_NAME in .env')
     args = parser.parse_args(argv)
     if not 0 <= args.seconds <= 300 or not 1 <= args.fps <= 5:
         parser.error('Use seconds 0..300 and fps 1..5')
     if args.action != 'capture' and args.seconds:
         parser.error('Duration is only valid for capture')
     return args
+
+
+def selected_camera(args, config):
+    name = args.camera if args.camera is not None else config.get('NEO_CAMERA_NAME', CAMERA)
+    if not name or not name.strip() or any(ord(char) < 32 for char in name):
+        raise ValueError('Supply a nonempty camera name without control characters')
+    return name
 
 
 def bundle_info():
@@ -84,10 +92,10 @@ def install(client, sftp, base):
     return app
 
 
-def launch_source(app, destination, action, seconds, fps, base):
+def launch_source(app, destination, action, seconds, fps, base, camera=CAMERA):
     # Hold the lock while open waits for this bounded app instance to exit.
     arguments = ['/usr/bin/open', '-n', '-W', app, '--args', action, destination,
-                 str(seconds), str(fps), CAMERA, 'video-only']
+                 str(seconds), str(fps), camera, 'video-only']
     return '''import fcntl, pathlib, subprocess, sys, time
 with open({lock!r}, 'a') as lock:
     try:
@@ -110,14 +118,24 @@ with open({lock!r}, 'a') as lock:
                 child.wait()
             sys.exit('Camera app exceeded its watchdog; inspect partial private evidence')
         time.sleep(0.1)
-    sys.stdout.buffer.write(child.stdout.read()[-4000:])
+    output = child.stdout.read()[-4000:]
+    sys.stdout.buffer.write(output)
+    # macOS open -W can lose the exit race for a short-lived status app.
+    # Only a saved terminal result can supersede this specific wait error;
+    # the host still validates its action, success and stopped-session flag.
+    if (child.returncode == 1 and
+            b'initial call to kevent() failed: No such process' in output and
+            pathlib.Path({result!r}).is_file()):
+        print('Desktop exit-wait race; validating the saved camera result.', flush=True)
+        sys.exit(0)
     sys.exit(child.returncode)
 '''.format(lock=base + '/capture.lock', arguments=arguments,
            ready=destination + '/ready.json',
+           result=destination + '/result.json',
            timeout=135 if action == 'authorize' else seconds + 35)
 
 
-def validate_result(result, action):
+def validate_result(result, action, camera=CAMERA):
     if result.get('schema') != 1 or result.get('action') != action:
         raise ValueError('Camera result has an unexpected schema or action')
     if not isinstance(result.get('frames'), list):
@@ -140,16 +158,20 @@ def validate_result(result, action):
             raise ValueError('Camera permission was not granted')
         if action == 'capture' and not names:
             raise ValueError('Capture succeeded without images')
+        if action == 'capture' and result.get('camera_name') != camera:
+            raise ValueError('Capture used a different camera from the requested device')
     return names
 
 
 def main(argv=None):
     args = options(argv)
+    config = load_env()
+    camera = selected_camera(args, config)
     os.umask(0o077)
     capture = evidence_directory()
     print('Private camera evidence:', capture, flush=True)
     action = 'authorize' if args.action == 'setup' else args.action
-    with connect_mac(load_env()) as client, client.open_sftp() as sftp:
+    with connect_mac(config) as client, client.open_sftp() as sftp:
         base = posixpath.join(sftp.normalize('.'), '.local/share/GameShellNeo/camera')
         mkdirs(sftp, base)
         app = base + '/GameShellNeo Camera.app'
@@ -165,7 +187,7 @@ def main(argv=None):
                 raise RuntimeError('Camera app source changed; run task mac:camera-setup')
         destination = base + '/captures/' + capture.name
         mkdirs(sftp, destination)
-        source = launch_source(app, destination, action, args.seconds, args.fps, base)
+        source = launch_source(app, destination, action, args.seconds, args.fps, base, camera)
         with (capture / 'launch.log').open('wb') as output:
             run(client, '/usr/bin/python3 -B -', input_data=source.encode(),
                 timeout=145 if action == 'authorize' else args.seconds + 45,
@@ -177,7 +199,7 @@ def main(argv=None):
             raise RuntimeError('No camera result; the app may have timed out or failed to launch') from error
         (capture / 'result.json').write_bytes(data)
         result = json.loads(data)
-        names = validate_result(result, action)
+        names = validate_result(result, action, camera)
         if names:
             sftp.get(destination + '/ready.json', str(capture / 'ready.json'))
         for name in names:
@@ -191,6 +213,7 @@ def main(argv=None):
                 sftp.remove(destination + '/' + name)
             sftp.rmdir(destination)
     print(json.dumps(dict(success=result.get('success'), authorization=result.get('authorization'),
+                         camera_name=result.get('camera_name'), cameras=result.get('cameras'),
                          frame_count=len(names), camera_stopped=result.get('camera_stopped'),
                          error=result.get('error')), indent=2))
     if not result.get('success'):

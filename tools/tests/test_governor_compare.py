@@ -93,6 +93,7 @@ class GovernorRecovery(unittest.TestCase):
 
     def subprocess_setup(self):
         return ('import importlib.util, pathlib, sys, time\n'
+                f'sys.path.insert(0, {str(TOOLS)!r})\n'
                 f'spec = importlib.util.spec_from_file_location("compare", {str(TOOLS / "compare-governor.py")!r})\n'
                 'm = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(m)\n'
                 f'm.RATE_PATHS = (pathlib.Path({str(self.rate)!r}),)\n'

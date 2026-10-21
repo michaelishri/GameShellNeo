@@ -8,7 +8,7 @@ import re
 import shlex
 
 from private_config import load_env
-from remote import LOCAL, ROOT, device, evidence_directory, run, upload, python_command
+from remote import LOCAL, ROOT, device, device_source, evidence_directory, run, upload, python_command
 
 
 def service_command(directory, seconds, delay):
@@ -44,7 +44,7 @@ def main():
                 if loaded != 'not-found':
                     run(client, 'sudo -n systemctl stop gameshellneo-rsb-comparison', timeout=30)
                 with (capture / 'restore.txt').open('wb') as output:
-                    run(client, **python_command((ROOT / 'tools/compare-rsb.py').read_text(), '--restore'),
+                    run(client, **python_command(device_source('compare-rsb.py'), '--restore'),
                         output=output, timeout=30)
                 print('RSB comparison stopped and owned delay restored.')
                 return
@@ -54,6 +54,8 @@ def main():
                             display=False).decode().strip()
             command = service_command(directory, seconds, delay)
             files = [(ROOT / 'tools/compare-rsb.py', 'compare-rsb.py'),
+                     (ROOT / 'tools/battery_sample.py', 'battery_sample.py'),
+                     (ROOT / 'tools/awake_clock.py', 'awake_clock.py'),
                      (ROOT / 'tools/profile-power.py', 'profile-power.py'),
                      (ROOT / 'build/sources.lock.json', 'sources.lock.json')]
             with client.open_sftp() as sftp:

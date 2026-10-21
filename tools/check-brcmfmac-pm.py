@@ -24,7 +24,12 @@ PATCHES = tuple(ROOT / 'kernel/patches' / name for name in (
 
 
 def function(source, declaration):
-    start = source.index(declaration)
+    # A prototype may precede the definition; never include the next function
+    # merely because it supplies the first closing brace after that prototype.
+    match = re.search(re.escape(declaration) + r'[^;{}]*\{', source)
+    if match is None:
+        raise ValueError('Missing function definition: ' + declaration)
+    start = match.start()
     return source[start:source.index('\n}', start) + 2] + '\n'
 
 

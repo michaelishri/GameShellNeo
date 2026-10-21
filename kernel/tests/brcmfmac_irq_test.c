@@ -4,6 +4,7 @@
  */
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdatomic.h>
@@ -29,9 +30,14 @@ typedef unsigned int uint;
 static unsigned errors;
 #define brcmf_err(...) do { errors++; if (0) fprintf(stderr, __VA_ARGS__); } while (0)
 #include "brcmfmac_irq_types.h"
+#ifdef NEO_CLOCK_DEADLINE
+static unsigned long jiffies;
+#define time_after_eq(a, b) ((long)((a) - (b)) >= 0)
+#endif
 
 enum { BRCMF_SDIOD_DOWN, BRCMF_SDIOD_DATA };
-struct sdio_func { int unused; };
+struct device { int unused; };
+struct sdio_func { struct device dev; };
 struct work_struct { int unused; };
 struct brcmf_core { u32 base; };
 struct pktq { unsigned len; };
@@ -57,8 +63,10 @@ struct brcmf_sdio {
  unsigned ctrl_frame_len;
  int ctrl_frame_err;
  uint txbound, rxbound, txminmax, clkstate, hostintmask, flowcontrol, idlecount;
+ unsigned long clk_pending_deadline;
+ u8 rx_seq, sdpcm_ver;
  struct pktq txq;
- struct { unsigned f1regdata, intrcount; } sdcnt;
+ struct { unsigned f1regdata, intrcount, fc_xoff, fc_xon, fc_rcvd; } sdcnt;
 };
 static struct {
  struct brcmf_sdio bus;
@@ -78,9 +86,28 @@ static struct {
  bool pending_work, running_work, parked, inject_during_frames, hold_receive;
  bool in_irq, clock_pending, clock_ready, byte_write_error, release_irq_error;
  bool retire_on_spin, irq_retired;
+#ifdef NEO_RX_RECOVERY
+ int rx_error;
+ bool allow_tx;
+ unsigned data_tx, control_tx;
+#endif
+#ifdef NEO_TX_RECOVERY
+ int tx_error;
+ bool fail_control_tx, pending_control_during_tx;
+#endif
+#ifdef NEO_MAILBOX_ERRORS
+ u32 mailbox_data;
+ int mailbox_read_error, mailbox_ack_error;
+ unsigned mailbox_writes, crashes, console_reads;
+ int console_error;
+ bool console_retire;
+#endif
 } hw;
 static unsigned scenarios, characterizations;
 static void brcmf_sdio_isr(struct brcmf_sdio *bus, bool in_isr);
+#ifdef NEO_SHARED_DIAGNOSTICS
+static void brcmf_sdio_dpc_failed(struct brcmf_sdio *bus, int err);
+#endif
 
 static void access_ok(void)
 {
@@ -101,6 +128,13 @@ static void enable_irq(int irq)
          (!f.bus.ipend || f.bus.clkstate == CLK_PENDING)); hw.enables++; }
 static u32 brcmf_sdiod_readl(struct brcmf_sdio_dev *dev, u32 addr, int *err)
 {
+#ifdef NEO_MAILBOX_ERRORS
+ if (addr == f.core.base + SD_REG(tohostmailboxdata)) {
+  assert(dev == &f.dev); access_ok(); assert(f.bus.clkstate == CLK_AVAIL);
+  hw.mail++; *err = hw.mailbox_read_error;
+  return hw.mailbox_data; /* Model zero/window and all-ones/transfer failures. */
+ }
+#endif
  assert(dev == &f.dev && addr == f.core.base + SD_REG(intstatus));
  access_ok(); assert(f.bus.clkstate == CLK_AVAIL); hw.reads++;
  *err = hw.read_error ? hw.read_error : hw.reads == hw.fail_read_at ? -EIO : 0;
@@ -108,6 +142,14 @@ static u32 brcmf_sdiod_readl(struct brcmf_sdio_dev *dev, u32 addr, int *err)
 }
 static void brcmf_sdiod_writel(struct brcmf_sdio_dev *dev, u32 addr, u32 val, int *err)
 {
+#ifdef NEO_MAILBOX_ERRORS
+ if (addr == f.core.base + SD_REG(tosbmailbox)) {
+  assert(dev == &f.dev && val == SMB_INT_ACK); access_ok();
+  assert(f.bus.clkstate == CLK_AVAIL && hw.mail && !hw.mailbox_read_error);
+  hw.mailbox_writes++; *err = hw.mailbox_ack_error;
+  return;
+ }
+#endif
  assert(dev == &f.dev && addr == f.core.base + SD_REG(intstatus));
  access_ok(); assert(f.bus.clkstate == CLK_AVAIL); hw.writes++;
  *err = hw.write_error ? hw.write_error : hw.writes == hw.fail_write_at ? -EIO : 0;
@@ -133,8 +175,31 @@ static int brcmf_sdio_bus_sleep(struct brcmf_sdio *bus, bool sleep, bool pending
  if (hw.clock_pending) bus->clkstate = CLK_PENDING;
  return hw.wake_error;
 }
+#ifndef NEO_MAILBOX_ERRORS
 static u32 brcmf_sdio_hostmail(struct brcmf_sdio *bus)
 { assert(bus == &f.bus); access_ok(); hw.mail++; return hw.mailbox_result; }
+#else
+static void decoded_mailbox_ok(void)
+{
+ access_ok();
+ assert(hw.mail && hw.mailbox_writes == hw.mail);
+ assert(!hw.mailbox_read_error && !hw.mailbox_ack_error);
+}
+static void brcmf_fw_crashed(struct device *dev)
+{ assert(dev == &f.func.dev); decoded_mailbox_ok(); hw.crashes++; }
+static int brcmf_sdio_get_console_addr(struct brcmf_sdio *bus)
+{
+ assert(bus == &f.bus); decoded_mailbox_ok();
+#ifdef DEBUG
+ hw.console_reads++;
+#ifdef NEO_SHARED_DIAGNOSTICS
+ if (hw.console_error && hw.console_retire) brcmf_sdio_dpc_failed(bus, hw.console_error);
+#endif
+ return hw.console_error;
+#endif
+ return 0;
+}
+#endif
 static void brcmf_sdio_readframes(struct brcmf_sdio *bus, uint limit)
 {
  assert(bus == &f.bus && limit == 8 && !hw.host_depth);
@@ -147,15 +212,44 @@ static void brcmf_sdio_readframes(struct brcmf_sdio *bus, uint limit)
  }
  if (hw.frames_remaining) hw.frames_remaining--;
  bus->rxpending = hw.frames_remaining != 0 || hw.hold_receive;
+#ifdef NEO_RX_RECOVERY
+ /* Packet cleanup is exercised separately by the actual RX caller suite. */
+ f.dev.io_error = hw.rx_error;
+#endif
 }
 static bool txctl_ok(struct brcmf_sdio *bus) { (void)bus; return true; }
 static bool data_ok(struct brcmf_sdio *bus) { (void)bus; return true; }
 static unsigned brcmu_pktq_mlen(struct pktq *q, uint mask)
 { (void)mask; return q->len; }
 static void brcmf_sdio_sendfromq(struct brcmf_sdio *bus, uint count)
-{ (void)bus; (void)count; assert(false); }
+{
+#ifdef NEO_RX_RECOVERY
+ assert(bus == &f.bus && count == 1 && hw.allow_tx && !f.dev.io_error);
+ assert(!hw.host_depth && hw.frames == 1); hw.data_tx++; bus->txq.len = 0;
+#ifdef NEO_TX_RECOVERY
+ if (hw.pending_control_during_tx) bus->ctrl_frame_stat = true;
+ if (!hw.fail_control_tx) f.dev.io_error = hw.tx_error;
+#endif
+#else
+ (void)bus; (void)count; assert(false);
+#endif
+}
 static int brcmf_sdio_tx_ctrlframe(struct brcmf_sdio *bus, u8 *data, uint len)
-{ (void)bus; (void)data; (void)len; assert(false); return 0; }
+{
+#ifdef NEO_RX_RECOVERY
+ assert(bus == &f.bus && hw.allow_tx && !f.dev.io_error);
+ assert(hw.host_depth == 1 && hw.frames == 1 && !data && !len); hw.control_tx++;
+#ifdef NEO_TX_RECOVERY
+ if (hw.fail_control_tx) {
+  f.dev.io_error = hw.tx_error;
+  return hw.tx_error;
+ }
+#endif
+#else
+ (void)bus; (void)data; (void)len; assert(false);
+#endif
+ return 0;
+}
 static void brcmf_sdio_wait_event_wakeup(struct brcmf_sdio *bus)
 { assert(bus == &f.bus); hw.wakes++; }
 static bool queue_work(void *queue, struct work_struct *work)
@@ -199,6 +293,9 @@ static void setup(void)
  f.dev.state = BRCMF_SDIOD_DATA;
  f.bus.sdiodev = &f.dev; f.bus.sdio_core = &f.core;
  f.bus.clkstate = CLK_AVAIL; f.bus.rxbound = 8; f.bus.intr = true;
+#ifdef NEO_CLOCK_DEADLINE
+ jiffies = 100; f.bus.clk_pending_deadline = 1100;
+#endif
  f.bus.hostintmask = HOSTINTMASK; f.bus.brcmf_wq = &hw;
  assert(SD_REG(intstatus) == 0x20);
 }
@@ -348,6 +445,9 @@ static void oob_rearm(void)
 static void mailbox_frame(void)
 {
  setup(); hw.status = I_HMB_HOST_INT; hw.mailbox_result = I_HMB_FRAME_IND;
+#ifdef NEO_MAILBOX_ERRORS
+ hw.mailbox_data = HMB_DATA_NAKHANDLED; f.bus.rxskip = true;
+#endif
  hw.frames_remaining = 1;
  irq(true); drain();
  assert(hw.mail == 1 && hw.frames == 1 && !f.bus.intstatus);
@@ -429,6 +529,266 @@ static void pending_clock(bool oob, bool start_pending)
  assert(hw.reads == reads + 1 && hw.sleeps == 2 && hw.runs == 2);
  finish();
 }
+#ifdef NEO_CLOCK_DEADLINE
+static void clock_notify(void)
+{
+ /* Consumer seam for the host-held publication checked by the watchdog suite.
+  * No ISR is invoked: a missing hardware interrupt must not prevent service.
+  */
+ sdio_claim_host(&f.func);
+ atomic_set(&f.bus.ipend, 1); f.bus.dpc_triggered = true;
+ queue_work(f.bus.brcmf_wq, &f.bus.datawork);
+ sdio_release_host(&f.func);
+}
+static void clock_deadline(unsigned phase, bool wrap, bool ready, bool oob, bool lost_irq)
+{
+ setup(); f.bus.clkstate = CLK_PENDING; hw.clock_ready = ready;
+ f.bus.clk_pending_deadline = wrap ? 0 : 1100;
+ jiffies = f.bus.clk_pending_deadline + phase - 1;
+ f.dev.oob_irq_requested = oob; f.dev.sd_irq_requested = !oob;
+ hw.status = I_HMB_FRAME_IND; hw.frames_remaining = 1;
+ f.bus.ctrl_frame_stat = !ready;
+ if (lost_irq) clock_notify(); else irq(oob);
+ drain();
+ assert(f.bus.sdcnt.intrcount == (unsigned)!lost_irq);
+ if (ready) {
+  assert(!f.dev.io_error && hw.frames == 1 && f.bus.clkstate == CLK_AVAIL);
+  assert(!hw.stops && !hw.responses && !f.bus.ipend);
+ } else {
+  if (!phase) {
+   assert(!f.dev.io_error && !hw.frames && !hw.stops && f.bus.clkstate == CLK_PENDING);
+   jiffies = f.bus.clk_pending_deadline;
+   irq(oob); drain();
+  }
+  assert(f.dev.io_error == -ETIMEDOUT && f.bus.io_error_handled && !hw.frames);
+  assert(f.dev.state == BRCMF_SDIOD_DOWN && !f.bus.ctrl_frame_stat);
+  assert(f.bus.ctrl_frame_err == -ETIMEDOUT && hw.responses == 1 && hw.wakes == 1 && hw.stops == 1);
+  assert(!f.bus.ipend && !f.bus.intstatus && !f.dev.sd_irq_requested);
+  unsigned reads = hw.byte_reads;
+  hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+  assert(hw.byte_reads == reads && hw.responses == 1 && hw.stops == 1);
+ }
+ finish();
+}
+enum clock_transfer_failure { CLOCK_CSR_READ, CLOCK_FILTER_READ, CLOCK_FILTER_WRITE };
+static void clock_transfer_failure(enum clock_transfer_failure stage, bool wrap, bool oob)
+{
+ setup(); f.bus.clkstate = CLK_PENDING; hw.clock_ready = true;
+ f.bus.clk_pending_deadline = wrap ? 0 : 1100;
+ jiffies = f.bus.clk_pending_deadline;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = oob; f.dev.sd_irq_requested = !oob;
+ f.bus.ctrl_frame_stat = true; f.bus.txq.len = 1; f.bus.txbound = 1;
+ if (stage == CLOCK_FILTER_WRITE) hw.byte_write_error = true;
+ else hw.fail_byte_read_at = 1 + (stage == CLOCK_FILTER_READ);
+#ifdef DEBUG
+ if (hw.fail_byte_read_at) hw.fail_byte_read_at++; /* Initial diagnostic read. */
+#endif
+ clock_notify(); drain();
+ assert(!f.bus.sdcnt.intrcount && f.dev.io_error == -EIO && f.bus.io_error_handled);
+ assert(f.bus.ctrl_frame_err == -EIO && !f.bus.ctrl_frame_stat && f.bus.txq.len == 1);
+ assert(hw.responses == 1 && hw.wakes == 1 && hw.stops == 1 && !hw.frames);
+ assert(!hw.control_tx && !hw.data_tx && !f.bus.ipend && !f.bus.intstatus);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2));
+ finish();
+}
+#endif
+#endif
+#ifdef NEO_MAILBOX_ERRORS
+static void mailbox_seed(void)
+{
+ f.bus.rxskip = true; f.bus.rx_seq = 12; f.bus.sdpcm_ver = 7;
+ f.bus.flowcontrol = 0x12;
+ f.bus.sdcnt.fc_xoff = 3; f.bus.sdcnt.fc_xon = 5; f.bus.sdcnt.fc_rcvd = 9;
+}
+static void mailbox_unchanged(void)
+{
+ assert(f.bus.rxskip && f.bus.rx_seq == 12 && f.bus.sdpcm_ver == 7);
+ assert(f.bus.flowcontrol == 0x12 && f.bus.sdcnt.fc_xoff == 3);
+ assert(f.bus.sdcnt.fc_xon == 5 && f.bus.sdcnt.fc_rcvd == 9);
+ assert(!hw.crashes && !hw.console_reads);
+}
+static void mailbox_error(bool ack, u32 data, int error)
+{
+ setup(); mailbox_seed(); hw.mailbox_data = data;
+ if (ack) hw.mailbox_ack_error = error;
+ else hw.mailbox_read_error = error;
+ u32 status = UINT32_MAX;
+ sdio_claim_host(&f.func);
+ assert(brcmf_sdio_hostmail(&f.bus, &status) == error);
+ sdio_release_host(&f.func);
+ assert(!status && hw.mail == 1 && hw.mailbox_writes == ack);
+ assert(f.bus.sdcnt.f1regdata == 1u + ack && !errors);
+ mailbox_unchanged(); finish();
+}
+static void mailbox_fatal(bool ack, bool oob, bool hard, u32 data, int error)
+{
+ setup(); mailbox_seed(); hw.mailbox_data = data;
+ if (ack) hw.mailbox_ack_error = error;
+ else hw.mailbox_read_error = error;
+ hw.status = I_HMB_HOST_INT | I_HMB_FRAME_IND;
+ hw.frames_remaining = 1;
+ f.bus.ctrl_frame_stat = true; f.bus.txbound = 1; f.bus.txq.len = 1;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = oob;
+ f.dev.sd_irq_requested = !oob;
+ irq(hard); drain();
+ assert(f.dev.io_error == error && f.bus.io_error_handled);
+ assert(f.dev.state == BRCMF_SDIOD_DOWN && !f.bus.ctrl_frame_stat);
+ assert(f.bus.ctrl_frame_err == error && hw.wakes == 1 && hw.responses == 1);
+ assert(hw.stops == 1 && !hw.frames && !hw.enables);
+ assert(!f.bus.ipend && !f.bus.intstatus && !f.dev.sd_irq_requested);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2));
+ assert(hw.reads == 1 && hw.writes == 1 && hw.mail == 1 && hw.mailbox_writes == ack);
+ assert(f.bus.sdcnt.f1regdata == 3u + ack);
+ mailbox_unchanged();
+ unsigned count = hw.queue;
+ irq(false); irq(true); brcmf_sdio_trigger_dpc(&f.bus);
+ assert(hw.queue == count);
+ /* Already queued work must neither repeat I/O nor retire IRQs twice. */
+ hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+ assert(hw.stops == 1 && hw.responses == 1 && hw.wakes == 1);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2));
+ assert(hw.reads == 1 && hw.writes == 1 && hw.mail == 1 && hw.mailbox_writes == ack);
+ assert(f.dev.io_error == error); mailbox_unchanged(); finish();
+}
+static void mailbox_success(u32 data, bool skipped)
+{
+ setup(); mailbox_seed(); hw.mailbox_data = data; f.bus.rxskip = skipped;
+ u32 status = UINT32_MAX;
+ sdio_claim_host(&f.func);
+ assert(!brcmf_sdio_hostmail(&f.bus, &status));
+ sdio_release_host(&f.func);
+ assert(hw.mail == 1 && hw.mailbox_writes == 1 && f.bus.sdcnt.f1regdata == 2);
+ assert(status == ((data & HMB_DATA_NAKHANDLED) ? I_HMB_FRAME_IND : 0));
+ assert(f.bus.rxskip == (skipped && !(data & HMB_DATA_NAKHANDLED)));
+ assert(hw.crashes == !!(data & HMB_DATA_FWHALT));
+ bool ready = data & (HMB_DATA_DEVREADY | HMB_DATA_FWREADY);
+ u8 version = (data & HMB_DATA_VERSION_MASK) >> HMB_DATA_VERSION_SHIFT;
+ assert(f.bus.sdpcm_ver == (ready ? version : 7));
+#ifdef DEBUG
+ assert(hw.console_reads == ready);
+#else
+ assert(!hw.console_reads);
+#endif
+ bool flow = data & HMB_DATA_FC;
+ u8 fc = (data & HMB_DATA_FCDATA_MASK) >> HMB_DATA_FCDATA_SHIFT;
+ assert(f.bus.flowcontrol == (flow ? fc : 0x12));
+ assert(f.bus.sdcnt.fc_xoff == 3u + (flow && (fc & ~0x12)));
+ assert(f.bus.sdcnt.fc_xon == 5u + (flow && (0x12 & ~fc)));
+ assert(f.bus.sdcnt.fc_rcvd == 9u + flow);
+ u32 known = HMB_DATA_DEVREADY | HMB_DATA_FWREADY | HMB_DATA_NAKHANDLED |
+             HMB_DATA_FWHALT | HMB_DATA_FC | HMB_DATA_FCDATA_MASK | HMB_DATA_VERSION_MASK;
+ assert(errors == (unsigned)(ready && version != SDPCM_PROT_VERSION) +
+                  (unsigned)(!skipped && (data & HMB_DATA_NAKHANDLED)) + !!(data & ~known));
+ finish();
+}
+static void mailbox_cases(void)
+{
+ const u32 data[] = {0, UINT32_MAX};
+ const int faults[] = {-EIO, -ETIMEDOUT, -EILSEQ};
+ for (unsigned ack = 0; ack < 2; ack++)
+  for (unsigned d = 0; d < 2; d++)
+   for (unsigned e = 0; e < 3; e++) {
+    mailbox_error(ack, data[d], faults[e]);
+    for (unsigned oob = 0; oob < 2; oob++)
+     for (unsigned hard = 0; hard < 2; hard++)
+      mailbox_fatal(ack, oob, hard, data[d], faults[e]);
+   }
+ const u32 ready = SDPCM_PROT_VERSION << HMB_DATA_VERSION_SHIFT;
+ const u32 valid[] = {0, HMB_DATA_NAKHANDLED, HMB_DATA_DEVREADY | ready,
+  HMB_DATA_FWREADY | ready, HMB_DATA_FWREADY | (5u << HMB_DATA_VERSION_SHIFT),
+  HMB_DATA_FC, HMB_DATA_FC | (0x12u << HMB_DATA_FCDATA_SHIFT),
+  HMB_DATA_FC | (0x25u << HMB_DATA_FCDATA_SHIFT), HMB_DATA_FWHALT,
+  HMB_DATA_FWHALT | HMB_DATA_NAKHANDLED | HMB_DATA_DEVREADY | HMB_DATA_FWREADY |
+  HMB_DATA_FC | ready | (0x25u << HMB_DATA_FCDATA_SHIFT), 0x8000};
+ for (unsigned n = 0; n < sizeof(valid) / sizeof(valid[0]); n++)
+  for (unsigned skipped = 0; skipped < 2; skipped++) mailbox_success(valid[n], skipped);
+}
+#if defined(NEO_SHARED_DIAGNOSTICS) && defined(DEBUG)
+static void diagnostic_mailbox_error(int error, bool retired, bool oob, bool hard)
+{
+ setup(); hw.mailbox_data = HMB_DATA_FWREADY | (SDPCM_PROT_VERSION << HMB_DATA_VERSION_SHIFT);
+ hw.status = I_HMB_HOST_INT | I_HMB_FRAME_IND; hw.frames_remaining = 1;
+ hw.console_error = error; hw.console_retire = retired;
+ f.bus.ctrl_frame_stat = true; f.bus.txbound = 1; f.bus.txq.len = 1;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = oob; f.dev.sd_irq_requested = !oob;
+ irq(hard); drain();
+ assert(hw.console_reads == 1 && f.dev.io_error == error && f.bus.io_error_handled);
+ assert(!hw.frames && !hw.control_tx && !hw.data_tx && hw.stops == 1);
+ assert(f.dev.state == BRCMF_SDIOD_DOWN && !f.bus.ctrl_frame_stat && f.bus.ctrl_frame_err == error);
+ assert(hw.wakes == 1 && hw.responses == 1 && !f.bus.ipend && !f.bus.intstatus);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2));
+ hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+ assert(hw.console_reads == 1 && hw.stops == 1 && hw.wakes == 1 && hw.responses == 1);
+ assert(hw.disables == oob && hw.releases_irq == (oob ? 0 : 2)); finish();
+}
+#endif
+#endif
+#ifdef NEO_RX_RECOVERY
+static void rx_completion(int error, bool oob, bool hard)
+{
+ setup(); hw.status = I_HMB_FRAME_IND; hw.frames_remaining = 1;
+ hw.rx_error = error; hw.allow_tx = !error;
+ f.bus.ctrl_frame_stat = true; f.bus.txbound = 1; f.bus.txq.len = 1;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = false;
+ f.dev.sd_irq_requested = !oob;
+ irq(hard); drain();
+ assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && !hw.mail);
+ assert(f.dev.io_error == error && f.bus.io_error_handled == !!error);
+ assert(!f.bus.ctrl_frame_stat && f.bus.ctrl_frame_err == error && hw.wakes == 1);
+ assert(!f.bus.ipend && !f.bus.intstatus);
+ if (!error) {
+  assert(f.dev.state == BRCMF_SDIOD_DATA && !hw.stops && !hw.responses);
+  assert(hw.data_tx == 1 && hw.control_tx == 1 && !f.bus.txq.len);
+  assert(hw.enables == oob && !hw.releases_irq);
+ } else {
+  assert(f.dev.state == BRCMF_SDIOD_DOWN && hw.stops == 1 && hw.responses == 1);
+  assert(!hw.data_tx && !hw.control_tx && f.bus.txq.len == 1);
+  assert(!hw.enables && !f.dev.sd_irq_requested);
+  assert(hw.releases_irq == (oob ? 0 : 2));
+  unsigned queued = hw.queue;
+  irq(false); irq(true); brcmf_sdio_trigger_dpc(&f.bus);
+  assert(hw.queue == queued);
+  hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+  assert(hw.stops == 1 && hw.responses == 1 && hw.wakes == 1);
+  assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && !hw.enables);
+  assert(f.dev.io_error == error && hw.releases_irq == (oob ? 0 : 2));
+ }
+ finish();
+}
+#endif
+#ifdef NEO_TX_RECOVERY
+static void tx_completion(int error, bool control, bool oob, bool hard, bool pending_control)
+{
+ setup(); hw.status = I_HMB_FRAME_IND; hw.frames_remaining = 1; hw.allow_tx = true;
+ hw.tx_error = error; hw.fail_control_tx = control;
+ hw.pending_control_during_tx = pending_control;
+ f.bus.ctrl_frame_stat = !pending_control; f.bus.txbound = 1; f.bus.txq.len = 1;
+ f.dev.oob_irq_requested = oob; f.dev.irq_en = false; f.dev.sd_irq_requested = !oob;
+ irq(hard); drain();
+ assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && !hw.mail);
+ assert(f.dev.io_error == error && f.bus.io_error_handled == !!error);
+ assert(!f.bus.ctrl_frame_stat && f.bus.ctrl_frame_err == (control || pending_control ? error : 0));
+ assert(hw.wakes == 1 && hw.control_tx == (unsigned)!pending_control);
+ assert(hw.data_tx == (unsigned)(!control || !error));
+ assert(f.bus.txq.len == (unsigned)(control && error));
+ assert(!f.bus.ipend && !f.bus.intstatus && hw.enables == oob);
+ if (error) {
+  assert(f.dev.state == BRCMF_SDIOD_DOWN && hw.stops == 1 && hw.responses == 1);
+  assert(!f.dev.sd_irq_requested && !f.dev.irq_en);
+  assert(hw.releases_irq == (oob ? 0 : 2) && hw.disables == oob);
+  unsigned queued = hw.queue;
+  irq(false); irq(true); brcmf_sdio_trigger_dpc(&f.bus);
+  assert(hw.queue == queued);
+  hw.pending_work = true; f.bus.dpc_triggered = true; drain();
+  assert(hw.stops == 1 && hw.responses == 1 && hw.wakes == 1);
+  assert(hw.frames == 1 && hw.reads == 1 && hw.writes == 1 && hw.control_tx == (unsigned)!pending_control);
+  assert(hw.data_tx == (unsigned)!control && f.dev.io_error == error);
+ } else {
+  assert(f.dev.state == BRCMF_SDIOD_DATA && !hw.stops && !hw.responses);
+  assert(!hw.releases_irq && !hw.disables);
+ }
+ finish();
+}
 #endif
 int main(void)
 {
@@ -451,6 +811,48 @@ int main(void)
 #endif
  for (unsigned oob = 0; oob < 2; oob++)
   for (unsigned pending = 0; pending < 2; pending++) pending_clock(oob, pending);
+#endif
+#ifdef NEO_MAILBOX_ERRORS
+ mailbox_cases();
+#if defined(NEO_SHARED_DIAGNOSTICS) && defined(DEBUG)
+ const int diagnostic_errors[] = {-EIO, -ETIMEDOUT, -EILSEQ};
+ for (unsigned e = 0; e < 3; e++)
+  for (unsigned retired = 0; retired < 2; retired++)
+   for (unsigned oob = 0; oob < 2; oob++)
+    for (unsigned hard = 0; hard < 2; hard++)
+     diagnostic_mailbox_error(diagnostic_errors[e], retired, oob, hard);
+#endif
+#endif
+#ifdef NEO_RX_RECOVERY
+ const int faults[] = {0, -EIO, -ETIMEDOUT, -ENOMEDIUM};
+ for (unsigned e = 0; e < sizeof(faults) / sizeof(faults[0]); e++)
+  for (unsigned oob = 0; oob < 2; oob++)
+   for (unsigned hard = 0; hard < 2; hard++) rx_completion(faults[e], oob, hard);
+#endif
+#ifdef NEO_TX_RECOVERY
+ for (unsigned e = 0; e < sizeof(faults) / sizeof(faults[0]); e++)
+  for (unsigned control = 0; control < 2; control++)
+   for (unsigned oob = 0; oob < 2; oob++)
+    for (unsigned hard = 0; hard < 2; hard++) tx_completion(faults[e], control, oob, hard, false);
+#ifdef NEO_TX_POLL
+ const int poll_faults[] = {-EIO, -ETIMEDOUT, -EILSEQ, -ENOMEDIUM};
+ for (unsigned e = 0; e < sizeof(poll_faults) / sizeof(poll_faults[0]); e++)
+  for (unsigned pending = 0; pending < 2; pending++)
+   for (unsigned oob = 0; oob < 2; oob++)
+    for (unsigned hard = 0; hard < 2; hard++) tx_completion(poll_faults[e], false, oob, hard, pending);
+#endif
+#endif
+#ifdef NEO_CLOCK_DEADLINE
+ for (unsigned phase = 0; phase < 3; phase++)
+  for (unsigned wrap = 0; wrap < 2; wrap++)
+   for (unsigned ready = 0; ready < 2; ready++)
+    for (unsigned oob = 0; oob < 2; oob++) {
+     clock_deadline(phase, wrap, ready, oob, false);
+     if (phase) clock_deadline(phase, wrap, ready, oob, true);
+    }
+ for (unsigned stage = CLOCK_CSR_READ; stage <= CLOCK_FILTER_WRITE; stage++)
+  for (unsigned wrap = 0; wrap < 2; wrap++)
+   for (unsigned oob = 0; oob < 2; oob++) clock_transfer_failure(stage, wrap, oob);
 #endif
  printf("%u IRQ service scenarios passed (%u characterize existing error limitations)\n",
         scenarios, characterizations);

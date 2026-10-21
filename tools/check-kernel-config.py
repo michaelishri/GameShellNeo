@@ -9,10 +9,24 @@ from keypad_supply import enabled as keypad_retention
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def requirements(requested, lock):
+def requirements(requested, lock, *, clock_diagnostics_test=None):
     keypad_retention(lock)
     requested = dict(requested)
     experiments = lock.get('experiments', {})
+    clock = experiments.get('clock_provenance', False)
+    if type(clock) is not bool:
+        raise ValueError('Clock provenance must be an explicit boolean')
+    selected_clock = clock
+    if clock_diagnostics_test is not None:
+        if clock_diagnostics_test not in ('enabled', 'disabled'):
+            raise ValueError('Invalid isolated clock diagnostic test variant')
+        clock = clock_diagnostics_test == 'enabled'
+    requested.update(CONFIG_NEO_CLOCK_DIAG='y' if clock else 'n',
+                     CONFIG_NEO_CLOCK_DIAG_KUNIT_TEST='n')
+    if clock or selected_clock:
+        requested.update(CONFIG_ARM='y', CONFIG_AEABI='y', CONFIG_POSIX_TIMERS='y',
+                         CONFIG_DEBUG_FS='y', CONFIG_ARM_ARCH_TIMER='y',
+                         CONFIG_IKCONFIG='y', CONFIG_IKCONFIG_PROC='y')
     suspend_tests = experiments.get('suspend_diagnostics', False)
     if type(suspend_tests) is not bool:
         raise ValueError('Suspend diagnostics must be an explicit boolean')
@@ -24,6 +38,17 @@ def requirements(requested, lock):
                          CONFIG_PM_SLEEP_DEBUG='y', CONFIG_PM_ADVANCED_DEBUG='y',
                          CONFIG_HIBERNATION='n', CONFIG_PM_AUTOSLEEP='n', CONFIG_PM_WAKELOCKS='n',
                          CONFIG_ARM_PSCI_CPUIDLE='n', CONFIG_PM_TEST_SUSPEND='n')
+    wfi = experiments.get('cpi_wfi_s2idle', False)
+    if type(wfi) is not bool:
+        raise ValueError('CPI WFI experiment must be an explicit boolean')
+    if wfi:
+        if not suspend_tests or lock.get('features', {}).get('battery_sample_clock') != 'CLOCK_BOOTTIME':
+            raise ValueError('CPI WFI requires suspend diagnostics and BOOTTIME battery samples')
+        requested.update(CONFIG_ARM_CPI_WFI_CPUIDLE='y', CONFIG_CPU_IDLE='y',
+                         CONFIG_ARM_CPUIDLE='n', CONFIG_ARM_PSCI_CPUIDLE='n',
+                         CONFIG_SMP='y', CONFIG_NO_HZ_IDLE='y', CONFIG_HIGH_RES_TIMERS='y',
+                         CONFIG_GENERIC_CLOCKEVENTS_BROADCAST='y', CONFIG_ARM_ARCH_TIMER='y',
+                         CONFIG_GENERIC_SCHED_CLOCK='y', CONFIG_SUN4I_TIMER='y')
     if 'usb_absent_poll' in experiments:
         requested.update(CONFIG_USB_MUSB_GADGET='y', CONFIG_USB_MUSB_SUNXI='y',
                          CONFIG_USB_MUSB_HOST='n', CONFIG_USB_MUSB_DUAL_ROLE='n',
@@ -34,6 +59,8 @@ def requirements(requested, lock):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('config', type=Path)
+    parser.add_argument('--clock-diagnostics-test', choices=('enabled', 'disabled'),
+                        help='Isolated object test only; retain all other project assertions')
     args = parser.parse_args()
     actual = dict(re.findall(r'^(CONFIG_\w+)=(.*)$', args.config.read_text(), re.M))
     requested = dict(re.findall(r'^(CONFIG_\w+)=(.*)$',
@@ -41,12 +68,14 @@ def main():
     requested.update(CONFIG_MMC_BLOCK='y', CONFIG_BLK_DEV_SD='y', CONFIG_SERIAL_8250_CONSOLE='y',
                      CONFIG_UNIX='y', CONFIG_INET='y', CONFIG_PROC_FS='y', CONFIG_SYSFS='y')
     lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
-    requested = requirements(requested, lock)
+    requested = requirements(requested, lock, clock_diagnostics_test=args.clock_diagnostics_test)
     errors = [f'{key}: requested {value}, resolved {actual.get(key, "n")}'
               for key, value in requested.items() if actual.get(key, 'n') != value]
     if errors:
         raise SystemExit('\n'.join(errors))
     print(f'Kernel configuration: {len(requested)} assertions passed')
+    if args.clock_diagnostics_test:
+        print('Isolated clock diagnostic object test; not image configuration qualification')
 
 
 if __name__ == '__main__':

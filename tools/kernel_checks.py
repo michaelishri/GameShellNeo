@@ -87,12 +87,23 @@ def compile_locked(archive, lock, work, objects, extra_config, project_config):
     return build_objects(source, scratch, lock, objects, extra_config, project_config, metadata)
 
 
-def build_objects(source, scratch, lock, objects, extra_config, project_config, metadata):
+def build_objects(source, scratch, lock, objects, extra_config, project_config, metadata, *,
+                  offline=False, clock_diagnostics_test=None):
+    variant = ''
+    if clock_diagnostics_test is not None:
+        if clock_diagnostics_test not in ('enabled', 'disabled') or not project_config:
+            raise ValueError('Clock diagnostic variants require project configuration checks')
+        value = 'y' if clock_diagnostics_test == 'enabled' else 'n'
+        if (f'CONFIG_NEO_CLOCK_DIAG={value}' not in extra_config or
+                'CONFIG_NEO_CLOCK_DIAG_KUNIT_TEST=n' not in extra_config):
+            raise ValueError('Clock diagnostic variant requires explicit matching overrides')
+        variant = ' --clock-diagnostics-test ' + clock_diagnostics_test
     builder = lock['builder']
     relative = scratch.relative_to(ROOT).as_posix()
-    config_check = ('python3 /project/tools/check-kernel-config.py "$output/.config"\n'
+    config_check = ('python3 /project/tools/check-kernel-config.py "$output/.config"' + variant + '\n'
                     if project_config else '')
-    run(['docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
+    run(['docker', 'run', '--rm', *(['--network', 'none', '--pull', 'never'] if offline else []),
+         '--user', f'{os.getuid()}:{os.getgid()}',
          '--platform', builder['platform'], '--entrypoint', 'bash', '-v', f'{ROOT}:/project',
          '-v', f'{source}:/kernel-source:ro',
          '-e', f'NEO_DRIVER_SCRATCH=/project/{relative}',
@@ -121,4 +132,5 @@ def build_objects(source, scratch, lock, objects, extra_config, project_config, 
                 config_sha256=sha256(scratch / 'output/.config'),
                 extra_config=list(extra_config), builder=builder,
                 shared_source=dict(path=str(source.relative_to(ROOT)), **metadata),
-                configuration_scope='project' if project_config else 'driver-compilation-only')
+                configuration_scope=('project-clock-diagnostics-' + clock_diagnostics_test + '-test'
+                    if clock_diagnostics_test else 'project' if project_config else 'driver-compilation-only'))

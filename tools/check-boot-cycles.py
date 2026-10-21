@@ -88,7 +88,8 @@ def validate(snapshot, lock):
                         for s in snapshot['services'].values()),
         'failed_units': not snapshot['failed_units'],
         'ready': snapshot['ready'].get('local_userspace_ready') is True,
-        'battery_monitor': snapshot['battery'].get('monitoring') == 'valid',
+        'battery_monitor': snapshot['battery'].get('monitoring') == 'valid' and
+                           'clock_fault' not in snapshot['battery'],
         'usb': snapshot['usb_states'] == ['configured'],
         'backlight': snapshot['backlight']['brightness'] > 0 and
                      snapshot['backlight']['bl_power'] == 0,

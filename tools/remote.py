@@ -18,6 +18,8 @@ import uuid
 
 import paramiko
 from private_config import load_env
+from host_timing import phase, ssh_state, observe_forward, forward_state
+import socket_observation
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL = ROOT / '.local'
@@ -32,6 +34,17 @@ cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor /sys/devices/system
 cat /proc/sys/kernel/tainted
 systemd-analyze
 '''
+
+
+def device_source(filename):
+    """Bundle shared observation helpers for standalone python -c diagnostics."""
+    source = 'import sys, types\n'
+    for name in ('battery_sample', 'awake_clock'):
+        helper = (ROOT / 'tools' / (name + '.py')).read_text()
+        source += (f'_helper = types.ModuleType({name!r})\n'
+                   'exec(' + repr(helper) + ', _helper.__dict__)\n'
+                   f'sys.modules[{name!r}] = _helper\n')
+    return source + (ROOT / 'tools' / filename).read_text()
 
 
 def private_path(value, default):
@@ -54,11 +67,16 @@ def connect_mac(config):
         # Use the existing Mac identity for host-key verification even when
         # reaching that same host through its explicitly configured tailnet IP.
         if endpoint != identity:
-            sock = socket.create_connection((endpoint, 22), timeout=10)
-        client.connect(identity, username=config['M2_MACBOOK_AIR_USERNAME'],
-                       password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
-                       key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
-                       sock=sock, timeout=10, auth_timeout=10, banner_timeout=10)
+            with phase('mac.tcp'):
+                sock = socket.create_connection((endpoint, 22), timeout=10)
+        with phase('mac.ssh'):
+            try:
+                client.connect(identity, username=config['M2_MACBOOK_AIR_USERNAME'],
+                               password=config.get('M2_MACBOOK_AIR_PASSWORD') or None,
+                               key_filename=config.get('M2_MACBOOK_AIR_KEY') or None,
+                               sock=sock, timeout=10, auth_timeout=10, banner_timeout=10)
+            finally:
+                ssh_state(client)
     except BaseException:
         client.close()
         if sock is not None:
@@ -72,25 +90,63 @@ def device(config, route):
     via_mac = config.get('GAMESHELL_WIFI_VIA_MAC') or '0'
     if route not in ('usb', 'wifi') or via_mac not in ('0', '1'):
         raise ValueError('Use ROUTE=usb/wifi and GAMESHELL_WIFI_VIA_MAC=0/1')
-    with ExitStack() as stack:
+    with phase('route.'+route), ExitStack() as stack:
         address = config.get('GAMESHELL_USB_IP', '192.168.10.1') if route == 'usb' else config['GAMESHELL_IP']
-        sock = None
         if route == 'usb' or via_mac == '1':
-            mac = stack.enter_context(connect_mac(config))
-            sock = mac.get_transport().open_channel('direct-tcpip', (address, 22), ('127.0.0.1', 0), timeout=10)
-            stack.callback(sock.close)
+            with phase('mac.connect'):
+                mac = stack.enter_context(connect_mac(config))
+            client = stack.enter_context(forwarded_device(config, mac, address))
+        else:
+            client = stack.enter_context(paramiko.SSHClient())
+            authenticate_device(client, config, address, None)
+        yield client
+
+
+@contextmanager
+def forwarded_device(config, mac, address, port=22):
+    """One forwarded setup; optional observations bracket, never delay, its exchange.
+
+    A nonstandard port is used only by the saved awake failure controls. Normal
+    device routes keep port 22, the pinned host key and all existing timeouts.
+    """
+    observer = socket_observation.prepare(mac, address, port)
+    with ExitStack() as stack:
+        try:
+            with phase('device.tunnel'):
+                sock = observe_forward(mac.get_transport().open_channel(
+                    'direct-tcpip', (address, port), ('127.0.0.1', 0), timeout=10))
+        except BaseException:
+            socket_observation.finish(observer, 'tunnel-error', {})
+            raise
+        stack.callback(sock.close)
+        client = stack.enter_context(paramiko.SSHClient())
+        authenticate_device(client, config, address, sock, observer)
+        yield client
+
+
+def authenticate_device(client, config, address, sock, observer=None):
+    """Use the pinned device key and existing SSH policy on a caller-owned client."""
+    outcome, states = 'not-started', {}
+    try:
         public = private_path(config.get('NEO_HOST_PUBLIC_KEY'), LOCAL / 'provisioning/device/ssh_host_ed25519_key.pub')
         fields = public.read_text().split()
         if fields[0] != 'ssh-ed25519':
             raise ValueError('Expected the provisioned Ed25519 device host key')
-        client = stack.enter_context(paramiko.SSHClient())
         client.get_host_keys().add(address, fields[0], paramiko.Ed25519Key(data=base64.b64decode(fields[1])))
         client.set_missing_host_key_policy(paramiko.RejectPolicy())
         key = private_path(config.get('NEO_SSH_KEY'), LOCAL / 'ssh/id_ed25519')
-        client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
-                       sock=sock, look_for_keys=False, allow_agent=False,
-                       timeout=10, auth_timeout=10, banner_timeout=10)
-        yield client
+        outcome = 'ssh-error'
+        with phase('device.ssh'):
+            try:
+                client.connect(address, username=config.get('GAMESHELL_USERNAME', 'cpi'), key_filename=str(key),
+                               sock=sock, look_for_keys=False, allow_agent=False,
+                               timeout=10, auth_timeout=10, banner_timeout=10)
+                outcome = 'ok'
+            finally:
+                # Freeze the original observations before the optional snapshot.
+                states = dict(ssh=ssh_state(client), forward=forward_state(sock))
+    finally:
+        socket_observation.finish(observer, outcome, states)
 
 
 def run(client, command, password=None, output=None, display=True, timeout=300, input_data=None):
@@ -100,32 +156,35 @@ def run(client, command, password=None, output=None, display=True, timeout=300, 
     if input_data is not None and (not isinstance(input_data, bytes) or
             len(input_data) > 1024 * 1024 or password is not None):
         raise ValueError('Command input requires at most 1 MiB of bytes and no password')
-    channel = client.get_transport().open_session(timeout=10)
-    channel.settimeout(timeout)
-    channel.set_combine_stderr(True)
+    with phase('command.channel'):
+        channel = client.get_transport().open_session(timeout=10)
     try:
-        channel.exec_command(command)
-        if password is not None:
-            channel.sendall((password + '\n').encode())
-        if input_data is not None:
-            channel.sendall(input_data)
-        channel.shutdown_write()
-        data = bytearray()
-        while True:
-            chunk = channel.recv(65536)
-            if not chunk:
-                break
-            data.extend(chunk)
-            if output:
-                output.write(chunk)
-                output.flush()
-            if display:
-                sys.stdout.buffer.write(chunk)
-                sys.stdout.buffer.flush()
-        code = channel.recv_exit_status()
-        if code:
-            raise RuntimeError('Remote command failed (exit {})'.format(code))
-        return bytes(data)
+        with phase('command.request'):
+            channel.settimeout(timeout)
+            channel.set_combine_stderr(True)
+            channel.exec_command(command)
+            if password is not None:
+                channel.sendall((password + '\n').encode())
+            if input_data is not None:
+                channel.sendall(input_data)
+            channel.shutdown_write()
+        with phase('command.response'):
+            data = bytearray()
+            while True:
+                chunk = channel.recv(65536)
+                if not chunk:
+                    break
+                data.extend(chunk)
+                if output:
+                    output.write(chunk)
+                    output.flush()
+                if display:
+                    sys.stdout.buffer.write(chunk)
+                    sys.stdout.buffer.flush()
+            code = channel.recv_exit_status()
+            if code:
+                raise RuntimeError('Remote command failed (exit {})'.format(code))
+            return bytes(data)
     finally:
         channel.close()
 
@@ -184,7 +243,22 @@ def device_action(config, action, route):
             run(client, shlex.join(arguments))
             return
         directory = evidence_directory()
-        if action == 'check':
+        if action == 'awake-clock-check':
+            arguments = ['python3', '-B', '-c', device_source('record-awake-clock.py')]
+            path = directory / 'awake-clock.json'
+            inputs = ('record-awake-clock.py', 'awake_clock.py', 'battery_sample.py', 'remote.py')
+            (directory / 'clock-sources.json').write_text(json.dumps({name:
+                hashlib.sha256((ROOT / 'tools' / name).read_bytes()).hexdigest()
+                for name in inputs}, indent=2) + '\n')
+            with path.open('wb') as output:
+                run(client, shlex.join(arguments), output=output, display=False, timeout=20)
+            result = json.loads(path.read_text())
+            from awake_clock import checked_proof
+            summary = checked_proof(result.get('awake_proof'))
+            if result.get('passed') is not True or summary['observation_count'] != 21:
+                raise ValueError('Incomplete read-only clock check')
+            print(json.dumps(dict(kernel=result['kernel'], python=result['python'], **summary), indent=2))
+        elif action == 'check':
             country = config.get('GAMESHELL_WIFI_COUNTRY', '')
             active_country = os.environ.get('NEO_ACTIVE_COUNTRY') or country
             if not all(re.fullmatch(r'[A-Z]{2}', value) for value in (country, active_country)):
@@ -237,7 +311,7 @@ def device_action(config, action, route):
                 raise ValueError('SECONDS must be a multiple of 10 in 60..3600')
             if backlight not in ('keep', 'off'):
                 raise ValueError('BACKLIGHT must be keep or off')
-            remote_dir = stage_helpers(client, 'idle', ('sample-idle.py', 'speaker_audio.py'))
+            remote_dir = stage_helpers(client, 'idle')
             warning_owner = uuid.uuid4().hex
             (directory / 'warning.json').write_text(json.dumps(dict(owner=warning_owner, helper=remote_dir)) + '\n')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
@@ -255,13 +329,13 @@ def device_action(config, action, route):
             seconds = int(os.environ.get('NEO_PROFILE_SECONDS', '120'))
             if not 30 <= seconds <= 300 or seconds % 30:
                 raise ValueError('SECONDS must be a multiple of 30 in 30..300')
+            remote_dir = stage_helpers(client, 'power-profile')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-power-profile',
                          '--description=GameShellNeo awake-power counter profile',
                          '--property=RuntimeMaxSec=' + str(seconds + 90),
                          '--property=TimeoutStopSec=10', '--property=Nice=10',
-                         '/usr/bin/python3', '-B', '-u', '-c',
-                         (ROOT / 'tools/profile-power.py').read_text(), '--seconds', str(seconds)]
+                         '/usr/bin/python3', '-B', '-u', remote_dir + '/profile-power.py', '--seconds', str(seconds)]
             path = directory / 'power-profile.jsonl'
             print('Capturing private profile:', path, flush=True)
             with path.open('wb') as output:
@@ -325,7 +399,7 @@ def device_action(config, action, route):
             remote_dir = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-governor.XXXXXXXX',
                              display=False).decode().strip()
             arguments = governor_command(remote_dir, seconds, rate)
-            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py')
+            names = ('compare-governor.py', 'profile-power.py', 'sample-idle.py', 'battery_sample.py', 'awake_clock.py')
             with client.open_sftp() as sftp:
                 for name in names:
                     upload(sftp, ROOT / 'tools' / name, remote_dir + '/' + name)
@@ -360,7 +434,7 @@ def device_action(config, action, route):
                              display=False).decode().strip()
             if not re.fullmatch(r'/tmp/gameshellneo-sugov\.[A-Za-z0-9]+', remote_dir):
                 raise ValueError('Unexpected temporary governor profile directory')
-            names = ('profile-governor.py', 'profile-power.py')
+            names = ('profile-governor.py', 'profile-power.py', 'battery_sample.py', 'awake_clock.py')
             artifacts = ('perf.data', 'perf-record.txt', 'perf-report.txt', 'kallsyms.txt')
             with client.open_sftp() as sftp:
                 for name in names:
@@ -404,7 +478,7 @@ def device_action(config, action, route):
             with (directory / 'stability.jsonl').open('wb') as output:
                 run(client, shlex.join(arguments), output=output)
         elif action == 'backlight':
-            remote_dir = stage_helpers(client, 'backlight', ('check-backlight.sh', 'speaker_audio.py'))
+            remote_dir = stage_helpers(client, 'backlight')
             warning_owner = uuid.uuid4().hex
             (directory / 'warning.json').write_text(json.dumps(dict(owner=warning_owner, helper=remote_dir)) + '\n')
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
@@ -438,18 +512,21 @@ def device_action(config, action, route):
         print('Private capture:', directory)
 
 
-def stage_helpers(client, purpose, names):
+def stage_helpers(client, purpose):
     """Keep standalone diagnostic dependencies together until recovery finishes."""
-    if purpose not in ('idle', 'backlight'):
+    bundles = {
+        'idle': ('sample-idle.py', 'speaker_audio.py', 'battery_sample.py', 'awake_clock.py'),
+        'power-profile': ('profile-power.py', 'battery_sample.py', 'awake_clock.py'),
+        'backlight': ('check-backlight.sh', 'speaker_audio.py'),
+    }
+    if purpose not in bundles:
         raise ValueError('Unknown diagnostic helper purpose')
     prefix = '/tmp/gameshellneo-' + purpose + '.'
     directory = run(client, 'umask 077; mktemp -d ' + prefix + 'XXXXXXXX', display=False).decode().strip()
     if not re.fullmatch(re.escape(prefix) + r'[A-Za-z0-9]+', directory):
         raise ValueError('Unexpected diagnostic helper directory')
     with client.open_sftp() as sftp:
-        for name in names:
-            if Path(name).name != name or name not in ('sample-idle.py', 'check-backlight.sh', 'speaker_audio.py'):
-                raise ValueError('Unknown diagnostic helper')
+        for name in bundles[purpose]:
             upload(sftp, ROOT / 'tools' / name, directory + '/' + name)
     return directory
 
@@ -622,7 +699,7 @@ def main():
     sub = parser.add_subparsers(dest='host', required=True)
     target = sub.add_parser('device')
     target.add_argument('action', choices=['status', 'logs', 'exec', 'check', 'backlight',
-                                          'stability', 'battery-check', 'idle-sample', 'power-profile',
+                                          'stability', 'battery-check', 'awake-clock-check', 'idle-sample', 'power-profile',
                                           'governor-compare', 'governor-profile', 'usb-policy',
                                           'wifi-scan-test', 'wifi-scan-restore'])
     target.add_argument('--route', choices=['wifi', 'usb'], default=os.environ.get('NEO_ROUTE', 'wifi'))

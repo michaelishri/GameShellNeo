@@ -145,15 +145,22 @@ class Cue:
     def play(self, label, level=WARNING_LEVEL, *, duration_ms=WARNING_DURATION_MS):
         if type(level) is not int or level not in LEVELS:
             raise ValueError('Speaker level must be 1, 2, 3, 4 or 5')
+        # Software phase boundaries only: none measures acoustic onset. Keep
+        # the original started/completed interval for historical comparisons.
+        timing = dict(schema=1, clock='monotonic', call_seconds=time.monotonic())
         payload = waveform(duration_ms)
+        timing['waveform_ready_seconds'] = time.monotonic()
         idle()
+        timing['idle_before_seconds'] = time.monotonic()
         set_control('Headphone Playback Volume', str(LEVELS[level]))
         started = time.monotonic()
+        timing['playback_requested_seconds'] = started
         # A child stuck in playback cannot survive normal timeout cleanup. The
         # owning systemd unit additionally kills its whole cgroup on interruption.
         process = subprocess.Popen(['aplay', '-q', '-D', 'hw:CARD=' + CARD + ',DEV=0', '-t', 'wav'],
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
+            timing['process_created_seconds'] = time.monotonic()
             _, error = process.communicate(payload, timeout=5)
             if process.returncode:
                 raise RuntimeError('Speaker playback failed: ' + error.decode(errors='replace')[:400])
@@ -161,7 +168,8 @@ class Cue:
             if process.poll() is None:
                 process.kill()
                 process.wait(timeout=3)
-        deadline = time.monotonic() + 6
+        timing['process_finished_seconds'] = time.monotonic()
+        deadline = timing['process_finished_seconds'] + 6
         while True:
             try:
                 state = idle()
@@ -170,8 +178,10 @@ class Cue:
                 if time.monotonic() >= deadline:
                     raise
                 time.sleep(0.1)
+        completed = time.monotonic()
+        timing['idle_after_seconds'] = completed
         self.record.setdefault('cues', []).append(dict(label=label, level=level, duration_ms=duration_ms,
-            started_seconds=started, completed_seconds=time.monotonic(), amplifiers_after=state))
+            started_seconds=started, completed_seconds=completed, amplifiers_after=state, timing=timing))
 
 
 @contextmanager

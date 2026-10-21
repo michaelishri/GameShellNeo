@@ -139,9 +139,25 @@ def main():
         return {'upstream_regdb_selected': True, 'cfg80211_loaded': True,
                 'alsa_rules_absent': True, 'unprivileged_bpf_disabled': True}
 
+    def wake_policy():
+        features = json.loads(Path('/etc/gameshellneo/image.json').read_text())['sources'].get('features', {})
+        require(features.get('usb_system_wakeup') is False and
+                features.get('power_supply_system_wakeup') is False,
+                'Image does not select stay-asleep USB insertion policy')
+        controllers = sorted(Path('/sys/class/udc').glob('*'))
+        require(len(controllers) == 1, 'Expected one USB controller')
+        controls = {'usb': controllers[0] / 'device/power/wakeup'}
+        controls.update({name: Path('/sys/class/power_supply') / name / 'power/wakeup'
+                         for name in ('axp20x-usb', 'axp22x-ac')})
+        values = {name: path.read_text().strip() for name, path in controls.items()}
+        require(all(value == 'disabled' for value in values.values()),
+                'USB insertion wake remains enabled: ' + json.dumps(values))
+        return values
+
     check('image_identity', identity)
     check('service_state', service_state)
     check('database_and_policy', database)
+    check('wake_policy', wake_policy)
     check('journal_acl', journal_acl)
     check('bpf_enforcement', bpf_filter)
     check('country', lambda: country_state(args.country, args.active_country))

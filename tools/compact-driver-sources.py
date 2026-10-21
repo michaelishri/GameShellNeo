@@ -3,6 +3,7 @@
 import argparse
 from datetime import datetime, timezone
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -120,7 +121,34 @@ def migrate(scratch, source, marker):
     sync_directory(scratch)
 
 
-def compact(root, suite, *, apply=False):
+def recorded_queue(work):
+    directory = work / 'patches'
+    real_directory(directory)
+    real_file(directory / 'manifest.json')
+    manifest = json.loads((directory / 'manifest.json').read_text())
+    if not isinstance(manifest, list) or not manifest:
+        raise ValueError('Missing recorded patch manifest')
+    queue, names = [], []
+    for entry in manifest:
+        if (not isinstance(entry, dict) or set(entry) != {'name', 'sha256'} or
+                not isinstance(entry['name'], str) or
+                not re.fullmatch(r'[0-9]{4}-[A-Za-z0-9_.-]+[.]patch', entry['name']) or
+                not isinstance(entry['sha256'], str) or
+                not re.fullmatch('[0-9a-f]{64}', entry['sha256'])):
+            raise ValueError('Invalid recorded patch entry')
+        path = directory / entry['name']
+        real_file(path)
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != entry['sha256']:
+            raise ValueError('Recorded patch hash mismatch: ' + entry['name'])
+        names.append(entry['name'])
+        queue.append((entry['name'], data))
+    if names != sorted(set(names)) or {p.name for p in directory.iterdir()} != set(names) | {'manifest.json'}:
+        raise ValueError('Unexpected recorded patch order or export contents')
+    return manifest, queue
+
+
+def compact(root, suite, *, apply=False, recorded=False):
     if suite not in SUITES:
         raise ValueError('Unsupported suite')
     root = Path(root)
@@ -136,11 +164,16 @@ def compact(root, suite, *, apply=False):
         # Existing downloads may be intentional shared links; verify their bytes.
         if sha256(archive) != lock['linux']['tarball_sha256']:
             raise ValueError('Locked archive hash mismatch')
-        with tempfile.TemporaryDirectory(prefix='.queue-', dir=work) as temporary:
-            subprocess.run(['python3', str(root / 'tools/kernel-inputs.py'), '--export', temporary],
-                           check=True, stdout=subprocess.DEVNULL)
-            manifest = json.loads((Path(temporary) / 'manifest.json').read_text())
-        source, entries, metadata = ensure_source(root, work, archive, lock, manifest)
+        queue = None
+        if recorded:
+            manifest, queue = recorded_queue(work)
+        else:
+            with tempfile.TemporaryDirectory(prefix='.queue-', dir=work) as temporary:
+                subprocess.run(['python3', str(root / 'tools/kernel-inputs.py'), '--export', temporary],
+                               check=True, stdout=subprocess.DEVNULL)
+                manifest = json.loads((Path(temporary) / 'manifest.json').read_text())
+        source, entries, metadata = ensure_source(root, work, archive, lock, manifest,
+                                                 recorded_patches=queue)
         marker = dict(schema=1, source=str(source.relative_to(work)), tree_sha256=digest(entries))
         # Validate every selected tree before removing any copy.
         selection = []
@@ -148,6 +181,7 @@ def compact(root, suite, *, apply=False):
             print('Verifying source:', scratch.name, flush=True)
             selection.append((scratch, migration_plan(scratch, source, entries, marker)))
         result = dict(schema=1, suite=suite, apply=apply,
+                      patch_source='recorded-export' if recorded else 'current-checkout',
                       shared_source=str(source.relative_to(root)), tree_sha256=metadata['tree_sha256'],
                       evidence_sha256=evidence_hashes, output_sha256=output_hashes,
                       selection={p.name: action for p, action in selection}, completed=[],
@@ -198,12 +232,15 @@ def main():
     parser.add_argument('--suite', choices=SUITES, default=os.environ.get('NEO_SCRATCH_SUITE'))
     parser.add_argument('--target', default=os.environ.get('NEO_SCRATCH_TARGET') or str(ROOT))
     parser.add_argument('--apply', action='store_true')
+    parser.add_argument('--recorded-patches', action='store_true')
     args = parser.parse_args()
     apply = os.environ.get('NEO_SCRATCH_APPLY', '0')
-    if not args.suite or apply not in ('0', '1'):
-        parser.error('Supply SUITE; APPLY must be 0 or 1')
+    recorded = os.environ.get('NEO_SCRATCH_RECORDED_PATCHES', '0')
+    if not args.suite or apply not in ('0', '1') or recorded not in ('0', '1'):
+        parser.error('Supply SUITE; APPLY and RECORDED_PATCHES must be 0 or 1')
     os.umask(0o077)
-    compact(target_root(args.target), args.suite, apply=args.apply or apply == '1')
+    compact(target_root(args.target), args.suite, apply=args.apply or apply == '1',
+            recorded=args.recorded_patches or recorded == '1')
 
 
 if __name__ == '__main__':

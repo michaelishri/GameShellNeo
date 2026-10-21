@@ -46,6 +46,14 @@ final class CameraObserver: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
         }
     }
 
+    func cameras() -> [AVCaptureDevice] {
+        var types: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
+        if #available(macOS 14.0, *) { types.append(.external) }
+        else { types.append(.externalUnknown) }
+        return AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video,
+                                                position: .unspecified).devices
+    }
+
     func finish(_ error: String? = nil) {
         guard !finished else { return }
         finished = true
@@ -78,12 +86,16 @@ final class CameraObserver: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
             self.result["requested_seconds"] = self.seconds
             self.result["requested_fps"] = self.fps
             self.result["authorization"] = self.authorization()
+            self.result["requested_camera"] = self.cameraName
             let timer = DispatchSource.makeTimerSource(queue: self.queue)
             timer.schedule(deadline: .now() + (self.action == "authorize" ? 120 : self.seconds + 20))
             timer.setEventHandler { self.finish("Camera operation timed out") }
             self.deadline = timer
             timer.resume()
             if self.action == "status" {
+                self.result["cameras"] = self.cameras().map {
+                    ["name": $0.localizedName, "id": $0.uniqueID, "type": $0.deviceType.rawValue]
+                }
                 self.finish()
             } else if self.authorization() == "notDetermined" {
                 DispatchQueue.main.async {
@@ -106,10 +118,11 @@ final class CameraObserver: NSObject, AVCaptureVideoDataOutputSampleBufferDelega
     func authorized() {
         guard !finished else { return }
         if action == "authorize" { finish(); return }
-        let discovery = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: .unspecified)
-        guard let camera = discovery.devices.first(where: { $0.localizedName == cameraName }) else {
-            finish("Requested camera was not found: \(cameraName)"); return
+        let matches = cameras().filter { $0.localizedName == cameraName }
+        guard matches.count == 1 else {
+            finish("Requested camera must match exactly one device (found \(matches.count)): \(cameraName)"); return
         }
+        let camera = matches[0]
         result["camera_name"] = camera.localizedName
         result["camera_id"] = camera.uniqueID
         do {

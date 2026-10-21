@@ -1,0 +1,233 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: guard shared diagnostic RAM reads
+
+Keep diagnostic reads behind host-held admission and successful wake.
+Preserve first transport errors through existing once-only cleanup while
+leaving allocation and invalid metadata errors local. Propagate console
+discovery transport failure to its worker and publish only validated shared
+metadata. All diagnostic callers run after probe initializes cleanup state.
+Candidate only; integration and hardware qualification remain separate.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -1070,6 +1070,46 @@
+ 	return !(addr == 0 || ((~addr >> 16) & 0xffff) == (addr & 0xffff));
+ }
+ 
++static void brcmf_sdio_dpc_failed(struct brcmf_sdio *bus, int err);
++
++/*
++ * Diagnostic callers run after probe initialized work, timers and waiters.
++ * Serialize admission, wake and RAM access with PM and error retirement.
++ */
++static int brcmf_sdio_diag_read(struct brcmf_sdio *bus, u32 address,
++				u8 *data, uint size)
++{
++	struct brcmf_sdio_dev *sdiod = bus->sdiodev;
++	int ret;
++
++	sdio_claim_host(sdiod->func1);
++	ret = READ_ONCE(sdiod->io_error);
++	if (ret)
++		goto out;
++	if (READ_ONCE(sdiod->pm_failed)) {
++		ret = -EHOSTDOWN;
++		goto out;
++	}
++	if (sdiod->state == BRCMF_SDIOD_NOMEDIUM) {
++		ret = -ENOMEDIUM;
++		goto out;
++	}
++	ret = brcmf_sdio_bus_sleep(bus, false, false);
++	if (ret)
++		goto failed;
++	ret = brcmf_sdiod_ramrw(sdiod, false, address, data, size);
++	/* Local allocation failure does not make healthy transport unusable. */
++	if (ret && ret != -ENOMEM)
++		goto failed;
++	goto out;
++
++failed:
++	brcmf_sdio_dpc_failed(bus, ret);
++out:
++	sdio_release_host(sdiod->func1);
++	return ret;
++}
++
+ static int brcmf_sdio_readshared(struct brcmf_sdio *bus,
+ 				 struct sdpcm_shared *sh)
+ {
+@@ -1080,7 +1120,6 @@
+ 	__le32 addr_le;
+ 
+ 	sdio_claim_host(bus->sdiodev->func1);
+-	brcmf_sdio_bus_sleep(bus, false, false);
+ 
+ 	/*
+ 	 * Read last word in socram to determine
+@@ -1089,8 +1128,8 @@
+ 	shaddr = bus->ci->rambase + bus->ci->ramsize - 4;
+ 	if (!bus->ci->rambase && brcmf_chip_sr_capable(bus->ci))
+ 		shaddr -= bus->ci->srsize;
+-	rv = brcmf_sdiod_ramrw(bus->sdiodev, false, shaddr,
+-			       (u8 *)&addr_le, 4);
++	rv = brcmf_sdio_diag_read(bus, shaddr,
++				  (u8 *)&addr_le, 4);
+ 	if (rv < 0)
+ 		goto fail;
+ 
+@@ -1108,12 +1147,19 @@
+ 	brcmf_dbg(INFO, "sdpcm_shared address 0x%08X\n", addr);
+ 
+ 	/* Read hndrte_shared structure */
+-	rv = brcmf_sdiod_ramrw(bus->sdiodev, false, addr, (u8 *)&sh_le,
+-			       sizeof(struct sdpcm_shared_le));
++	rv = brcmf_sdio_diag_read(bus, addr, (u8 *)&sh_le,
++				  sizeof(struct sdpcm_shared_le));
+ 	if (rv < 0)
+ 		goto fail;
+ 
+ 	sdio_release_host(bus->sdiodev->func1);
++
++	if ((le32_to_cpu(sh_le.flags) & SDPCM_SHARED_VERSION_MASK) > SDPCM_SHARED_VERSION) {
++		brcmf_err("sdpcm shared version unsupported: dhd %d dongle %d\n",
++			  SDPCM_SHARED_VERSION,
++			  le32_to_cpu(sh_le.flags) & SDPCM_SHARED_VERSION_MASK);
++		return -EPROTO;
++	}
+ 
+ 	/* Endianness */
+ 	sh->flags = le32_to_cpu(sh_le.flags);
+@@ -1124,12 +1170,6 @@
+ 	sh->console_addr = le32_to_cpu(sh_le.console_addr);
+ 	sh->msgtrace_addr = le32_to_cpu(sh_le.msgtrace_addr);
+ 
+-	if ((sh->flags & SDPCM_SHARED_VERSION_MASK) > SDPCM_SHARED_VERSION) {
+-		brcmf_err("sdpcm shared version unsupported: dhd %d dongle %d\n",
+-			  SDPCM_SHARED_VERSION,
+-			  sh->flags & SDPCM_SHARED_VERSION_MASK);
+-		return -EPROTO;
+-	}
+ 	return 0;
+ 
+ fail:
+@@ -1139,16 +1179,23 @@
+ 	return rv;
+ }
+ 
+-static void brcmf_sdio_get_console_addr(struct brcmf_sdio *bus)
++static int brcmf_sdio_get_console_addr(struct brcmf_sdio *bus)
+ {
+ 	struct sdpcm_shared sh;
+-
+-	if (brcmf_sdio_readshared(bus, &sh) == 0)
++	int ret;
++
++	ret = brcmf_sdio_readshared(bus, &sh);
++	if (!ret)
+ 		bus->console_addr = sh.console_addr;
++	else if (brcmf_sdiod_io_blocked(bus->sdiodev) ||
++		 bus->sdiodev->state == BRCMF_SDIOD_NOMEDIUM)
++		return ret;
++	return 0;
+ }
+ #else
+-static void brcmf_sdio_get_console_addr(struct brcmf_sdio *bus)
+-{
++static int brcmf_sdio_get_console_addr(struct brcmf_sdio *bus)
++{
++	return 0;
+ }
+ #endif /* DEBUG */
+ 
+@@ -1216,7 +1263,9 @@
+ 		 * Retrieve console state address now that firmware should have
+ 		 * updated it.
+ 		 */
+-		brcmf_sdio_get_console_addr(bus);
++		ret = brcmf_sdio_get_console_addr(bus);
++		if (ret)
++			return ret;
+ 	}
+ 
+ 	/*
+@@ -3229,22 +3278,22 @@
+ 
+ 	/* obtain console information from device memory */
+ 	addr = sh->console_addr + offsetof(struct rte_console, log_le);
+-	rv = brcmf_sdiod_ramrw(bus->sdiodev, false, addr,
+-			       (u8 *)&sh_val, sizeof(u32));
++	rv = brcmf_sdio_diag_read(bus, addr,
++				  (u8 *)&sh_val, sizeof(u32));
+ 	if (rv < 0)
+ 		return rv;
+ 	console_ptr = le32_to_cpu(sh_val);
+ 
+ 	addr = sh->console_addr + offsetof(struct rte_console, log_le.buf_size);
+-	rv = brcmf_sdiod_ramrw(bus->sdiodev, false, addr,
+-			       (u8 *)&sh_val, sizeof(u32));
++	rv = brcmf_sdio_diag_read(bus, addr,
++				  (u8 *)&sh_val, sizeof(u32));
+ 	if (rv < 0)
+ 		return rv;
+ 	console_size = le32_to_cpu(sh_val);
+ 
+ 	addr = sh->console_addr + offsetof(struct rte_console, log_le.idx);
+-	rv = brcmf_sdiod_ramrw(bus->sdiodev, false, addr,
+-			       (u8 *)&sh_val, sizeof(u32));
++	rv = brcmf_sdio_diag_read(bus, addr,
++				  (u8 *)&sh_val, sizeof(u32));
+ 	if (rv < 0)
+ 		return rv;
+ 	console_index = le32_to_cpu(sh_val);
+@@ -3258,8 +3307,8 @@
+ 
+ 	/* obtain the console data from device */
+ 	conbuf[console_size] = '\0';
+-	rv = brcmf_sdiod_ramrw(bus->sdiodev, false, console_ptr, (u8 *)conbuf,
+-			       console_size);
++	rv = brcmf_sdio_diag_read(bus, console_ptr, (u8 *)conbuf,
++				  console_size);
+ 	if (rv < 0)
+ 		goto done;
+ 
+@@ -3287,8 +3336,8 @@
+ 		return 0;
+ 	}
+ 
+-	error = brcmf_sdiod_ramrw(bus->sdiodev, false, sh->trap_addr, (u8 *)&tr,
+-				  sizeof(struct brcmf_trap_info));
++	error = brcmf_sdio_diag_read(bus, sh->trap_addr, (u8 *)&tr,
++				     sizeof(struct brcmf_trap_info));
+ 	if (error < 0)
+ 		return error;
+ 
+@@ -3341,14 +3390,14 @@
+ 
+ 	sdio_claim_host(bus->sdiodev->func1);
+ 	if (sh->assert_file_addr != 0) {
+-		error = brcmf_sdiod_ramrw(bus->sdiodev, false,
+-					  sh->assert_file_addr, (u8 *)file, 80);
++		error = brcmf_sdio_diag_read(bus,
++					     sh->assert_file_addr, (u8 *)file, 80);
+ 		if (error < 0)
+ 			goto release_host;
+ 	}
+ 	if (sh->assert_exp_addr != 0) {
+-		error = brcmf_sdiod_ramrw(bus->sdiodev, false,
+-					  sh->assert_exp_addr, (u8 *)expr, 80);
++		error = brcmf_sdio_diag_read(bus,
++					     sh->assert_exp_addr, (u8 *)expr, 80);
+ 		if (error < 0)
+ 			goto release_host;
+ 	}
+@@ -3379,7 +3428,7 @@
+ 
+ 	if (sh.flags & SDPCM_SHARED_TRAP) {
+ 		brcmf_err("firmware trap in dongle\n");
+-		brcmf_sdio_trap_info(NULL, bus, &sh);
++		return brcmf_sdio_trap_info(NULL, bus, &sh);
+ 	}
+ 
+ 	return 0;

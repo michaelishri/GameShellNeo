@@ -2,7 +2,1000 @@
 
 Record deferred questions and activities here as they arise.
 
-**Latest diagnostic checkpoint, 5 October 2026:** fresh attachment debug prerequisites and awake rehearsal passed ([report 164](docs/164-diagnostic19-usb-attachment-debug-qualification.md)), but the actual attachment attempt woke early through shared PMIC IRQ67, with no RTC event. Both power-supply insertion-wake controls were enabled. The owner heard the long warning, waited ten seconds, saw the screen return as the cable engaged, then confirmed the normal dim console. Separate USB/Wi-Fi recovery and healthy PM24/0/SDIO2 are saved; the original RTC qualification remains failed ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). USB is connected; PM/RTC/console/audio controls are restored, but diagnostic power-button suppression remains retained. No further physical test is running. The owner selected staying asleep and charging on USB insertion; NEO-117 prepares that policy before fresh qualification.
+**NEO-58/200 clock readiness, 12 October 2026:** asynchronous `CLK_PENDING`
+had no deadline. The baseline reproduces missing deadlines and notifications;
+candidate 0052 preserves one request budget and uses the existing watchdog
+to schedule a host-held worker check. Readiness is accepted, original transfer
+errors preserved, and unavailable clocks time out through existing cleanup.
+The full native/sanitizer/ARM suite, complete board/debug objects and both
+independent reviews pass, including explicit no-IRQ worker consumption;
+see [report 283](docs/283-brcmfmac-clock-deadline.md). The candidate remains outside the image queue;
+NEO-58 retains integration, hardware qualification and reset/reprobe ownership.
+
+**NEO-58/199 watchdog ownership, 12 October 2026:** the actual-source baseline
+reproduces discarded polling/wake/console/idle errors and work published after
+bus retirement. Isolated candidate 0051 preserves the first transport failure,
+rechecks each host admission and publishes successful poll work under the host
+claim. Local console allocation/index failures retain healthy bus operation.
+Review found RAM allocation could be misclassified as transport failure; an
+expanded actual-RAM-helper fixture reproduced 14 failing cases. The corrected
+errno/classification now passes all 50 normal / 157 debug watchdog cases,
+20 watchdog mutations, combined TX/RX/worker regressions and both full ARM
+objects. Independent reviews have no outstanding findings; see
+[report 282](docs/282-brcmfmac-watchdog-errors.md). NEO-58 retains
+image integration, matching board qualification and
+reset/reprobe ownership. No observed board fault is attributed to this finding.
+
+**NEO-58/201 shared-memory diagnostics, 12 October 2026:** the baseline
+reproduces ignored wake, missing admission and lost transport errors. Isolated
+candidate 0053 guards every diagnostic RAM read, preserves first-error and
+once-only cleanup ownership, keeps local failures local and publishes only
+validated shared metadata. Native, sanitizer and ARM tests pass 194 diagnostic
+cases plus the combined regression suites and meaningful mutations. Complete
+board/debug objects, final rehash and both independent reviews pass; see
+[report 285](docs/285-brcmfmac-shared-diagnostic-errors.md). The candidate remains
+outside the image queue. NEO-58 retains integration, hardware qualification
+and startup/reset ownership. NEO-154 remains abandoned; no board fault is
+attributed to this source finding.
+
+**NEO-202 diagnostic output bounds, 12 October 2026:** actual-source offline
+tests reproduce invalid console cursor output and unterminated assertion
+buffer overreads. Isolated candidate 0054 checks size/index before allocation
+or output, avoids empty-console work and reserves terminators outside the
+existing 80-byte text reads. Valid ring output and transport ownership remain
+unchanged. Native, sanitizer and ARM output/combined regressions, meaningful
+mutations and both complete driver objects pass. On 21 October both review
+axes had zero findings and final input/artifact/source verification passed.
+See [report 286](docs/286-brcmfmac-diagnostic-output-bounds.md).
+No triggering firmware input or live fault is claimed; candidate 0054 stays
+outside the image queue, with integration/hardware ownership in NEO-58.
+
+**NEO-58 firmware-startup error audit, 12 October 2026:** the callback still
+discards clock/setup transfer results outside NEO-201's shared-reader path.
+Trace them with function-2/IRQ/interface ownership and reset/reprobe cleanup;
+the completed active-worker candidates do not qualify startup failures.
+
+**NEO-58/198 polling status, 12 October 2026:** actual-source tests reproduce
+discarded queued-TX polling errors and I/O after a prior error arrives at host
+acquisition: 137/215 baseline cases pass. Isolated candidate 0050 records the
+error before releasing the host and preserves prior-error ownership. Saved
+tests, original attempts and scope are in
+[report 281](docs/281-brcmfmac-tx-poll-errors.md). Offline qualification/review
+is complete: 215 TX /115 RX cases, 211/213 worker cases, all mutations and both
+full ARM objects pass. NEO-58 retains integration and matching hardware tests;
+no image or device change and no observed board fault attributed.
+
+**NEO-58/197 TX recovery, 12 October 2026:** the actual-source baseline
+reproduces discarded abort/terminate/count failures and traffic after an
+unverified write-FIFO flush (44/107 pass). Isolated candidate 0049 now passes
+the 107-case native/sanitizer/ARM caller suite, RX regressions, worker shutdown
+checks and assertion-based mutations. Both full ARM objects pass; independent
+review and fixture cleanup are complete in
+[report 280](docs/280-brcmfmac-tx-review.md). NEO-197's offline scope is complete;
+NEO-58 retains integration and matching hardware qualification.
+[Report 279](docs/279-brcmfmac-tx-recovery.md) records exact scope and controlled
+test boundaries. No image or live device change. NEO-198 tracks the adjacent lead:
+`brcmf_sdio_sendfromq()` still drops a polling-mode `intstatus` read error on
+its packet-count return path; audit its error contract separately. This is not
+an attributed board failure or the abandoned SSH-stall investigation.
+
+**NEO-58/196 control allocation recovery, 12 October 2026:** the byte-position
+FIFO harness now reproduces allocation failure leaving an unread control body
+without recovery, plus a stale next-frame hint after successful body-error NAK.
+Candidate 0048 adds flush/retry on allocation failure and a fresh header read
+after control retransmission, while preserving successful read-ahead and an
+already-published response. Saved control tests cover 62 new cases alongside
+the original 53, native memory sanitizers, recovery-stage failures and firmware
+replay at a scripted boundary. [Report 277](docs/277-brcmfmac-control-rx-recovery.md)
+records qualification; [report 278](docs/278-brcmfmac-rx-review.md) completes the
+offline review. Integration/hardware scope remains with NEO-58. No
+observed GameShell fault is attributed, and the patch is outside diagnostic.26.
+
+**NEO-58/195 RX recovery candidate, 12 October 2026:** isolated candidate 0046
+preserves abort/terminate/count/NAK errors, refuses retransmission after an
+unverified flush and hands fatal recovery to the existing worker quarantine.
+The saved helper suite passes 44 native/ARM32 scenarios and 13 assertion-based
+negative controls. Candidate 0047 now fixes the reproduced missing-descriptor
+packet leak and use of failed superframe parser outputs. The actual-caller
+suite passes 53 native/ARM packet cases, native memory sanitizers, worker
+quarantine and successful-TX cases, negative controls, and four full board/debug
+ARM builds with/without the mailbox candidate. NEO-195's offline candidate
+scope has completed review; image integration and matching hardware
+qualification remain with NEO-58. Diagnostic.26
+is unchanged. [Report 276](docs/276-brcmfmac-rx-caller-qualification.md) records
+the caller results and their boundary-model limits.
+[Report 275](docs/275-brcmfmac-rx-recovery.md)
+preserves the initial helper evidence and the two packet findings before
+their reproduction; no observed GameShell fault is attributed to either one.
+
+**NEO-194 local build ownership, completed 22 October 2026:** the diagnostic.26 host
+command ended with status 143 while its Docker kernel build remained running.
+The host log stopped advancing; Docker logs and process activity established
+continued compilation. Attached to that exact container, observed exit 0,
+then verified all 16 kernel artifacts before continuing image assembly. No
+duplicate build was started. The implementation on `work/build-stage-ownership`
+now reserves per-stage ownership before Docker creation, blocks later logged
+stages until verified retirement, and supplies `build:stage:status/resume/stop`
+with retained container logs and actual exit status. A durable start receipt
+blocks repeated starts and created-state removal while an earlier request is
+unresolved. The old wrapper's second-writer admission and five review
+regressions were reproduced before correction. All twelve Docker groups,
+full host checks and both independent review rechecks pass; evidence is in
+[report 287](docs/287-docker-build-ownership.md). Recovery collects the original
+container; it does not replay host postprocessing or prove image validity.
+Other branches must adopt the change deliberately. This is separate from the
+abandoned SSH-stall work; no GameShell command was involved.
+
+- [ ] NEO-103 real-kernel concurrency preparation: the locked Linux 6.18.54
+  `arch/um/Kconfig` restricts `NR_CPUS` to 1. The later NEO-163 UML suite covers
+  endpoint restart/giveback ownership, not simultaneous IRQ-context gadget
+  callbacks and unbind on different CPUs. Do not count it as that missing
+  callback qualification. Prepare a separate SMP system-emulation runner (or
+  equivalent real-kernel environment) with non-sleeping callback handshakes,
+  original callback/UDC operations and bounded cleanup. The retained builder
+  inventory has QEMU user emulation but no QEMU system package; environment
+  preparation remains software work, not an owner/hardware blocker.
+
+**Clock image integration, 12 October 2026:** diagnostic.26 explicitly selects
+the canonical recorder and has its own kernel release, `6.18.54-gameshellneo25`.
+The prior image is checkpointed; host checks, full kernel build, all 16 kernel
+artifact checks, board policy and device-tree qualification pass. Image
+assembly, offline verification, packing and checkpointing are complete; the
+matching clock reader also passes the offline image/ABI admission check.
+Arrange transfer on confirmed regular Wi-Fi, a DEV-card swap and one matching awake
+capture with fresh runtime identity. No clock correction, new PM admission or
+hardware qualification is claimed. [Report 272](docs/272-clock-provenance-image.md).
+
+**Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies
+kernel build ID/configuration, image/source/runtime hashes, same-process vDSO
+routes and task/namespace ownership before arming. Original results survive
+postflight/replay failure; one transient unit is supervised with a separate
+host deadline and termination checks. Fourteen boundary / seventeen deployment
+cases, native/ARM checks and the full 24 runtime / 1,001 tooling suite pass.
+Real diagnostic.25 artifacts were refused offline because the recorder is
+absent. No device access occurred. Next compose, review and build the matching
+instrumented image before a card swap; root cause and PM admission stay open.
+[Report 271](docs/271-clock-capture-deployment.md).
+
+**Clock boundary tooling prepared, 12 October 2026:** NEO-192 now has a fixed
+384-call workload, raw ARM time32/time64 and libc buffers, independent C/Python
+integer conversion and exact kernel-ordinal replay. Backwards results, errors
+and partial captures are retained; ambiguous call alignment is rejected.
+Thirteen Python tests, native/ARM fixtures and independent replay of 27 actual
+ARM fixture buffers pass. No device access or PM test occurred. Finish the
+deployment provenance/timeout wrapper and separately identified image before
+requesting a card swap. The root cause remains open; complete diagnostic data
+does not imply a healthy clock. [Report 270](docs/270-clock-userspace-boundary.md).
+
+**Board completion audit, 12 October 2026:** NEO-100's BOOTTIME producer,
+consumers, installed simulations and real stopped-clock/resume contract are
+complete. Original image/test records were inspected and the sleep result's
+published hash, clock evidence, restoration and BOOTTIME sample age rechecked.
+Current focused runtime/consumer tests pass. NEO-192's later clock regression
+and PM admission remain unresolved; this closure does not qualify protection
+during sleep or clear the new fault. [Report 269](docs/269-in-progress-board-audit.md)
+tracks the broader 20-ticket audit and remaining preparation work.
+
+NEO-94's first functional RTC-wake milestone is also complete: its original
+diagnostic.17 failure remains failed, while the published diagnostic.18 success
+was hash-verified and reassessed from the original record. The later WFI image
+also provides independently checked freeze evidence. NEO-95/96 retain broader
+USB and energy gates; no fresh PM operation ran during this audit.
+
+NEO-26's bounded unavailable-network diagnosis is complete: the original A/B/A
+trace gives 8/0/8 firmware-crash and SDIO-removal counts, and the installed A0
+candidate's unavailable-network/reconnect record has zero radio faults with
+restored configuration and independent Wi-Fi proofs. These originals were
+re-read, not rerun. The binary's internal defect is not source-proven; actual
+associated-AP disappearance/recovery stays with NEO-31, and delayed resume
+authentication stays with NEO-55.
+
+**External camera verified, 12 October 2026:** NEO-193 selects the owner's
+Razer Kiyo through private `.env` configuration. A still and five-second,
+ten-frame sequence show readable console text; capture shutdown and remote
+cleanup are verified. Use this camera for subsequent authorized observations,
+checking fresh positioning before relying on it. No device test occurred and
+NEO-192 clock/PM admission remains unresolved.
+[Report 268](docs/268-razer-kiyo-observation.md).
+
+**Kernel clock recorder prepared offline, 10 October 2026:** NEO-192 now has
+an isolated default-off candidate retaining the consumed counter, coherent
+conversion tuple, read CPU, final syscall result and bounded writer context.
+It preserves regressions and copy errors, rejects live/unstarted exports, and
+drains in-flight calls before releasing ownership. Five real-kernel UML cases
+pass with KASAN/lockdep and no warnings; actual serializer replay, ARM enabled
+and disabled builds, and hook-symbol checks pass. Full host checks pass:
+24 runtime / 967 tooling tests, one optional skip, both C checks and shell lint.
+The candidate is outside the image queue and no GameShell access occurred.
+Next review the hooks and prepare the userspace collector to join exact ABI
+results and Python/native integers to kernel ordinals and capture provenance.
+The root cause, deployment and PM admission remain unresolved; do not count a
+complete diagnostic record as healthy clocks. [Report 267](docs/267-kernel-clock-provenance-candidate.md).
+
+- [ ] Extend verified scratch-retention support to the newer isolated UML/ARM
+  suites, including `clock-provenance-tests` and `axp223-controls-tests`.
+  Existing pruning expects other suite names/layouts. Preserve accepted-run
+  receipts and failed-test evidence; do not apply its old layout assumptions
+  to these directories or remove a build still running.
+
+**Kernel counter/timekeeping audit completed, 10 October 2026:** NEO-192's
+source review finds no missing sequence protection in the syscall readers and
+no counter-register rewrite in the CPI WFI callback. Sequence validation and
+negative-delta handling do not compare against previous returned timestamps,
+so a bad counter observation remains a plausible, unproven mechanism. The
+captured image has no clocksource watchdog; absent warnings cannot clear it.
+The archive, 27 upstream files, captured config and board inputs are verified.
+No GameShell access or runtime change occurred. Next prepare default-off kernel
+diagnostics that retain the actual consumed count, coherent conversion tuple
+and matching syscall result, with bounded storage and offline fault fixtures.
+Do not substitute another nearby timestamp or clamp/retry away the failure.
+NEO-192 remains unresolved; NEO-191/NEO-182 PM work stays pending.
+[Report 266](docs/266-kernel-counter-timekeeping-audit.md).
+
+**All-core native capture completed, 10 October 2026:** NEO-192 now has one
+bounded libc/syscall capture with verified CPU 0–3 coverage: 3,750 sequences /
+67,500 readings per core, 270,000 readings total, zero ordering discrepancies.
+The new explicit task pins only its own thread at batch boundaries, checks
+affinity and CPU endpoints, then restores the original mask. Saved replay
+agrees. Both network routes, PM53/0, battery restart count 1 and the original
+kernel checkpoint remain intact. Native/ARM fixtures and full checks pass:
+24 runtime / 958 tooling tests, one optional skip. Pinning changes the original
+scheduling conditions, and 100 ms pauses hide small cross-core offsets; this
+does not clear either prior clock fault. Next inspect the physical-counter and
+kernel-timekeeping paths for a concrete cause before another measurement.
+NEO-192 stays open; NEO-191/NEO-182 PM work stays pending.
+[Report 265](docs/265-native-clock-cpu-coverage.md).
+The source review proposed here is now recorded in report 266 above.
+
+**Native two-route capture completed, 10 October 2026:** NEO-192's explicit
+libc/syscall experiment retains 270,000 integer readings with zero ordering
+discrepancies, and offline replay agrees. The mode verifies that time32/time64
+vDSO clock exports remain unavailable and cannot silently replace the previous
+three-route plan. CPU endpoints cover only CPUs 1 and 2, with no differing
+endpoint pairs; this cannot qualify all cores or exclude migration between
+observations. Both network routes, PM53/0, battery restart count 1 and protected
+kernel evidence remain intact. Host/ARM fixtures and full checks pass:
+24 runtime / 953 tooling tests (one optional skip), existing C checks and lint.
+Next define bounded CPU coverage and examine the physical-counter/timekeeper
+path for a concrete failure hypothesis. The original MONOTONIC fault and RAW
+−750 ns discrepancy remain open; NEO-191/NEO-182 PM work stays pending.
+[Report 264](docs/264-native-libc-syscall-comparison.md).
+The bounded coverage follow-up is now recorded in report 265 above.
+
+**vDSO clock exports unavailable, 10 October 2026:** NEO-192's prepared native
+three-route comparison stopped before sampling. A separate verified same-boot
+inventory resolves the actual vDSO mapping but none of its four clock exports,
+matching `arch/arm/kernel/vdso.c`: the timer DT flag suppresses their names at
+boot. This corrects a missing gate in report 261 and substantially weakens the
+physical-versus-virtual counter explanation for the saved RAW discrepancy.
+Both network routes, PM53/0, restart count 1 and protected evidence stay intact.
+Offline native/ARM fixtures and full checks pass: 24 runtime / 947 tooling
+tests (one optional skip), existing C checks and lint.
+Next specify a native libc/syscall comparison explicitly; do not silently drop
+the third route, force a hidden entry or change the DT flag to pass a test.
+Keep the original clock fault, NEO-191 and NEO-182 open.
+[Report 263](docs/263-native-clock-vdso-availability.md).
+
+- [ ] Future timer optimization: assess whether the board can safely expose
+  vDSO clocks after proving bootloader/per-CPU virtual-counter configuration and
+  suspend/resume retention. The current DT flag disables these exports by
+  design. No flag change or efficiency claim is justified by source inspection
+  alone; investigate the current physical-counter fault first. See report 263.
+
+**Clock paths narrowed, 10 October 2026:** NEO-192 now has hash-verified live
+Python/libc inventory and offline disassembly. Python imports the time64 libc
+API; the installed libc contains the expected vDSO candidates and syscall403
+fallback, but the original event's branch remains unproven. The kernel reads
+the physical counter; direct ARM32 vDSO code reads the virtual counter. Normal
+RAW math agrees, and the observed HYP startup initializes CNTVOFF to zero.
+Do not assume a missing offset initialization, rounding error or A64 erratum.
+Next prepare a bounded native comparison with verified API layouts and explicit
+route attribution to reduce call-spacing ambiguity. Preserve the original
+MONOTONIC failure and RAW discrepancy; no driver/clocksource/guard change has
+been qualified. Runtime inventory, both routes and unchanged-state checks pass;
+full checks pass 24 runtime / 935 tooling tests (one optional skip), C and lint.
+[Kernel source analysis](docs/261-arm-clock-path-source-analysis.md) and
+[installed runtime evidence](docs/262-clock-runtime-inventory.md).
+
+**Clock-path discrepancy captured, 10 October 2026:** NEO-192's first completed
+Python/API versus explicit ARM time64 comparison records one RAW cross-path
+discrepancy in 15,000 sequences: Python reads 750 ns below the preceding kernel
+read. Neither individual path decreases in that sequence; this is not yet the
+original Python MONOTONIC failure. Trace installed API dispatch and pinned
+kernel counter/conversion paths before assigning cause. Both routes, PM53/0,
+restart count 1 and protected kernel evidence remain intact. An explicit
+inspection-only commit pin preserves the original checkpoint provenance after
+the host producer changed; failed inspections now save their raw error output.
+Full checks pass 24 runtime / 930 tooling tests (one optional skip), C and lint.
+Keep the fault, guard deployment and PM qualification open.
+[Report 260](docs/260-clock-comparison-provenance.md); preparation and earlier
+access failures in [report 259](docs/259-clock-path-comparison.md).
+
+**Battery clock-fault handling prepared, 10 October 2026:** NEO-192 now has
+tested producer handling for invalid, failed and decreasing clock observations.
+Schema-3 records preserve first/latest raw evidence and a count through good
+samples and service restarts, reject the bad sample and reset low-battery
+history. Later valid samples can restore battery protection; retained faults
+still block age/PM/boot qualification. Offline checks pass 24 runtime / 913
+tooling tests (one optional skip), both C checks and shell lint.
+The live diagnostic.25 guard is unchanged. Root cause, controlled deployment
+and hardware qualification remain open; never erase the original restart or
+treat the earlier short non-reproduction as clearance. Next useful comparison
+is the normal clock API versus explicit kernel calls, with verified ARM ABI
+and CPU context. This is separate from any clocksource or driver change.
+[Report 258](docs/258-battery-clock-fault-handling.md).
+
+**Clock regression investigation, 10 October 2026:** NEO-192 verifies the
+installed guard/unit hashes and preserves the original unhandled backwards
+MONOTONIC bracket. `device:clock-observe` now records 60,000 fixed awake
+sequences, bounded raw anomaly evidence and state/route checks. Its first
+capture has zero regressions, unchanged PM53/0 and the same restart count of 1;
+this does not clear the historical fault or qualify clock reliability.
+Full checks pass 16 runtime / 910 tooling tests (one optional skip), C and lint.
+Next: distinguish source/call-path/CPU effects and implement tested degraded
+guard reporting with retained raw fault evidence, without hiding a driver issue.
+Keep NEO-191 PM checks and NEO-182 battery sleep pending; no live clocks,
+services, charger settings or image inputs were changed by the recorder.
+[Report 257](docs/257-awake-clock-regression-investigation.md).
+
+**Camera PM preflight stopped, 10 October 2026:** NEO-191 imports the owner's
+camera workflow, verifies existing permission and directly inspects a readable
+fresh still. Both SSH routes reach the same diagnostic.25 boot at PM53/0.
+No screen or PM test starts: the battery service has one automatic restart,
+with an unhandled backwards-clock observation in its original journal.
+NEO-192 tracks the clock cause and guard fault handling; keep the failed
+preflight, restart count and installed image intact. Camera readiness can now
+replace human visual confirmation, but not the health gate or physical actions.
+[Report 256](docs/256-camera-pm-preflight.md).
+
+**AXP223 control diagnostic tested offline, 10 October 2026:** NEO-188 has an
+isolated default-off REG33/34 normal/bypass diagnostic with PM admission,
+protected removal, per-read errors and timestamps. It performs no charger
+writes or cache repair. Full host checks pass 16 runtime / 898 tooling tests
+(one optional skip), C checks and lint. All seven real UML regmap/PM/debugfs
+tests pass with KASAN/lockdep, and the complete ARM RSB MFD driver compiles.
+The candidate remains outside the active image queue, ready for review.
+Integration, collector provenance and attended
+hardware qualification remain separate. NEO-10's voltage, pack limits and
+conflicting REG34 semantics are still unresolved. No device was contacted.
+[Report 255](docs/255-axp223-control-provenance-diagnostic.md).
+
+**Wi-Fi mailbox candidate tested, 10 October 2026:** NEO-187's isolated 0039
+candidate checks read/ACK errors before decoding firmware flags and routes
+failures to the existing host-owned worker cleanup. Actual-source native/ARM32
+normal/DEBUG runs pass 131/133 scenarios; 43 negative controls reject and both
+complete ARM driver configurations compile. Full 16 runtime / 893 tooling tests
+pass (one optional skip), plus C/lint. It is outside the active image queue;
+source-suite integration and a new image/hardware qualification remain required.
+No hardware was contacted, and no RF, power-saving or historical crash-cause
+claim follows. NEO-58's RX cleanup, clock-ready and recovery leads remain open.
+[Report 254](docs/254-brcmfmac-mailbox-error-candidate.md).
+
+**USB failed-queue candidate tested, 10 October 2026:** NEO-186's isolated
+rollback returns DMA ownership after deferred-work allocation failure. All
+74 actual-source scenarios pass natively, under Address/UndefinedBehavior
+Sanitizers and ARM32; six negative controls reject and board/DMA-enabled core
+and gadget objects compile. Full 16 runtime / 893 tooling tests pass (one
+optional skip), plus C/lint. The patch is outside the active image queue.
+Integrate the affected suites/patch queue under a new image identity before
+hardware qualification; Sunxi PIO cannot qualify other boards' DMA engines.
+NEO-106's broader teardown and channel-release mapping lead remain open.
+[Report 253](docs/253-musb-queue-dma-rollback-candidate.md).
+
+**Three board tickets investigated offline, 10 October 2026:** NEO-106 has a
+demonstrated failed-queue DMA rollback gap and a separate channel-release versus
+mapping-lifetime lead ([report 250](docs/250-musb-queue-failure-audit.md)); NEO-186
+tracks the narrow rollback candidate. NEO-58's mailbox helper discards read and
+ACK errors, potentially decoding an all-ones transfer-failure sentinel as valid
+firmware flags ([report 251](docs/251-brcmfmac-suspend-failure-audit.md)); NEO-187
+tracks propagation into the existing worker failure path. NEO-10 can narrow
+cached-control provenance through a driver-owned bypass read, once PM/lifetime
+admission is designed ([report 252](docs/252-charging-voltage-evidence-gap.md));
+NEO-188 tracks that work. No cause is assigned to the historical radio or
+voltage observations, and no target hardware was contacted for these audits.
+
+**Speaker timing prepared offline, 10 October 2026:** NEO-185 adds fixed cue
+phase timestamps and `report:audio-timing`, without changing the waveform,
+volume, driver startup delay, prompt waits or playback cleanup. The report
+separates historical total operations from new phase measurements; it does
+not claim acoustic onset or PM acceptance. 29 speaker regressions and the full
+16 runtime / 893 tooling tests pass (one optional skip), plus C/lint. No sound,
+PM or device configuration ran. The next attended session can gather current
+source records; the owner-deferred latency fix and audio energy tests remain
+open. NEO-184/182 still need fresh attended qualification; no card swap needed.
+[Report 249](docs/249-speaker-confirmation-timing.md).
+
+**Kernel-evidence awake checks passed, 10 October 2026:** NEO-184 captures a
+complete 1,660-record boot prefix on the existing diagnostic.25 boot, although
+the independent general journal still lacks the firmware identity. The saved
+`device:kernel-evidence-smoke` task appends one userspace/debug marker, verifies
+kernel-only exclusion, protected storage, unchanged PM53/0 and both SSH routes.
+All 16 runtime and 882 tooling tests pass (one optional skip), plus C/lint.
+No PM, reboot, audio or display operation ran while the owner slept. NEO-184
+remains in review for fresh attended preparation; NEO-182's clean battery
+workflow remains open. Historical originals are unchanged. No card swap needed.
+[Report 248](docs/248-kernel-evidence-awake-validation.md).
+
+**Kernel-evidence correction implemented offline, 9 October 2026:** NEO-184
+adds a bounded root-owned printk checkpoint, complete boot/firmware anchor,
+exact sequence/overlap checks and boot/image/collector/PM-producer source binding.
+General-journal rotation no longer removes this separate evidence; missing
+kernel records, caps, source changes and storage failures still stop admission.
+No background monitor or journal-policy change. Existing failed originals remain
+unchanged and cannot qualify the new source. All 16 runtime and 874 tooling
+tests pass (one optional skip), with C and shell checks. NEO-184 is in review
+for awake board qualification and fresh attended preparation; NEO-182's clean
+60-second battery workflow remains open. No device was contacted, and no image
+or card swap is needed. Preserve original/checkpoint/staging evidence on failure;
+obtain separate readiness before any reboot, screen test or physical unplug.
+[Report 247](docs/247-bounded-kernel-evidence.md).
+
+**Battery-repeat preparation stopped, 9 October 2026:** NEO-182's fresh
+post-NEO-183 sequence passes five debug checks, then stops in check six because
+the earlier kernel-journal prefix and firmware identity disappear. PM reaches
+53/0 with normal saved restoration; the owner confirms the warning and dim
+console. No fifth late/noirq check, unplug, new battery rehearsal or actual
+sleep follows. Read-only checks show unchanged journald identity/storage policy,
+eleven verified retained files and restored INFO Wi-Fi logging. Zero inline
+Python command records remain; the exact deletion cause is unproven. Preserve
+the failed original and incomplete history. NEO-184 now tracks bounded
+boot-identity/per-test kernel evidence with explicit loss detection, blocking
+the clean NEO-182 repeat. Keep the 60-second cap and obtain fresh qualification
+and owner readiness after the correction. No physical action is currently
+needed; leave USB connected.
+[Report 246](docs/246-battery-repeat-preparation-journal-loss.md).
+
+**Sleep collection handling fixed offline, 9 October 2026:** NEO-183 handles
+malformed JSON/encoding replies at the collection boundary and preserves
+bounded private failure evidence. The existing deadline and single sleep
+submission remain unchanged; only retrieval of the same original run can
+continue. Decoded protocol/identity/clock and completed-result failures remain
+fatal, with route proofs required before acceptance. All 147 sleep-protocol
+tests pass, including ten new regressions. No device was contacted, and device
+helpers/image and NEO-182's historical records are unchanged. NEO-182 remains
+open for fresh preparation and an attended clean battery repeat. The cause of
+the original incomplete reply is still unestablished; the abandoned SSH-stall
+investigation remains closed. Keep the 60-second cap.
+[Report 245](docs/245-sleep-collection-reply-recovery.md).
+
+**60-second battery device trial passed; host collection remains open,
+9 October 2026:** NEO-182's fresh preparation and battery rehearsal pass. One
+actual sleep succeeds on the device: all four CPU callbacks/timekeeping freeze,
+RTC wake, battery endpoints and restoration pass, with owner warning/display
+confirmation. PM finishes at 47/0. The host stops on an unterminated JSON reply;
+read-only collection recovers the same completed original without resubmitting
+sleep. Separate later Wi-Fi health and owner-triggered USB reconnection pass.
+The original lacks host route-proof flags: preserve it unchanged and do not
+treat it as a clean host pass or continuation anchor. Next: offline recorder
+handling for incomplete/malformed JSON, preserving failure evidence and the
+single-submission rule; cause of the incomplete reply is unestablished. Do not
+reopen the abandoned SSH-stall investigation. Obtain fresh qualification and
+readiness for a later clean repeat; keep the 60-second cap. The gauge change
+does not establish sleep power or endurance.
+[Report 244](docs/244-first-60-second-battery-rtc-trial.md).
+
+**First 60-second USB RTC trial passed, 9 October 2026:** NEO-181 completes
+fresh seven-debug preparation, matching awake rehearsal and one observed
+USB-connected trial on diagnostic.25. All four CPU callbacks and timekeeping
+freeze are verified, both routes recover, owner warning/display observations
+pass and PM finishes at 39/0 with all owned controls restored. Immediate battery
+endpoints are saved; USB charge-current readings do not measure sleep power.
+Next: separately qualify the 60-second battery trial with fresh preparation,
+explicit unplug/readiness and matching rehearsal, preserving the unplugged
+result before reconnection. Repeatability, longer intervals, sleeping
+low-battery protection and energy/endurance remain open.
+[Report 243](docs/243-first-60-second-usb-rtc-trial.md).
+
+**60-second RTC tooling prepared, 9 October 2026:** NEO-180 adds an explicit
+one-shot 60-second option with matching duration-bound evidence, reserve checks
+and immediate pre/post battery endpoints. Offline regressions pass; no live
+trial has run. Next: fresh debug/rehearsal qualification and one observed USB
+trial, then a separate battery trial after its own qualification and physical
+unplug confirmation. Keep long warnings and collect original failed/uncertain
+results without resubmission. Durations above 60 seconds remain rejected.
+Gauge/voltage endpoints are coarse observations, not sleep energy; sleeping
+low-battery protection and endurance remain open.
+[Report 242](docs/242-bounded-rtc-duration-protocol.md).
+
+**Backlight comparison complete, 9 October 2026:** NEO-179's fresh battery-only
+lit/off/lit sequence passes all three 31-sample windows, with warning and
+brightness/audio restoration confirmed. Estimates are 1.042 → 1.015 → 1.027 W,
+with unchanged PM31/0. The off result is lower than both lit references, but
+15.3 mW of lit-window drift prevents treating the difference as calibrated
+backlight-only power. This is characterization, not a new driver/policy change.
+The next step is the deliberately bounded longer-RTC protocol described in
+[report 240](docs/240-diagnostic25-battery-measurement-baseline.md); sleep
+energy, low-battery protection and broader repeatability remain open.
+[Report 241](docs/241-diagnostic25-backlight-power-comparison.md).
+
+**Diagnostic.25 awake battery baseline, 9 October 2026:** NEO-178's 61 samples
+over ten minutes pass, after a separate settling minute, with approximately
+264 mA / 1.05 W at the normal dim display. Raw summary recomputation and awake
+clock/PM checks pass; PM remains 31/0. This is an uncalibrated awake reference,
+not an asleep-consumption or optimization result. Next compare backlight-off
+awake operation against surrounding lit windows, then extend the fixed
+30-second RTC protocol deliberately for bounded longer observations. A
+qualified sleep-energy integral and sleeping battery protection remain open.
+[Report 240](docs/240-diagnostic25-battery-measurement-baseline.md).
+
+**MUSB restart integration review complete, 9 October 2026:** NEO-177 found
+no actionable Standards or Spec findings in `8d8a2e4...6ac61a3`. Exact
+patch/test/image provenance passes, and diagnostic.25's bounded qualification
+finishes at 21 debug checks plus 10 actual sleeps, with zero PM failures.
+NEO-108's defined restart-ownership work is complete on
+`work/musb-restart-integration`. No new image or physical test is needed for
+this review. Energy, charge acceptance during sleep, broader reliability,
+dequeue/DMA follow-ups and NEO-106 controller removal remain separate.
+[Report 239](docs/239-musb-restart-integration-review.md).
+
+**Awake SSH investigation complete, 9 October 2026:** NEO-160 reviews both
+diagnostic.24 late/noirq inner-SSH failures: 24 greeting bytes accepted by the
+forwarding API, zero received, active/open channels and no parsed greeting.
+Bounded preflight clock alignment places inner negotiation after PM return,
+but the enclosing collection started before return. Two retained journal
+windows add no independently bound server-worker cause; NEO-154 remains open.
+Ordinary PM/RTC tasks now honor explicit `SOCKET_STATE=1` using the existing
+Mac observer, with separate batch-cycle limits and reuse of a dedicated trace's
+outer owner. Defaults, SSH deadlines/retries and device PM sources are unchanged.
+All host checks and three awake USB/Wi-Fi pairs pass; seven socket observations
+validate. Final health `20261008T120812.683399Z` retains PM12/0, original boot,
+all four WFI counts 5 and dim display. No sleep, reboot or blanking ran while
+the owner was away. Use the observer on a future independently planned,
+admitted and attended PM run; its ordinary-task wrapper still needs that
+hardware exercise. No extra sleeps solely to provoke the stall.
+[Report 221](docs/221-diagnostic24-ssh-stall-awake-investigation.md).
+
+**Connected sleep repeats qualified, 9 October 2026:** NEO-159 completes four
+further actual RTC sleep/wake cycles on diagnostic.24, same boot
+`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM12/0. All four CPU callbacks advance
+once per cycle, with independent timekeeping freeze and clock gaps of
+28.708–29.075 seconds. Both SSH routes, original keypad, dim backlight and
+temporary-control restoration pass. The owner confirms clear long warnings
+and all four normal returns without intervention. Batch capture:
+`20261008T114344.024513Z`; fresh full health and seven-debug/five-sleep admission
+pass at `20261008T115117.076929Z`. All four WFI s2idle counts are now 5.
+The unused continuation is the batch's `cycle-4/qualification-next.json`.
+Eight retained USB forwarding timeouts all began before recorded PM return;
+seven ended before it and one end overlaps the alignment uncertainty. This
+does not close NEO-154's earlier post-return inner-SSH investigation.
+Next: independently qualify battery-only and cable-change profiles, exercise
+awake-measurement interruption rejection, then measure energy/awake overhead.
+No new sleep test is running; keep physical steps coordinated.
+[Report 220](docs/220-diagnostic24-connected-sleep-repeatability.md).
+
+**First coordinated sleep qualified, 9 October 2026:** NEO-158 completes seven
+freezer/driver/late-noirq debug checks, the awake RTC rehearsal and one actual
+connected-USB RTC sleep on diagnostic.24, boot
+`44b698ad-7fef-46d4-9e0f-71153f6f81e9`, now PM8/0. All four CPU s2idle callbacks
+advance once, with independent timekeeping-freeze evidence and a 28.869-second
+BOOTTIME–MONOTONIC gap. Both SSH routes recover, the original keypad handle
+survives, SDIO usage stays 2 and all temporary controls restore. The owner
+confirms clear warnings and normal untouched display returns. The first sleep
+capture is `20261008T112241.497557Z`, run `5165eaa30fb54d6ba48d89e85b5d3c5f`.
+Its `qualification-next.json` is unused and passes continuation validation
+against fresh health capture `20261008T112529.727122Z`. The awake rehearsal is
+`f96b80e84fd9449080f042a43c78a69f`, capture `20261008T111833.022485Z`;
+the seven-debug history is `.local/neo158-reference-history.json`.
+Next: fresh readiness and four connected sleep repeats, then independently
+qualified battery/cable profiles and energy comparisons. BOOTTIME battery
+freshness passes after resume; awake-measurement interruption rejection still
+needs its own hardware exercise. Earlier USB forwarding/SSH setup failures
+remain preserved under NEO-154; no PM was resubmitted and their cause is open.
+No further screen test is running.
+[Report 219](docs/219-diagnostic24-pm-qualification.md).
+
+**Installation and awake checks complete, 8 October 2026:** NEO-157 shut down diagnostic.23
+after the long warning sequence and owner-confirmed card-swap readiness.
+The Samsung DEV card now contains diagnostic.24; all 4 GiB passed readback,
+the mount guard passed and the card was safely ejected. The owner confirmed boot;
+both routes, exact manifest/all 335 input hashes, schema-2 battery readings and
+12 installed guard tests, all-CPU WFI/timer inventory, integration, journal
+continuity, power-key ownership, awake RTC and 21 clock observations pass.
+Final full health passes on boot `44b698ad-7fef-46d4-9e0f-71153f6f81e9` at PM0/0,
+with unchanged dim backlight and no diagnostic key suppression. No PM test has
+run on diagnostic.24; all four s2idle callback counts remain zero.
+[Report 218](docs/218-diagnostic24-installation.md) retains the evidence and
+next gates. Use `work/cpi-wfi-integration` tools for the new image.
+
+**Latest integration, 8 October 2026:** NEO-155 produced verified diagnostic.24 in
+`work/cpi-wfi-integration`, combining NEO-96 WFI s2idle with NEO-100 BOOTTIME
+battery readings and NEO-101 awake measurement guards. Host checks pass and
+the installed diagnostic.23 timer inventory matches the audited source; the
+full new kernel, ARM matrix, DT and image checks pass. The 4 GiB image and 269 MB
+transfer archive are retained on the Intel host, with recovery checkpoint
+`diagnostic24-wfi-s2idle`. NEO-156 transferred the archive after the owner
+confirmed home regular Wi-Fi; compressed and full decompressed hashes and sizes
+pass verification on the Mac. The subsequent card write is recorded above;
+the integration and transfer themselves made no live PM or policy change.
+[Report 217](docs/217-wfi-s2idle-image-integration.md)
+records the reproducible tasks and first-install gates. Keep NEO-96/100/101
+open for matching-image hardware qualification; all-CPU callbacks and frozen
+timekeeping are required before claiming this path works. Energy, CPU/DRAM
+power-off and sleeping battery protection remain unqualified. Preserve the
+diagnostic.23 worktree/tools and its original evidence. Next: attended PM/RTC qualification using
+the new worktree. The image remains explicitly hardware-unqualified.
+
+- [ ] Build host: inspect ownership and active users of stale `/tmp` content
+  before any cleanup. Its per-user quota blocked both native compiler temporary
+  files and the sandbox launcher on 8 October despite ample workspace space.
+  NEO-155 continues with private `.local/host-tmp` via `TMPDIR`; unrelated shared
+  temporary files were not removed. This is separate from image/driver behavior.
+
+**Latest awake work, 8 October 2026:** NEO-153 completes the installed SSH
+source/evidence audit and adds `task device:ssh-provenance`. Installed Paramiko
+matches upstream 4.0.0; pinned Apple and exact patched Debian references explain
+the forwarding and pre-identification stages. The local caller deadline can
+produce `No existing session` before the background negotiation finishes. This
+explains the error shape, not the original stall. Current DNS/admission settings,
+empty wrapper rules and preserved journal searches establish no policy cause;
+the installed Debian package already includes the MaxStartups tracking fix.
+Host checks pass (13 runtime, 764 tooling, one optional skip, C and shell checks),
+and final full health/continuation validation passes on the same boot at PM12/0.
+No sleep, reboot, display or policy change occurred. **NEO-154 retains root-cause
+resolution**, using the existing diagnostics during independently planned tests;
+do not repeat sleep merely to seek recurrence or mask it with longer deadlines.
+[Report 216](docs/216-ssh-greeting-source-audit.md).
+
+**Latest attended work, 8 October 2026:** NEO-152 qualifies opt-in socket
+observations across one actual RTC sleep on diagnostic.23. The owner confirms
+the clear long warning and normal dim console returned untouched. Both routes
+recover, original keypad/policy checks pass, and PM advances to **12/0** on boot
+`cc26703f-d9ef-4d71-8da1-9d766f3efdbe` (seven debug checks, five actual sleeps).
+All fifteen socket observations validate: twelve healthy SSH setups have unique
+established worker candidates; three failed forwarding opens before PM return
+have missing sockets. The original post-return setup failure does not recur.
+The Mac packet recorder retains a 29.009-second interface gap, zero reported
+drops and seven matched later greetings; continuous coverage remains rejected.
+Final full health and the new unused continuation validate at PM12/0:
+`.local/diagnostics/20261008T083013.709559Z/qualification-next.json`, retaining
+rehearsal `e1afea155b864a79b04bb133496e4e26`. Its `070741.360669Z` predecessor is
+consumed. No further sleep/screen test is running. The subsequent NEO-153 audit
+is complete above; NEO-154 retains the unresolved cause. No repeated PM merely
+to provoke it. [Report 215](docs/215-rtc-wake-socket-observation-validation.md).
+
+**Earlier awake work, 8 October 2026:** NEO-151 integrates opt-in Mac socket state
+around actual forwarded SSH setup, preserving its original error and first byte
+observations. Silent/greeting-only loopback controls and healthy USB/Wi-Fi
+controls pass; the silent socket disappears before collection and is correctly
+recorded as missing. Seven awake packet-workflow setups pass with the option,
+with four two-ended USB greeting matches. Offline reports and full host checks
+pass. Final health and the unused continuation validate on the same boot at
+PM11/0. No sleep, reboot, display, cable or image action occurred in that slice.
+The subsequent NEO-152 attended qualification is recorded above; the original
+intermittent cause remains open. [Report 214](docs/214-ssh-failure-socket-observations.md).
+
+**Earlier attended work, 8 October 2026:** NEO-149 passes one RTC sleep on
+diagnostic.23, same boot `cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM11/0
+(seven debug checks and four actual sleeps). The owner confirms the clear warning
+and normal untouched dim-console return. Both routes recover; the earlier
+post-return SSH setup failure does not recur. Twelve inner SSH setups have
+healthy byte counts. The Mac observer records another explicit 29.92-second
+interface-disappearance gap, then seven matched greeting flows; continuous
+coverage remains rejected and both recorders report zero drops. A channel-flag
+integer/boolean compatibility fix passes regression and subsequent awake checks.
+No further sleep is running. Post-sleep full health/continuation validation passes;
+temporary services are inactive/not-found. The then-unused continuation was
+`.local/diagnostics/20261008T070741.360669Z/qualification-next.json`, retaining
+rehearsal `e1afea155b864a79b04bb133496e4e26`. NEO-152 has since consumed it;
+use only the latest validated continuation above. NEO-150/151 complete awake
+socket tooling, NEO-152 qualifies it through sleep, and NEO-153 audits source
+paths. NEO-154 retains the still-open failure investigation.
+[Report 212](docs/212-rtc-wake-forwarding-byte-validation.md).
+
+**Earlier attended work, 8 October 2026:** diagnostic.23 remains on boot
+`cc26703f-d9ef-4d71-8da1-9d766f3efdbe`, now PM10/0: seven qualified debug checks
+and three actual RTC sleeps. The latest sleep passes, with controls restored,
+original keypad retained, stable SDIO usage and both SSH routes healthy. The
+owner confirms the clear warning and normal untouched dim-console return.
+The revised Mac observer records a real interface disappearance and recovers in
+29 attempts, retaining an explicit 29.907-second gap. Both recorders report zero
+drops; five later handshakes match within clean segments. Continuous coverage
+remains rejected. One post-return SSH setup fails without an observed greeting;
+its incomplete handshake does not establish the cause. NEO-148 audits it below.
+No further display or sleep test ran then. The then-unused continuation was
+`.local/diagnostics/20261008T062557.111288Z/qualification-next.json`, with
+rehearsal `e1afea155b864a79b04bb133496e4e26`; the former 054356 continuation was
+consumed. Final health and full continuation validation pass. Validate current
+state before reuse; an audible warning does not replace fresh readiness.
+[Report 210](docs/210-rtc-wake-segmented-observer-validation.md).
+
+**Subsequent awake investigation, 8 October:** NEO-148 finds a same-peer/port
+preauthentication closure in the saved boot's server journal at 59.817 seconds
+after PM return, well after host setup failure and recorder closure. This does
+not establish exact forwarded-socket ownership or the delay's cause. Passive
+forwarding byte/state observations now pass local failure controls and awake
+USB/Wi-Fi probes, with zero capture drops and four matched flows. Final health
+and the existing unused receipt validate at unchanged PM10/0. No sleep, reboot,
+display/cable action or policy change occurred.
+[Report 211](docs/211-forwarded-ssh-observation.md).
+
+**Earlier awake recorder work, 8 October:** NEO-146 reproduces capture pressure
+with three checked 2 MiB transfers, then passes the same workload with zero
+reported drops and four matched handshakes after recorder changes. A deliberate
+Mac capture-handle interruption also recovers with an explicit gap and four
+matched flows in the clean reopened segment; continuous coverage remains rejected.
+No sleep, reboot, cable action or display change occurred. Final health and the
+then-unused continuation validate at unchanged PM9/0; both transient services
+are inactive/not-found. At that checkpoint, actual USB-transition recovery still
+required separately attended qualification; NEO-147 below records its result.
+[Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md).
+
+- [x] NEO-144 bounded two-ended SSH metadata recorder: saved awake/sleep/collect
+  tasks and offline flow report, with payload-free output, source/identity/hash
+  checks, limits, cleanup and original clock anchors. Final awake smoke matches
+  four USB SSH flows and greeting prefixes at both endpoints with zero reported
+  drops, unchanged boot/PM8/0, and successful recollection. Full host checks pass.
+  [Report 206](docs/206-two-ended-ssh-tcp-metadata.md).
+- [x] Correct the recorder's sleep-service integration. NEO-145's first attempt
+  was rejected before warning, alarm or PM entry because the independent recorder
+  was another active diagnostic. Originals are retained; no successor claim was
+  consumed. The recorder now shares the existing sleep-test service's lifecycle,
+  preserving the unchanged device admission guard and PM helper. The saved
+  `device:ssh-trace-smoke` passes while awake: four matched USB flows, six successful
+  route probes, verified cgroup/unit ownership, both children exit zero and no
+  cleanup errors. Full host checks pass; boot/PM8/0 unchanged.
+  [Report 207](docs/207-ssh-observer-sleep-unit-integration.md).
+- [x] Run and assess NEO-145's separately attended actual RTC sleep with the
+  corrected observer integration. Functional sleep/recovery and both routes
+  pass at PM9/0, with owner confirmation. Independent TCP capture validation
+  rejects the Mac error and Linux socket drops; no complete flow claim is made.
+  Both transient services are inactive/not-found. Final health/receipt checks
+  pass, and all original files remain retained.
+  [Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
+- [x] NEO-146 recorder engineering and awake validation: fixed backend/phase
+  diagnostics, bounded Mac handle reopening, explicit segment/gap identities and
+  positive-only partial reports. Per-flow record selection plus a temporary
+  Linux receive buffer changes the repeated awake workload from 3,223 recorder
+  drops to zero, with all data checks/probes passing and four matched handshakes.
+  Synthetic interruption recovery and strict rejection both pass. Historical
+  failed captures stay rejected. The 538 earlier diagnostic drops and 3,223
+  reproduced drops do not establish USB/TCP network loss. No driver or SSH-policy
+  change, measured energy saving or resolved greeting cause is claimed.
+  [Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md).
+- [x] NEO-147: qualify the revised observer across one separately attended RTC
+  sleep. Functional sleep/recovery and final health pass at PM10/0 with owner
+  confirmation. Mac read error `interface-disappeared`, status −1/errno 6, closes
+  segment 0; bounded reopening succeeds and segment 1 matches five later flows
+  with the clean Linux capture. Both report zero drops. The strict command exits
+  nonzero for the real gap and saves its separate positive-only report. No PM
+  repeat, altered acceptance or SSH-policy change is used.
+  [Report 210](docs/210-rtc-wake-segmented-observer-validation.md).
+- [x] NEO-148: audit the post-return SSH setup failure captured in report
+  210. The forwarded-channel operation completes, but the associated flow has
+  only two SYN observations at each endpoint and no established handshake in
+  the report; the SSH state has no greeting/key exchange/authentication before
+  its ten-second failure. Source review separates forwarding confirmation from
+  greeting delivery; timing-only flow associations are now explicitly unverified
+  socket identities. The server journal adds a later same-peer/port closure.
+  Passive channel byte/state observations pass silent/greeting-only controls,
+  full host checks and awake two-ended recording. This completes the audit and
+  diagnostic preparation, not root-cause resolution.
+  [Report 211](docs/211-forwarded-ssh-observation.md).
+- [x] NEO-149: one attended sleep with forwarding observations passes functional
+  and both-route recovery checks, with owner confirmation. The earlier failed
+  SSH setup does not recur; twelve setups transfer bytes and authenticate. The
+  Mac gap stays rejected, with seven later matched flows and zero recorder drops.
+  Correct integer/boolean channel flags and validate awake; preserve the original
+  unknown fields. Full host checks pass. The intermittent cause remains open.
+  [Report 212](docs/212-rtc-wake-forwarding-byte-validation.md).
+- [x] NEO-150: bounded Mac worker/socket snapshots confirmed against authenticated
+  board endpoints over USB and Wi-Fi. Multiple forwards are rejected as ambiguous;
+  a separate transport's same-target connection is excluded. Source/observation
+  hashes and independent board records support offline rechecking. Full host
+  checks and final health pass. No PM or runtime policy changes.
+  [Report 213](docs/213-forwarded-socket-identity.md).
+- [x] NEO-151: opt-in socket snapshots bracket actual SSH setup without work
+  between channel opening and greeting or new retries. Original error/state/byte
+  observations survive collection. Bounded silent/greeting-only/healthy awake
+  controls pass, followed by seven successful packet-workflow setups, offline
+  reports and full checks. Missing, ambiguous and unavailable observations remain
+  explicit; independent awake corroboration is not borrowed for failed-flow
+  ownership. [Report 214](docs/214-ssh-failure-socket-observations.md).
+- [x] NEO-152: one attended RTC wake with `SOCKET_STATE=1` passes functional
+  recovery and the socket report, with owner-confirmed warning/display return.
+  Twelve healthy SSH setups and three failed forwarding opens before PM return
+  retain their original state; the packet gap remains unqualified. Final health
+  and new continuation pass at PM12/0. No implementation/image change or second
+  sleep. [Report 215](docs/215-rtc-wake-socket-observation-validation.md).
+- [x] NEO-153: audit the installed SSH implementations, exact Debian patches and
+  original greeting-stall evidence. Save a reusable private version/hash/policy
+  inventory; host checks and unchanged full device health/continuation pass.
+  The caller timeout explains the generic error but establishes no faulty layer.
+  [Report 216](docs/216-ssh-greeting-source-audit.md).
+- [x] NEO-154: **abandoned by explicit owner instruction; not fixed**. See the [board audit](docs/269-in-progress-board-audit.md). Do not resume this investigation under general project authorization. Historical plan was to resolve the original intermittent post-return SSH stall when bound
+  failure evidence becomes available during independently justified tests. Use
+  existing byte/state/socket observations first, preserving the first failure;
+  add a narrow discriminator only for the remaining ambiguous branch. No extra
+  sleeps solely to provoke it, speculative driver workaround, admission-policy
+  weakening or longer timeouts/retries. Missing sockets and packet gaps remain
+  unknown; a healthy comparison is not a fix. CPU retention and energy remain
+  separate qualification work.
+  NEO-160 adds the diagnostic.24 24-byte-send/zero-receive evidence and makes
+  `SOCKET_STATE=1` available in ordinary PM/RTC tasks; the original cause is
+  still unproven ([report 221](docs/221-diagnostic24-ssh-stall-awake-investigation.md)).
+
+- [x] NEO-142 offline Ethernet audit: paired full ARM kernels pass with exactly
+  nine audited configuration removals, identical ten modules/DTB and a 103,648-byte
+  (1.575%) smaller `zImage`. All 24 compiled-DTB negative controls pass for both
+  outputs. Layout inspection finds an unchanged kernel address span; ELF totals
+  do not establish reclaimed RAM. Host checks and the completed-stage manifest
+  pass. The saved `check:ethernet-config` task and
+  [report 204](docs/204-unused-ethernet-build-candidate.md) preserve the evidence.
+- [ ] Qualify the CPI-only unused Ethernet candidate: `SUN4I_EMAC=n` and
+  `STMMAC_ETH=n` remove platform controller
+  support while retaining SDIO Wi-Fi and USB gadget ECM. The active image
+  fragment is unchanged. Require a new image/recovery checkpoint and attended
+  boot, both network routes and PM checks before integration is accepted.
+  Do not infer idle-energy or boot-time savings from linked bytes alone.
+  [Report 204](docs/204-unused-ethernet-build-candidate.md).
+- [ ] Audit remaining unused Ethernet PHY/PCS options separately. The two
+  NEO-142 controller overrides leave prompted `PHYLIB`/`PCS_XPCS` and related
+  support enabled. Check actual board bindings, dependency changes and both
+  recovery networks before broadening the candidate; do not assume every option
+  containing "PHY" belongs to Ethernet, since the USB PHY is required.
+
+- [x] Build resource preflight: check Armbian's 10 GiB free-space requirement
+  before a long kernel build, allowing for kernel outputs and assembly
+  headroom. Diagnostic.21 reached the image stage before this gate rejected
+  the available space; verified retention/compaction is recorded in
+  [report 188](docs/188-historical-driver-source-compaction.md). Keep the gate;
+  avoid spending the kernel build time before discovering insufficient space.
+  NEO-141 adds read-only filesystem checks, a 6 GiB kernel planning allowance
+  and stage rechecks. Full build requires 16 GiB on shared storage before
+  preparation/regressions/compilation. No reservation or peak guarantee is claimed.
+  [Report 203](docs/203-build-preflight.md).
+- [x] Build input preflight for nested worktrees: the documented `BOOTLOADER`
+  and `RADIO_DIR` overrides are required when sibling/default paths do not
+  exist. Diagnostic.22 completed its kernel before `prepare` discovered the
+  missing default bootloader. Check input existence and locked hashes before
+  long compilation; retain explicit overrides and do not silently select other
+  bootloader or radio inputs. [Report 193](docs/193-diagnostic22-adc-integration.md).
+  NEO-141 verifies explicit local inputs and cached public blobs before cloning;
+  full builds now prepare public sources/downloads before compilation. Missing
+  public caches are reported honestly by the offline preflight and resolved by
+  preparation, not silently skipped. Twelve focused regressions and the actual
+  explicit-path preflight pass. [Report 203](docs/203-build-preflight.md).
+- [ ] Bounded kernel build parallelism: `build-kernel.sh` currently uses one
+  job. Evaluate configurable jobs against the Intel host's CPU/memory limits,
+  recording the compiler/job identity and measured time/memory cost. Do not
+  infer a safe setting or change unrelated build/cache identities merely to
+  accelerate diagnostic.21 assembly.
+- [ ] Evaluate verified incremental kernel-output seeding for small patch
+  changes. `kernel:reset` currently archives both source and output, so a
+  one-line header correction starts a full rebuild. Any reuse must bind the
+  prior source/configuration/toolchain, preserve recovery outputs, honor changed
+  dependencies and prove equivalence against a clean build. Do not reuse a
+  patch stamp alone or mutate archived outputs through hard links.
+
+- [ ] Diagnostic.21 other PM profiles and broader qualification: NEO-125/126's build, checked card
+  installation, owner-confirmed login, awake startup and fresh volatile-B8
+  inspection now pass. [Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md)
+  records matching reported control values, healthy final USB/Wi-Fi and PM0/0.
+  NEO-128's seven attended debug checks, awake RTC rehearsal and one actual
+  connected-USB RTC sleep/wake now pass at PM8/0, with both routes restored,
+  owner-confirmed warnings/normal returns and SDIO usage 2
+  ([report 190](docs/190-diagnostic21-pm-qualification.md)). NEO-129's four-cycle
+  connected-USB batch also passes, with owner-confirmed untouched returns,
+  both SSH routes each time and final PM12/0, SDIO2
+  ([report 191](docs/191-diagnostic21-connected-sleep-repeatability.md)).
+  Its cycle-4 continuation is current; earlier baselines/continuations are consumed.
+  Battery/cable/POWER cases and energy still need separate qualification.
+  B8=`c0` remains fresh after resume; E0/E1 remain potentially cached, with no
+  configured capacity. The later 100%/2 mA/4.158 V awake sample does not resolve
+  the earlier 4.2559 V against the unchanged 4.2 V target.
+  No calibration transition or physical accuracy is established, and no
+  calibration will be forced just to test a status bit. NEO-10 and NEO-117
+  retain electrical and direct sleep-charge qualification.
+
+- [ ] NEO-10/NEO-117 measurement follow-through: [report 184](docs/184-axp223-measurement-source-audit.md)
+  finds contradictory REG34[2] polarity, no ADC absolute-accuracy/latch contract,
+  and approximately 30-second percentage steps without a capacity denominator.
+  Preserve raw evidence; do not infer a compensation formula, OCV-only mode or
+  calibrated capacity. AXP223's dynamic B8 status caching is now corrected in
+  the owning driver and passes variant-scoped tests plus diagnostic.21 awake
+  inspection. NEO-130 audits and tests the shared variable-width ADC helper
+  separately ([report 192](docs/192-axp-adc-width-correction.md)); its low-byte
+  mask is now built and offline-verified in diagnostic.22, with verified Mac
+  staging and a recovery checkpoint ([report 193](docs/193-diagnostic22-adc-integration.md)).
+  NEO-132's installation and awake validation now pass: full card readback,
+  owner-confirmed login, both routes, startup/RTC/POWER checks and the schema-4
+  inventory ([report 194](docs/194-diagnostic22-installation-and-adc-validation.md)).
+  Raw `ec/03`, corrected/legacy formula and separate sysfs all report 4.1569 V;
+  unused bits are zero and controls match diagnostic.21. This does not resolve
+  the earlier discrepancy. NEO-133's seven PM debug checks and awake RTC
+  rehearsal now pass with owner-confirmed warnings/display. Two actual
+  connected-USB RTC sleeps also pass automated checks at PM9/0; the first
+  warning was missed and the requested repeat's clear warning/untouched normal
+  display return is now owner-confirmed
+  ([report 195](docs/195-diagnostic22-pm-qualification.md)). Both network routes
+  recover and policy/ownership restore. NEO-134 adds four consecutive actual
+  connected-USB RTC-wake passes with owner-confirmed clear warnings and
+  untouched normal returns; final PM13/0, SDIO2
+  ([report 196](docs/196-diagnostic22-connected-sleep-repeatability.md)). The
+  current continuation is the batch's cycle-4 receipt; earlier receipts are
+  consumed. Other connection/wake profiles remain separate. Post-first-wake ADC inspection passes
+  at 4.1558 V with raw `ec/02`, no unused bits and unchanged sampled controls.
+  Energy, retention and physical voltage accuracy remain unqualified.
+  Fresh
+  configuration and independent terminal-voltage evidence
+  remain needed before resolving the voltage discrepancy. No charger/gauge
+  write or longer charging experiment is justified by these source findings.
+
+**Partial-discharge/charging checkpoint, 7 October 2026:** fresh USB/Wi-Fi and PM-health
+checks passed on a new diagnostic.20 boot. After the owner unplugged USB, the
+saved eleven-minute awake protocol completed: 61 measured samples, reported
+97% → 77%, average 254.89 mA and an uncalibrated 42.48 mAh estimate. Separate
+Wi-Fi inspection confirmed the disconnected state before requesting reconnect.
+After owner-confirmed reconnect, the first charging attempt lost SSH after one
+sample and remains incomplete. Both routes and PM health recovered; the original
+process had exited and Mac history showed no intervening sleep. A distinct
+two-minute trace then passed 13 samples, 182–195 mA and 82% → 86%, with an
+uncalibrated sampled estimate of 6.28 mAh. Its voltage telemetry was 4.2559 V
+against the unchanged 4.2 V configured target: NEO-10 remains unresolved.
+Final USB/Wi-Fi health passes on the same boot at PM0/0; no sleep, screen
+blanking or charging-setting change occurred. USB is connected and no test is
+running. [Report 183](docs/183-partial-discharge-charging-validation.md).
+NEO-117's direct sleep-charge criterion remains open; defer extended charging
+experiments while the voltage discrepancy is unresolved.
+
+**Unattended awake preparation, 6 October 2026:** NEO-120 and NEO-121 add saved
+read-only charging inventory and a bounded awake baseline. Both pass host and
+awake hardware checks ([reports 180](docs/180-sleep-charge-measurement-design.md)–[182](docs/182-awake-charging-baseline.md)).
+The 13-sample/two-minute trace reports 100%/Charging and 1–2 mA; this is an
+uncalibrated awake baseline, not sleep charge evidence. Cached E0/E1 report no
+configured capacity. The manuals leave candidate charge-register semantics
+unresolved, and current regmap caching/coherent reads need driver work before
+adding a trustworthy accumulated-charge interface. Final USB access and PM
+health pass on the same boot at PM11/0, SDIO2 and normal dim console settings.
+USB and charging remain connected/enabled, with no controls changed and no
+test left running. Physical partial discharge and any sleep comparison wait
+for the owner's return; NEO-117's direct charging criterion remains open.
+
+**Home Wi-Fi return, 6 October 2026, after the completed cable batch:** the
+owner switched the Mac back to home Wi-Fi and requested the matching GameShell
+change. The saved `.env` transaction committed, cleanup passed, and independent
+USB/Wi-Fi status checks succeeded on the same boot at PM11/0, SDIO usage 2.
+Battery telemetry reports 100%/Charging. The sampled home signal is still weak
+at −81 dBm, despite successful access; this does not qualify an unattended
+Wi-Fi-only test. No new sleep, reboot or screen test ran. Details and the next
+proposed slice are appended to [report 178](docs/178-guided-cable-batch-hardware-validation.md).
+NEO-117 still needs evidence of charging during sleep, with battery headroom
+and a measurement method that distinguishes the sleeping interval from awake
+charging. CPU-idle integration follows with the NEO-100 battery-clock
+prerequisite; power savings remain unmeasured.
+
+**Access checkpoint, 6 October 2026:** the owner returned to home Wi-Fi with
+the GameShell at its login screen and USB connected to the Mac. The first saved
+USB-status command failed locally with `Operation not permitted` under the
+session's newly restricted network policy, before any device Wi-Fi change or
+physical test. The owner restored access and the retry succeeded: home Wi-Fi
+was applied from `.env`, both routes and awake PM/POWER/RTC checks pass on new
+boot `34483a13-9373-4ee3-8984-fd81a99bc5de`, at PM0/0 and SDIO usage 2. The shared
+`.env` link is intact; NEO-119 and its pushed fix record the correction below.
+[Report 175](docs/175-home-wifi-and-batch-admission.md) preserves the evidence.
+The subsequently readied seven-debug preparation now passes at PM7/0, with
+both SSH routes, retained keypad, restored long warnings and SDIO usage 2
+([report 176](docs/176-guided-cable-batch-debug-preparation.md)). The owner
+confirmed clear warnings and normal returns. The first guided batch then passed
+its awake rehearsal but stopped on a Wi-Fi SSH timeout during the read-only
+pre-sleep inspection, before any sleep submission. PM remains 7/0, no controls
+are retained, and USB recovery reads pass. Wi-Fi reports −90 to −88 dBm and
+intermittent access; the owner moved closer but confirmed remaining distance or
+walls. The owner then selected a nearby hotspot and updated `.env`; the saved
+USB Wi-Fi transaction, independent Wi-Fi status and original-result retrieval
+all pass. Signal improves to −47 dBm (reported link rates 72.2 Mbit/s). Fresh
+health and unused-baseline admission remain valid at PM7/0, SDIO2, with no
+retained owners ([report 177](docs/177-cable-batch-preflight-timeout.md)). The
+new guided session now passes all four alternating removal/attachment sleeps,
+with RTC wakes, correct final cable states and the required route proofs. All
+owner observations pass, including staying dark after both insertions
+([report 178](docs/178-guided-cable-batch-hardware-validation.md)). Final health
+is PM11/0, SDIO2, normal dim console and restored diagnostic power policy, with
+no retained owners. USB is connected; no further test is running. The batch is
+complete and its baseline consumed. Preserve the failed earlier session;
+charging during sleep, energy and wider platform qualification remain separate.
+
+**Latest diagnostic checkpoint, 5 October 2026:** diagnostic.20 is running with MUSB and both power-supply wake controls disabled, following verified card readback, startup/integration checks and attended debug qualification ([reports 167](docs/167-diagnostic20-installation-and-awake-checks.md)–[168](docs/168-diagnostic20-attended-debug-qualification.md)). One connected-USB RTC sleep/wake passes ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Independent debug baselines and awake rehearsals then supported one passing attended case in each cable direction: attachment stays dark until RTC wake, and removal returns correct disconnected USB/power state ([reports 170](docs/170-diagnostic20-usb-attachment-preparation.md)–[173](docs/173-diagnostic20-usb-removal-sleep-validation.md)). The owner confirmed long warnings and normal display returns. Removal evidence was saved over Wi-Fi before a separately requested awake reconnect; both SSH routes and external-power detection then passed, with exactly one AC/VBUS insertion dispatch each. Current PM24/0 and SDIO usage 2 are healthy. USB is connected; battery reports 99%/Charging, with the existing uncalibrated charging-voltage observation under NEO-10. No retained key guard remains and no further sleep test is running. NEO-117/NEO-110 retain repetition and separate charging-through-sleep evidence. All used baselines are consumed; diagnostic.19's original early-wake failure remains unchanged ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). Ordinary automatic/button sleep and energy qualification remain ahead.
 
 **Prior completed sleep checkpoint, 5 October 2026:** diagnostic.19 is running on the CPI v3.1 Samsung DEV card. Installation/startup and unattended awake checks passed in reports [155](docs/155-diagnostic19-installation-and-awake-checks.md)–[156](docs/156-diagnostic19-unattended-validation.md). Office debug qualification and the first connected-USB RTC sleep passed in reports [158](docs/158-diagnostic19-attended-debug-qualification.md) and [160](docs/160-diagnostic19-first-rtc-wake.md). Following the long-tone selection, seven fresh debug cycles and awake rehearsal passed with owner-confirmed warnings/display ([report 162](docs/162-diagnostic19-long-cue-debug-qualification.md)). One attended removal-during-sleep case now passes with correct disconnected USB state, RTC wake and Wi-Fi recovery, followed by a separate successful awake reconnect ([report 163](docs/163-diagnostic19-usb-removal-sleep-validation.md)). PM is 16/0, SDIO usage 2; USB is connected and battery telemetry is 98%, charging. NEO-112's immediate correction is qualified in this bounded comparison; NEO-110 retains attachment during sleep and wider repetition. Ordinary automatic/button sleep remains disabled.
 
@@ -22,7 +1015,219 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 ## Diagnostic implementation follow-up
 
-- [ ] NEO-117: implement the owner's explicit **stay asleep and charge when USB is attached during sleep** policy for both ACIN and VBUS supply wake paths. The current drivers honor their independent enabled wake controls; disabling MUSB wake alone does not disable supply insertion wake ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). Preserve POWER/RTC wake, charging and state reconciliation. Audit startup ordering (supply wake setup follows `device_add`), wake-reference balance and masked insertion dispatch before selecting prospective, source/image-bound diagnostic criteria. Keep the original early-wake failure, consumed baseline and retained key guard intact until deliberate recovery; no blind wake-control changes or automatic sleep retry.
+- [ ] AXP717-only USB voltage fallback: the locked no-IIO path uses
+  `(ret % AXP717_ADC_DATA_MASK) * 1000`, where the mask is `GENMASK(13, 0)`.
+  Modulo is not field masking (for example, raw `0x3fff` produces zero).
+  This separate caller issue was found during NEO-130's complete helper audit;
+  CPI v3.1 uses AXP223 and does not enter this path. Review the AXP717 register
+  contract and test a separate correction before claiming AXP717 voltage
+  correctness. Patch 0036 preserves all existing 16-bit helper results and
+  deliberately leaves the downstream conversion unchanged.
+
+- [ ] Investigate the recurring post-sleep SSH collection delays. Diagnostic.21's
+  four-cycle batch retains channel-opening timeouts and connection failures in
+  every cycle, followed by successful collection of each original and independent
+  USB/Wi-Fi recovery. Preserve these timings separately from PM/RTC intervals and
+  instrument the host/route/device stages before assigning a cause or adding
+  retries. The current evidence does not isolate Mac, tailnet or GameShell
+  behavior. The collector starts while sleep may still be active, retries
+  collection after five seconds, and records errors without attempt timestamps.
+  The device also deliberately observes recovery for 30 seconds after keypad
+  readiness before finalizing the result. Distinguish expected unavailable
+  sleep intervals and this observation time from genuinely late network recovery;
+  existing error strings alone cannot make that distinction.
+  [Report 191](docs/191-diagnostic21-connected-sleep-repeatability.md).
+  NEO-135 adds timestamped host spans and device BOOTTIME brackets without
+  changing the five-second collection interval or resubmitting PM. Three awake
+  route batches pass with PM13/0 unchanged. NEO-138 captures one failed SSH
+  collection attempt during diagnostic.23's first late/noirq test, followed by
+  successful original-result collection and both route proofs. The failed SSH
+  phase lasts 10.016 seconds inside a 19.920-second attempt. Repeats 1, 2 and 4
+  also have a failed collection attempt, while repeat 3 has none; all completed
+  PM results and both route proofs pass. This locates host failures but does
+  not establish their cause or device availability then. Faster awake manager
+  startup has not eliminated these errors.
+  Diagnostic.23's first actual RTC sleep has no timing errors: a successful
+  35.403-second collection span overlaps sleep. A 0.637-second post-return clock
+  bracket places its end approximately 3.80–4.44 seconds after the recorded PM return,
+  assuming negligible short-term relative clock drift. Investigate that tail
+  separately from the expected sleep wait; no exact network-ready time or cause
+  is established. Retained timing permits further analysis without physical input.
+  [Report 200](docs/200-diagnostic23-pm-qualification.md).
+  NEO-139's four actual sleeps now pass with owner-confirmed returns and both
+  routes recovered. Of 13 failed collection attempts, bounded clock alignment
+  places ten wholly before PM return, two across return and one wholly after.
+  Cycle 4's latter attempt starts 1.111–1.732 seconds after return: Mac connection
+  and the device tunnel succeed, then device SSH setup fails after 10.018 seconds.
+  The first successful post-return clock command completes 21.883–22.505 seconds
+  after return. These bounds assume negligible short-term clock drift and do
+  not isolate network-ready time or cause. Investigate the retained host/device
+  evidence without adding retries or conflating this with pre-wake failures.
+  [Report 201](docs/201-diagnostic23-connected-sleep-repeatability.md).
+  NEO-140 finds a device preauthentication closure within the cycle-4 failure-end
+  bracket, with user-manager startup only on the following successful connection.
+  Existing logs lack a forwarded source-port identity and cannot prove whether
+  the stall awaited a greeting or key exchange. Host-only Boolean SSH observations
+  now preserve greeting/key-exchange/authenticated/active state before cleanup,
+  without changing timeouts, retry policy or host-key validation. Local real-SSH
+  failure/success cases and awake USB/Wi-Fi probes pass with unchanged PM12/0.
+  Use these observations on the next separately attended, currently admitted
+  sleep; if insufficient, add bounded TCP metadata with matching connection
+  identities at both ends. Cause remains open; no image rebuild is needed.
+  [Report 202](docs/202-post-return-ssh-investigation.md).
+  NEO-143 requalifies a fresh diagnostic.23 boot and captures a debug-cycle
+  device SSH timeout before a server greeting is observed (key exchange and
+  authentication also incomplete). Four other debug collection failures are
+  forwarded TCP-channel failures. All original results and both routes recover.
+  One actual RTC sleep passes without any SSH errors; its first post-return
+  clock command completes 3.611–4.267 seconds after PM return. These different
+  observations must not be conflated with report 201's confirmed post-return
+  failure. Bounded socket-correlated metadata remains the next diagnostic step.
+  [Report 205](docs/205-diagnostic23-fresh-boot-ssh-qualification.md).
+  NEO-144's bounded Mac/libpcap and GameShell/AF_PACKET metadata recorder now
+  passes awake validation and recollection; four flows are matched at both
+  endpoints and to unique host tunnel spans. No packet payload is persisted,
+  and source/identity/bounds/drop/clock/interface checks guard interpretation.
+  Use `device:ssh-trace-sleep` only with current admission and fresh readiness.
+  [Report 206](docs/206-two-ended-ssh-tcp-metadata.md).
+  NEO-145 corrects its first sleep-integration failure: the separate recorder
+  service was rejected before PM entry. The recorder is now owned by the
+  existing sleep service, with awake lifecycle/probe validation and the original
+  admission guard unchanged.
+  [Report 207](docs/207-ssh-observer-sleep-unit-integration.md).
+  The actual instrumented sleep now passes, with all three connection failures
+  bounded before PM return and no observed greeting timeout. The first successful
+  post-return clock completion is 9.427–10.064 seconds after return; this includes
+  connection/command work and instrumentation, not exact network-ready time.
+  Mac capture stops during entry; Linux reports 538 diagnostic socket drops.
+  Repair recorder coverage/pressure while awake before another attended test;
+  neither incomplete capture resolves the original post-return cause.
+  [Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md).
+  Earlier untimestamped failures still cannot be classified.
+  [Report 197](docs/197-ssh-collection-timing.md).
+
+- [x] Profile and reduce user-manager unit-loading cost on the diagnostic image.
+  Three awake probes each show a 4.677–4.792-second first USB SSH command-channel
+  opening, versus roughly 0.2 seconds subsequently. Journal startup reports are
+  about 3.9 seconds; separate manager timestamps put 3.426 seconds in unit loading
+  within 3.925 seconds total, while generators take 0.120 seconds. This is a
+  plausible contributor to session latency and repeated diagnostic CPU work,
+  not proof of the historical post-sleep failures. Inspect unit search paths,
+  parser/filesystem cost and session lifecycle before choosing a fix; preserve
+  PAM/session behavior and future UI needs. No linger, PAM, SSH, user-service or
+  driver setting was changed. [Report 197](docs/197-ssh-collection-timing.md).
+  NEO-136 identifies 256 legacy slave devices and their 512 systemd device-unit
+  records (of 588 total). The diagnostic.23 candidate disables legacy PTY
+  allocation in Kconfig while retaining Unix98/console support.
+  [Report 198](docs/198-legacy-pty-startup-candidate.md).
+  NEO-137 installs diagnostic.23 and passes awake startup checks, four modern
+  terminal/SSH PTY checks and three isolated route timing batches. Legacy sysfs
+  slaves/device-unit records are zero, with all user-manager units reduced from
+  588 to 76. Unit loading is 0.591–0.610 seconds versus 3.440 seconds; first USB
+  command channels are 1.909–1.959 seconds versus 4.677–4.792 seconds. Resource
+  observations are lower but have different instance histories, so no precise
+  RAM/CPU or battery saving is claimed.
+  [Report 199](docs/199-diagnostic23-installation-and-pty-validation.md).
+
+- [x] Qualify diagnostic.23 initial suspend/debug and actual sleep on its new boot.
+  Its installed kernel removes legacy PTY allocation and passes awake checks;
+  all seven debug checks also pass with the owner's warning/display confirmation
+  at PM7/0 and stable SDIO usage. The awake RTC rehearsal passes with restored
+  alarm and original power policy. The first connected-USB actual RTC sleep passes
+  at PM8/0 with both routes, retained keypad and complete restoration; the owner
+  confirms the long warning and normal untouched display return.
+  The sequence used fresh observer readiness and this boot's freezer, driver and
+  late/noirq evidence; diagnostic.22's continuation was not reused. Long warnings
+  and host timing were retained for the collection-delay investigation.
+  [Report 200](docs/200-diagnostic23-pm-qualification.md).
+  Broader power/cable profiles, CPU retention and energy remain separate.
+
+- [x] Repeat diagnostic.23 connected-USB actual sleep in a bounded four-cycle
+  batch with fresh observer readiness. NEO-139 passes all four original results
+  and both routes, with retained keypad/memory, restored policy and SDIO usage 2.
+  The owner confirms clear warnings and untouched normal console returns.
+  Final read-only inspection and history recomputation pass at PM12/0: seven
+  debug cycles and five actual sleeps. The sole unused continuation is
+  `.local/diagnostics/20261007T101111.308402Z/cycle-4/qualification-next.json`;
+  earlier receipts are consumed. Original rehearsal remains
+  `6dac26e6365247dea7ceeeb0d2664c7b`; fresh readiness and current-state/age admission
+  are required before another sleep. Host timing, including the distinct
+  post-return SSH failure, remains preserved.
+  [Report 201](docs/201-diagnostic23-connected-sleep-repeatability.md).
+  Long-term reliability, energy and other connection profiles remain open.
+
+- [ ] Identify the source of the charging recorder's 7 October SSH connection
+  reset if it recurs. The original trace retains only inventory and sample zero;
+  the command failed, its process exited, both routes returned, the same boot
+  passed health checks, and no new kernel or intervening Mac sleep event was
+  found. A distinct bounded repeat passed. These facts do not attribute the
+  reset to the GameShell USB driver, Mac or tailnet. Preserve separate original
+  and repeat evidence; never treat an incomplete trace as a measurement pass.
+  [Report 183](docs/183-partial-discharge-charging-validation.md).
+
+- [x] NEO-121: `device:charge-baseline SECONDS=120` records bounded awake,
+  USB-connected telemetry with timestamp/boot/PM and state checks, private
+  provenance, preserved failures and a remote deadline. Eleven focused tests
+  and full host checks pass (13 runtime/616 tooling, one optional skip).
+  The first full-battery hardware baseline passes 13 samples in 120.021 seconds;
+  final USB/PM checks pass unchanged PM11/0 and SDIO2. Source hashes and summary
+  recomputation match. The sampled charge estimate is explicitly uncalibrated
+  and awake-only. [Report 182](docs/182-awake-charging-baseline.md).
+
+- [x] NEO-120: saved `device:charge-inspect` reads documented AXP223 charger/gauge
+  fields and sysfs telemetry with strict identity/layout/cache checks, bounded
+  allowlisted reads and provenance. Nine focused tests and the full host checks
+  pass; one awake diagnostic.20 hardware inventory and both surrounding health
+  checks pass at unchanged PM11/0 and SDIO2. Cached gauge/counting enables are
+  set, but E0/E1 report the capacity-configured flag clear. No controls changed.
+  [Source design](docs/180-sleep-charge-measurement-design.md);
+  [implementation/hardware report](docs/181-charge-inventory-validation.md).
+- [ ] Resolve AXP223-specific remaining-charge measurement before adding a new
+  power-supply property. Both supplied manuals omit candidate E2/E3 semantics;
+  vendor code scales it by 1,456 µAh but also writes/clamps it to full capacity.
+  Do not label it a monotonic `charge_counter`. Current Linux caches B8's dynamic
+  calibration bit and E0–E3, and RSB reads do not establish an atomic two-byte
+  sample. Audit validity, corrections, reset/retention, coherent reads and shared
+  variant access tables in the driver. No cache-bypass/raw-bus workaround or
+  gauge programming has been performed. Preserve the unset cached capacity
+  observation from NEO-120 without inferring actual pack health or configuration
+  accuracy. Direct charging-through-sleep evidence remains NEO-117.
+
+- [ ] Re-audit the exact diagnostic.24/.25 image/kernel register contract before
+  using `device:charge-inspect` or `device:charge-baseline` on those images.
+  `tools/charge_inventory.py` currently admits profiles only through
+  diagnostic.23 and deliberately rejects newer identities before reading
+  registers. Preserve that rejection; add explicit cache/ADC-width profiles
+  and focused regressions rather than bypassing identity validation. The
+  sysfs-based idle sampler is independent of this allowlist. Identified during
+  NEO-178; [report 240](docs/240-diagnostic25-battery-measurement-baseline.md).
+
+- [ ] Qualify software charge inhibition separately from forced battery discharge.
+  The installed AXP22x battery driver already exposes a root-writable `status`
+  control that clears the charger-enable bit; it does not disconnect external
+  power from the system. The AXP22x USB and AC input controls do not expose a
+  supported force-off switch, and the board schematic joins both inputs.
+  For NEO-117's discharge preparation, physical USB removal remains the tested
+  route. Any future software-only discharge mode needs a board power-path audit
+  and evidence of negative battery current with USB data retained. Charge-inhibit
+  qualification needs bounded restoration and direct enable-state readback;
+  observed Charging/Full status alone is not the original enable setting.
+  No charging or power-path setting was changed during this read-only review.
+  [Report 179](docs/179-software-charge-inhibit-and-discharge.md).
+
+- [x] NEO-119: preserve the shared `.env` symlink when a verified Wi-Fi change updates
+  `GAMESHELL_IP`. The helper now resolves the existing target before atomic
+  replacement, so subsequent credential edits remain visible in the worktree.
+  All ten Wi-Fi transaction regressions pass, including shared-file updates,
+  retained private permissions and rejection of concurrent target edits.
+  Tests use temporary synthetic credentials. Commit `3313069` is pushed; the
+  subsequent saved home Wi-Fi transaction passed with verified Wi-Fi SSH,
+  cleanup and the shared link still intact ([report 175](docs/175-home-wifi-and-batch-admission.md)).
+  Initial session permission failures and their resolution remain documented.
+
+- [x] NEO-118: the saved four-cycle alternating cable-sleep workflow is implemented and hardware-qualified for one observed diagnostic.20 session ([implementation report 174](docs/174-guided-cable-sleep-batch.md); [hardware report 178](docs/178-guided-cable-batch-hardware-validation.md)). One seven-debug baseline supports remove/attach/remove/attach with per-step awake rehearsals, original-result/route checks, immutable owner observations and durable successor claims. All four RTC wakes and physical observations pass, including staying dark after both insertions; PM7→11/fail0, SDIO2, retained keypad and full restoration. The earlier preflight-timeout batch remains failed ([report 177](docs/177-cable-batch-preflight-timeout.md)). No card swap or diagnostic source change was needed. The completed batch cannot run a fifth cycle. Charging during sleep remains NEO-117; energy, Mac sleep and broader reliability remain separate.
+
+- [ ] NEO-117: qualify the candidate **stay asleep and charge when USB is attached during sleep** policy for both ACIN and VBUS supply wake paths. The diagnostic.20 implementation selects and verifies both supply controls at startup, checks them in integration/debug admission, and introduces prospective masked-cable criteria with native/ARM32 regmap tests ([report 166](docs/166-stay-asleep-usb-charging-policy.md)). Host checks and offline image verification pass, with the archive and recovery checkpoint retained on the Intel host. The 270 MB archive is also staged and verified on the Mac, and the owner-confirmed DEV card has passed guarded flash/full readback, first boot and awake startup checks ([report 167](docs/167-diagnostic20-installation-and-awake-checks.md)). Live MUSB and both supply wake controls are disabled. Seven fresh same-source debug checks and owner sound/display observations pass. The first connected-USB RTC sleep/wake also passes with owner-confirmed warning/display and unchanged disabled wake controls ([report 169](docs/169-diagnostic20-first-rtc-wake.md)); one attended attachment case now passes with RTC wake and owner-confirmed staying dark after insertion ([report 171](docs/171-diagnostic20-usb-attachment-sleep-validation.md)). One removal case also passes with RTC wake, correct absent endpoints and owner-confirmed normal display, followed by separate both-route awake reconnection ([report 173](docs/173-diagnostic20-usb-removal-sleep-validation.md)). The guided remove/attach/remove/attach batch now supplies two more observed cases per direction with RTC wakes, correct endpoints and restored controls ([report 178](docs/178-guided-cable-batch-hardware-validation.md)). Direct charging-through-sleep evidence remains pending; repeated visible stay-asleep behavior does not establish charge acceptance. The current drivers honor their independent enabled wake controls; disabling MUSB wake alone does not disable supply insertion wake ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). Preserve POWER/RTC wake, charging and state reconciliation. The source audit preserves wake-reference ownership and handles the supply registration gap (wake setup follows `device_add`); validate live startup ordering, RTC wake and cable-state reconciliation on the candidate. Keep the original early-wake failure and consumed baseline intact. The old retained key guard ended with the deliberate shutdown/card swap; new-boot inspection confirms no owner or drop-in. No blind wake-control changes or automatic sleep retry.
 
 - [x] NEO-116: saved active speaker-path observations and calibrated feedback with the owner. At level 5 (headphone volume 57, -6 dB), the owner clarified the short tone works but the long one gets their attention, and requested long tones exclusively. All feedback now defaults to one-second level-5 tones; `device:audio-path` defaults to one long cue, `audio-test`/`reboot` to three. Original short/long evidence and source commits remain preserved. Active PCM/amplifier/GPIO and restoration checks passed; 13 runtime/567 tooling tests, C and shell checks pass. No driver fault is established or speculative fix applied. [Report 161](docs/161-active-audio-path-investigation.md). Subsequent screen-warning observation and fresh sleep admission passed in reports 162–163; NEO-115 still awaits the next needed reboot's warning observation.
 
@@ -44,6 +1249,12 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] Extend physical input qualification to other buttons/chords and release during suspension. The four face buttons and held-A/reset-state observation do not cover every input case.
 - [x] NEO-48: installed diagnostic.10 with upstream A33 speaker cues and saved audio/input tasks. Host checks passed 257 tool tests (one optional skip), 13 runtime tests, compiled/lint, kernel and DT checks. Transfer, card flash/full readback, boot, home Wi-Fi update and integration passed. Three quiet tones and a nine-cue physical-input/driver PM test passed; owner confirmed clear tones and normal dim screen return. Both SSH routes, original keypad handle, complete mixer/idle and console/trace/PM restoration passed; no PM failures or ULPI warnings. Actual sleep, wider audio and idle energy remain separate work. [Preparation report 65](docs/65-speaker-confirmation-cues.md); [hardware report 66](docs/66-speaker-hardware-validation.md).
 - [ ] Investigate the significant speaker-confirmation delay on **every keypress**, reported by the owner after NEO-48. The helper closes playback and verifies both amplifiers off after each cue, so the upstream 700 ms startup wait repeats; measured complete cue operations were 0.953–1.006 s, not direct audible-onset latency. The owner explicitly deferred a fix. Later measure keypress-to-sound latency and audio-enabled idle cost; compare a bounded ready audio path during the input sequence with per-cue shutdown, preserving idle/restoration before PM and after the test. Do not shorten the upstream delay without reliable-start/pop/noise evidence.
+  NEO-185's [report 249](docs/249-speaker-confirmation-timing.md) now separates
+  completed-tap handling, held-key verification, prompt pauses and the long
+  waveform from driver startup. Fixed cue phase timestamps and the offline
+  `report:audio-timing` task are tested, with no playback-policy change. Obtain
+  attended phase measurements next; acoustic onset and powered-audio cost
+  remain unmeasured. Historical totals cannot supply the missing phases.
 - [ ] Define the future application's held-button policy across sleep. NEO-47's trace/source inspection shows generic Linux input suspend deliberately releases held keys even when the evdev handle survives; the owner confirmed still holding A. Keep this distinct from disconnection. Qualify fresh input and release/repress behavior before considering any narrowly scoped state-resynchronization change; do not remove the generic release behavior globally.
 - [ ] Installed keypad MCU/firmware identity and retention energy remain unqualified. Keep keypad wake disabled and normal sleep masked; choose a normal supply policy only after energy measurement.
 - [x] NEO-46: preserve a rejected device-owned PM preflight snapshot and name failed health gates. The first retention batch stopped before its second stage, but the old recorder omitted the rejected snapshot. The recorder now retains it without relaxing checks; a regression proves rejection cannot enter PM. Host checks passed 234 tool tests (one optional skip), 13 runtime tests and compiled/lint checks. The original transient cause remains unproven; its completed first cycle and same-boot healthy inspection are retained under NEO-45.
@@ -60,7 +1271,8 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [x] NEO-53: diagnostic.11 freezer/initial devices tests, a fresh owner-ready four-cycle traced devices batch, audio-assisted physical input and four awake USB reconnects passed. Original keypad identity/handle survived, traces/settings restored and both network routes recovered in accepted runs. Record 74 preserves one Wi-Fi deadline failure (NEO-55), an ambiguous power-status rejection corrected by NEO-54, and an uncontrolled session stopped before cycle two. Observed ordinary PHY/AXP USB/RSB callback order is recorded; no late/noirq or actual sleep entered. [Report 74](docs/74-diagnostic11-pm-validation.md).
 - [ ] Before late/noirq, record supplier/RSB cutoff/restore ordering and finish the other ADC/regulator client inventory, considering runtime-active and suspended RSB states. The ordinary-stage traces in report 74 do not exercise the noirq cutoff or inject cable edges during freezing. Wake-source accounting alone is not bus exclusion; keep actual sleep disabled until the remaining gates are addressed.
 - [x] NEO-114: audit power-supply unregister/deferred-registration lifetime. The generic core can leave a late notification pending after unregister; Corsair's runtime worker is a concrete upstream caller without parent-lock exclusion. Ordinary AXP devres cleanup holds the parent lock and excludes that particular overlap, while its IRQ/poll/diagnostic producers retire before supply unregister. Saved `task test:power-supply-lifetime` executes original and test-only reordered core functions: 42 scenarios per native/ARM32 architecture, with two expected native assertion controls. The reorder closes the deferred-producer edge, not arbitrary external producers or all consumer lifetimes. [Report 157](docs/157-power-supply-unregister-lifetime.md). No production kernel change or board unbind was performed.
-- [ ] Prepare the bounded power-supply core cancellation reorder from NEO-114: join `deferred_register_work` before draining `changed_work`, retaining the parent trylock/removal escape. Add controlled real-kernel worker-gate/KASAN evidence, review independent-producer and consumer contracts, compile and qualify a separately identified candidate. Do not describe source-model reproduction as a GameShell fault or the reorder as complete supply/PHY removal safety. This is separate from the USB sleep-session fix under NEO-112.
+- [x] NEO-161: bounded cancellation fix prepared and host-qualified as commit `989c1a1` on `work/power-supply-unregister`. Real Linux UML worker gates reproduce the original notification-after-unregister schedule and verify the corrected join with KASAN/lock checks, including the parent-lock removal escape. Actual-patch native/ARM32 tests, production ARM core build and full host checks pass. [Candidate report 222](https://github.com/michaelishri/GameShellNeo/blob/work/power-supply-unregister/docs/222-power-supply-unregister-candidate.md). The installed diagnostic.24 and this branch's kernel queue are unchanged.
+- [ ] Integrate patch 0037 from `work/power-supply-unregister` into a separately identified future image; qualify startup/normal PM/USB then. Retain the independent-producer and supply/PHY consumer-removal contracts: the core producer reorder does not establish arbitrary supplier-unbind safety or an observed GameShell fault.
 - [x] NEO-51: checkpoint diagnostic.10 recovery, build/offline-verify diagnostic.11 with patches 0012/0013 and unchanged resolved config/package inventory, refresh private provisioning from `.env`, and stage its 270 MB archive on the Mac with compressed/decompressed verification. Full kernel/modules/DT checks and the final host suite passed; all ten modules identify gameshellneo11. Compatible object-cache reuse and evidence are documented. No card write, GameShell command or PM stage in this slice. [Report 72](docs/72-diagnostic11-preparation.md).
 - [x] NEO-52: diagnostic.11 flash/full 4 GiB readback/eject, owner-confirmed login, current-boot validation, independent USB/Wi-Fi SSH and all six integration groups passed. Captured read-only PM/keypad/audio baselines; no failed services, kernel taint or tracked radio faults. Both freezer options are enabled; PM counters remain zero and normal sleep is masked. Owner-observed PM/input/cable tests are deferred until the owner returns. [Report 73](docs/73-diagnostic11-installation.md).
 - [ ] NEO-55: investigate diagnostic.11's intermittent Wi-Fi recovery failure after an ordinary devices debug stage. The source audit narrows the first timeout to incomplete security setup after reported association; brcmfmac synthesizes status 16 for multiple failures, so it does not prove an AP rejection. Backoff contributes to the ~135-second recovery. Awake comparisons and five owner-ready traced driver cycles now pass, including a complete four-cycle batch with authentication completion 0.541–1.885 s after kernel PM exit. Every trace captured the full handshake without timeout/backoff or trace loss; settings, both SSH routes and the original keypad handle passed, and the owner confirmed normal console/brightness. This does not resolve the original failure or exclude tracing's scheduling effects. Keep the recorder for subsequent justified PM investigations; preserve the failed evidence and distinguish host, firmware and AP causes before selecting a fix. [Qualification evidence](docs/74-diagnostic11-pm-validation.md); [source audit](docs/76-wifi-resume-authentication-source-audit.md); [recorder and validation](docs/78-wifi-resume-metadata-capture.md). Diagnostic.12 adds five passing traced cycles, but one first-attempt status-16 event and one repeated message-1/message-2 exchange remain unexplained; recovery completed within the unchanged deadline. Preserve the metadata without attributing the cause to the AP, firmware or new patches yet. [Report 87](docs/87-diagnostic12-pm-validation.md).
@@ -183,7 +1395,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [x] Record the replacement battery's owner-supplied identification and purchase listing: BL-5C, advertised Li-ion, nominal 3.7 V, 1020 mAh, [AliExpress item 1005001822206061](https://www.aliexpress.com/item/1005001822206061.html). The listing could not be independently retrieved; these are supplied seller claims, not measured capacity or verified manufacturer specifications. [Report 30](docs/30-bl5c-battery-identification.md) distinguishes historical BL-5C examples from this pack.
 - [x] Ask whether a manufacturer/brand is printed on the replacement pack. The owner confirmed there is none: it is an unbranded generic BL-5C. Do not repeat the label question without new information.
 - [ ] Establish permissible charge voltage/current if matching specifications can be obtained for the unbranded pack; otherwise keep these explicitly unknown. Validate its advertised 1020 mAh capacity and benchmark usable endurance separately. BL-5C compatibility, nominal voltage and a CE marketing claim do not provide the missing numerical charging limits. It was replaced approximately 18 months ago; present condition remains unqualified. Do not transfer another maker's limits or infer a permitted rate from capacity alone. Software-only policy tests can continue over battery-powered Wi-Fi while electrical qualification remains open.
-- [ ] Establish a baseline using software readings and timed battery tests. External power-measurement equipment is unavailable, so document measurement uncertainty.
+- [ ] Establish a baseline using software readings and timed battery tests. External power-measurement equipment is unavailable, so document measurement uncertainty. The 7 October partial-discharge window reported 97% → 77% over ten minutes while sampled current integrated to an uncalibrated 42.48 mAh ([report 183](docs/183-partial-discharge-charging-validation.md)). Investigate percentage calibration and repeatable usable endurance separately; do not infer full capacity from this short post-charge trace or silently program the battery label into the gauge.
 - [x] Exercise the installed awake battery guard with isolated simulated readings. `task device:battery-check ROUTE=wifi` passed nine tests, including fifteen main-loop scenarios, without stopping the live guard or delivering a real shutdown. Report 29 records source identity, evidence and limitations; physical reserve and percentage accuracy remain unqualified.
 - [x] Capture the first real automatic low-battery shutdown. The recovered previous-boot system journal records three low Discharging samples and the guard's poweroff request at 2026-09-27 08:12:36 UTC, followed by orderly shutdown/filesystem syncing. After USB reconnection, a new boot reported 10% and Charging with healthy services and both access routes. See report 29; exact triggering percentages/voltage were not retained, and repeatable physical reserve, gauge accuracy and battery capacity remain unqualified.
 - [x] Capture the first awake-idle baseline using `task device:idle-sample ROUTE=wifi SECONDS=600`. With brightness 1/31, Wi-Fi associated and USB unplugged, 61 samples over ten minutes estimated 263.52 mA / 1.042 W; gauge 92% → 90%, peak sampled temperature 39.852 °C. Monitoring and postcheck remained healthy. Report 29 records the uncalibrated estimates, observer effects and evidence; this does not establish pack capacity or endurance.
@@ -211,7 +1423,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] Measure the NM/NKM constraint optimization's effect on relevant clock setup or mode changes if attribution is needed. Diagnostic.4's normal boot/display/load checks passed, but reduced host lookup counts do not establish board latency or battery savings. No continuous NM/NKM idle workload has been established; see reports 39 and 40.
 - [x] NEO-21: implement the opt-in USB polling policy and prepare diagnostic.5. Actual-source native/ARM32 gates, states, errors, races and lifetime tests pass; the compiled-board test accepts the real 184-node graph and rejects role/connector changes. Stock/experimental next-boot selection uses verified prebuilt scripts. Full build, offline verification and Mac compressed/decompressed transfer checks passed; see [report 41](docs/41-usb-polling-experiment.md). Diagnostic.4 recovery is intact. No physical deployment or new power measurement has occurred; NEO-22 covers hardware qualification.
 - [x] NEO-22: diagnostic.5's functional polling experiment is qualified on the owner's board. [Report 44](docs/44-diagnostic5-hardware-validation.md) preserves attached/unplugged startups, 20 cable cycles and early recovering USB probes; [report 45](docs/45-usb-polling-idle-comparison.md) records fewer RSB interrupts with unresolved energy savings. Diagnostic.6's missing direct count/error/post-error IRQ coverage is completed in [report 52](docs/52-diagnostic6-hardware-validation.md). Broader energy, latency and electrical-fault limits remain explicit.
-- [ ] NEO-26: finish Wi-Fi recovery qualification. Runtime original/host-scanning/original comparison produced 8/0/8 firmware crashes and SDIO removals in equal two-minute windows; normal setting restored after the comparison. The newer exact-A0 candidate then produced zero crashes in separate 120/300-second trials and restored the original binary. See reports 46–48. This implicates offloaded scanning but does not identify a defective firmware instruction. The original firmware subsequently joined the owner's re-enabled 2.4 GHz hotspot. Reconnection and cold-start qualification remain. Temporary host scanning was used while network visibility was unresolved; the successful hotspot transition restarted the supplicant and verified its configured default zero.
+- [x] NEO-26: bounded scan-crash diagnosis completed in the [board audit](docs/269-in-progress-board-audit.md); actual AP loss remains NEO-31. Historical investigation record: Runtime original/host-scanning/original comparison produced 8/0/8 firmware crashes and SDIO removals in equal two-minute windows; normal setting restored after the comparison. The newer exact-A0 candidate then produced zero crashes in separate 120/300-second trials and restored the original binary. See reports 46–48. This implicates offloaded scanning but does not identify a defective firmware instruction. The original firmware subsequently joined the owner's re-enabled 2.4 GHz hotspot. Reconnection and cold-start qualification remain. Temporary host scanning was used while network visibility was unresolved; the successful hotspot transition restarted the supplicant and verified its configured default zero.
 - [x] Provide low-overhead direct USB poll-function counting before claiming a measured reduction in calls. Diagnostic.6's bounded counters measured 999 stock versus 231 experimental callbacks in matched 60-second unplugged windows, with no read errors or synthetic requests. [Report 52](docs/52-diagnostic6-hardware-validation.md) records exact rates and userspace observer CPU time. Incremental kernel instrumentation cost and energy impact remain unmeasured; high-overhead USB event capture ran separately.
 - [x] NEO-28: bounded, opt-in direct USB poll counts and poll-read error diagnostics are implemented and host-tested in diagnostic.6; board/role gates are preserved. [Report 50](docs/50-usb-diagnostic-implementation-notes.md) records requirements and [report 51](docs/51-diagnostic6-preparation.md) records implementation/build verification. Hardware qualification continues under NEO-22 in report 52.
 - [x] NEO-29: qualify `device:wifi-config`, the guarded USB-only .env network transition. After the owner re-enabled the 2.4 GHz hotspot, association succeeded. An initial host-route failure rolled back; restoring `GAMESHELL_WIFI_VIA_MAC=1` then passed independent Wi-Fi SSH verification, same-boot identity, configuration commit, private address update and cleanup. Report 46 preserves both captures and the earlier association failures. Postcheck confirmed healthy Wi-Fi/USB/services. The supplicant restart restored scan-offload setting zero; no firmware or image change occurred.
@@ -230,6 +1442,14 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 ## Development preparation
 
+- [ ] Investigate the development host's system temporary-directory quota. On
+  9 October it prevented sandbox startup and caused three unrelated kernel
+  fixture tests to fail despite free filesystem space. NEO-184's complete
+  checks pass with `TMPDIR` in `.local/host-tmp/neo184`. Check active jobs,
+  ownership and quota use before any cleanup; no shared temporary files were
+  removed. See [report 247](docs/247-bounded-kernel-evidence.md).
+
+- [ ] If the Intel host's transient sandbox quota error recurs, investigate it separately from device/network behavior. During NEO-176, one local read-only command failed to register the synthetic `/tmp/.git` mount with `Quota exceeded`; the already-running hardware task continued and passed. Read-only host checks showed about 215 GiB free on the workspace filesystem and 1.2 GiB on `/tmp`, with free inodes on both. Subsequent ordinary sandboxed commands worked. No device failure, storage cleanup or cause is inferred from this single event.
 - [x] NEO-72: added `build:prune-retained KEEP=3` with preview by default, explicit application, build-stage locking, full gzip verification and compact kernel-provenance preservation. Upgraded the older diagnostic.6 checkpoint additively from matching archive metadata; all seven checkpoints verify after pruning. Removed thirteen old raw images, nine full kernel snapshots and eighteen inactive external test-fixture directories, reclaiming about 33.6 GiB. Three raw images, three snapshots and all sixteen compressed images remain; filesystem free space is about 64.3 GiB. Twelve new retention/recovery regressions and shared host checks passed. [Report 92](docs/92-build-artifact-retention.md).
 - [x] NEO-71: saved `build:prune-driver-scratch SUITE=...` previews superseded brcmfmac compiler trees; explicit `APPLY=1` removes them while holding the suite lock and preserving the current normal/debug build references, all parent evidence and private images/downloads/recovery. Strict suite/path/layout checks refuse unexpected or active state; seven protection regressions passed. Applied to five old PM trees and two old worker trees, freeing about 11.7 GiB before diagnostic.13's build; incremental private `prune-*.json` records remain with both suites. Wider cache/archive retention remains manual; this task intentionally excludes full-image and previous-kernel archives.
 - [ ] Evaluate build-host parallelism separately: the lock records `builder.jobs=1`, but `build-kernel.sh` and isolated driver compilation currently hard-code `make -j1`. During NEO-70 the Intel host exposed three CPUs and about 7.3 GiB RAM. Before increasing concurrency, make the locked job setting authoritative, retain memory bounds and compare clean-build time/peak memory; do not change target CPU or power policy. Diagnostic.13 keeps the existing serial build.
@@ -319,11 +1539,12 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [x] NEO-90: saved awake power-key sequence passed on diagnostic.16: two taps, a 1.235-second hold through disposable-worker SIGKILL, then a final tap. Exact eight edges, checked physical release while awake, original policy/console/audio and both routes recovered; owner confirmed prompts/tones/dim console. No new kernel messages, PM activity or retained policy files. 13 runtime/384 tooling tests pass (one existing optional skip). [Report 114](docs/114-awake-power-key-input.md). Parent ownership remained alive; this does not qualify synthetic PM release, whole-controller death or sleep.
 - [x] NEO-91: saved bounded POWER release during one devices debug cycle passed, followed by a separate fresh awake tap and checked handoff. Logical release is correlated with the input suspend callback, with expected IRQ increments, retained keypad, both routes and exact policy/audio restoration. The owner confirmed tones/dim console but estimated the hold and released just before visible darkness: physical hold through the callback is not established. Source checks pass natively/ARM32 with negative controls; full suite passes 13 runtime/397 tooling tests (one existing optional skip). [Report 115](docs/115-power-key-release-semantics.md) explains the semantics and limits; [report 116](docs/116-bounded-power-key-pm-release.md) preserves hardware evidence and the separate NEO-92 SDIO reference increase. Never hold until debug return with the configured six-second cutoff or lengthen a hold to force reproduction.
 - [x] NEO-93: added separate one-shot RTC-wake and no-sleep rehearsal tasks. Admission binds the seven diagnostic.17 prerequisite captures, stable SDIO references and both-route proofs to device originals; actual sleep additionally requires an identical-source same-boot rehearsal and explicit attended flag. Owned 30-second RTC deadline, bounded wakeup-count read/handshake, durable evidence, RTC/trace/residency attribution and unchanged-key IRQ handoff are implemented. 24 new regressions and the full 13 runtime/423 tooling tests pass (one optional skip); two awake board rehearsals pass with restored policy/controls, unchanged PM 7/0, SDIO usage 2 and both routes. The first actual attempt and a correction to the clock-residency assumption are recorded separately in [report 120](docs/120-first-rtc-sleep-findings.md). [Preparation report 119](docs/119-guarded-rtc-sleep-preparation.md).
-- [ ] NEO-94: first RTC-wake s2idle attempt returned on the original boot with RTC IRQ/event attribution, preserved keypad/memory, PM 8/0 and SDIO usage 2, but USB remains not attached; no full pass. Wi-Fi retrieved the original failed result and read-only postmortem. Owned RTC/PM/trace controls restored; diagnostic power-key ignore policy was retained until the later observed reboot. The owner subsequently confirmed the same-boot dim console; immediate post-wake observation was not captured. A prompted cable reconnect restored USB, and the new clean boot restored ordinary diagnostic power-key handling with both routes working ([report 121](docs/121-usb-reconnect-and-clean-boot.md)). Do not reuse the old boot's consumed seven-cycle baseline. [Report 120](docs/120-first-rtc-sleep-findings.md). A second, separately observed attempt confirms immediate normal screen return and RTC wake, but reproduces USB failure with a complete trace; full qualification remains open ([report 125](docs/125-traced-rtc-wake-usb-failure.md)).
+- [x] NEO-94: the first functional RTC-wake milestone is complete; original failures stay failed, and later success is verified in the [board audit](docs/269-in-progress-board-audit.md). Historical first attempt: returned on the original boot with RTC IRQ/event attribution, preserved keypad/memory, PM 8/0 and SDIO usage 2, but USB remains not attached; no full pass. Wi-Fi retrieved the original failed result and read-only postmortem. Owned RTC/PM/trace controls restored; diagnostic power-key ignore policy was retained until the later observed reboot. The owner subsequently confirmed the same-boot dim console; immediate post-wake observation was not captured. A prompted cable reconnect restored USB, and the new clean boot restored ordinary diagnostic power-key handling with both routes working ([report 121](docs/121-usb-reconnect-and-clean-boot.md)). Do not reuse the old boot's consumed seven-cycle baseline. [Report 120](docs/120-first-rtc-sleep-findings.md). A second, separately observed attempt confirms immediate normal screen return and RTC wake, but reproduces USB failure with a complete trace; full qualification remains open ([report 125](docs/125-traced-rtc-wake-usb-failure.md)).
 - [ ] NEO-95: fix USB gadget reconnection after actual s2idle. The second, separately attended attempt reproduced failure with a complete trace: first MUSB resume interrupt `0x2d`, endpoint disable, unattached gadget and no fresh enumeration. USB supply, PHY cable detection, peripheral mode and binding survive. The Mac loses the USB device without a new recorded Mac sleep; RTC wake, Wi-Fi, keypad, display and SDIO usage 2 survive. Patch 0025 now implements a temporary system-sleep pull-up gate for fixed peripherals with USB wake disabled, preserving intent and normal interrupt order. Native/ARM32 source regressions, complete ARM compilation, board/device-tree checks and diagnostic.18 offline image verification pass. Its 270 MB archive passed Mac compressed/decompressed checks; the Samsung DEV card now passes guarded flash/full 4 GiB readback after an initial dongle-power interruption. Owner-confirmed boot, exact installed manifest, both SSH routes, integration/journal and awake key/RTC checks pass on boot e419f334-0a16-4b04-96d2-d97a2e4d5d0b. All seven attended debug prerequisites now pass on that boot (freezer, driver, five late/noirq), with owner-confirmed normal display, both SSH routes, PM0→7/fail0 and stable SDIO usage 2. The same-source awake rehearsal also passes (0120c40f292b4e1b96a89a051ae47986), with RTC IRQ1→2, no PM increment, complete/restored traces and clean policy handback. The first separately attended actual RTC-wake run b32de0c57c474275b73ad5cf34a49b36 now passes: fresh USB enumeration/ECM/carrier and both SSH routes recover without physical intervention; RTC IRQ2→3, PM7→8/fail0, SDIO2, retained keypad/memory and owner-confirmed normal display. All policies/traces restore. The new-source repeat runner now passes a fresh seven-debug baseline, awake rehearsal and four consecutive actual sleeps on the same boot: PM8→19/fail0, RTC IRQ5→9 across the actual batch, stable SDIO2, both SSH routes and clean ownership restoration. The owner confirmed all four normal screen returns without intervention; final board/host inspection and full ancestry recomputation pass. [Report 148](docs/148-diagnostic18-repeat-rtc-wake.md) records five successful actual sleeps across the two sessions. Four subsequent awake USB removal/reconnection cycles now also pass, each with independent USB SSH proof on the same boot; final both-route checks, unchanged PM19/0 and SDIO2, clean recorder shutdown and unchanged Mac sleep history are recorded in [report 149](docs/149-diagnostic18-post-sleep-usb-reconnects.md). Sleep with USB absent, cable changes during sleep, Mac sleep, other boots, broader reliability and energy qualification remain open; use only a currently valid continuation for further attended repeats. [First success](docs/142-diagnostic18-first-rtc-wake-success.md). [Card installation](docs/140-diagnostic18-card-installation.md). [Design](docs/126-musb-system-sleep-design.md); [candidate](docs/128-musb-system-sleep-candidate.md). The failed diagnostic.17 boot was remotely shut down because it retained diagnostic power-key suppression; its PM8/0 prerequisite sequence is consumed. Saved workflows cover both-end inspection and original-result collection. [Current evidence: report 125](docs/125-traced-rtc-wake-usb-failure.md); [prerequisites/rehearsal](docs/124-usb-reproduction-prerequisites.md), [USB tracing](docs/122-usb-resume-metadata-recorder.md), [measurement criteria](docs/123-sleep-measurement-criteria.md), [earlier Mac sleep/reconnect case](docs/121-usb-reconnect-and-clean-boot.md).
 - [x] NEO-97: corrected USB endpoint trace formatting is source-, image- and live-format qualified. Patch 0024 changes bare `ret` to `__entry->ret`; 252 actual-source native/ARM32 scenarios, three negative controls and complete ARM UDC compilation pass. Diagnostic.18 is verified and installed; its first actual RTC-wake capture trusts both stored-result formats and records four endpoint disables plus three enables, all returning `--> 0` with matching endpoint state. Live error injection was not performed; source regressions cover failure values. Historical diagnostic.17 trailing `--> 1` values remain unreliable. This fixes observability, separate from NEO-95 repeatability. [Source report](docs/127-usb-endpoint-trace-format.md); [live qualification](docs/142-diagnostic18-first-rtc-wake-success.md).
 - [ ] NEO-96: define and implement supported CPI v3.1 s2idle CPU-idle/timer behavior. Current driver is none; ARM/PSCI idle backends are disabled. The RTC wake and 28.949-second sleep-loop interval do not establish stopped timekeeping or energy savings; BOOTTIME minus MONOTONIC was negligible. The recorder now separates functional RTC wake, bounded clock/trace evidence and unqualified CPU retention/energy; source tests and an unchanged offline assessment of the failed original run pass. WFI-only registration still needs a suitable s2idle callback/selection path (state 0 is skipped by the current selection logic), IRQ/timer/wake audits and hardware qualification; avoid invented DT states or unqualified core-off. [Report 123](docs/123-sleep-measurement-criteria.md). [Report 129](docs/129-cpi31-wfi-s2idle-design.md) specifies a one-state board WFI driver plus a separately reviewed global state-0 s2idle entry contract, all-CPU timer checks and truthful accounting. Before enabling it, audit battery freshness/consecutive-sample timestamps: current MONOTONIC ages do not include frozen time. No CPU-idle change is included in diagnostic.18.
-- [ ] NEO-100: integrate and qualify the [BOOTTIME battery candidate](docs/133-battery-boottime.md) from [work/battery-boottime](https://github.com/michaelishri/GameShellNeo/tree/work/battery-boottime). Schema 2 binds sample age to BOOTTIME and boot ID, resets low-reading sequences across detected sleep, and rejects delayed/interrupted observations. All five age consumers share the parser; transport, image-source matching and clock/schema failure checks are saved. 16 runtime and 467 tooling tests pass with two documented skips. No image or live service changed; diagnostic.18 keeps its original tools. Later-image/installed simulations and actual stopped-clock resume remain pending. This does not serialize the final userspace decision with sleep or qualify asleep protection.
+- [x] NEO-96 source review: the installed single-state CPI WFI driver already takes the scheduler branch that skips governor selection and feedback during ordinary idle, and s2idle also bypasses the governor. No replacement governor or duplicate fast-path patch is warranted. Core accounting/context tracking remains; no cost or energy saving was measured. The existing scheduler fixture covers the single-state/two-state distinction. [Report 224](docs/224-wfi-governor-overhead-review.md).
+- [x] NEO-100: integration, installed simulations and actual stopped-clock resume are now verified in the [board audit](docs/269-in-progress-board-audit.md); NEO-192 remains separate. Historical candidate preparation was to integrate and qualify the [BOOTTIME battery candidate](docs/133-battery-boottime.md) from [work/battery-boottime](https://github.com/michaelishri/GameShellNeo/tree/work/battery-boottime). Schema 2 binds sample age to BOOTTIME and boot ID, resets low-reading sequences across detected sleep, and rejects delayed/interrupted observations. All five age consumers share the parser; transport, image-source matching and clock/schema failure checks are saved. 16 runtime and 467 tooling tests pass with two documented skips. No image or live service changed; diagnostic.18 keeps its original tools. Later-image/installed simulations and actual stopped-clock resume remain pending. This does not serialize the final userspace decision with sleep or qualify asleep protection.
 - [ ] NEO-96 source candidate: [report 134](docs/134-cpi-wfi-s2idle-candidate.md) records the separate default-off CPI WFI driver and global state-0 s2idle return contract on [work/cpi-wfi-s2idle](https://github.com/michaelishri/GameShellNeo/tree/work/cpi-wfi-s2idle). 618 native/ARM32 source cases, eleven negative controls, four complete ARM object configurations and saved WFI disassembly checks pass. Full kernel/link/image checks, installed per-CPU/timer inspection, all-CPU freeze, attended RTC wake and energy measurements remain pending. Require NEO-95's reviewed USB baseline and NEO-100 battery integration before enabling it; assign a new image identity. Diagnostic.18 remains unchanged. The board option does not scope the global core correction to CPI.
 - [ ] NEO-101: integrate and qualify [awake measurement clock guards](docs/135-awake-measurement-clock-guards.md) from [work/awake-sample-clock](https://github.com/michaelishri/GameShellNeo/tree/work/awake-sample-clock), based on NEO-100. Bounded BOOTTIME/MONOTONIC observations and unchanged PM counters gate awake-only idle, governor, USB and RSB comparisons; cleanup restores settings, new comparisons reject legacy proof and historical reports label absent observations. 17 focused tests and 16 runtime/486 tooling tests pass (two existing skips). Two read-only diagnostic.17 checks passed 42 total observations with a 221,585 ns widest bracket and unchanged PM 8/0. Matching-image long runs, controlled interruptions and observer cost remain pending. Sub-bracket sleep plus a pending final PM-counter update can escape detection; coordinate these measurements with the eventual product sleep controller. Diagnostic.18 and installed services remain unchanged.
 - [ ] When automatic sleep is introduced, audit non-power diagnostic capture/timeout clocks separately. Do not apply awake-only rejection to actual sleep recorders, which need explicit elapsed-sleep attribution; distinguish hardware event latency, userspace scheduling and sleep-inclusive deadlines.
@@ -360,16 +1581,20 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 - [ ] Evaluate a provenance-preserving compiler cache for repeated UML KUnit builds. Each changed source inventory currently gets a fresh output directory; the observed one-job full build took about 7.5 minutes while execution took under a second. Keep configuration/source/toolchain identities and independent accepted binaries; do not reuse unverified build outputs or weaken recorded-source matching to gain speed.
 
-- [ ] Reproduce and fix MUSB pending-resume request ownership before terminal retirement changes. `musb_gadget_queue()` passes a raw `musb_request *` to `musb_queue_resume_work()` while runtime-suspended; `musb_ep_restart_resume_work()` later dereferences it unconditionally. `musb_gadget_dequeue()`/`musb_g_giveback()` can return the request to a completion callback without removing the separate pending entry, and `musb_free_request()` frees it. Establish queue/cancel/resume interleavings, including completion requeue and failure; do not merely drop pending entries at final removal. `musb_run_resume_work()` currently holds list_lock through callbacks, so a new cancellation API also needs a lock/reentrancy review. This is a pinned-source finding, not an observed CPI fault; Sunxi retains a runtime-PM hold. Distinct from the already-recorded failed-queue DMA mapping issue.
+- [x] NEO-108 integration: final review and bounded diagnostic.25 qualification complete. Work resumed with the owner home. NEO-170 has built, offline-verified, packed and checkpointed diagnostic.25 from reviewed source `2d40f6f` on [work/musb-restart-integration](https://github.com/michaelishri/GameShellNeo/tree/work/musb-restart-integration); [report 232](docs/232-musb-restart-image-integration.md) records the artifacts and qualification plan. Transfer over confirmed regular Wi-Fi and guarded DEV-card flash with full 4 GiB readback passed. [Report 233](docs/233-diagnostic25-installation.md) records owner-confirmed boot and passing image, both-route, battery, WFI/timer, journal, power-key and awake RTC checks, completing NEO-171. NEO-172 has passed all seven freezer/driver/late-noirq debug checks with both-route recovery, retained keypad, stable SDIO usage and owner-confirmed warnings/display returns ([report 234](docs/234-diagnostic25-pm-qualification.md)). NEO-172 also passes the awake rehearsal and first actual connected-USB RTC sleep: all four WFI sleep callbacks advance once, independent timekeeping freezes, both routes recover and the owner confirms normal untouched display return. NEO-173 then passes four more attended connected-USB sleeps with both-route/keypad recovery, all-CPU callbacks, timekeeping freeze and owner-confirmed normal returns ([report 235](docs/235-diagnostic25-connected-sleep-repeatability.md)). NEO-174 then passes four physical awake USB reconnects with per-cycle independent USB SSH proof, final Wi-Fi/Mac health, unchanged keypad/SDIO/PM state and no new kernel journal lines ([report 236](docs/236-diagnostic25-post-sleep-usb-reconnects.md)). NEO-175 then passes seven fresh debug checks, the awake battery rehearsal and one attended battery-only RTC sleep with Wi-Fi recovery, all-CPU callbacks, timekeeping freeze and owner-confirmed normal untouched return. Separate USB reattachment and both-route health also pass ([report 237](docs/237-diagnostic25-battery-rtc-qualification.md)). NEO-176 then passes a fresh debug baseline and all four guided cable-during-sleep cases (remove, attach, remove, attach), with accepted owner observations, all-CPU callbacks, timekeeping freeze and endpoint-specific route proofs. Both insertions stay dark until RTC wake. Final both-route health and restored policy pass at PM31/0 ([report 238](docs/238-diagnostic25-guided-cable-sleep-qualification.md)). The planned bounded diagnostic.25 hardware coverage and NEO-177 integration review are complete ([report 239](docs/239-musb-restart-integration-review.md)): no actionable Standards or Spec findings, with exact source/test/image provenance verified. NEO-108 is complete within its defined restart scope; energy, charge acceptance during sleep and broader reliability remain separate. Diagnostic.24 is retained for recovery. Review follow-up NEO-163 preserves the busy-giveback restart obligation with a bounded PM reference and advances an owned restart after synchronous completion. [Report 225](docs/225-musb-resume-request-ownership.md) records the corrected original coverage and revised host/kernel validation. No CPI fault or hardware improvement is claimed. The incomplete NEO-106 teardown stack is excluded.
+- [x] NEO-163: addressed all four NEO-108 review findings: busy-giveback progress, missing validation, inflated coverage counts and the duplicate extraction helper. Revised validation passed 48 request scenarios per execution, seven Linux UML KUnit cases with KASAN/lockdep, the existing sleep/callback suites, six ARM compile configurations and host checks. [Report 225](docs/225-musb-resume-request-ownership.md) records receipt identities and limits; subsequent diagnostic.25 integration, bounded hardware qualification and NEO-177 review are complete in [reports 232–239](docs/239-musb-restart-integration-review.md).
+- [ ] Audit MUSB dequeue progress outside an owned deferred restart. NEO-163 covers busy/completion handoffs while `restart_pending` owns the progress obligation. General dequeue behavior without that obligation and failed-queue DMA mapping remain separate. Keep complete controller removal with NEO-106; fixture results do not establish full producer retirement or hardware qualification. See [report 225](docs/225-musb-resume-request-ownership.md).
 
-- [ ] Make the route behavior of `device:pm-inspect` explicit: `ROUTE=wifi` is currently ignored because this task always opens USB. A post-battery-sleep inspection therefore timed out on absent USB without submitting PM; the original sleep result and saved `device:sleep-collect ROUTE=wifi` retained valid evidence. Either document/reject unsupported route selection or add read-only Wi-Fi inspection with transport tests, while retaining USB requirements for active debug tests. Discovered during NEO-109; no hardware recovery issue is implied.
+- [x] NEO-162: `device:pm-inspect` now defaults explicitly to USB and honors `ROUTE=wifi` for read-only inspection. Captures save the selected transport, connection errors do not trigger fallback or PM submission, and inspection-route options are rejected for active/restore modes. Host transport tests cover default/explicit routes, invalid selections and original-error preservation. See [report 223](docs/223-read-only-pm-inspection-route.md). Active debug tests retain their USB requirement.
 
 - [ ] Investigate optional charge-only behavior on USB insertion from full shutdown. The owner reports USB currently boots the GameShell. AXP223 documents ACIN/VBUS insertion as a power-on source (§9.1, [vendor datasheet](https://linux-sunxi.org/images/e/e5/AXP223_Datasheet_V1.0_en.pdf#page=21)); no documented external-input startup-disable bit has yet been established. Audit the exact PMIC revision, board wiring and bootloader before promising true stay-off charging. A bootloader charge-only path is a separate fallback involving brief hardware startup, not equivalent to suppressing PMIC power-on. Verify retained settings versus complete battery removal, charging and power-key startup. Keep this distinct from USB wake while asleep and the desired eight-second forced shutdown; no live setting has been changed.
 
-- [ ] NEO-110: [USB cable-transition sleep tooling](docs/151-usb-cable-sleep-diagnostics.md) prepares independent removal and attachment one-shots with strict starting/ending profiles, matching awake rehearsal, original Wi-Fi result collection, explicit on-screen instructions and separately hashed observer reports. Early/non-RTC wakes cannot pass RTC qualification; no automatic repeat or continuation is published. Diagnostic.18's original removal attempt failed with stale gadget state despite RTC wake/normal console ([report 153](docs/153-usb-removal-sleep-state-failure.md)); that result remains unchanged. NEO-112's diagnostic.19 driver correction now passes fresh debug prerequisites, awake rehearsal, one attended removal case and separate awake reconnection ([reports 162](docs/162-diagnostic19-long-cue-debug-qualification.md)–[163](docs/163-diagnostic19-usb-removal-sleep-validation.md)). Fresh attachment prerequisites and rehearsal subsequently passed, but actual attachment woke early with supply insertion wake enabled ([reports 164](docs/164-diagnostic19-usb-attachment-debug-qualification.md)–[165](docs/165-diagnostic19-usb-attachment-early-wake.md)). NEO-117 now implements the selected stay-asleep-and-charge policy; both consumed baselines remain historical and must not be retried. Wider cable repetition remains open. Mac sleep and repeat-boot coverage stay with NEO-95.
+- [x] NEO-110: [USB cable-transition sleep tooling](docs/151-usb-cable-sleep-diagnostics.md) prepares independent removal and attachment one-shots with strict starting/ending profiles, matching awake rehearsal, original Wi-Fi result collection, explicit on-screen instructions and separately hashed observer reports. Early/non-RTC wakes cannot pass RTC qualification; no automatic repeat or continuation is published. Diagnostic.18's original removal attempt failed with stale gadget state despite RTC wake/normal console ([report 153](docs/153-usb-removal-sleep-state-failure.md)); that result remains unchanged. NEO-112's diagnostic.19 driver correction now passes fresh debug prerequisites, awake rehearsal, one attended removal case and separate awake reconnection ([reports 162](docs/162-diagnostic19-long-cue-debug-qualification.md)–[163](docs/163-diagnostic19-usb-removal-sleep-validation.md)). Fresh attachment prerequisites and rehearsal subsequently passed, but actual attachment woke early with supply insertion wake enabled ([reports 164](docs/164-diagnostic19-usb-attachment-debug-qualification.md)–[165](docs/165-diagnostic19-usb-attachment-early-wake.md)). NEO-117 now implements the selected stay-asleep-and-charge policy. Its diagnostic.20 first attended attachment case passes with owner-confirmed darkness after insertion, RTC wake, recovered endpoints and Charging after resume ([report 171](docs/171-diagnostic20-usb-attachment-sleep-validation.md)); one removal case under the new policy now passes with separately verified awake reconnect ([report 173](docs/173-diagnostic20-usb-removal-sleep-validation.md)). The guided four-case repetition now passes with immutable owner reports and original-result/route verification ([report 178](docs/178-guided-cable-batch-hardware-validation.md)). The saved attended cable-transition tooling and bounded hardware matrix are complete. All consumed baselines and original failures remain historical and must not be retried. Charging during sleep stays with NEO-117; Mac sleep, repeat-boot coverage and broader reliability stay with NEO-95.
 - [x] NEO-111: [diagnostic command logging](docs/152-diagnostic-command-log-volume.md) occupied 94.7% of retained journal message bytes when NEO-110's fresh driver prerequisite lost its early-boot journal prefix. No matching kernel fault was recorded; the owner confirmed normal display return, but the result remains failed. Bounded stdin transport now avoids logging complete helper source while retaining command auditing, all journal limits and strict evidence gates. Host checks pass 13 runtime/541 tooling tests, C and shell checks. Three live read-only operations pass on the unchanged boot: their audit window contains three short Python commands, twelve sudo entries/1,050 message bytes and no source fragments; original failed-result collection and remaining journal continuity are unchanged. A later owner-attended reboot passes all seven sequential debug prerequisites on boot `f2dfd67d-cf9a-4242-b9b7-58c1bc944357`: PM0→7/fail0, SDIO2, original input, both SSH routes and boot-journal continuity remain valid. The fresh journal has zero inline Python command records, and the owner confirmed all display returns were normal. The bounded logging correction is complete; wider evidence retention remains the separate follow-up below. Actual cable-transition sleep remains with NEO-110.
 - [x] NEO-112: diagnostic.19's logical USB session retirement and callback admission/drain correction (patches 0033/0030, [report 154](docs/154-usb-sleep-session-retirement.md)) is qualified in the bounded connected-USB and removal-during-sleep comparisons. Installation/awake checks passed in [report 155](docs/155-diagnostic19-installation-and-awake-checks.md), connected-USB RTC wake in [report 160](docs/160-diagnostic19-first-rtc-wake.md), and refreshed seven-debug prerequisites/awake removal rehearsal in [report 162](docs/162-diagnostic19-long-cue-debug-qualification.md). The attended removal now returns correct absent AC/USB/PHY, not-attached UDC and carrier0, with RTC IRQ31 wake, Wi-Fi recovery and owner-confirmed normal display; the trace places logical retirement before s2idle. A separately saved absent-state inspection precedes the requested awake reconnect, which restores both SSH routes, configured UDC/carrier1 and external power with exactly one AC/VBUS insertion dispatch each. PM16/0, SDIO2, original input and policy restoration pass. [Report 163](docs/163-diagnostic19-usb-removal-sleep-validation.md) preserves all original hashes and observations. The prospective masked-removal policy permits zero or one removal-handler dispatch while retaining endpoint/RTC/provenance gates; no electrical edge is inferred from handler counts. Diagnostic.18's [failed original](docs/153-usb-removal-sleep-state-failure.md) remains failed. NEO-110 retains attachment and wider repetition; this pass establishes neither energy savings nor general sleep reliability. No retained power-key guard/drop-in remains, and ordinary sleep is still disabled.
 - [ ] Refresh the research index installed-image/status banner (the main README was refreshed during NEO-112) against the latest hardware reports. Its diagnostic.16/.17 descriptions are historical; diagnostic.18's bounded USB-connected/battery RTC results are in reports 148–150. Diagnostic.19's connected-USB and removal-during-sleep passes are in reports 160 and 162–163; attachment remains open and report 153 retains the original removal failure. Preserve the report history and avoid implying production sleep is enabled.
-- [ ] Design bounded boot-identity and per-test kernel evidence preservation across legitimate journal retention. Avoid assuming an entire old boot remains available indefinitely. Require original boot/source provenance, explicit sequence-gap/loss detection, protected diagnostic storage and bounded cleanup; never merge stale logs into a new result or relabel a failed original. NEO-111 reduces avoidable source logging but does not implement this wider evidence model.
+- [ ] NEO-184: complete attended PM qualification of the bounded kernel-evidence path. [Report 247](docs/247-bounded-kernel-evidence.md) records the implementation; [report 248](docs/248-kernel-evidence-awake-validation.md) passes initial boot capture, normal append, real record parsing, protected storage and both-route awake checks with PM53/0 unchanged. Failure/loss/interruption cases remain offline-tested; no collector performance claim yet. Obtain fresh current-source attended preparation before NEO-182's matching battery rehearsal and sleep. Legacy originals remain unchanged and cannot authorize new-source sleep. The motivating failure remains historical ([report 246](docs/246-battery-repeat-preparation-journal-loss.md)); full battery workflow acceptance stays open.
 
-- [ ] Audit whether explicitly identified diagnostic metadata can be excluded from the base-rootfs cache key. Diagnostic.19's new `sleep_cable_irq_policy` field correctly failed the current conservative cache match and triggered a fresh Debian bootstrap. The field is consumed by final image identity and diagnostic admission, but any narrower cache key needs a complete consumer audit and tests that still invalidate reuse for package, APT, builder and unknown feature changes. Do not bypass the existing provenance check merely to speed a build.
+- [ ] Audit whether explicitly identified diagnostic metadata can be excluded from the base-rootfs cache key. Diagnostic.19's new `sleep_cable_irq_policy` field correctly failed the current conservative cache match and triggered a fresh Debian bootstrap; diagnostic.20's additional supply-wake feature similarly requires a fresh bootstrap under this policy. The field is consumed by final image identity and diagnostic admission, but any narrower cache key needs a complete consumer audit and tests that still invalidate reuse for package, APT, builder and unknown feature changes. Do not bypass the existing provenance check merely to speed a build.
+
+- [ ] Preflight all dependencies when reusing a completed kernel in an isolated image-build workspace, including the locked kernel regulatory signing certificates. Diagnostic.20 assembled successfully but its first verification correctly rejected an empty certificate set because only compiled artifacts had been staged. Restoring the hash-checked, patched source allowed unchanged-image verification to pass. Consider exporting verified certificates with the completed stage and checking prerequisites before a long bootstrap; preserve the current signature/trust checks.

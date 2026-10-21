@@ -13,6 +13,10 @@ import subprocess
 import sys
 import time
 
+from battery_sample import age_evidence, sample_age
+import cpi_idle
+import kernel_evidence
+
 POWER = Path('/sys/power')
 BOOT = Path('/proc/sys/kernel/random/boot_id')
 STATE = Path('/run/gameshellneo-pm-test.json')
@@ -131,9 +135,8 @@ def snapshot():
         'systemctl', 'show', unit, '-p', 'ActiveState', '-p', 'NRestarts').splitlines())
         for unit in SERVICES}
     battery = json.loads(read('/run/gameshellneo/battery.json'))
-    journal = command('journalctl', '-b', '-k', '--no-pager', '-o', 'short-monotonic')
     config = gzip.decompress(Path('/proc/config.gz').read_bytes()).decode()
-    return dict(boot_id=read(BOOT), image=image, kernel=os.uname().release,
+    result = dict(boot_id=read(BOOT), image=image, kernel=os.uname().release,
                 monotonic_seconds=time.monotonic(), taint=read('/proc/sys/kernel/tainted'),
                 pm={name: optional(POWER / name) for name in ('state', 'mem_sleep', 'pm_test', 'pm_async')},
                 pm_test_delay=optional('/sys/module/suspend/parameters/pm_test_delay'),
@@ -152,7 +155,6 @@ def snapshot():
                 masks={name: os.path.realpath('/etc/systemd/system/' + name) for name in MASKS},
                 sleep_config=read('/etc/systemd/sleep.conf.d/50-gameshellneo.conf'),
                 services=services, battery=battery,
-                battery_age_seconds=time.monotonic() - battery['monotonic_seconds'],
                 external_power={name: {field: read('/sys/class/power_supply/' + name + '/' + field)
                                        for field in ('type', 'present', 'online')}
                                 for name in ('axp20x-usb', 'axp22x-ac')},
@@ -160,6 +162,8 @@ def snapshot():
                 usb=[read(p) for p in Path('/sys/class/udc').glob('*/state')],
                 usb_system_wakeup=[optional(p / 'device/power/wakeup')
                                    for p in sorted(Path('/sys/class/udc').glob('*'))],
+                power_supply_system_wakeup={name: optional('/sys/class/power_supply/' + name + '/power/wakeup')
+                                            for name in ('axp20x-usb', 'axp22x-ac')},
                 wifi=command('/usr/sbin/wpa_cli', '-i', 'wlan0', 'status'),
                 wifi_config_sha256=hashlib.sha256(Path('/etc/wpa_supplicant/wpa_supplicant-wlan0.conf').read_bytes()).hexdigest(),
                 wifi_power_save=command('/usr/sbin/iw', 'dev', 'wlan0', 'get', 'power_save'),
@@ -170,8 +174,17 @@ def snapshot():
                 inputs=sorted(read(p) for p in Path('/sys/class/input').glob('event*/device/name')),
                 backlight={n: read('/sys/class/backlight/ocp8178/' + n) for n in ('brightness', 'bl_power')},
                 firmware_sha256=hashlib.sha256(Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.bin').read_bytes()).hexdigest(),
-                nvram_sha256=hashlib.sha256(Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt').read_bytes()).hexdigest(),
-                journal=journal)
+                nvram_sha256=hashlib.sha256(Path('/usr/lib/firmware/brcm/brcmfmac43430a0-sdio.clockwork,clockworkpi-cpi3.txt').read_bytes()).hexdigest())
+    result['pm_source_sha256'] = kernel_evidence.loaded_source(globals())
+    result[kernel_evidence.KEY] = kernel_evidence.capture(result)
+    # Retain this field for existing report consumers. New records identify
+    # their actual source explicitly; it is not copied from systemd's journal.
+    result['journal'] = kernel_evidence.validate(result[kernel_evidence.KEY])
+    result['boottime_seconds'] = time.clock_gettime(time.CLOCK_BOOTTIME)
+    result.update(age_evidence(battery, now=result['boottime_seconds'], boot_id=result['boot_id']))
+    if cpi_idle.enabled(result['image']['sources']):
+        result['cpu_idle'] = cpi_idle.snapshot()
+    return result
 
 
 def validate(snapshot, lock, connection='usb'):
@@ -179,11 +192,17 @@ def validate(snapshot, lock, connection='usb'):
         raise ValueError('Unknown PM connection profile')
     experiments = lock.get('experiments', {})
     retention = experiments.get('keypad_supply_retention', False)
-    if (experiments not in ({'suspend_diagnostics': True},
+    wfi = cpi_idle.enabled(lock)
+    base_experiments = {k: v for k, v in experiments.items() if k != 'cpi_wfi_s2idle'}
+    if (base_experiments not in ({'suspend_diagnostics': True},
                            {'suspend_diagnostics': True, 'keypad_supply_retention': True}) or
             any(type(value) is not bool for value in experiments.values())):
         raise ValueError('A dedicated suspend diagnostic source lock is required')
     s = snapshot
+    if wfi:
+        cpi_idle.validate(s.get('cpu_idle'))
+        if 'CONFIG_ARM_CPI_WFI_CPUIDLE=y\n' not in s['kernel_config']:
+            raise ValueError('Missing CPI WFI driver configuration')
     if s['keypad_retains_supply'] is not retention:
         raise ValueError('Live keypad supply policy differs from the image experiment')
     if (s['image']['board'] != 'gameshellneo-cpi31' or s['image']['version'] != lock['image_version'] or
@@ -198,6 +217,9 @@ def validate(snapshot, lock, connection='usb'):
     for option in ('HIBERNATION', 'PM_AUTOSLEEP', 'PM_WAKELOCKS', 'ARM_PSCI_CPUIDLE', 'PM_TEST_SUSPEND'):
         if f'CONFIG_{option}=y\n' in s['kernel_config']:
             raise ValueError('Unexpected deep/automatic/test-boot power support')
+    kernel_evidence.validate_snapshot(s)
+    if kernel_evidence.KEY in s and s['pm_source_sha256'] != kernel_evidence.loaded_source(globals()):
+        raise ValueError('PM snapshot producer differs from the validating source')
     identities = re.findall(r'brcmf_c_preinit_dcmds: (Firmware: .+)', s['journal'])
     if (not identities or any(v != lock['radio']['firmware']['runtime_identity'] for v in identities) or
             any(x in s['journal'] for x in FAULTS)):
@@ -210,12 +232,29 @@ def validate(snapshot, lock, connection='usb'):
             'gameshellneo_slow_poll=' in s['cmdline'] or 'gameshellneo_diagnostics=' in s['cmdline']):
         raise ValueError('PM stage isolation or ordinary sleep policy failed')
     b = s['battery']
+    if 'clock_fault' in b:
+        raise ValueError('Battery monitor retains a clock fault')
     features = lock.get('features', {})
+    if 'battery_sample_clock' in features:
+        if (features['battery_sample_clock'] != 'CLOCK_BOOTTIME' or
+                s['image']['sources'].get('features') != features or
+                s.get('boottime_seconds') is None or not s.get('boot_id')):
+            raise ValueError('Battery sample clock differs from image inputs')
+        age = sample_age(b, now=s.get('boottime_seconds'), boot_id=s.get('boot_id'))
+        if age != s['battery_age_seconds']:
+            raise ValueError('Battery age differs from captured BOOTTIME evidence')
     if 'usb_system_wakeup' in features:
         if (features['usb_system_wakeup'] is not False or
                 s['image']['sources'].get('features') != features or
                 s.get('usb_system_wakeup') != ['disabled']):
             raise ValueError('USB system wake policy differs from the qualified image inputs')
+    if 'power_supply_system_wakeup' in features:
+        if (features['power_supply_system_wakeup'] is not False or
+                features.get('usb_system_wakeup') is not False or
+                s['image']['sources'].get('features') != features or
+                s.get('power_supply_system_wakeup') !=
+                {'axp20x-usb': 'disabled', 'axp22x-ac': 'disabled'}):
+            raise ValueError('Power-supply wake policy differs from the qualified image inputs')
     # Battery status describes current flow, not whether the PMIC has USB input.
     # Require a fresh USB supply observation as well as the configured UDC below.
     usb_supply = s.get('external_power', {}).get('axp20x-usb', {})
@@ -224,7 +263,8 @@ def validate(snapshot, lock, connection='usb'):
         usb_configured=s['usb'] == ['configured'],
         wifi_connected='wpa_state=COMPLETED' in s['wifi'].splitlines(),
         battery_monitoring=b.get('monitoring') == 'valid',
-        battery_freshness=0 <= s['battery_age_seconds'] <= 25,
+        battery_freshness=type(s['battery_age_seconds']) in (int, float) and
+                          0 <= s['battery_age_seconds'] <= 25,
         usb_external_power=usb_supply == {'type': 'USB', 'present': '1', 'online': '1'},
         battery_status=b.get('status') in ('Charging', 'Discharging', 'Full', 'Not charging'),
         battery_capacity=b.get('capacity_percent', 0) > 20,
@@ -246,9 +286,7 @@ def validate(snapshot, lock, connection='usb'):
 def check_result(before, after, stage, memory_ok):
     if stage not in STAGES or before['boot_id'] != after['boot_id'] or not memory_ok:
         raise ValueError('Stage, boot identity or process memory changed')
-    if not after['journal'].startswith(before['journal']):
-        raise ValueError('Kernel evidence lost or rotated during stage')
-    delta = after['journal'][len(before['journal']):]
+    delta = kernel_evidence.delta(before, after)
     if delta.count('suspend debug: Waiting for 5 second(s).') != 1 or any(x in delta for x in FAULTS):
         raise ValueError('Expected bounded debug wait missing or new kernel fault')
     if int(after['stats']['success']) - int(before['stats']['success']) != 1:

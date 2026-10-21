@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from awake_fixtures import window
 
 source = Path(__file__).resolve().parents[1] / 'profile-power.py'
 spec = importlib.util.spec_from_file_location('power_profile', source)
@@ -52,7 +53,7 @@ class CounterParsing(unittest.TestCase):
 
     def test_cpu_busy_iowait_and_wall_time_units(self):
         def snapshot(seconds, cpu):
-            return dict(monotonic_seconds=seconds, stat={'cpus': {'cpu': cpu}, 'counters': {}},
+            return dict(monotonic_seconds=seconds, awake_window=window(seconds), stat={'cpus': {'cpu': cpu}, 'counters': {}},
                         interrupts={'cpus': ['CPU0'], 'rows': {}},
                         softirqs={'cpus': ['CPU0'], 'rows': {}},
                         processes={}, network={}, radio={})
@@ -67,9 +68,9 @@ class CounterParsing(unittest.TestCase):
     def test_short_cpu_accounting_is_visible(self):
         empty = dict(interrupts={'cpus': ['CPU0'], 'rows': {}},
                      softirqs={'cpus': ['CPU0'], 'rows': {}}, processes={}, network={}, radio={})
-        before = dict(empty, monotonic_seconds=0,
+        before = dict(empty, monotonic_seconds=0, awake_window=window(0),
                       stat={'cpus': {'cpu': [0] * 8, 'cpu0': [0] * 8}, 'counters': {}})
-        after = dict(empty, monotonic_seconds=20,
+        after = dict(empty, monotonic_seconds=20, awake_window=window(20),
                      stat={'cpus': {'cpu': [0, 0, 100, 900, 0, 0, 0, 0],
                                     'cpu0': [0, 0, 100, 900, 0, 0, 0, 0]}, 'counters': {}})
         result = profile.summarize(before, after, 100)

@@ -1,0 +1,38 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: recover control RX allocation failures
+
+Flush and request retransmission when a control response cannot be
+allocated after its header was consumed. Preserve any already-published
+response and count the failed receive. A successful NAK must clear the
+next-frame hint: the retransmitted frame needs a new header read. Keep
+normal next-frame hints when no retransmission was requested.
+
+Isolated candidate after 0046 and 0047; no image integration.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -1827,8 +1827,11 @@
+ 	brcmf_dbg(SDIO, "Enter\n");
+ 	if (bus->rxblen)
+ 		buf = vzalloc(bus->rxblen);
+-	if (!buf)
++	if (!buf) {
++		bus->sdcnt.rxc_errors++;
++		brcmf_sdio_rxfail(bus, false, true);
+ 		goto done;
++	}
+ 
+ 	rbuf = bus->rxbuf;
+ 	pad = ((unsigned long)rbuf % bus->head_align);
+@@ -1983,8 +1986,8 @@
+ 				brcmf_sdio_read_control(bus, bus->rxhdr,
+ 							rd->len,
+ 							rd->dat_offset);
+-				/* prepare the descriptor for the next read */
+-				rd->len = rd->len_nxtfrm << 4;
++				/* A retransmitted control frame needs a fresh header. */
++				rd->len = bus->rxskip ? 0 : rd->len_nxtfrm << 4;
+ 				rd->len_nxtfrm = 0;
+ 				/* treat all packet as event if we don't know */
+ 				rd->channel = SDPCM_EVENT_CHANNEL;

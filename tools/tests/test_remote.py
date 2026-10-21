@@ -2,6 +2,8 @@
 from pathlib import Path
 import io
 import json
+import os
+import shutil
 import shlex
 import subprocess
 import sys
@@ -16,6 +18,24 @@ import remote
 
 
 class PythonTransportTests(unittest.TestCase):
+    def test_staged_power_collectors_import_with_only_their_transferred_dependencies(self):
+        for purpose, script in (('idle', 'sample-idle.py'), ('power-profile', 'profile-power.py')):
+            with self.subTest(purpose=purpose), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                def upload(sftp, source, target): shutil.copyfile(source, root/Path(target).name)
+                with patch.object(remote, 'run', return_value=(
+                        '/tmp/gameshellneo-'+purpose+'.TEST1234\n').encode()), \
+                        patch.object(remote, 'upload', side_effect=upload):
+                    remote.stage_helpers(MagicMock(), purpose)
+                environment = {k: v for k, v in os.environ.items() if k != 'PYTHONPATH'}
+                arguments = [sys.executable, '-B', str(root/script), '--help']
+                result = subprocess.run(arguments, cwd=root, env=environment, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr.decode())
+                (root/'awake_clock.py').unlink()
+                result = subprocess.run(arguments, cwd=root, env=environment, capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(b'awake_clock', result.stderr)
+
     def test_real_interpreter_preserves_source_and_literal_arguments(self):
         source = 'import json, sys\nprint(json.dumps(sys.argv[1:]))\n# café \' " $() `literal`\n'
         arguments = ('--inspect', 'spaces and quotes \' "', '$(must-not-run)', '--flag=é')

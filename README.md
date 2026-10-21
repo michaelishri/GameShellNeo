@@ -6,7 +6,238 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
-Diagnostic.19 is installed after full card readback and owner-confirmed boot.
+NEO-202's console and assertion output-bounds candidate is documented in
+[report 286](docs/286-brcmfmac-diagnostic-output-bounds.md). Run
+`task test:brcmfmac-output-bounds` for native/sanitizer/ARM output checks and
+combined Wi-Fi regressions, or `task check:brcmfmac-output-drivers` to include
+complete board/debug ARM objects. `task test:brcmfmac-output-baseline`
+intentionally reproduces the prior output defects. These offline commands
+do not access the GameShell; candidate 0054 stays outside the image queue.
+
+NEO-201's shared diagnostic candidate is documented in
+[report 285](docs/285-brcmfmac-shared-diagnostic-errors.md). Run
+`task test:brcmfmac-shared-diagnostics` for native/sanitizer/ARM diagnostic and
+combined Wi-Fi regressions, or `task check:brcmfmac-shared-drivers` to include
+complete board/debug ARM objects. `task test:brcmfmac-shared-baseline`
+intentionally reproduces the prior defects. These offline commands do not
+access the GameShell; the candidate remains outside the image queue.
+
+NEO-200's asynchronous clock-deadline candidate is documented in
+[report 283](docs/283-brcmfmac-clock-deadline.md). Run
+`task test:brcmfmac-clock-deadline` for offline native/sanitizer/ARM clock,
+sleep and packet/worker checks, or `task check:brcmfmac-clock-drivers` to
+include full board/debug ARM objects. `task test:brcmfmac-clock-baseline`
+intentionally reproduces the missing deadline. The candidate stays outside
+the image queue; integration and hardware qualification remain with NEO-58.
+
+NEO-199's isolated watchdog-error candidate is documented in
+[report 282](docs/282-brcmfmac-watchdog-errors.md). Run
+`task test:brcmfmac-watchdog` for native/sanitizer/ARM watchdog, TX/RX and worker
+checks, or `task check:brcmfmac-watchdog-drivers` to include full board/debug ARM
+objects. `task test:brcmfmac-watchdog-baseline` intentionally reproduces the
+discarded errors and late-work failures. These commands run offline and leave
+the image queue unchanged; hardware qualification remains with NEO-58.
+
+NEO-198's isolated polling-status error candidate is documented in
+[report 281](docs/281-brcmfmac-tx-poll-errors.md). Use
+`task test:brcmfmac-tx-poll` for the extended TX/RX/worker checks or
+`task check:brcmfmac-tx-poll-drivers` to include board/debug ARM builds.
+`task test:brcmfmac-tx-poll-baseline` intentionally reproduces the old failure.
+These commands do not access hardware or modify the image queue.
+
+NEO-197's isolated transmit-recovery candidate and saved fault tests are in
+[report 279](docs/279-brcmfmac-tx-recovery.md). Run
+`task test:brcmfmac-tx-recovery` for native/sanitizer/ARM TX, RX and worker
+checks, or `task check:brcmfmac-tx-recovery-drivers` to also compile complete
+board/debug ARM driver objects. `task test:brcmfmac-tx-recovery-baseline`
+deliberately reproduces the pre-candidate failures. These commands are offline;
+the candidate has passed full board/debug ARM compilation and independent
+[review](docs/280-brcmfmac-tx-review.md), remains outside the image queue and
+awaits deliberate integration and matching hardware qualification.
+
+The isolated NEO-195 receive-recovery candidates pass helper, packet and worker
+checks. Use `task test:brcmfmac-rx-recovery` for the abort/flush fault matrix and
+`task test:brcmfmac-rx-callers` for packet ownership, worker quarantine and
+successful traffic. `task check:brcmfmac-rx-callers-drivers` also compiles complete
+board/debug ARM brcmfmac objects and repeats the checks with the mailbox fix.
+The commands use native sanitizers and the locked, network-disabled ARM builder;
+they do not access hardware or add candidates to the image queue. Results and
+remaining integration work are in [report 275](docs/275-brcmfmac-rx-recovery.md)
+and [report 276](docs/276-brcmfmac-rx-caller-qualification.md).
+
+NEO-196 adds the isolated control-response retry candidate and byte-position
+FIFO tests in [report 277](docs/277-brcmfmac-control-rx-recovery.md). Use
+`task test:brcmfmac-control-rx` for its native/sanitizer/ARM checks,
+`task test:brcmfmac-control-rx-mailbox` to test the combined mailbox candidate, or
+`task check:brcmfmac-control-rx-drivers` to include the complete board/debug
+driver builds with and without the mailbox fix. The separate
+`task test:brcmfmac-control-rx-baseline` intentionally fails against the source
+without this correction, retaining the original reproduction. None of these
+commands changes the image queue or accesses the GameShell.
+
+Both isolated RX tickets have completed offline implementation and review.
+[Report 278](docs/278-brcmfmac-rx-review.md) records the two review axes, resolved
+fixture cleanup and rerun evidence. NEO-58 retains integration, matching hardware
+qualification and its other driver leads.
+
+Diagnostic.26 is built, offline-verified, packed and checkpointed with explicitly
+selected, bounded kernel clock instrumentation for NEO-192. It gives the pending clock investigation its own
+image/kernel identity and retains diagnostic.25 for recovery. It does not fix
+the clock fault or clear PM admission. [Report 272](docs/272-clock-provenance-image.md)
+records the artifact hashes, matching reader checks and pending installation work.
+
+Diagnostic.25 is built and offline-verified with the reviewed NEO-108/163 USB
+deferred restart fix. [Report 232](docs/232-musb-restart-image-integration.md)
+records its separate build and qualification plan. Transfer, both archive/image
+checksums on the Mac and full DEV-card readback have passed. Diagnostic.25 is now
+installed with owner-confirmed boot and passing awake image, both-route, battery,
+WFI/timer, journal, power-key ownership and RTC checks in
+[report 233](docs/233-diagnostic25-installation.md). All seven freezer, driver and
+late/noirq debug checks now pass, with both routes recovered, the original keypad
+retained and
+owner-confirmed warning/display return in
+[report 234](docs/234-diagnostic25-pm-qualification.md). The awake RTC rehearsal
+and first actual connected-USB sleep also pass: all four CPU sleep callbacks run,
+with independent timekeeping-freeze evidence, both routes recovered and an
+owner-confirmed normal untouched display return. Four further connected-USB
+sleep/wake repeats also pass with the same recovery and CPU evidence, bringing
+PM to 12/0; the owner confirms normal warnings/display returns throughout.
+[Report 235](docs/235-diagnostic25-connected-sleep-repeatability.md) records the
+batch and preserved collection errors. Four subsequent awake USB reconnects
+also pass, with independent USB access after each, final Wi-Fi/Mac health and
+unchanged PM/keypad state in
+[report 236](docs/236-diagnostic25-post-sleep-usb-reconnects.md). A fresh seven-debug
+sequence, awake battery rehearsal and one attended battery-only RTC sleep also
+pass, followed by separate USB reattachment and both-route health checks.
+[Report 237](docs/237-diagnostic25-battery-rtc-qualification.md) records PM20/0,
+all-CPU sleep callbacks and owner-confirmed normal display return. Four guided
+cable changes during sleep also pass—two removals and two insertions—with the
+screen staying asleep after both insertions until RTC wake. Final health and
+both routes pass at PM31/0 in
+[report 238](docs/238-diagnostic25-guided-cable-sleep-qualification.md).
+The final [integration review](docs/239-musb-restart-integration-review.md)
+found no actionable Standards or Spec findings and verified the source/test/image
+provenance. NEO-108's restart fix and planned bounded diagnostic.25 coverage are
+complete; broader reliability, charging during sleep and energy measurements
+remain open.
+The newer controller-removal work is outside this candidate.
+
+The first diagnostic.25 battery-only awake baseline passes: 61 samples over
+ten minutes, after a settling minute, estimate **264 mA / 1.05 W** with the dim
+screen on. [Report 240](docs/240-diagnostic25-battery-measurement-baseline.md)
+records the uncalibrated result and the planned backlight/sleep comparisons.
+It does not measure asleep consumption or establish an optimization gain.
+
+The subsequent [lit/off/lit comparison](docs/241-diagnostic25-backlight-power-comparison.md)
+passes all three windows: approximately **1.042 W → 1.015 W → 1.027 W**.
+Turning off the minimum-dim backlight gives a small directional reduction in
+the software readings, with battery/temperature drift still present. This
+does not establish calibrated backlight consumption or asleep power.
+
+Diagnostic.24 integrates the WFI s2idle driver, sleep-inclusive battery timestamps
+and guards against sleep interrupting awake measurements. It requires all four
+CPUs to participate and independent timekeeping-freeze evidence. This candidate
+was installed after verified full DEV-card readback and owner-confirmed boot.
+Awake checks pass: all four cores expose the WFI state, both SSH routes work,
+and the battery, timer, journal and power-key prerequisites pass.
+[Report 218](docs/218-diagnostic24-installation.md) records these results.
+All seven freezer/driver/late-noirq debug checks pass, with both SSH routes
+recovered and the original keypad retained. [Report 219](docs/219-diagnostic24-pm-qualification.md)
+records the passing awake RTC rehearsal and first actual connected-USB RTC
+sleep at PM8/0. All four CPU sleep callbacks run, with independent timekeeping
+freeze and a 28.87-second BOOTTIME–MONOTONIC gap. Both routes recover, and the
+owner confirms the warning and normal untouched display return. Four further
+connected-USB sleep/wake repeats also pass, with all-CPU callback participation,
+timekeeping freeze, both routes recovered and owner-confirmed normal returns.
+[Report 220](docs/220-diagnostic24-connected-sleep-repeatability.md) records
+PM12/0 and the retained collection errors. Other power/cable profiles, broader
+reliability and energy savings remain unqualified.
+[Report 217](docs/217-wfi-s2idle-image-integration.md)
+records the changes and first-install sequence.
+
+Diagnostic.23 previously qualified full card readback, owner-confirmed
+login, both SSH routes and awake startup checks. Removing unused legacy PTYs
+eliminates 512 user-manager device-unit records while modern terminals and
+console support remain intact. Four manager starts load units in 0.59–0.61 s,
+down from 3.44 s; three first USB SSH channel openings take 1.91–1.96 s,
+down from 4.68–4.79 s. These measurements do not establish wake latency or
+battery savings. Seven PM debug
+checks also pass, with both routes recovered, original keypad retention and
+stable SDIO usage. The owner confirms clear warnings and normal dim-console
+returns. [Report 200](docs/200-diagnostic23-pm-qualification.md) records PM7/0 and
+the retained collection errors. The awake RTC rehearsal and first actual
+connected-USB RTC sleep also pass, with an owner-confirmed warning and normal
+untouched display return. Four further actual sleep/wake cycles pass with both
+routes recovered and owner-confirmed warnings/untouched normal returns.
+[Report 201](docs/201-diagnostic23-connected-sleep-repeatability.md) records
+bounded connected-USB repeatability at PM12/0 and the remaining post-return
+SSH collection failure. CPU retention, energy and broader profiles remain open.
+[Report 198](docs/198-legacy-pty-startup-candidate.md) records the source rationale,
+terminal checks and artifact hashes; [report 199](docs/199-diagnostic23-installation-and-pty-validation.md)
+records installation, terminal compatibility and repeated timings.
+
+Diagnostic.22 previously qualified the shared ADC width correction. Full card
+readback, owner-confirmed login, both network routes, startup checks and the
+read-only schema-4 inventory pass. The first sample reports about 4.157 V with
+no unused ADC bits set; this does not resolve the earlier voltage discrepancy
+or establish physical accuracy. Seven staged PM debug checks and the awake RTC
+rehearsal also pass, with owner-confirmed warnings/normal display returns;
+six actual connected-USB RTC sleeps pass automated recovery checks, including
+a four-cycle batch. The owner confirms the batch's clear warnings and untouched
+normal display returns. Both routes recover each time, with final PM13/0 and
+stable SDIO usage. [Report 195](docs/195-diagnostic22-pm-qualification.md)
+preserves the initial tests and first missed warning;
+[report 196](docs/196-diagnostic22-connected-sleep-repeatability.md) records the
+completed batch. CPU retention, energy and other power/cable profiles remain open.
+[Report 194](docs/194-diagnostic22-installation-and-adc-validation.md) records
+the hardware checks; [report 193](docs/193-diagnostic22-adc-integration.md)
+records the build, checksums and recovery checkpoint.
+
+Diagnostic.21 previously qualified the AXP223 gauge-status cache correction.
+Full card readback, startup, both network routes and the live volatile-B8
+inspection pass. Seven attended suspend-debug checks and the awake RTC rehearsal
+also pass, followed by five actual connected-USB RTC sleeps, including a
+four-cycle batch. Both routes recover every time, and the owner confirms clear
+warnings and normal display returns without intervention. Fresh B8 reads survive
+resume. [Report 190](docs/190-diagnostic21-pm-qualification.md) records the initial
+checks; [report 191](docs/191-diagnostic21-connected-sleep-repeatability.md)
+records bounded repeatability. Other power/cable profiles, broader reliability
+and energy savings remain open.
+[Report 189](docs/189-diagnostic21-installation-and-gauge-validation.md) records
+the hardware results and continuing voltage/capacity uncertainty.
+[Report 187](docs/187-diagnostic21-gauge-integration.md) records its build,
+inspection contract and checksums.
+
+Diagnostic.20 has booted after verified full 4 GiB card readback. Both SSH
+routes, integration and awake journal/POWER/RTC checks pass. The MUSB and both
+supply wake controls are disabled as intended
+([report 167](docs/167-diagnostic20-installation-and-awake-checks.md)).
+One freezer, one driver and five late/noirq debug checks also pass, with both
+routes recovering, the original keypad connection retained, PM7/0 and stable
+SDIO usage 2. The owner confirmed clear warnings and normal console returns
+throughout the complete sequence
+([report 168](docs/168-diagnostic20-attended-debug-qualification.md)).
+The awake RTC rehearsal also passes with full restoration and both routes
+verified. The first connected-USB actual RTC sleep/wake passes, with both routes
+recovering, unchanged wake settings and owner-confirmed clear warning/normal
+dim console ([report 169](docs/169-diagnostic20-first-rtc-wake.md)). Independent
+attachment prerequisites and rehearsal passed ([report 170](docs/170-diagnostic20-usb-attachment-preparation.md)).
+One attended USB-attachment-during-sleep case now passes: the owner confirmed
+the screen stayed dark after insertion, the RTC woke it later, both routes
+recovered and Charging was reported after resume. PM16/0 and SDIO usage 2 remain
+healthy ([report 171](docs/171-diagnostic20-usb-attachment-sleep-validation.md)).
+The independent removal debug baseline and connected awake rehearsal pass,
+with owner-confirmed warnings/display and PM23/0 ([report 172](docs/172-diagnostic20-usb-removal-preparation.md)).
+One attended removal-during-sleep case then passed: RTC wake, Wi-Fi recovery,
+correct absent USB state and normal dim-console return. The separately requested
+awake reconnect restored both SSH routes and external-power detection, with
+PM24/0 and SDIO usage 2 unchanged ([report 173](docs/173-diagnostic20-usb-removal-sleep-validation.md)).
+The subsequent four-cycle removal/attachment batch passed all RTC wakes,
+endpoint checks and owner observations, including staying asleep after both
+insertions ([report 178](docs/178-guided-cable-batch-hardware-validation.md)).
+Direct charging evidence during sleep and standby-energy qualification remain open.
+
+The previous diagnostic.19 installation passed full card readback and owner-confirmed boot.
 Both SSH routes, integration, journal rotation, awake power-key ownership and
 awake RTC checks pass; [report 155](docs/155-diagnostic19-installation-and-awake-checks.md)
 records the evidence. Fresh office startup checks and one freezer, one driver
@@ -25,10 +256,19 @@ A fresh, owner-observed attachment prerequisite sequence also passed
 The attachment attempt then woke early through the PMIC, before the RTC:
 both supply insertion-wake policies were enabled. USB/Wi-Fi and the normal
 console recovered, but the RTC test remains failed ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)).
-PM is now 24/0, with stable SDIO usage 2. NEO-117 will implement the agreed
-policy: **connecting USB during sleep leaves the device asleep and charging**.
-The diagnostic power-button suppression remains retained pending deliberate
-recovery; further sleep testing is stopped. Wider repetition remains open.
+Before the card swap, diagnostic.19 reached PM24/0 with stable SDIO usage 2. The agreed policy is:
+**connecting USB during sleep leaves the device asleep and charging**.
+NEO-117 has built and offline-verified diagnostic.20 using the existing supply
+wake controls. Host checks pass, and the 270 MB archive is now staged on the
+Mac with compressed/decompressed checksums verified. Card flash/readback also
+passed, followed by first boot, awake startup checks and the bounded attended
+sleep cases above
+([report 166](docs/166-stay-asleep-usb-charging-policy.md)).
+The old diagnostic guard explained the suppressed POWER button before the
+card swap. Long speaker warnings preceded the requested remote shutdown
+(report 166). No retained key guard exists on diagnostic.20's new boot.
+The first connected-USB RTC wake and one attended case in each cable direction pass.
+Wider repetition remains open.
 [Report 154](docs/154-usb-sleep-session-retirement.md) covers the driver change,
 callback lifetime protection, masked-interrupt findings and verification.
 Diagnostic.18's removal-during-sleep failure remains preserved in
@@ -229,10 +469,205 @@ task check                 # Host tests and shell lint
 task build:image           # Rebuild userspace/image using the completed kernel
 task device:status         # Capture the running board's status over Wi-Fi
 task device:status ROUTE=usb # Connect through the Mac's USB link
+task device:ssh-timing CYCLES=3 # Fresh USB/Wi-Fi timing pairs while awake
+task device:ssh-timing-report CAPTURE=.local/diagnostics/<capture> # Offline summary
+task device:ssh-provenance # Installed SSH versions, hashes and selected policy; stays awake
+task device:user-startup LEGACY=either # User-manager inventory and Unix98/SSH terminal checks
 ```
 
 Both humans and coding agents should use these commands. When another routine
 operation is needed, extend the Taskfile and its checked-in `tools/` helpers.
+
+The SSH timing probe leaves the screen and power policy unchanged. It discovers
+the current Wi-Fi address through USB, requires the same boot and unchanged PM
+counters across both routes, and stops on failure. Credentials remain in `.env`.
+It saves private `awake-ssh.json`, `host-timing.jsonl` and a timing summary.
+Each PM debug cycle, RTC rehearsal/sleep attempt and explicit sleep collection
+also records host timing automatically. The offline report accepts a capture
+directory, including a batch's individual `cycle-N` directory. Nested durations
+overlap; do not add them together or treat SSH command latency as wake latency.
+[Report 197](docs/197-ssh-collection-timing.md) describes the clock brackets,
+the awake session-startup delay and the remaining recovery investigation.
+The report also lists Boolean SSH state observations captured before connection
+cleanup: server greeting received, initial key exchange complete, authenticated
+and active. Unknown state stays unknown; these are observations, not exact
+milestone timestamps. [Report 202](docs/202-post-return-ssh-investigation.md)
+explains the post-return setup failure, privacy limits and passing awake checks.
+This host-only addition needs no image rebuild or card swap.
+
+For the intermittent SSH greeting failure, the optional two-ended TCP recorder
+uses the same connection path and timeouts:
+
+```sh
+task device:ssh-trace-awake # Fixed three USB/Wi-Fi pairs; screen stays on
+task device:ssh-trace-smoke # Same probes with the observer owned by the sleep-test unit; no sleep
+task device:ssh-trace-burst # Awake: three checked 2 MiB USB replies plus Wi-Fi probes
+task device:ssh-trace-gap-smoke # Awake: close/reopen only the Mac capture handle, once
+task report:ssh-trace CAPTURE=.local/diagnostics/<capture> # Offline validation
+task report:ssh-trace-partial CAPTURE=.local/diagnostics/<capture> # Positive evidence from clean segments only
+# Only after fresh observer readiness and the normal same-boot sleep gates:
+task device:ssh-trace-sleep QUALIFICATION=<current-receipt> REHEARSAL=<original-run-id> ATTENDED=1
+# Stop/collect the original recorders after an interrupted controller:
+task device:ssh-trace-collect CAPTURE=.local/diagnostics/<capture>
+```
+
+Keep USB connected and the Mac awake. The GameShell recorder uses Linux's
+native packet socket on `usb0`; the Mac uses its system libpcap on the Ethernet
+interface selected by the USB route. Temporary privileged helpers close their
+capture handles after a requested stop or a five-minute limit. They do not
+install packages, change networking/SSH policy or leave a capture service
+enabled. The Linux helper also has a systemd runtime deadline. For actual sleep,
+the recorder is a child of the existing sleep-test service, alongside the
+unchanged diagnostic. A source/identity/readiness check must pass before the
+diagnostic starts; its admission guard and 180-second service limit remain in
+force. The smoke task checks that ownership while awake. It does not qualify
+sleep, program the RTC, consume a continuation or blank the screen. A deadline,
+packet/byte cap, reported drops, rejected headers, clock step or changed
+interface prevents accepting a complete capture. These observations add some
+CPU/network overhead and do not measure uninstrumented latency or energy.
+
+The burst and gap smoke tasks leave the screen on and check unchanged boot/PM
+counters. Burst data is synthetic and checked for length and SHA-256; it is not
+saved as a payload artifact. The Linux recorder requests a temporary 4 MiB
+receive buffer on its own socket and records the effective limit. It saves each
+flow's first 16 packets plus connection controls, zero-window notifications,
+SSH-prefix observations and the first server payload, counting omitted bulk
+explicitly. This reduces metadata work while retaining handshake evidence.
+
+On a recognized Mac capture-interface disappearance, the recorder closes that
+segment and attempts to reopen its handle at one-second intervals, bounded by
+60 attempts total, three gaps and the original deadline. It never resets the
+network interface. Every interruption stays visible. A gapped capture fails the
+normal report; the separate partial report matches positive observations only
+inside segments with known, clean capture statistics. It cannot establish that
+a greeting was absent across a gap. Unknown backend errors still stop capture.
+The gap smoke deliberately injects one handle interruption after 32 reads;
+success means the gap was rejected as continuous coverage and later flows were
+matched. It does not simulate device suspend or change USB connectivity.
+
+Private `tcp-mac/` and `tcp-device/` contain JSON metadata, not PCAP files:
+IPv4 endpoints/ports, TCP sequence/acknowledgment/flags/lengths, timestamps and
+a Boolean for the four-byte `SSH-` prefix. Packet payloads, greeting text,
+credentials and keys are not written. Raw endpoints remain in ignored
+`.local/diagnostics/`. Capture setup/collection can add unrelated control
+connections; matching requires a unique recorded tunnel span and matching
+TCP handshake identities. Missing or ambiguous flows stay unqualified.
+Zero reported drops do not prove complete wire delivery.
+
+Recollection never launches a recorder or resubmits sleep. `ROUTE=wifi` can
+retrieve the device recorder when USB recovery is incomplete; the Mac still
+needs SSH access. If the original sleep result is uncertain, separately use
+`device:sleep-collect RUN=<original-run-id>` before considering another test.
+TCP collection cannot qualify a failed sleep. Original packet/result files
+are immutable; recollection preserves their bytes and original clock anchors.
+Helpers and metadata remain in their recorded private temporary directories
+for diagnosis. [Report 206](docs/206-two-ended-ssh-tcp-metadata.md) records
+the recorder design; [report 207](docs/207-ssh-observer-sleep-unit-integration.md)
+records the pre-sleep integration failure, correction and validation.
+[Report 208](docs/208-instrumented-rtc-sleep-and-recorder-limits.md) records the
+subsequent RTC sleep pass and independently rejected incomplete packet capture.
+[Report 209](docs/209-ssh-recorder-burst-and-gap-recovery.md) records the awake
+burst comparison, bounded handle-recovery test and remaining attended validation.
+[Report 210](docs/210-rtc-wake-segmented-observer-validation.md) qualifies recovery
+across one real suspend transition: an explicit Mac capture gap, zero reported
+drops and five later matched handshakes. A post-return SSH setup failure is also
+preserved; its cause remains open. The strict task correctly exits nonzero for
+the gap even though the independent sleep/recovery result passes.
+
+Timing captures now also include passive `forward_state` observations at channel
+opening and immediately after device SSH setup succeeds or fails. They record
+send/receive byte and call counts, errors/timeouts, EOF/closed/active flags and
+whether receive data is buffered. They never read ahead or retain payloads.
+The existing `device:ssh-timing` and `device:ssh-trace-*` tasks enable these
+automatically; no timing capture means the channel remains unwrapped.
+Bytes accepted by the forwarding API are not proof of delivery over USB.
+Likewise, a packet flow's unique time overlap with a tunnel request is only a
+candidate association: `host_tunnel_identity_verified` remains false.
+[Report 211](docs/211-forwarded-ssh-observation.md) records the source audit,
+late server closure, local failure controls and passing awake validation.
+[Report 212](docs/212-rtc-wake-forwarding-byte-validation.md) adds attended sleep
+validation: this time SSH setup succeeds after wake, with usable byte counts;
+the original intermittent failure remains unresolved. Channel flags accept both
+booleans and Paramiko's integer `0`/`1` representation; unsupported values remain
+unknown. The correction is separately verified awake.
+
+`device:ssh-socket-smoke ROUTE=usb` (or `ROUTE=wifi`) independently checks the
+Mac SSH worker's outgoing socket against the authenticated GameShell endpoint.
+It rejects multiple forwards as ambiguous and excludes a separate transport's
+connection to the same target. Keep USB connected and Wi-Fi associated; the task
+stays awake and temporarily opens extra test connections. Endpoint records remain
+private. `report:ssh-sockets CAPTURE=...` rechecks the saved evidence offline.
+[Report 213](docs/213-forwarded-socket-identity.md) records both passing routes,
+bounds and limits. It does not establish the earlier failure's cause.
+
+Use `SOCKET_STATE=1` with `device:ssh-timing`, the `device:ssh-trace-*` capture
+tasks, or ordinary PM debug/RTC rehearsal/sleep tasks to retain Mac socket
+snapshots around the actual forwarded SSH setup. A sleep batch keeps separate
+observations in each `cycle-N` directory; a dedicated SSH trace reuses its
+existing observer instead of starting a second one.
+The option defaults off. Each baseline runs before opening the forwarding
+channel; collection runs after the original SSH result and first byte/state
+observations, before the caller closes the connection. Nothing is inserted
+between channel opening and the SSH greeting, and the ten-second SSH timeouts
+and single-attempt behavior are unchanged. These snapshots add wall time outside
+the SSH setup span, so instrumented totals are not latency comparisons.
+
+```sh
+task device:ssh-failure-smoke # Awake silent/greeting-only Mac loopback peers, then healthy USB/Wi-Fi
+task device:ssh-timing CYCLES=1 SOCKET_STATE=1 # Awake real-route observations
+task report:ssh-socket-state CAPTURE=.local/diagnostics/<capture> # Offline, no device access
+```
+
+For a planned, separately admitted and attended PM or sleep run, append
+`SOCKET_STATE=1` to its usual task command. After a batch, run
+`report:ssh-socket-state` on each completed `cycle-N` directory. The flag does
+not itself enable packet capture, and ordinary awake inspection tasks do not
+create socket observations. It remains off unless explicitly requested.
+
+Keep USB connected and Wi-Fi associated for the awake controls; they do not
+blank the screen or change network policy. Loopback peers accept one connection
+and have a 60-second lifetime limit. Socket records, endpoints, source copies
+and the original timing remain private under `.local/diagnostics`. A missing
+socket may have disappeared before collection, including inside the SSH library;
+it is not proof that TCP never connected. A unique worker candidate remains
+distinct from an independently corroborated endpoint. Unavailable snapshots
+never replace the original SSH error or trigger retries. The snapshot command
+has a 15-second host watchdog and ten-second remote helper deadline; captures
+are limited to 32 observed setups. See
+[report 214](docs/214-ssh-failure-socket-observations.md) for awake qualification
+and [report 215](docs/215-rtc-wake-socket-observation-validation.md) for the first
+attended sleep qualification: twelve healthy setups, three missing-socket
+forwarding failures before PM return, and a separately unqualified packet gap.
+The earlier intermittent post-return failure remains unresolved.
+`SOCKET_STATE=1` does not waive any existing sleep admission or readiness requirement.
+[Report 221](docs/221-diagnostic24-ssh-stall-awake-investigation.md) records the
+ordinary-workflow integration, awake validation and newer unresolved failure
+evidence: client greeting bytes accepted by the forwarding API, with no reply
+bytes returned before the setup timeout.
+
+`device:ssh-provenance` reads the Mac and GameShell SSH versions, authenticated
+server banners, executable hashes and selected global configuration, using the
+credentials in `.env` and the USB route. Keep USB connected. It also saves local
+Paramiko source identities and the device's linked libraries and access-rule
+counts, with no rule contents. Evidence stays private under `.local/diagnostics`.
+The task leaves the device awake and verifies unchanged boot, PM counters and
+display state. Its `sshd -G` view describes current on-disk global settings,
+without per-connection `Match` evaluation or historical-policy proof. The
+[source audit](docs/216-ssh-greeting-source-audit.md) explains the caller timeout
+and forwarding stages; the intermittent stall remains tracked as NEO-154.
+
+`device:user-startup` defaults to the USB route. Use `LEGACY=enabled` for the
+diagnostic.22 baseline and `LEGACY=disabled` for the diagnostic.23 candidate;
+`ROUTE=wifi` selects the configured Wi-Fi route. The task records manager startup
+phases and device-unit counts, tests data transfer and resizing on its own
+temporary Unix98 terminal, and requests a real SSH terminal as the ordinary
+login user. It preserves the screen and checks unchanged boot/PM/display state.
+It neither restarts the user manager nor changes session/SSH policy. The startup
+times describe the manager serving that login, which may already have been
+running. Allow ordinary session cleanup before comparing fresh logins; keep
+unit counts, startup phases and host SSH timings as separate measurements.
+[Report 198](docs/198-legacy-pty-startup-candidate.md) records the candidate and
+the measurements required after installation.
 
 ### Prerequisites
 
@@ -352,8 +787,10 @@ task provision
 task build
 ```
 
-`task build` runs the kernel regressions, compiles the kernel, validates the device tree, then builds and
-verifies the image **in sequence**. It does not provision credentials implicitly.
+`task build` first checks locked local inputs and disk headroom, then prepares
+public sources/downloads before running kernel regressions, compiling the kernel,
+validating the device tree and building/verifying the image **in sequence**.
+It does not provision credentials implicitly.
 Run `task provision` again after editing Wi-Fi settings, country or the authorized key,
 then rebuild. This changes the next image, not the running board.
 Country is explicit and is never inferred from timezone. A future launcher
@@ -365,19 +802,41 @@ radio baseline recorded on 2026-09-27. Override paths when needed; pass the same
 overrides to `build`/`build:image`, which refresh preparation automatically:
 
 ```sh
+task build:preflight BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/radio-reference'
 task prepare BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/radio-reference'
 task provision AUTHORIZED_KEY='/path/to/development-key.pub'
 task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/radio-reference'
 ```
 
+`build:preflight` is read-only. Its default `SCOPE=full` verifies the selected
+bootloader/private radio inputs and any cached public radio assets, and requires
+16 GiB free when kernel and image storage share a filesystem: a 6 GiB kernel
+planning allowance plus Armbian's 10 GiB image minimum. `SCOPE=kernel` checks
+kernel storage only, `SCOPE=image` checks image inputs/storage, and `SCOPE=inputs`
+checks only inputs. Separate filesystems are checked independently, with each
+role counted once per filesystem. A missing public blob is reported as needing
+download; full-build preparation must fetch and verify it before compilation.
+There is no fallback to another bootloader or staged private input when a
+selected path is missing. Nested worktrees therefore need explicit paths.
+
+These are conservative planning checks, not a disk reservation or measured peak
+guarantee. They do not check Docker's separate storage or prevent concurrent disk
+use. Kernel/image wrappers recheck their stage's space, and the existing artifact,
+Armbian, signature and final image checks remain mandatory.
+[Report 203](docs/203-build-preflight.md) records the workflow and validation.
+
 | Task | When to use it |
 | --- | --- |
 | `task setup` | New checkout or changed builder lock; prepare and verify the build environment |
 | `task setup:host` | Install missing native prerequisites on Debian/Ubuntu |
+| `task build:preflight` | Check selected locked inputs and build headroom without downloading, compiling or contacting hardware |
 | `task build:image` | Runtime/image changes; reuses the completed, verified kernel stage |
 | `task build:kernel` | Kernel source/configuration work; preserves incremental build outputs |
 | `task kernel:reset` | After changing the patch queue; archives old kernel source/output and artifact metadata/logs under `.local/previous-kernels/`, then run `task build`. Recovery images stay in `.local/artifacts/` |
 | `task build:rootfs` | Exercise Debian bootstrap/cache preparation independently |
+| `task build:stage:status` | Inspect a recorded container after a lost build command or observation timeout |
+| `task build:stage:resume` | Follow the same container, collect its complete log and actual exit code, then retire it |
+| `task build:stage:stop` | Request termination of only the recorded container and retain its result |
 | `task build:prune-driver-scratch SUITE=brcmfmac-pm-tests` | Preview superseded compiler trees; add `APPLY=1` to remove them while retaining current normal/debug build evidence |
 | `task build:compact-driver-sources SUITE=musb-sleep-tests` | Verify duplicate sources against the locked archive and patch queue; add `APPLY=1` to replace them with shared-source links, keeping compiled outputs and evidence |
 | `task check:kernel-source-reuse` | Build two real ARM configurations and regenerate an object, checking isolated outputs and shared read-only source; no device access |
@@ -385,6 +844,7 @@ task build BOOTLOADER='/path/to/u-boot-sunxi-with-spl.bin' RADIO_DIR='/path/to/r
 | `task check` | Python and C regressions, Bash syntax and ShellCheck |
 | `task test:nkmp` | Compare original/patched clock searches natively and under ARM32 emulation; also runs before the kernel in `task build` |
 | `task check:kernel` | Resolved Kconfig assertions and kernel artifact manifest |
+| `task check:ethernet-config` | Compare isolated baseline/candidate ARM kernels with unused platform Ethernet controllers removed; does not change the image or device |
 | `task check:dt` | Binding and compiled device-tree validation in the pinned container |
 | `task image:verify` | Repeat filesystem/content checks on the current bundled image |
 | `task image:pack` | Compress the verified image and record raw/transfer checksums |
@@ -431,7 +891,76 @@ Older logs are retained under `.local/build/logs/`. A failed stage returns a
 failure and prints the log tail. The wrappers reject overlapping build stages;
 run build tasks sequentially on this memory-constrained host.
 
-To reclaim superseded Wi-Fi driver compiler trees, first preview the named
+Docker commands launched through `run-logged.sh` also retain a per-checkout
+ownership record in `.local/build/container-active.json` before creation.
+The fixed container name and workspace/stage/run labels identify the same
+container after the foreground command disappears. A running container or an
+uncollected result blocks another logged stage before host preparation or log
+rotation. An observation timeout does not establish that compilation stopped.
+
+From the same checkout, inspect and recover the recorded stage:
+
+```sh
+task build:stage:status
+task build:stage:resume
+# To deliberately terminate that stage instead:
+task build:stage:stop
+```
+
+`resume` follows an existing running container, collects an exited container,
+or starts the original created container if creation was interrupted. It never
+creates a replacement. A durable `start.json` receipt distinguishes a start
+that was never requested from an unresolved request. A nonzero CLI return or
+lost response leaves that request unresolved; another start and created-state
+removal are blocked. Missing start metadata in older records is also unknown.
+Once the original container is running or exited, normal recovery can collect
+its actual output and result. A created container that stays unresolved retains
+ownership for diagnosis. `status` includes this start state.
+`stop` verifies the exact container identity, requests
+termination with a ten-second grace period and collects the actual exit code.
+Both commands return the container's exit status when established. Cancelling
+a created container with no start requested, or an absent creation, returns 125 with
+`exit_code: null` and `log_complete: false`; it does not establish a process
+exit or rule out a delayed start. A cancelled late creation is retired with
+`stop` and cannot be resumed.
+
+The daemon retains container output across host interruption. Final collection
+saves `job.json`, `container.log` and `result.json` under
+`.local/build/container-stages/RUN/`; the result records the state, exact ID,
+exit code and log SHA-256. Only after saving that evidence does the helper
+remove the verified container and release admission. Failed observations,
+log collection or removal retain ownership and private failure evidence.
+Created cancellation saves its observed state in `cancellation.json` before
+removal, so a lost removal reply cannot erase the original start error.
+Repeated cancellation snapshots are additive. Concurrent observers reconcile
+the same run's saved result if another observer already removed the container.
+The interrupted top-level stage log remains unchanged; use the recorded
+`container.log` for the complete container output. Recovery does not replay
+the outer Task or host-side postprocessing: inspect the result, then run the
+appropriate existing artifact checks and remaining build tasks. A container
+exit of zero alone does not verify a completed image.
+
+Keep the ownership records and Docker container intact until collection. If
+Docker is unavailable, identity differs, or a log cannot be verified, inspect
+the saved evidence and restore access before proceeding. Do not clear a lock
+or ledger, start another build or remove unrelated containers to bypass a
+blocked stage. These guarantees apply to logged commands in this checkout;
+direct Docker commands and older worktrees keep their existing behavior.
+Docker log rotation and nonblocking log delivery are rejected before every
+start, including recovery of a created container, so that an interrupted
+build's full output remains available. Logs may include private build inputs
+and stay outside Git.
+
+`task test:docker-ownership` runs bounded fixtures using the locked, already
+cached builder with network access disabled. The historical reproduction
+`task test:docker-ownership-baseline` intentionally exits nonzero when the old
+wrapper admits a second writer. `task test:build-workflow` checks host-only
+workflow behavior. `CASE=logging-rotation`, `logging-nonblocking`,
+`created-cancellation`, `attachment-race` or `delayed-start` selects an individual review
+regression. [Report 287](docs/287-docker-build-ownership.md) records the
+contract, evidence and recovery limits.
+
+To reclaim superseded driver compiler trees, first preview the named
 suite, then apply the reviewed selection:
 
 ```sh
@@ -449,6 +978,13 @@ active tests, symlinks or unexpected scratch contents stop cleanup. Only older
 removed; recovery images, archived full kernels, downloads, provisioning and
 diagnostic captures remain outside its scope. Each application saves an
 incremental `prune-*.json` record alongside the retained suite evidence.
+
+`usb-policy-tests` is also supported. Its single ARM build and any additional
+references in saved `*evidence.json` files are retained; their object and
+configuration hashes must verify before any deletion. Use `TARGET=/absolute/path`
+to inspect a different checkout, applying the same target after reviewing its
+preview. This lets the current saved tool maintain older compiler artifacts
+without changing that checkout's source files.
 
 Driver object checks now share one verified kernel source per patch queue within
 each suite. Each configuration retains its own `kernel-<16 hex digits>/output`;
@@ -475,7 +1011,21 @@ an idle suite, completed compiler evidence and matching object/configuration
 hashes. Every selected source must match the freshly patched source, including
 files left by `patch`; all selected trees are checked before any replacement.
 The worktree's current archive and patch queue must still reproduce those
-sources. Unreferenced compiler trees are left alone.
+sources. If the checkout has advanced but the suite retains its original
+`patches/manifest.json` and patch files, add `RECORDED_PATCHES=1` to both preview
+and application. This explicitly replays that historical export against the
+locked archive; it verifies every patch hash and still requires an exact match
+to every selected source and the recorded compiled outputs. It does not apply
+the old patches to the checkout or change its kernel build. For example:
+
+```sh
+task build:compact-driver-sources SUITE=brcmfmac-pm-tests RECORDED_PATCHES=1
+task build:compact-driver-sources SUITE=brcmfmac-pm-tests RECORDED_PATCHES=1 APPLY=1
+```
+
+Unreferenced compiler trees are left alone. Historical compaction and the
+diagnostic.21 disk-space recovery are recorded in
+[report 188](docs/188-historical-driver-source-compaction.md).
 
 `APPLY=1` replaces each matching source directory with a relative cache link.
 It preserves outputs, configurations, logs and original evidence, and writes an
@@ -583,6 +1133,251 @@ concurrent changes, wake holds, abort/thaw replay and repeated cycles.
 use of the kernel freezer and the remaining hardware/wake-policy qualification.
 Both freezer options are required by the diagnostic configuration checks.
 
+The integrated AXP223 gauge-status correction has saved host-only checks:
+
+```sh
+task test:axp223-gauge-status   # Actual MFD/regmap paths, native and ARM32
+task check:axp223-gauge-driver  # Also compile the complete ARM MFD driver
+```
+
+They exercise live status, cache behavior and read failures without connecting
+to a device. [Report 186](docs/186-axp223-gauge-status-candidate.md) records the
+AXP223-only correction and validation limits. Diagnostic.21 includes it with
+updated inventory admission; build and installation progress are recorded in
+[report 187](docs/187-diagnostic21-gauge-integration.md). This is not an ADC or
+battery-calibration fix.
+
+The separate AXP223 control-provenance diagnostic has offline tasks:
+
+```sh
+task test:axp223-controls          # Real Linux UML/regmap/PM/debugfs tests
+task check:axp223-controls-driver # Also compile the complete ARM RSB MFD driver
+```
+
+These require the locked Linux archive and pinned builder already cached;
+both containers have networking and image pulls disabled. The candidate is
+default-off and outside the active image queue. It compares ordinary and
+bypassed REG33/34 reads without charger writes or cache repair. Its records
+can clarify register provenance, not calibrate battery voltage. The saved
+receipts live under `.local/build/axp223-controls-tests/`; missing receipts
+mean validation is incomplete. [Report 255](docs/255-axp223-control-provenance-diagnostic.md)
+records the PM/removal contract, test status and remaining integration gates.
+
+The clock-regression investigation has a bounded awake recorder:
+
+```sh
+task device:clock-observe
+```
+
+It reads 60,000 MONOTONIC/BOOTTIME/RAW sequences in fixed batches, retaining
+the first 32 anomalous sequences and total counts. It changes no clocksource,
+CPU affinity or PM setting and leaves the screen on. A device timeout bounds
+execution; both network routes and unchanged device state are checked afterward.
+It permits inspection of the known service-restart condition without granting
+PM admission. A clean short capture does not clear a historical clock failure.
+[Report 257](docs/257-awake-clock-regression-investigation.md) records evidence,
+measurement overhead and the remaining guard/clock-source investigation.
+The guard fault-handling change is now implemented and tested offline in
+[report 258](docs/258-battery-clock-fault-handling.md); the underlying clock
+regression remains unresolved and the live guard has not been replaced.
+
+The next clock diagnostic compares the Python APIs with explicit ARM EABI
+kernel calls:
+
+```sh
+task check:clock-abi       # Offline verification of the pinned syscall/time64 ABI
+task device:clock-compare # One awake 15000-sequence comparison; USB stays connected
+```
+
+The comparison verifies the live ABI before any explicit syscall and preserves
+raw discrepancies and CPU context. It changes no clocksource, affinity, service
+or PM setting and keeps the screen on. It does not establish that Python uses
+vDSO or qualify clock reliability. The first completed capture retains one
+750 ns RAW cross-path discrepancy, with unchanged device state and both routes
+working. Full offline checks pass. See
+[report 260](docs/260-clock-comparison-provenance.md) for exact readings and limits;
+[report 259](docs/259-clock-path-comparison.md) describes the recorder.
+
+If a protected checkpoint belongs to a previous inspection producer, this
+awake-only task can explicitly use that committed inspection bundle:
+
+```sh
+task device:clock-compare INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+```
+
+The revision must be a full local ancestor commit with the same collector as
+the current validator. All inspection source hashes and exact bundled bytes
+are saved privately. Select it only when it matches the checkpoint's original
+producer; this is not an automatic fallback or PM-admission override. Normal
+PM tasks still use current sources. Failed comparison inspections save
+`before-output.txt` or `after-output.txt`; `device:pm-inspect` saves
+`inspection-output.txt`, so the underlying remote error remains available.
+
+For installed clock-runtime attribution, use the saved awake inventory and
+offline report:
+
+```sh
+task device:clock-runtime INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+task report:clock-runtime CAPTURE=20261009T230039.014366Z
+```
+
+Use the new capture timestamp printed by the first task for subsequent runs.
+The inventory keeps the screen on, reads Python/libc/package/DT identity,
+downloads bounded hash-verified copies of the two public binaries, and checks
+device state and both network routes. It needs host `readelf`. The report uses
+the pinned Docker builder's ARM disassembler offline, with a read-only capture
+mount, and saves each attempt separately. No binary from the device is executed
+by the report. Raw results stay private under `.local/diagnostics/`.
+
+The first inventory confirms Python imports `__clock_gettime64`; mapped vDSO
+and static libc dispatch do not prove which branch served a recorded call.
+[Report 262](docs/262-clock-runtime-inventory.md) records the installed evidence
+and test results. [Report 261](docs/261-arm-clock-path-source-analysis.md)
+traces the pinned kernel counter/conversion paths and the remaining hypotheses.
+Neither task grants clock reliability or PM admission.
+
+The native comparator and its read-only vDSO inventory use a tested ARM binary:
+
+```sh
+task check:clock-native
+task device:clock-vdso BUILD=<new-build> RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+```
+
+Use the build/inventory timestamps produced on your checkout. The offline build
+verifies the pinned ARM time64 ABI and vDSO sources, runs host and ARM/QEMU
+fixtures, compiles the comparator and retains its ELF imports/disassembly.
+The device task verifies the binary and installed libc, resolves the actual
+mapped vDSO by its auxiliary-vector identity, then checks the versioned and
+unversioned clock exports without calling them. It keeps the screen on and
+preserves the PM state, original fault and protected kernel checkpoint.
+
+**On diagnostic.25, all four clock exports are unavailable.** The timer DT flag
+causes the pinned ARM kernel to suppress them at boot. The completed inventory
+is valid evidence of that absence; it is not a completed timing comparison.
+[Report 263](docs/263-native-clock-vdso-availability.md) corrects the earlier
+candidate-path interpretation and records the stopped comparison.
+
+`task device:clock-native BUILD=<build> RUNTIME_CAPTURE=<inventory>` prepares
+one fixed 15,000-sequence libc/syscall/vDSO comparison, with the optional explicit
+`INSPECTION_REVISION` above. It deliberately stops before sampling when the
+versioned vDSO entry cannot be verified. Do not run it repeatedly on the current
+image or enable that entry to make the test pass. It retains every integer
+reading when available; `task report:clock-native CAPTURE=<completed-capture>`
+reclassifies a completed comparison offline into a fresh report, checking the
+original raw-data hash. A vDSO inventory or stopped attempt cannot pass as a
+completed comparison. All raw results remain under ignored `.local/diagnostics/`.
+
+For this image's confirmed absence of clock exports, select the **explicit
+two-route experiment** instead:
+
+```sh
+task check:clock-native
+task device:clock-native-pair BUILD=<new-build> RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+# After a completed comparison, use its printed timestamp:
+task report:clock-native CAPTURE=<completed-capture>
+```
+
+This invokes `--libc-syscall` and records a distinct operation identity. It
+requires the verified mapped vDSO to have neither time32 nor time64 clock
+exports, then alternates libc and syscall403 three times per clock family.
+The fixed 15,000 sequences retain all 270,000 readings for MONOTONIC, RAW and
+BOOTTIME. Source/binary/libc checks, CPU endpoints, bounded runtime and protected
+before/after evidence use the existing workflow. The analyzer checks ordering
+within each route, between adjacent routes and across sequence boundaries.
+There is no automatic downgrade from the three-route task or clock/PM setting
+change. A clean short run does not clear a historical fault or qualify sleep.
+See [report 264](docs/264-native-libc-syscall-comparison.md).
+
+For deliberate coverage of **all four CPUs**, use the separately selected mode:
+
+```sh
+task check:clock-native
+task device:clock-native-cpus BUILD=<new-build> RUNTIME_CAPTURE=20261009T230039.014366Z INSPECTION_REVISION=be6c719c1b8e1637b69fa3e94a96b370adfb84d2
+task report:clock-native CAPTURE=<completed-capture>
+```
+
+Replace `<new-build>` with the timestamp printed by the build task. The CPU
+mode takes the same 270,000 readings over 300 batches, selecting CPU 0, 1, 2,
+then 3 repeatedly. It temporarily pins only its own diagnostic thread and
+restores the original mask after capture, including returned failure paths.
+All four CPUs must already be allowed. Every batch records its affinity
+readback before and after sampling, and every clock sequence records both CPU
+endpoints; a mismatch or failed operation stops the capture without retries.
+The existing `device:clock-native-pair` stays unpinned.
+
+The report separately counts same-core and cyclic cross-core sequence
+boundaries, preserving negative readings. The 100 ms batch pauses limit what
+these cross-core comparisons can establish about small offsets. This awake
+test neither blanks the display nor changes clocksource, governor, services or
+other processes' affinity. It does not clear the clock fault or admit PM tests.
+See [report 265](docs/265-native-clock-cpu-coverage.md).
+The subsequent [kernel source audit](docs/266-kernel-counter-timekeeping-audit.md)
+defines the missing counter/conversion evidence; further clean userspace
+captures alone do not establish the cause of the saved regressions.
+
+The kernel recorder has its own offline checks:
+
+```sh
+task test:clock-provenance       # UML: original conversion, scripted counter, KASAN/lockdep
+task check:clock-provenance      # Also compile ARM objects with diagnostics off/on
+task report:clock-provenance FILE=<saved-records.ndjson>
+```
+
+The kernel checks use the pinned local builder without network access; the
+report task replays a local file. None contacts the GameShell.
+Diagnostic.26 explicitly adds the canonical recorder to its image queue;
+ordinary builds without that selector omit it, and Kconfig defaults off.
+Replay preserves backwards results and rejects inconsistent arithmetic, but
+does not qualify clocks or PM. Installation and the first live capture remain
+pending; [report 272](docs/272-clock-provenance-image.md) records integration. See
+[report 267](docs/267-kernel-clock-provenance-candidate.md) for the record format,
+ownership, fixed limits, test evidence and instrumentation effects.
+
+The userspace boundary layer has separate offline commands:
+
+```sh
+task test:clock-boundary
+task check:clock-boundary
+task report:clock-boundary KERNEL=<kernel.ndjson> USERS=<users.json>
+```
+
+The check runs host replay/cleanup tests, native and ARM fixtures, then builds
+the raw ARM syscall/libc reader in the pinned offline container. Replay joins
+kernel ordinals to raw ABI bytes and native/Python integers, preserving
+backwards values and boundary mismatches. A complete capture is not a healthy
+clock result. These commands do not contact the GameShell. See
+[report 270](docs/270-clock-userspace-boundary.md).
+
+The deployment wrapper has a separate test and a guarded device task:
+
+```sh
+task test:clock-deployment
+# Requires a built, verified and installed instrumented image:
+task device:clock-boundary BUILD=<reader-build> RUNTIME_CAPTURE=<runtime-inventory>
+```
+
+The wrapper verifies the running kernel build ID/configuration, image and
+runtime binaries, same-process clock routes and recorder ownership. It saves
+original partial results, supervises one owned process with a host deadline,
+and replays successful downloads independently. Diagnostic.25 is refused
+before device access; the instrumented image remains to be built. Neither a
+complete capture nor a clean window clears the original fault or admits PM.
+[Report 271](docs/271-clock-capture-deployment.md) details admission and cleanup.
+
+The candidate ADC width correction has its own saved checks:
+
+```sh
+task test:axp-adc-width     # Actual helper/callers, exhaustive bytes, native + ARM32
+task check:axp-adc-drivers # Also compile ARM ADC/USB users and no-IIO USB fallback
+```
+
+These preserve valid 9–16-bit readings and test unused low-byte bits, register
+order and read failures. `task build` includes the regression task. Evidence
+is saved under `.local/build/axp-adc-width-tests/`;
+[report 192](docs/192-axp-adc-width-correction.md) records patch 0036's scope.
+It is not installed in diagnostic.21 and does not establish ADC coherence,
+calibration or a cause for the earlier voltage discrepancy.
+
 For the separate deferred-registration/unregister lifetime audit, use
 `task test:power-supply-lifetime`. It reproduces the original cancellation
 order and a test-only reordered comparison using actual core functions on
@@ -676,6 +1471,21 @@ Diagnostic.13 is installed; [report 91](docs/91-diagnostic13-preparation.md)
 records preparation and [report 93](docs/93-diagnostic13-installation.md) records
 the running baseline. Source-test evidence is under
 `.local/build/brcmfmac-{irq,lifecycle}-worker-tests/`.
+
+The isolated mailbox-error candidate has separate offline checks:
+
+```sh
+task test:brcmfmac-mailbox          # Actual mailbox + worker, native/ARM32 normal and DEBUG
+task check:brcmfmac-mailbox-drivers # Also compile the complete normal/debug ARM driver
+```
+
+These test candidate 0039 against the complete locked image source queue in
+separate scratch storage. They inject failed reads and acknowledgements, verify
+that invalid mailbox data cannot publish state, and retain valid-message and
+worker cleanup checks. Evidence is under `.local/build/brcmfmac-mailbox-tests/`.
+The candidate lives in `kernel/candidates`, outside `task build` and the active
+image patch queue. [Report 254](docs/254-brcmfmac-mailbox-error-candidate.md)
+records coverage and the integration/hardware qualification still required.
 
 Country-request ordering across suspend has saved checks:
 
@@ -773,6 +1583,67 @@ qualify safe removal. The task introduces no driver patch and is not an image
 build gate. [Report 139](docs/139-musb-teardown-power-audit.md) documents the
 coverage, modeled boundaries and follow-on implementation requirements.
 
+On `work/musb-request-resume`, the NEO-108 restart candidate has these
+repeatable host-only checks (run the build tasks sequentially):
+
+```sh
+task test:musb-request-resume          # Native/ARM32 request-progress scenarios and failure controls
+task test:musb-restart-kunit           # Actual driver in Linux UML, KASAN and lockdep; no USB hardware
+task check:musb-sleep-configs          # Updated PM/callback regressions plus six ARM configurations
+task check                           # Runtime/tool unit tests, compiled helpers and shell lint
+```
+
+The KUnit task builds the full MUSB driver with test-only hooks kept out of
+the production patch queue. It uses real USB giveback, locking and runtime-PM
+accounting; the hardware restart is intercepted and controller resume state
+is staged. Its retained kernel, configuration, log and test report are recorded
+in `.local/build/musb-restart-kunit/evidence.json`. The native/ARM32 receipt
+is `.local/build/musb-request-resume-tests/evidence.json`; the ARM configuration
+receipt is `.local/build/musb-sleep-tests/matrix-evidence.json`. These checks
+do not install an image or qualify physical USB or system sleep. See
+[report 225](docs/225-musb-resume-request-ownership.md) for results and limits.
+
+The separate failed-queue DMA rollback candidate has explicit offline tasks:
+
+```sh
+task test:musb-queue-dma          # Actual mapping/queue functions, native + sanitizers + ARM32
+task check:musb-queue-dma-drivers  # Also compile board and DMA-enabled ARM driver objects
+```
+
+This candidate lives under `kernel/candidates`, outside the active image patch
+queue and `task build`. It returns buffer ownership when deferred-work
+allocation fails; success paths and the installed image remain unchanged.
+Evidence is saved under `.local/build/musb-queue-dma-tests/`.
+[Report 253](docs/253-musb-queue-dma-rollback-candidate.md) records passing
+checks and the later source-suite/image integration requirements. It does not
+complete controller teardown or qualify DMA hardware on the PIO-only GameShell.
+
+For the CPI WFI s2idle candidate in diagnostic.24, use:
+
+```sh
+task test:cpuidle-s2idle  # Actual entry/scheduler/registration/tick source, native + ARM32
+task check:cpuidle-kernel # Also compile four ARM configurations and inspect WFI assembly
+```
+
+These tasks run locally and save evidence in `.local/build/cpuidle-s2idle-tests/`.
+Kconfig defaults the board driver off; diagnostic.24 explicitly enables it with
+the BOOTTIME battery prerequisite and a new kernel identity. The state-0 core
+correction is global, including when the board driver is disabled. `task build`
+includes the source regression. [Report 134](docs/134-cpi-wfi-s2idle-candidate.md)
+records the original source candidate; [report 217](docs/217-wfi-s2idle-image-integration.md)
+records integration and the remaining hardware gates.
+
+Before running PM checks on this image, `task device:sleep-clock-inspect` saves
+the live architecture-timer DT, active timers and all four CPU-idle inventories.
+PM admission requires the exact enabled WFI state on every CPU. Actual RTC-wake
+qualification additionally requires each CPU's grouped `state0/s2idle/usage`
+counter to advance and paired trace/clock evidence of frozen timekeeping.
+Awake rehearsal must not advance those counters. The offline sleep report
+recomputes these checks from original evidence. Counter duration is not physical
+residency, and these gates do not establish energy savings or CPU/DRAM power-off.
+Retain the diagnostic.23 worktree/tools for its installed image; source-bound
+receipts must not be carried across the image change.
+
 For the opt-in USB polling experiment, use:
 
 ```sh
@@ -829,7 +1700,10 @@ task device:wifi-firmware-connected SECONDS=120 # Four reconnections and Wi-Fi S
 task device:wifi-recovery SECONDS=120 # Installed firmware: four reconnections, unavailable/connected windows
 task device:rsb-compare SECONDS=120 DELAY_MS=100 # USB-powered bus-delay comparison
 task device:rsb-restore # Stop/recover an interrupted RSB comparison
-task device:pm-inspect # Read-only capabilities, counters and device links over USB
+task device:pm-inspect # Read capabilities/counters; update protected kernel evidence; no PM
+task device:pm-inspect ROUTE=wifi # Same inspection through the configured Wi-Fi route
+task device:charge-inspect # Read-only documented charger/gauge inventory; USB remains connected
+task device:charge-baseline SECONDS=120 # Two-minute awake charging trace; USB stays connected
 task device:pm-test STAGE=freezer # Diagnostic.7 only, owner present; one debug cycle
 task device:pm-test STAGE=devices CYCLES=1 # Only after the freezer test passes
 task device:wifi-trace-smoke # One awake reconnect; verify metadata recorder and restoration first
@@ -1136,6 +2010,8 @@ tailnet endpoint plus `GAMESHELL_WIFI_VIA_MAC=1`. Run `task device:wifi-config`.
 The task always uses USB for the change, refreshes private build provisioning,
 and verifies Wi-Fi SSH against the provisioned host key, same boot and new
 Wi-Fi address before committing. It updates only `GAMESHELL_IP` in `.env`.
+If a worktree's `.env` links to the shared file, the update preserves that link
+and atomically replaces its target; later credential edits remain shared.
 No image rebuild or reboot is needed; the Wi-Fi service restarts.
 
 Credentials travel by SFTP in a private directory, not in command arguments or
@@ -1284,15 +2160,25 @@ further dependency analysis, not an energy-saving claim. See
 
 ### Staged power-management diagnostics
 
-Use `device:pm-inspect` for read-only kernel capabilities, runtime counters and
-RSB supplier/consumer links. It also works on diagnostic.6, where sleep support
-is absent. Full private evidence includes radio/network state and kernel logs;
-only a small capability summary is printed. The task never enters suspend.
+Use `device:pm-inspect` to read kernel capabilities, runtime counters and
+RSB supplier/consumer links. Full private evidence includes radio/network state
+and kernel logs; only a small capability summary is printed. The task never
+enters suspend or changes hardware settings. It now creates/updates the bounded,
+root-owned kernel-evidence checkpoint described below. The new collector's
+hardware qualification is pending; older diagnostic-image inspections remain
+documented in their historical source revisions.
+USB is the default transport; `ROUTE=wifi` selects the configured Wi-Fi route
+(including the Mac relay when enabled in `.env`). The private capture's
+`route.json` records the selected route even if connection fails. It does not
+retry through another route. This option applies only to awake inspection;
+active PM tests and restoration retain their existing USB requirement. Direct
+tool users can pass `--inspect --inspect-route wifi`.
 
 `device:pm-test` requires the currently locked image/kernel/radio, stock USB
 polling, normal sleep masks, SDIO power retention, USB power, healthy services
-and working USB/Wi-Fi SSH. Be present for the initial hardware tests and retain
-the preceding verified recovery image. Leave USB connected, the Mac awake, Wi-Fi
+and working USB/Wi-Fi SSH. Use an owner observer or the authorized camera
+workflow below for visual display checks, and retain the preceding verified
+recovery image. Leave USB connected, the Mac awake, Wi-Fi
 available and the controls untouched. Start with one `STAGE=freezer`, then one
 `STAGE=devices`. After those pass and the console/backlight return normally,
 `STAGE=devices CYCLES=4` repeats four identical cycles with 20 seconds between
@@ -1488,6 +2374,15 @@ PM recovery tasks also restore audio after an audio-assisted keypad run.
 The owner observed a significant delay on every button confirmation: each cue
 powers the amplifiers up again and repeats the upstream 700 ms startup wait.
 Improving that latency is recorded for later investigation.
+Completed cues now save separate software timings for waveform preparation,
+idle checks, mixer setup and playback. Use `task report:audio-timing --
+.local/diagnostics/<capture>/result.json` (or a PM `cycle-1/result.json`) to
+summarize an existing result without contacting the device or playing sound.
+Old cues retain their original total interval with no invented phase timings;
+the report does not measure acoustic onset or qualify a failed result.
+`task test:audio-timing` runs the offline playback/timing regressions.
+[Report 249](docs/249-speaker-confirmation-timing.md) explains the known delays,
+new measurements and remaining optimization work. Playback behavior is unchanged.
 See [report 65](docs/65-speaker-confirmation-cues.md) for routing, levels,
 recovery and qualification status.
 
@@ -1560,12 +2455,85 @@ three low readings, invalid/missing telemetry, charging or capacity recovery,
 sampling gaps and retry after a rejected shutdown request. Output is retained
 privately as `battery-policy.txt`.
 
+The BOOTTIME contract covers sleep-inclusive reading age, interrupted reads and
+low-reading sequences across resume; [report 133](docs/133-battery-boottime.md)
+records its introduction. The next guard candidate adds schema 3 and retained
+clock-fault evidence. On a clock failure it publishes a degraded sample with
+unusable timestamps, resets the low-reading history and preserves first/latest
+raw observations and a count in `battery.json`. That record survives service
+restarts within the boot. Later good samples can rebuild battery protection,
+but the retained fault continues to block diagnostic admission. No clock value
+is clamped and no clocksource is changed.
+
+`task check` runs the local simulations and consumer checks, including every
+clock-read failure boundary and restart retention. The matching age tools read
+schema 2 and 3; older schema-2 tools reject the new producer. This candidate is
+not installed on diagnostic.25, so `device:battery-check` will intentionally
+reject the source mismatch until a matching guard is deployed. Do not restart
+the live service or clear its original failure to make qualification pass.
+[Report 258](docs/258-battery-clock-fault-handling.md) records implementation,
+validation and the remaining clock-cause/hardware work.
+
 The checks run as the SSH user with a 60-second bound. Temporary state replaces
 the real `/run/gameshellneo` path inside that process, and a test function
 records every would-be shutdown command. The live battery service continues
 running; no real shutdown request, charger write or gauge change occurs. This
 qualifies simulated behavior of the installed software, not physical low-battery
 shutdown reserve, percentage accuracy or charging limits. It needs no image rebuild.
+
+`device:charge-inspect` captures one awake charger/gauge inventory over USB.
+Keep USB connected. It checks the matching image/kernel and AXP223 identity,
+reads existing battery/input sysfs telemetry and eleven documented registers,
+and saves the original JSON plus helper/source-lock hashes under
+`.local/diagnostics/`. No charger, gauge, cache, screen or sleep setting is written.
+The local PM lock prevents overlap with another saved PM workflow.
+
+The targeted regmap reads verify the Linux 6.18.54 map layout and use exact
+seven-byte reads without buffered read-ahead. Undocumented charge registers
+E2/E3 and IRQ status are excluded. Nonvolatile fields, including calibration
+status on diagnostic.20 and configured capacity on all supported images, are
+explicitly labeled as possibly cached. Schema 4 accepts only the audited pairs
+diagnostic.20/kernel `6.18.54-gameshellneo19` and diagnostic.21/kernel
+`6.18.54-gameshellneo20`, requiring cached and volatile B8 respectively,
+plus diagnostic.22/kernel `6.18.54-gameshellneo21` with volatile B8 and the
+corrected ADC width mask. The report preserves both masked and legacy unmasked
+formulas and selects `linux_helper_formula_uv` from the admitted image's behavior.
+Unexpected pairings or observed cache metadata are rejected before register reads.
+A completed
+inventory is not a charging test: instantaneous current and percentage do not
+measure charge gained while asleep. See [measurement design](docs/180-sleep-charge-measurement-design.md)
+and [inventory validation](docs/181-charge-inventory-validation.md). The inventory
+preserves raw REG34 and battery-voltage bytes 78/79. REG34 bit 2 is recorded without
+an enabled/disabled interpretation because the manuals disagree. The voltage
+bytes are separate reads: masked and existing Linux formula results are
+diagnostic comparisons, not coherent or calibrated samples. The
+[extended inventory report](docs/185-axp223-voltage-inventory.md) records the
+source limits, tests and historical hardware observation. Schema 3 moves B8's
+decoded controls/status into `assessment.gauge_control` with its explicit source
+label; E0/E1 capacity stays under `cached_configuration`. The embedded inventory
+in `device:charge-baseline` uses the same schema; previous captures stay unchanged.
+
+`device:charge-baseline SECONDS=120` records a connected, awake baseline with
+one sample every ten seconds. `SECONDS` must be a multiple of ten from 60 to
+600. Keep USB connected and the screen/controls unchanged. It uses the same
+read-only inventory first, then directly samples battery and external-power
+sysfs values with BOOTTIME/MONOTONIC brackets and boot/PM counters. It rejects
+detected sleep, missing/late samples, slow reads, lost external power, discharge,
+invalid battery readings, low capacity, excess temperature, taint, and observed
+changes to brightness or charger/input-limit settings. No setting is changed.
+
+Original JSON-lines observations (including a rejected sample), source hashes
+and requested duration remain private under `.local/diagnostics/`. A remote
+deadline bounds execution independently of SSH collection. Lost SSH or partial
+output cannot pass and does not cause an automatic rerun. A successful summary
+includes a trapezoidal **uncalibrated sampled charge estimate** for the awake
+interval only; it does not account for unseen current variation between samples
+and is not a sleep-charge measurement. A full-battery plateau is not evidence
+that charging during sleep is broken. [Baseline validation](docs/182-awake-charging-baseline.md)
+records the initial full-battery result. The subsequent
+[partial-discharge and charging session](docs/183-partial-discharge-charging-validation.md)
+passed an awake baseline below 100%, while preserving an earlier transport
+failure and the unresolved voltage/gauge and sleep-charge qualifications.
 
 `device:idle-sample ROUTE=wifi SECONDS=600` records a repeatable awake-idle
 scenario after one minute of settling. Unplug USB, keep Wi-Fi associated and
@@ -1658,6 +2626,24 @@ its health every thirty seconds. A changed boot/CPU set/brightness/governor,
 external power, invalid/stale monitoring, reported capacity at or below 20%,
 excessive temperature or kernel taint fails the run. Failure ends profiling,
 not the running system.
+
+In diagnostic.24, idle, counter, governor and RSB
+measurements also reject observed system sleep/PM activity using bounded clock
+observations and suspend counters. Existing recovery still restores temporary
+settings. New comparisons require the recorded proof; historical USB reports
+remain readable with a label showing that sleep observations were absent.
+This includes the matching BOOTTIME battery producer/tools from NEO-100; do not
+use these battery consumers against legacy image samples. See
+[report 135](docs/135-awake-measurement-clock-guards.md) for detection limits.
+
+```sh
+task test:awake-clock                 # Local simulated interruptions and cleanup
+task device:awake-clock-check ROUTE=wifi # Short read-only clock/PM check; no sleep/settings changes
+```
+
+The device check saves observations and source hashes in its printed private
+capture directory. It can run independently of the battery-producer version;
+passing it does not qualify a complete power comparison or sleep recovery.
 
 The private `power-profile.jsonl` contains before/after CPU accounting,
 interrupts, softirqs, process CPU ticks, Wi-Fi packet counters/power-save state,
@@ -1769,14 +2755,14 @@ qualify NZ operation or the radio firmware's country mapping.
 
 ### Camera observation of the GameShell screen
 
-The MacBook's built-in camera can provide independent visual evidence while
+The MacBook's selected camera can provide independent visual evidence while
 the GameShell sleeps, reboots or temporarily loses SSH. Position the GameShell
 screen clearly in view and keep the Mac open, awake and logged into its desktop.
 Set up the video-only helper once:
 
 ```sh
 task mac:camera-setup
-task mac:camera-status
+task mac:camera-status                  # Permission and available video cameras
 task mac:camera-capture                  # One still after exposure settles
 task mac:camera-capture SECONDS=30 FPS=2  # A bounded sequence of JPEG frames
 ```
@@ -1788,8 +2774,13 @@ System Settings → Privacy & Security → Camera, then rerun setup. Repeated se
 reuses an unchanged app. Changed helper source requires setup again and may
 require permission again. No login item or persistent camera service is installed.
 
-The helper selects the built-in `FaceTime HD Camera`, captures no microphone
-audio and closes its camera session on completion. `SECONDS=0` exports a still;
+Set `NEO_CAMERA_NAME='Razer Kiyo'` in `.env` to select the owner's external camera,
+using its exact name from `task mac:camera-status`. Without a preference the
+default remains `FaceTime HD Camera` for existing setups. A missing or ambiguous
+camera fails explicitly; the helper never falls back to another camera.
+For a one-off override, use `python3 tools/mac-camera.py capture --camera 'Razer Kiyo'`.
+Status lists cameras without starting a capture session. The helper captures no
+microphone audio and closes its camera session on completion. `SECONDS=0` exports a still;
 sequences accept 1–300 seconds and 1–5 exported frames per second. The helper
 announces readiness only after saving its first image, following 1.5 seconds
 of exposure settling. Start an authorized hardware test after that readiness
@@ -1809,6 +2800,17 @@ sub-second resume timing or power consumption. The camera cannot observe tests
 while the Mac itself sleeps. These commands provide capture tooling; visual
 review and other hardware acceptance gates remain explicit.
 [Report 166](docs/166-mac-camera-observation.md) records setup evidence and limits.
+[Report 268](docs/268-razer-kiyo-observation.md) records the external Kiyo's
+verified still/sequence capture and readable screen with the current positioning.
+
+The owner's current authorization in `AGENTS.md` lets a verified camera
+sequence replace a separate human-ready/screen-return exchange for simple
+screen observations. Inspect a fresh baseline, wait for the sequence's readiness,
+then run one authorized test and inspect its actual images before continuing.
+Retain the long warning tone; video-only evidence cannot confirm its audibility.
+Cable/card/button actions still need the owner, and a camera cannot override a
+failed device health check. [Report 256](docs/256-camera-pm-preflight.md) records
+the first current-branch preflight and its independent battery-service blocker.
 
 ### Backing up the original card
 
@@ -1993,12 +2995,13 @@ RTC and late/noirq preparation is repeatable:
 task device:rtc-inspect  # RTC time and logical alarm; no change
 task device:rtc-smoke    # Ten-second alarm while awake, then restore
 task device:rtc-restore  # Explicit recovery of an interrupted owned alarm
-task device:pm-platform # One attended late/noirq debug cycle; never real sleep
+task device:pm-platform # One observed late/noirq debug cycle; never real sleep
 ```
 
 The platform task requires the wake-fixed image, same-boot RTC qualification,
-power-key ownership and complete PM traces. Run it only after explicit observer
-readiness. [Report 102](docs/102-rtc-and-platform-diagnostic-preparation.md)
+power-key ownership and complete PM traces. Run it after owner readiness or
+verified camera readiness for the authorized visual test, as described above.
+[Report 102](docs/102-rtc-and-platform-diagnostic-preparation.md)
 records the awake evidence, guards and prepared hardware sequence.
 
 The first actual-s2idle experiment has its own commands:
@@ -2016,12 +3019,50 @@ task device:sleep-collect RUN=<original-run-id> ROUTE=wifi
 task mac:usb-inspect
 ```
 
+During an active attempt, malformed JSON or invalid text encoding in a
+collection reply is saved privately, then the recorder continues retrieving
+that same run within the original deadline. Sleep is still submitted only
+once. Decoded identity, clock or result-validation errors stop the workflow.
+The first four bad replies retain up to 1 MiB each in
+`collection-bad-reply-*.bin`; `collection-bad-replies.jsonl` records each reply's
+length, SHA-256, decode offset and any capture truncation. These files are mode
+0600 and may contain device logs; keep them private. Failure to save this
+evidence stops collection. Manual `device:sleep-collect` saves a malformed
+reply and fails with the original run ID, without automatically retrying.
+[Report 245](docs/245-sleep-collection-reply-recovery.md) records the offline
+regressions; the interrupted historical battery trial remains unqualified as
+a complete host workflow.
+
 The rehearsal never writes the sleep state. Actual sleep requires matching
 helper sources, boot/image, RTC and late/noirq qualification, unchanged SDIO
 references, healthy USB/Wi-Fi and independent power-key protection. It arms a
-30-second RTC deadline, checks the wakeup counter, and submits at most once.
+30-second RTC deadline by default, checks the wakeup counter, and submits at most once.
 Keep USB connected and all controls untouched. An early wake or incomplete
 result fails qualification; do not automatically repeat the command.
+
+The one-shot USB and battery tasks also support `ALARM_SECONDS=60`, with the
+same value required for their awake rehearsal and actual attempt. The first
+observed USB trial passes ([report 243](docs/243-first-60-second-usb-rtc-trial.md));
+the first battery device trial also passes, but its interrupted host collection
+leaves full workflow qualification and repeatability pending
+([report 244](docs/244-first-60-second-battery-rtc-trial.md)). It requires a fresh
+debug anchor, matching helper sources and conservative direct battery checks
+(more than 50% and at least 3.8 V before entry). It records immediate awake
+battery endpoints without deriving sleep energy. Durations above 60 seconds,
+extended cable-transition tests and extended automatic batches are rejected.
+
+```sh
+task test:sleep-protocol  # Offline duration, evidence and failure regressions
+task device:sleep-rehearse ALARM_SECONDS=60 QUALIFICATION=<fresh-history.json>
+# After a passing rehearsal and fresh observer readiness:
+task device:sleep-rtc ALARM_SECONDS=60 QUALIFICATION=<fresh-history.json> REHEARSAL=<run-id> ATTENDED=1
+```
+
+For battery-only use, add `ALARM_SECONDS=60` to both corresponding battery tasks
+below and retain `UNPLUGGED=1`. Service and collection budgets track the selected
+duration; they are not wake sources or sleeping battery protection. No card
+swap is required. [Report 242](docs/242-bounded-rtc-duration-protocol.md) records
+the limits, offline tests and pending USB-then-battery hardware sequence.
 
 Repeat testing has a bounded batch command. After a fresh same-source awake
 rehearsal and observer readiness, run up to four cycles together:
@@ -2100,8 +3141,9 @@ needed. Normal product sleep remains masked. See
 [report 150](docs/150-battery-rtc-qualification.md) for validation and live limits.
 
 USB changes during sleep have two separately qualified one-shot scenarios.
-The removal scenario has one hardware pass on diagnostic.19; attachment
-qualification is in progress.
+Diagnostic.20 has one attended pass in each direction, recorded in
+[reports 171](docs/171-diagnostic20-usb-attachment-sleep-validation.md) and
+[173](docs/173-diagnostic20-usb-removal-sleep-validation.md).
 Both submit and collect through Wi-Fi, keeping an uncertain USB result from
 triggering a second sleep. The Mac must remain awake on the same Wi-Fi; this
 is not the Mac-sleep test. Start each scenario with its own fresh, reviewed
@@ -2138,15 +3180,21 @@ Removal must finish with absent external power, UDC/carrier/PHY disconnected,
 valid battery discharge and independent Wi-Fi recovery. Attachment must finish
 with external power, configured USB/carrier/PHY and independent USB **and**
 Wi-Fi recovery. The before/entry states must match; a premature transition
-rejects admission before the handshake or sleep write. Attachment requires one
-AC/VBUS insertion dispatch per supply with no opposite events. Diagnostic.19's
-explicit `masked-removal-v1` policy permits zero or one dispatch per removal
-handler, with no insertion dispatch, regression or extra counts: a masked
-removal status can be acknowledged before its handler runs. All disconnected
-endpoint and Wi-Fi recovery gates still apply. Older images retain the exact
-count policy. [Report 154](docs/154-usb-sleep-session-retirement.md) records the
-source evidence and prospective criteria. Neither these counts nor screen
-darkness measures the electrical-edge time.
+rejects admission before the handshake or sleep write. Diagnostic.19 requires
+one AC/VBUS insertion dispatch per supply with no opposite events. Its explicit
+`masked-removal-v1` policy permits zero or one dispatch per removal handler,
+with no insertion dispatch, regression or extra counts: a masked removal status
+can be acknowledged before its handler runs. Older images retain the exact
+count policy ([report 154](docs/154-usb-sleep-session-retirement.md)).
+
+Diagnostic.20's prospective `masked-cable-v2` policy also permits zero or one
+insertion dispatch per supply. It requires matching image provenance and both
+supply wake controls disabled before and after the test. Opposite events, extra
+counts and regressing counts still fail. All RTC, endpoint and independent route
+recovery gates remain required. [Report 166](docs/166-stay-asleep-usb-charging-policy.md)
+records the startup policy and source tests; reports 171 and 173 record the
+first attended attachment and removal passes.
+Neither handler counts nor screen darkness measures the electrical-edge time.
 
 RTC delivery is checked immediately at return, never after an awake wait.
 An early wake, another wake source or incomplete recovery is a failed RTC
@@ -2174,7 +3222,9 @@ automated failure into a pass. Even a successful attended result leaves precise
 electrical-edge timing and energy unqualified.
 
 New helper sources require fresh qualification; report150's consumed chain
-cannot admit these tasks. No new image/card flash is required. Failure can
+cannot admit these tasks. The original helper-only addition needed no card
+flash; diagnostic.20 adds an image-bound startup policy and requires a new
+installation and baseline. Failure can
 retain the existing diagnostic power-key suppression pending review; console,
 RTC, trace and PM cleanup remains bounded and ownership-checked. See
 [report 151](docs/151-usb-cable-sleep-diagnostics.md) for implementation and limits.
@@ -2191,6 +3241,67 @@ The first attachment attempt returned early with supply insertion wake enabled
 ([report 165](docs/165-diagnostic19-usb-attachment-early-wake.md)). NEO-117 tracks
 the owner's selected stay-asleep-and-charge policy and fresh qualification.
 Both historical failures remain unchanged.
+
+For repeat coverage, the saved guided batch uses **remove → attach → remove →
+attach**, starting and ending connected. It requires diagnostic.20's qualified
+`masked-cable-v2` image/wake policy and one fresh seven-debug baseline. Each
+step runs its own matching awake RTC rehearsal, then exactly one actual sleep.
+The screen identifies the cycle and cable action; the long warning precedes
+darkness. The runner stops after collection and a separate endpoint inspection
+to await the owner's observation. It never advances on a timer or interprets
+silence as confirmation.
+
+```sh
+# After the fresh debug baseline passes, explain cycle 1 and confirm readiness.
+# Keep USB connected through the awake rehearsal; follow the later screen prompt.
+task device:sleep-cable-batch-start QUALIFICATION=<fresh-history.json> ATTENDED=1 CABLE_ACTION=1
+
+# Use the printed private batch directory for every remaining command.
+task report:sleep-cable-batch-status BATCH=<batch-directory>
+
+# Only after the owner confirms one action during darkness and normal return:
+task report:sleep-cable-batch BATCH=<batch-directory> OBSERVATION=during-dark DISPLAY=normal
+
+# After readiness for the next described direction; runs just that next step.
+task device:sleep-cable-batch-next BATCH=<batch-directory> ATTENDED=1 CABLE_ACTION=1
+# Repeat observe/next through cycle 4, then record its final observation.
+```
+
+Use the same honest `OBSERVATION`/`DISPLAY` choices as the one-shot report above.
+An uncertain action, abnormal display, failed recovery or incomplete command
+stops the session; a later answer cannot overwrite the first observer report.
+The final observation marks the batch complete and does not run a fifth cycle.
+Readiness includes leaving the cable in the preceding cycle's ending state:
+unplugged after removal, connected after attachment. Do not perform an extra
+awake reconnect between steps. The previous physical observation and fresh
+cable/IRQ checks establish the next starting state; the batch does not require
+another `UNPLUGGED` flag. Every step still requires explicit `ATTENDED=1` and
+`CABLE_ACTION=1`.
+
+Keep the Mac awake on the same Wi-Fi and leave all buttons untouched. A removal
+must prove Wi-Fi recovery while USB stays absent; an attachment must prove
+both routes. Each original result, rehearsal, observation and endpoint capture
+is retained beneath its numbered cycle directory. Same-source/boot/image,
+PM/RTC continuity and durable single-successor checks bind the sequence.
+These records cannot be used to extend an ordinary connected-sleep chain.
+
+On a failed or interrupted step, read `batch.json` and the original
+`cycle-N/awake/run.json` or `cycle-N/sleep/run.json`, then use
+`task device:sleep-collect RUN=<original-run-id> ROUTE=wifi`. Collection never
+retries PM or advances the batch. A `running`/`failed` batch is deliberately
+not resumable through `next`; preserve it for diagnosis. If a command stopped
+before creating a run ID, do not invent one or submit another attempt through
+that session. The old one-shot tasks retain their original admission rules.
+
+This tooling change needs no image build or card swap. The previous consumed
+baselines and rehearsals cannot admit it; a new baseline is required.
+[Report 174](docs/174-guided-cable-sleep-batch.md) records the implementation and
+offline tests. The first full attended four-cycle batch now passes on
+diagnostic.20, with both insertions staying dark until RTC wake, correct cable
+endpoints and all owner observations accepted
+([report 178](docs/178-guided-cable-batch-hardware-validation.md)). This is bounded
+coverage on one boot; charging during sleep, energy, Mac sleep and power-button
+wake remain separate qualifications. Normal product sleep stays disabled.
 
 Diagnostic inspections send their Python helper source over SSH standard input.
 Only the short interpreter command and its arguments enter the usual sudo command
@@ -2210,10 +3321,36 @@ task report:journal-volume -- .local/journal-volume.jsonl
 
 The offline report hashes the original and counts message bytes in fixed categories;
 it does not equate uncompressed text with disk usage or infer a deletion cause.
-Keep the raw capture private. Missing boot logs still fail PM admission: do not
+Keep the raw capture private. Missing evidence still fails PM admission: do not
 clear logs, substitute old records or repeat PM to bypass that failure.
 [Report 152](docs/152-diagnostic-command-log-volume.md) records the stopped
 prerequisite sequence, excessive command logging and the transport correction.
+
+PM snapshots now preserve sequence-numbered `/dev/kmsg` records independently
+of the general journal. The initial anchor requires a complete kernel sequence
+from zero and an observed kernel firmware identity. A root-owned checkpoint
+retains that prefix and exact later records, bound to boot/image/firmware and
+collector/PM-helper source hashes. Gaps, ring overruns, changed overlap, source
+changes and storage failures stop admission; no journal fallback or silent
+reset is permitted. Existing fault checks remain enforced.
+
+The checkpoint is capped at 4 MiB, with at most another 4 MiB staging file;
+there is no background monitor. PM inspection updates this diagnostic storage
+but leaves hardware settings unchanged. Old results remain historical and
+cannot qualify the new collector. Use `task test:kernel-evidence` for the
+offline failure/retention tests, and `task check` for the full suite.
+[Report 247](docs/247-bounded-kernel-evidence.md) explains bounds, private
+evidence preservation and interruption recovery.
+
+Use `task device:kernel-evidence-smoke` for the awake append/readback check.
+It writes one userspace/debug marker to `/dev/kmsg`, verifies its exact sequence
+and exclusion from kernel-only text, checks protected checkpoint storage and
+unchanged device settings, and independently proves both USB and Wi-Fi access.
+It does not run PM, play audio or blank the screen. An uncertain marker write
+is never automatically repeated; preserve the private diagnostic files on
+failure. [Report 248](docs/248-kernel-evidence-awake-validation.md) records the
+passing awake board check. Fresh attended PM qualification remains pending;
+no image/card swap is needed for these diagnostic helper changes.
 
 [Report 119](docs/119-guarded-rtc-sleep-preparation.md) records admission,
 recovery limits and the two successful awake rehearsals. Ordinary sleep remains

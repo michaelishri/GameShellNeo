@@ -2,8 +2,10 @@
 import re
 
 
-def extracted(sdio, header, function, bcmsdh='', hardened=False):
+def extracted(sdio, header, function, bcmsdh='', hardened=False, mailbox=False):
     text = function(header, 'static inline bool brcmf_sdiod_io_blocked(')
+    if mailbox:
+        text += function(sdio, 'static int brcmf_sdio_hostmail(')
     if hardened:
         text += function(bcmsdh, 'void brcmf_sdiod_quiesce_irqs(')
         text += function(sdio, 'static void brcmf_sdio_dpc_failed(')
@@ -29,13 +31,13 @@ def definitions(sdio, header):
                 continue
             while line.endswith('\\\n'):
                 line += next(lines)
-            if match[1].startswith(('SBSDIO_', 'I_', 'CLK_')) or match[1] in {
-                    'SD_REG', 'HOSTINTMASK'}:
+            if match[1].startswith(('SBSDIO_', 'I_', 'CLK_', 'HMB_DATA_')) or match[1] in {
+                    'SD_REG', 'HOSTINTMASK', 'SMB_INT_ACK', 'SDPCM_PROT_VERSION'}:
                 text += line
     return text
 
 
-def variants(good, function, mutate_once, hardened=False):
+def variants(good, function, mutate_once, hardened=False, mailbox=False):
     isr = function(good, 'void brcmf_sdio_isr(')
     status = function(good, 'static int brcmf_sdio_intr_rstatus(')
     dpc = function(good, 'static void brcmf_sdio_dpc(')
@@ -57,7 +59,10 @@ def variants(good, function, mutate_once, hardened=False):
         ('lost_read_error', status, 'if (ret != 0)', 'if (false && ret != 0)'),
         ('lost_frame_service', dpc, 'brcmf_sdio_readframes(bus, bus->rxbound);',
          'if (false) brcmf_sdio_readframes(bus, bus->rxbound);'),
-        ('lost_mailbox_service', dpc, 'intstatus |= brcmf_sdio_hostmail(bus);',
+        ('lost_mailbox_service', dpc,
+         'err = brcmf_sdio_hostmail(bus, &mailbox_status);' if mailbox else
+         'intstatus |= brcmf_sdio_hostmail(bus);',
+         'err = 0; mailbox_status = 0;' if mailbox else
          'if (false) intstatus |= brcmf_sdio_hostmail(bus);'),
         ('lost_leftover_status', dpc, 'atomic_or(intstatus, &bus->intstatus);', ''),
         ('lost_worker_failure_gate', worker,

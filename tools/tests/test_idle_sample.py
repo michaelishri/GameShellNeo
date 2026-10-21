@@ -4,6 +4,7 @@ import signal
 import tempfile
 import unittest
 from unittest.mock import patch
+from awake_fixtures import window
 
 source = Path(__file__).resolve().parents[1] / 'sample-idle.py'
 spec = importlib.util.spec_from_file_location('idle_sample', source)
@@ -14,7 +15,7 @@ spec.loader.exec_module(idle)
 class IdleUnits(unittest.TestCase):
     @staticmethod
     def reading(seconds, current_ua):
-        return dict(monotonic_seconds=seconds, current_ua=current_ua, voltage_uv=4000000,
+        return dict(monotonic_seconds=seconds, awake_window=window(seconds), current_ua=current_ua, voltage_uv=4000000,
                     capacity_percent=80, frequency_khz=120000, temperature_millic=40000)
 
     def test_one_amp_hour_at_four_volts(self):

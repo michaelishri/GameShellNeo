@@ -1,0 +1,56 @@
+From: GameShellNeo contributors
+Subject: [PATCH] mfd: axp20x: read AXP223 gauge calibration status uncached
+
+AXP223 register B8 mixes gauge controls with bit 4, which reports that
+capacity calibration is in progress (AXP223 datasheet v1.1, page 49).
+The shared AXP22x map currently caches the whole register, so later reads
+can return a stale calibration status.
+
+Use an AXP223-specific volatility callback that extends the existing
+ranges by B8 alone. Preserve the register limits, write access, cache
+type and other variants' configurations. This does not enable calibration,
+change charging policy or establish ADC accuracy.
+
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -152,6 +152,14 @@
+ 	.n_yes_ranges	= ARRAY_SIZE(axp22x_volatile_ranges),
+ };
+ 
++/* AXP223 B8[4] reports whether capacity calibration is in progress. */
++static bool axp223_volatile_reg(struct device *dev, unsigned int reg)
++{
++	return reg == AXP20X_CC_CTRL ||
++	       regmap_reg_in_ranges(reg, axp22x_volatile_ranges,
++				    ARRAY_SIZE(axp22x_volatile_ranges));
++}
++
+ /* AXP288 ranges are shared with the AXP803, as they cover the same range */
+ static const struct regmap_range axp288_writeable_ranges[] = {
+ 	regmap_reg_range(AXP288_POWER_REASON, AXP288_POWER_REASON),
+@@ -422,6 +430,15 @@
+ 	.val_bits	= 8,
+ 	.wr_table	= &axp22x_writeable_table,
+ 	.volatile_table	= &axp22x_volatile_table,
++	.max_register	= AXP22X_BATLOW_THRES1,
++	.cache_type	= REGCACHE_MAPLE,
++};
++
++static const struct regmap_config axp223_regmap_config = {
++	.reg_bits	= 8,
++	.val_bits	= 8,
++	.wr_table	= &axp22x_writeable_table,
++	.volatile_reg	= axp223_volatile_reg,
+ 	.max_register	= AXP22X_BATLOW_THRES1,
+ 	.cache_type	= REGCACHE_MAPLE,
+ };
+@@ -1294,7 +1311,7 @@
+ 	case AXP223_ID:
+ 		axp20x->nr_cells = ARRAY_SIZE(axp223_cells);
+ 		axp20x->cells = axp223_cells;
+-		axp20x->regmap_cfg = &axp22x_regmap_config;
++		axp20x->regmap_cfg = &axp223_regmap_config;
+ 		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
+ 		break;
+ 	case AXP288_ID:

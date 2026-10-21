@@ -16,7 +16,7 @@ def inventory():
     kernel = ROOT / '.local/build/kernel'
     release = (kernel / 'include/config/kernel.release').read_text().strip()
     modules = ROOT / '.local/kernel-install/lib/modules' / release
-    files = [kernel / p for p in ('.config', 'System.map', 'include/config/kernel.release',
+    files = [kernel / p for p in ('.config', 'System.map', 'vmlinux', 'include/config/kernel.release',
              'arch/arm/boot/zImage', 'arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb')]
     installed = sorted(modules.rglob('*.ko'))
     if not installed:

@@ -1,0 +1,33 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: preserve queued TX polling status failures
+
+Publish failed status reads before releasing the host so the caller can
+quarantine the worker. Recheck prior error ownership under the host claim;
+packet completion can race a separately claimed IRQ failure. Preserve
+completed packets, queued ownership and successful status handling.
+Candidate only; image integration and hardware qualification are separate.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -2496,11 +2496,17 @@
+ 		if (!bus->intr) {
+ 			/* Check device status, signal pending interrupt */
+ 			sdio_claim_host(bus->sdiodev->func1);
+-			intstatus = brcmf_sdiod_readl(bus->sdiodev,
+-						      intstat_addr, &ret);
++			/* An IRQ may have failed while packet completion ran. */
++			ret = READ_ONCE(bus->sdiodev->io_error);
++			if (!ret) {
++				intstatus = brcmf_sdiod_readl(bus->sdiodev,
++							      intstat_addr, &ret);
++				bus->sdcnt.f2txdata++;
++				if (ret)
++					WRITE_ONCE(bus->sdiodev->io_error, ret);
++			}
+ 			sdio_release_host(bus->sdiodev->func1);
+ 
+-			bus->sdcnt.f2txdata++;
+ 			if (ret != 0)
+ 				break;
+ 			if (intstatus & bus->hostintmask)

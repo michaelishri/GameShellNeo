@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from awake_fixtures import window, proof
 
 spec = importlib.util.spec_from_file_location('usb_idle_report',
     Path(__file__).resolve().parents[1] / 'report-usb-idle.py')
@@ -41,6 +42,27 @@ def fixture(root):
     return dict(passed=True, phases=phases)
 
 
+def observed_fixture(root):
+    report = fixture(root)
+    for phase in report['phases']:
+        boot = phase['boot_id']
+        phase['before'] = dict(boot_id=boot, awake_window=window(0, boot=boot))
+        phase['after'] = dict(boot_id=boot, awake_window=window(1000, boot=boot))
+        for kind, filename in (('idle', 'idle-sample.jsonl'), ('profile', 'power-profile.jsonl')):
+            path = Path(phase[kind]['capture']) / filename
+            rows = [json.loads(line) for line in path.read_text().splitlines()]
+            for index, row in enumerate(rows):
+                if row['event'] == 'sample':
+                    row['awake_window'] = window(index * 10, boot=boot)
+                if row['event'] == 'raw':
+                    for key, seconds in (('before', 500), ('after', 620.1)):
+                        row[key]['awake_window'] = window(seconds, boot=boot)
+            rows[-1]['awake_proof'] = proof(1000, boot=boot)
+            phase[kind]['summary'] = rows[-1]
+            path.write_text('\n'.join(json.dumps(row) for row in rows) + '\n')
+    return report
+
+
 class ReportTests(unittest.TestCase):
     def test_differences_preserve_opposite_bracketing_results(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -50,6 +72,33 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(differences[1]['power_mw']['difference'], 100)
             self.assertFalse(summary['calibrated'])
             self.assertIn('RSB IRQs are neither USB poll counts', reporter.markdown(summary))
+            self.assertIn('legacy: sleep observation absent', reporter.markdown(summary))
+
+    def test_new_report_rechecks_all_recorded_clock_windows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = observed_fixture(Path(directory))
+            self.assertIn('bounded clock/PM checks passed', reporter.markdown(reporter.summarize(report)))
+            # Both the accepted summary and raw summary claim success; the witness rejects it.
+            phase = report['phases'][0]
+            path = Path(phase['idle']['capture']) / 'idle-sample.jsonl'
+            rows = [json.loads(line) for line in path.read_text().splitlines()]
+            rows[-1]['awake_proof']['observations'][-1]['pm_counts']['success'] = 1
+            phase['idle']['summary'] = rows[-1]
+            path.write_text('\n'.join(json.dumps(row) for row in rows) + '\n')
+            with self.assertRaisesRegex(ValueError, 'system PM'):
+                reporter.summarize(report)
+
+    def test_partly_missing_new_evidence_is_not_downgraded_to_legacy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = observed_fixture(Path(directory))
+            phase = report['phases'][0]
+            path = Path(phase['profile']['capture']) / 'power-profile.jsonl'
+            rows = [json.loads(line) for line in path.read_text().splitlines()]
+            rows[-1].pop('awake_proof')
+            phase['profile']['summary'] = rows[-1]
+            path.write_text('\n'.join(json.dumps(row) for row in rows) + '\n')
+            with self.assertRaisesRegex(ValueError, 'Missing awake measurement proof'):
+                reporter.summarize(report)
 
     def test_partial_or_same_boot_comparisons_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

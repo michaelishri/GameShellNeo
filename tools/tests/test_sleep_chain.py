@@ -257,6 +257,10 @@ class Transport(unittest.TestCase):
         self.assertTrue(value['usb_ssh_verified']);self.assertTrue(value['wifi_ssh_verified'])
         self.assertTrue((self.root/'submission-error.txt').exists())
         self.assertTrue((self.root/'collection-errors.txt').exists())
+        timings=[json.loads(line) for line in (self.root/'host-timing.jsonl').read_text().splitlines()]
+        self.assertEqual(len([v for v in timings if v.get('phase')=='pm.submit' and v['event']=='begin']),1)
+        self.assertEqual(len([v for v in timings if v.get('phase')=='collection.attempt' and v['event']=='begin']),3)
+        self.assertEqual([v['state'] for v in timings if v['event']=='collection_state'],['started','complete'])
 
     def test_timeout_keeps_run_identity_and_never_resubmits(self):
         with patch.object(host.time,'monotonic',side_effect=[0,211]),patch.object(host,'collect') as collect:

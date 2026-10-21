@@ -1,0 +1,18 @@
+Subject: [CANDIDATE] usb: musb: return DMA ownership after failed restart allocation
+
+The restart callback is not called if deferred-work allocation fails.
+Return the still-owned request mapping before reporting queue failure.
+Keep success paths free of post-callback request access.
+
+Not in the active image patch queue; see the candidate regression task.
+
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -1308,6 +1308,7 @@
+ 					__func__, status);
+ 				list_del(&request->list);
+ 				musb_ep->restart_pending = false;
++				unmap_dma_buffer(request, musb);
+ 			}
+ 		}
+ 	}

@@ -18,6 +18,7 @@ env:
   NEO_IDLE_SECONDS: '{{.SECONDS | default "600"}}'
   NEO_IDLE_BACKLIGHT: '{{.BACKLIGHT | default "keep"}}'
   NEO_PROFILE_SECONDS: '{{.SECONDS | default "120"}}'
+  NEO_CHARGE_SECONDS: '{{.SECONDS | default "120"}}'
   NEO_GOVERNOR_RATE_US: '{{.RATE_US | default "10000"}}'
   NEO_PERF_SECONDS: '{{.SECONDS | default "30"}}'
   NEO_USB_POLL_MODE: '{{.MODE | default "status"}}'
@@ -27,9 +28,15 @@ env:
   NEO_RSB_DELAY_MS: '{{.DELAY_MS | default "100"}}'
   NEO_PM_STAGE: '{{.STAGE | default ""}}'
   NEO_PM_CYCLES: '{{.CYCLES | default "1"}}'
+  NEO_SSH_CYCLES: '{{.CYCLES | default "3"}}'
+  NEO_SSH_CAPTURE: '{{.CAPTURE | default ""}}'
+  NEO_SOCKET_STATE: '{{.SOCKET_STATE | default "0"}}'
+  NEO_PREFLIGHT_SCOPE: '{{.SCOPE | default "full"}}'
   NEO_PM_RUN: '{{.RUN | default ""}}'
   NEO_SLEEP_QUALIFICATION: '{{.QUALIFICATION | default ""}}'
   NEO_SLEEP_REHEARSAL: '{{.REHEARSAL | default ""}}'
+  NEO_SLEEP_ALARM_SECONDS: '{{.ALARM_SECONDS | default "30"}}'
+  NEO_SLEEP_BATCH: '{{.BATCH | default ""}}'
   NEO_SLEEP_ATTENDED: '{{.ATTENDED | default "0"}}'
   NEO_SLEEP_CABLE_OBSERVATION: '{{.OBSERVATION | default ""}}'
   NEO_SLEEP_CABLE_DISPLAY: '{{.DISPLAY | default ""}}'
@@ -48,6 +55,7 @@ env:
   NEO_SCRATCH_SUITE: '{{.SUITE | default ""}}'
   NEO_SCRATCH_APPLY: '{{.APPLY | default "0"}}'
   NEO_SCRATCH_TARGET: '{{.TARGET | default ""}}'
+  NEO_SCRATCH_RECORDED_PATCHES: '{{.RECORDED_PATCHES | default "0"}}'
   NEO_RETENTION_KEEP: '{{.KEEP | default "3"}}'
   NEO_RETENTION_APPLY: '{{.APPLY | default "0"}}'
   NEO_RECOVERY_UPLOAD: '{{.UPLOAD | default "0"}}'
@@ -58,8 +66,141 @@ env:
   NEO_COMPARISON_RETRY_INCOMPLETE: '{{.RETRY_INCOMPLETE | default "0"}}'
   NEO_CAMERA_SECONDS: '{{.SECONDS | default "0"}}'
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
+  NEO_DOCKER_OWNERSHIP_CASE: '{{.CASE | default ""}}'
 
 tasks:
+  test:build-workflow:
+    desc: Check build preflight, setup and logger behavior without Docker or device access
+    cmds: [bash tools/run-logged.sh build-workflow python3 -m unittest tools.tests.test_workflow tools.tests.test_build_preflight tools.tests.test_setup -v]
+
+  build:stage:status:
+    desc: Inspect the recorded build container without starting another build
+    cmds: [python3 tools/docker-stage.py status]
+
+  build:stage:resume:
+    desc: Reattach to the original build container and save its complete logs and result
+    cmds: [python3 tools/docker-stage.py resume]
+
+  build:stage:stop:
+    desc: Stop only the recorded build container, then retain its logs and actual exit status
+    cmds: [python3 tools/docker-stage.py stop]
+
+  test:docker-ownership-baseline:
+    desc: Reproduce historical build-lock loss in a bounded offline Docker fixture (expected failure)
+    cmds: [bash tools/run-logged.sh docker-ownership-baseline python3 tools/check-docker-stage.py --baseline]
+
+  test:docker-ownership:
+    desc: Exercise interrupted-build admission and reattachment in bounded offline Docker fixtures
+    cmds: [bash tools/run-logged.sh docker-ownership python3 tools/check-docker-stage.py]
+
+  test:brcmfmac-output-baseline:
+    desc: Reproduce unchecked diagnostic output in offline native/sanitizer cases (expected failures)
+    cmds: [bash tools/run-logged.sh brcmfmac-output-baseline python3 tools/check-brcmfmac-tx-recovery.py --bounds-baseline --native-only]
+
+  test:brcmfmac-output-bounds:
+    desc: Qualify bounded diagnostic output and combined Wi-Fi regressions without hardware
+    cmds: [bash tools/run-logged.sh brcmfmac-output-bounds python3 tools/check-brcmfmac-tx-recovery.py --diagnostic-bounds]
+
+  check:brcmfmac-output-drivers:
+    desc: Qualify diagnostic output and build complete board/debug ARM drivers
+    cmds: [bash tools/run-logged.sh brcmfmac-output-drivers python3 tools/check-brcmfmac-tx-recovery.py --diagnostic-bounds --compile-drivers]
+
+  test:brcmfmac-shared-baseline:
+    desc: Reproduce ignored shared-diagnostic wake and transport errors (expected failures)
+    cmds: [bash tools/run-logged.sh brcmfmac-shared-baseline python3 tools/check-brcmfmac-tx-recovery.py --shared-baseline --native-only]
+
+  test:brcmfmac-shared-diagnostics:
+    desc: Qualify shared diagnostics and combined Wi-Fi regressions without hardware
+    cmds: [bash tools/run-logged.sh brcmfmac-shared-diagnostics python3 tools/check-brcmfmac-tx-recovery.py --shared-diagnostics]
+
+  check:brcmfmac-shared-drivers:
+    desc: Qualify shared diagnostics and build complete board/debug ARM drivers
+    cmds: [bash tools/run-logged.sh brcmfmac-shared-drivers python3 tools/check-brcmfmac-tx-recovery.py --shared-diagnostics --compile-drivers]
+
+  test:brcmfmac-clock-baseline:
+    desc: Reproduce unbounded asynchronous clock waits (expected failures; no hardware)
+    cmds: [bash tools/run-logged.sh brcmfmac-clock-baseline python3 tools/check-brcmfmac-tx-recovery.py --clock-baseline --native-only]
+
+  test:brcmfmac-clock-deadline:
+    desc: Qualify clock deadlines and combined Wi-Fi regressions natively and on ARM
+    cmds: [bash tools/run-logged.sh brcmfmac-clock-deadline python3 tools/check-brcmfmac-tx-recovery.py --clock-deadline]
+
+  check:brcmfmac-clock-drivers:
+    desc: Qualify clock deadlines and compile full board/debug ARM drivers
+    cmds: [bash tools/run-logged.sh brcmfmac-clock-drivers python3 tools/check-brcmfmac-tx-recovery.py --clock-deadline --compile-drivers]
+
+  test:brcmfmac-watchdog-baseline:
+    desc: Reproduce ignored watchdog errors (expected assertion failures; no device access)
+    cmds: [bash tools/run-logged.sh brcmfmac-watchdog-baseline python3 tools/check-brcmfmac-tx-recovery.py --watchdog-baseline --native-only]
+
+  test:brcmfmac-watchdog:
+    desc: Qualify watchdog and combined TX/RX/worker regressions natively and on ARM
+    cmds: [bash tools/run-logged.sh brcmfmac-watchdog python3 tools/check-brcmfmac-tx-recovery.py --watchdog-errors]
+
+  check:brcmfmac-watchdog-drivers:
+    desc: Qualify watchdog errors and build complete board/debug ARM driver objects
+    cmds: [bash tools/run-logged.sh brcmfmac-watchdog-drivers python3 tools/check-brcmfmac-tx-recovery.py --watchdog-errors --compile-drivers]
+
+  test:brcmfmac-tx-poll-baseline:
+    desc: Reproduce discarded TX polling status errors (expected assertion failures; no device access)
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-poll-baseline python3 tools/check-brcmfmac-tx-recovery.py --poll-baseline --native-only]
+
+  test:brcmfmac-tx-poll:
+    desc: Exercise polling status failures and TX/RX/worker regressions natively and on ARM
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-poll python3 tools/check-brcmfmac-tx-recovery.py --poll-status]
+
+  check:brcmfmac-tx-poll-drivers:
+    desc: Qualify polling status failures and compile complete board/debug ARM objects
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-poll-drivers python3 tools/check-brcmfmac-tx-recovery.py --poll-status --compile-drivers]
+
+  test:brcmfmac-tx-recovery-baseline:
+    desc: Reproduce ignored TX recovery errors (expected assertion failures; no device access)
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-recovery-baseline python3 tools/check-brcmfmac-tx-recovery.py --baseline --native-only]
+
+  test:brcmfmac-tx-recovery:
+    desc: Exercise TX recovery and caller ownership natively and on ARM; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-recovery python3 tools/check-brcmfmac-tx-recovery.py]
+
+  check:brcmfmac-tx-recovery-drivers:
+    desc: Qualify TX/RX/mailbox recovery and build complete board/debug ARM driver objects
+    cmds: [bash tools/run-logged.sh brcmfmac-tx-recovery-drivers python3 tools/check-brcmfmac-tx-recovery.py --compile-drivers]
+
+  test:brcmfmac-control-rx-baseline:
+    desc: Reproduce control FIFO defects before candidate 0048 (expected assertion failures)
+    cmds: [bash tools/run-logged.sh brcmfmac-control-rx-baseline python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-cases --native-only]
+
+  test:brcmfmac-control-rx:
+    desc: Test control FIFO recovery and replay natively and on ARM; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-control-rx python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes]
+
+  test:brcmfmac-control-rx-mailbox:
+    desc: Test control FIFO recovery together with mailbox fixes; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-control-rx-mailbox python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes --mailbox]
+
+  check:brcmfmac-control-rx-drivers:
+    desc: Qualify control FIFO candidate with full ARM objects, alone and with mailbox fixes
+    cmds:
+      - bash tools/run-logged.sh brcmfmac-control-rx-drivers python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes --compile-drivers
+      - bash tools/run-logged.sh brcmfmac-control-rx-mailbox python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --control-fixes --mailbox --compile-drivers
+
+  test:brcmfmac-rx-callers:
+    desc: Test RX packet cleanup and worker quarantine natively and on ARM; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-rx-callers python3 tools/check-brcmfmac-rx-callers.py --packet-fixes]
+
+  check:brcmfmac-rx-callers-drivers:
+    desc: Check RX callers and full ARM brcmfmac objects, alone and with the mailbox candidate
+    cmds:
+      - bash tools/run-logged.sh brcmfmac-rx-callers-drivers python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --compile-drivers
+      - bash tools/run-logged.sh brcmfmac-rx-callers-mailbox python3 tools/check-brcmfmac-rx-callers.py --packet-fixes --mailbox --compile-drivers
+
+  test:brcmfmac-rx-recovery:
+    desc: Fault-test isolated RX recovery helper candidate; caller qualification remains separate
+    cmds: [bash tools/run-logged.sh brcmfmac-rx-recovery python3 tools/check-brcmfmac-rx-recovery.py]
+
+  check:brcmfmac-rx-recovery-drivers:
+    desc: Check RX helper faults and complete ARM brcmfmac objects; no device access
+    cmds: [bash tools/run-logged.sh brcmfmac-rx-recovery-drivers python3 tools/check-brcmfmac-rx-recovery.py --compile-drivers]
+
   default:
     desc: List the shared project commands
     cmds: [task --list]
@@ -92,11 +233,15 @@ tasks:
     desc: Run kernel regressions, build kernel, validate device tree, assemble and verify image (sequential)
     cmds:
       - task: doctor
+      - python3 tools/build_preflight.py --scope full
+      - task: prepare
       - task: test:nkmp
       - task: test:usb-lifecycle
       - task: test:usb-suspend
       - task: test:usb-phy-suspend
       - task: test:power-supply-suspend
+      - task: test:axp223-gauge-status
+      - task: test:axp-adc-width
       - task: test:brcmfmac-sleep
       - task: test:brcmfmac-freezer
       - task: test:brcmfmac-pm
@@ -111,13 +256,20 @@ tasks:
       - task: test:sunxi-sdio-refs
       - task: test:musb-context
       - task: test:musb-sleep
+      - task: test:musb-request-resume
       - task: test:udc-trace
       - task: test:usb-policy
       - task: test:clock-ranges
+      - task: test:cpuidle-s2idle
+      - task: check:clock-provenance
       - task: build:kernel
       - task: test:usb-policy-board
       - task: check:dt
       - task: build:image
+
+  build:preflight:
+    desc: Read-only locked-input and disk-headroom checks; SCOPE=full/kernel/image/inputs
+    cmds: [python3 tools/build_preflight.py]
 
   build:kernel:
     desc: Compile the locked kernel and modules; preserve incremental build outputs
@@ -130,12 +282,14 @@ tasks:
   build:image:
     desc: Rebuild and verify userspace/image using the completed kernel stage
     cmds:
+      - python3 tools/build_preflight.py --scope image
       - task: prepare
       - bash tools/run-logged.sh image tools/build-image.sh
 
   build:rootfs:
     desc: Bootstrap the signed Debian rootfs separately
     cmds:
+      - python3 tools/build_preflight.py --scope image
       - task: prepare
       - bash tools/run-logged.sh rootfs tools/build-image.sh rootfs
 
@@ -144,11 +298,11 @@ tasks:
     cmds: [bash tools/run-logged.sh kernel-reset bash tools/reset-kernel.sh]
 
   build:prune-driver-scratch:
-    desc: Preview superseded brcmfmac compiler trees for SUITE; APPLY=1 removes them under the suite lock
+    desc: Preview superseded driver compiler trees for SUITE and optional TARGET; APPLY=1 removes them under the suite lock
     cmds: [python3 tools/prune-driver-scratch.py]
 
   build:compact-driver-sources:
-    desc: Verify and share duplicate driver sources for SUITE; optional TARGET worktree, APPLY=1 replaces copies
+    desc: Verify/share driver sources; SUITE, optional TARGET and RECORDED_PATCHES=1 for historical exports; APPLY=1 replaces copies
     cmds: [python3 tools/compact-driver-sources.py]
 
   check:kernel-source-reuse:
@@ -187,6 +341,30 @@ tasks:
   test:governor-recovery:
     desc: Verify rollback through user-systemd with temporary files; no device access or sudo
     cmds: [NEO_SYSTEMD_TESTS=1 python3 -m unittest discover -s tools/tests -p test_governor_compare.py -v]
+
+  test:awake-clock:
+    desc: Simulate sleep during awake measurements and verify rejection/restoration; no device access
+    cmds: [bash tools/run-logged.sh awake-clock python3 -m unittest discover -s tools/tests -p test_awake_clock.py -v]
+
+  test:sleep-protocol:
+    desc: Offline RTC duration, admission, evidence, restoration and transport regressions; no device access
+    cmds: [bash tools/run-logged.sh sleep-protocol python3 -m unittest discover -s tools/tests -p 'test_sleep_*.py' -v]
+
+  test:kernel-evidence:
+    desc: Offline printk continuity, retention, provenance and storage regressions; no device access
+    cmds: [bash tools/run-logged.sh kernel-evidence python3 -m unittest discover -s tools/tests -p 'test_kernel_evidence*.py' -v]
+
+  test:audio-timing:
+    desc: Offline speaker timing, cleanup and report validation with fake playback; no device or sound
+    cmds: [bash tools/run-logged.sh audio-timing python3 -m unittest discover -s tools/tests -p 'test_speaker*.py' -v]
+
+  test:musb-queue-dma:
+    desc: Test isolated failed-queue DMA rollback candidate natively and ARM32; active image queue unchanged
+    cmds: [bash tools/run-logged.sh musb-queue-dma python3 tools/check-musb-queue-dma.py]
+
+  check:musb-queue-dma-drivers:
+    desc: Test isolated DMA rollback and compile PIO/DMA ARM drivers; no image or device changes
+    cmds: [bash tools/run-logged.sh musb-queue-dma-drivers python3 tools/check-musb-queue-dma.py --compile-drivers]
 
   test:nkmp:
     desc: Compare locked original/patched clock searches natively and on ARM32 in the pinned builder
@@ -228,9 +406,29 @@ tasks:
     desc: Check sleep/disconnect and callback regressions plus six isolated ARM configurations
     cmds: [bash tools/run-logged.sh musb-sleep-configs python3 tools/check-musb-sleep.py --compile-matrix]
 
+  test:musb-request-resume:
+    desc: Test actual deferred endpoint-restart ownership on native and ARM32 with negative controls
+    cmds: [bash tools/run-logged.sh musb-request-resume python3 tools/check-musb-request-resume.py]
+
+  test:musb-restart-kunit:
+    desc: Execute actual MUSB restart/giveback paths in an isolated UML kernel with KASAN and lockdep
+    cmds: [bash tools/run-logged.sh musb-restart-kunit python3 tools/check-musb-restart-kunit.py]
+
+  test:cpuidle-s2idle:
+    desc: Test actual CPU-idle entry, scheduler, registration and tick-freeze functions on native and ARM32
+    cmds: [bash tools/run-logged.sh cpuidle-s2idle python3 tools/check-cpuidle-s2idle.py]
+
+  check:cpuidle-kernel:
+    desc: Run CPU-idle regressions and compile ARM entry, scheduler and timer objects in four configurations
+    cmds: [bash tools/run-logged.sh cpuidle-kernel python3 tools/check-cpuidle-s2idle.py --compile-kernel]
+
   check:musb-sleep-drivers:
     desc: Test MUSB sleep ownership and compile the complete ARM controller/gadget/glue
     cmds: [bash tools/run-logged.sh musb-sleep-drivers python3 tools/check-musb-sleep.py --compile-drivers]
+
+  check:musb-request-resume-drivers:
+    desc: Test deferred restart ownership and compile the ARM MUSB core and gadget drivers
+    cmds: [bash tools/run-logged.sh musb-request-resume-drivers python3 tools/check-musb-request-resume.py --compile-drivers]
 
   check:udc-driver:
     desc: Run trace-format regressions and compile the complete ARM USB device-controller core
@@ -251,6 +449,22 @@ tasks:
   test:power-supply-suspend:
     desc: Check actual power-supply notification functions across freeze and thaw, native and ARM32
     cmds: [bash tools/run-logged.sh power-supply-suspend python3 tools/check-power-supply-suspend.py]
+
+  test:axp223-gauge-status:
+    desc: Check actual AXP223 volatility and regmap cache read decisions, native and ARM32
+    cmds: [bash tools/run-logged.sh axp223-gauge-status python3 tools/check-axp223-gauge-status.py]
+
+  check:axp223-gauge-driver:
+    desc: Run gauge-status regressions and compile the complete ARM MFD driver
+    cmds: [bash tools/run-logged.sh axp223-gauge-driver python3 tools/check-axp223-gauge-status.py --compile-driver]
+
+  test:axp-adc-width:
+    desc: Exhaustively check actual AXP ADC width decoding and IIO callers, native and ARM32
+    cmds: [bash tools/run-logged.sh axp-adc-width python3 tools/check-axp-adc-width.py]
+
+  check:axp-adc-drivers:
+    desc: Run ADC width regressions and compile ARM ADC/USB users including the no-IIO fallback
+    cmds: [bash tools/run-logged.sh axp-adc-drivers python3 tools/check-axp-adc-width.py --compile-driver]
 
   test:power-supply-lifetime:
     desc: Reproduce deferred notification teardown with original and test-only reordered core functions; native and ARM32
@@ -358,6 +572,22 @@ tasks:
     desc: Test worker errors and compile the complete ARM driver in normal/debug configurations
     cmds: [bash tools/run-logged.sh brcmfmac-worker-drivers python3 tools/check-brcmfmac-pm.py --irq-service --worker-errors --compile-driver]
 
+  test:brcmfmac-mailbox:
+    desc: Test isolated Wi-Fi mailbox read/ACK error candidate, native and ARM32
+    cmds: [bash tools/run-logged.sh brcmfmac-mailbox python3 tools/check-brcmfmac-mailbox.py]
+
+  test:axp223-controls:
+    desc: Test isolated charger-control diagnostic with real regmap, PM and debugfs in UML
+    cmds: [bash tools/run-logged.sh axp223-controls python3 tools/check-axp223-controls.py]
+
+  check:axp223-controls-driver:
+    desc: Run charger-control UML tests and compile the complete ARM RSB MFD driver
+    cmds: [bash tools/run-logged.sh axp223-controls-driver python3 tools/check-axp223-controls.py --compile-driver]
+
+  check:brcmfmac-mailbox-drivers:
+    desc: Test mailbox candidate and compile complete normal/debug ARM drivers outside the image queue
+    cmds: [bash tools/run-logged.sh brcmfmac-mailbox-drivers python3 tools/check-brcmfmac-mailbox.py --compile-drivers]
+
   check:usb-policy-driver:
     desc: Run USB policy regressions and compile the complete ARM driver in isolated scratch
     cmds: [bash tools/run-logged.sh usb-policy-driver python3 tools/check-usb-policy.py --compile-driver]
@@ -380,6 +610,10 @@ tasks:
       - python3 tools/check-kernel-config.py .local/build/kernel/.config
       - python3 tools/kernel-artifacts.py check
 
+  check:ethernet-config:
+    desc: Build two isolated ARM kernels to measure unused Ethernet removal; no image/device change
+    cmds: [bash tools/run-logged.sh ethernet-config python3 tools/check-ethernet-config.py]
+
   check:dt:
     desc: Validate the project's bindings and built DTB in the pinned container
     cmds: [bash tools/run-logged.sh devicetree tools/check-devicetree.sh]
@@ -395,6 +629,18 @@ tasks:
   device:status:
     desc: Capture kernel, service, power and access status (ROUTE=wifi or usb)
     cmds: [python3 tools/remote.py device status]
+
+  device:charge-inspect:
+    desc: Read documented AXP223 charge/gauge inventory over USB; no control writes or sleep
+    cmds: [python3 tools/check-charge-inventory.py]
+
+  device:charge-baseline:
+    desc: Read awake charging telemetry over USB for SECONDS=120; no control changes
+    cmds: [python3 tools/check-charge-baseline.py]
+
+  device:awake-clock-check:
+    desc: Read-only clock/PM-counter observations on the running board; no settings or sleep operations
+    cmds: [python3 tools/remote.py device awake-clock-check]
 
   device:wifi-config:
     desc: Apply Wi-Fi credentials from .env over USB, verify Wi-Fi SSH, then update GAMESHELL_IP
@@ -431,8 +677,129 @@ tasks:
     cmds: [python3 tools/check-rsb-runtime.py --restore]
 
   device:pm-inspect:
-    desc: Read PM capabilities and RSB debug state over USB without entering suspend
+    desc: Read PM state and update protected kernel evidence without suspend; ROUTE=usb (default) or wifi
+    env:
+      NEO_PM_INSPECT_ROUTE: '{{.ROUTE | default "usb"}}'
     cmds: [python3 tools/check-pm-stages.py --inspect]
+
+  device:kernel-evidence-smoke:
+    desc: Awake protected-checkpoint append test with one userspace debug marker; no PM or screen changes
+    cmds: [python3 tools/check-kernel-evidence.py]
+
+  device:clock-observe:
+    desc: Record 60000 awake clock brackets without changing clocksource or PM; no sleep admission
+    cmds: [python3 tools/check-clock-observation.py]
+
+  check:clock-abi:
+    desc: Verify ARM EABI/time64 definitions from the hash-locked kernel archive; no device access
+    cmds: [python3 tools/check-clock-paths.py --check-abi]
+
+  device:clock-compare:
+    desc: One awake Python/kernel clock comparison with fixed work and retained discrepancies; no sleep admission
+    env:
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-clock-paths.py]
+
+  device:clock-runtime:
+    desc: Identify installed Python/libc and inspect hash-verified ELF copies; awake, no clock or PM changes
+    env:
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-clock-runtime.py]
+
+  report:clock-runtime:
+    desc: Disassemble verified runtime captures using the pinned offline builder; no device access
+    env:
+      NEO_CAPTURE: '{{.CAPTURE | default ""}}'
+    cmds: [python3 tools/report-clock-runtime.py]
+
+  check:clock-native:
+    desc: Build fixed ARM two/three-route clock comparator and run native/ARM fixtures offline; no device access
+    cmds: [python3 tools/build-native-clocks.py]
+
+  test:clock-provenance:
+    desc: Test canonical kernel clock recorder with injected counter faults in offline UML; no device access
+    cmds: [bash tools/run-logged.sh clock-provenance python3 tools/check-clock-provenance.py]
+
+  check:clock-provenance:
+    desc: Run clock recorder UML tests and compile ARM timekeeping/syscall objects with diagnostics on and off
+    cmds: [bash tools/run-logged.sh clock-provenance-arm python3 tools/check-clock-provenance.py --compile-driver]
+
+  report:clock-provenance:
+    desc: Replay saved kernel clock tuples and preserve regressions; no device access or qualification
+    env:
+      NEO_CLOCK_RECORDS: '{{.FILE | default ""}}'
+    cmds: [python3 tools/clock_provenance.py]
+
+  test:clock-boundary:
+    desc: Test exact-call raw ABI replay and partial-capture cleanup offline; no device access
+    cmds: [python3 -m unittest discover -s tools/tests -p test_clock_boundary.py -v]
+
+  check:clock-boundary:
+    desc: Build ARM raw-clock reader with native/ARM fixtures offline; no device access
+    cmds:
+      - task: test:clock-boundary
+      - task: test:clock-deployment
+      - python3 tools/build-clock-boundary.py
+
+  test:clock-deployment:
+    desc: Test kernel/runtime admission, original-result persistence and host deadline cleanup offline
+    cmds: [python3 -m unittest discover -s tools/tests -p test_clock_deployment.py -v]
+
+  device:clock-boundary:
+    desc: One awake clock capture on the matching instrumented image; existing diagnostic.25 is refused
+    env:
+      NEO_BOUNDARY_BUILD: '{{.BUILD | default ""}}'
+      NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
+    cmds: [python3 tools/check-clock-boundary.py]
+
+  report:clock-boundary:
+    desc: Correlate saved kernel clock ordinals with raw ABI and Python/native values; no device access
+    env:
+      NEO_CLOCK_KERNEL: '{{.KERNEL | default ""}}'
+      NEO_CLOCK_USERS: '{{.USERS | default ""}}'
+    cmds: [python3 tools/clock_boundary.py]
+
+  device:clock-native:
+    desc: One awake native clock comparison with all raw readings retained; no clock/PM changes
+    env:
+      NEO_NATIVE_MODE: compare
+      NEO_NATIVE_BUILD: '{{.BUILD | default ""}}'
+      NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-native-clocks.py]
+
+  device:clock-native-pair:
+    desc: One fixed awake libc/syscall comparison on the verified boot without vDSO clock exports
+    env:
+      NEO_NATIVE_MODE: libc-syscall
+      NEO_NATIVE_BUILD: '{{.BUILD | default ""}}'
+      NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-native-clocks.py]
+
+  device:clock-vdso:
+    desc: Inspect mapped vDSO clock exports without sampling clocks or changing the device
+    env:
+      NEO_NATIVE_MODE: inspect-vdso
+      NEO_NATIVE_BUILD: '{{.BUILD | default ""}}'
+      NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-native-clocks.py]
+
+  device:clock-native-cpus:
+    desc: One awake libc/syscall capture across four CPUs; temporarily pins only its own thread and restores affinity
+    env:
+      NEO_NATIVE_MODE: libc-syscall-cpus
+      NEO_NATIVE_BUILD: '{{.BUILD | default ""}}'
+      NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
+      NEO_CLOCK_INSPECTION_REVISION: '{{.INSPECTION_REVISION | default ""}}'
+    cmds: [python3 tools/check-native-clocks.py]
+
+  report:clock-native:
+    desc: Reclassify every hash-verified saved native reading offline; no device access
+    env:
+      NEO_CAPTURE: '{{.CAPTURE | default ""}}'
+    cmds: [python3 tools/native_clock_report.py]
 
   device:keypad-inspect:
     desc: Save keypad identity, USB persistence, input paths and power state without changing policy
@@ -479,7 +846,7 @@ tasks:
     cmds: [python3 tools/check-audio.py --restore]
 
   device:pm-test:
-    desc: Manual freezer/devices debug stage only; owner present, USB powered, explicit STAGE required
+    desc: Freezer/devices debug stage with owner or verified camera observation; USB powered, explicit STAGE required
     cmds: [python3 tools/check-pm-stages.py --test]
 
   device:wifi-trace-smoke:
@@ -533,19 +900,19 @@ tasks:
     cmds: [python3 tools/check-power-key-policy.py --collect]
 
   device:pm-platform:
-    desc: One attended late/noirq debug cycle; checked image, same-boot RTC smoke, power-key ownership and traces required
+    desc: One observed late/noirq debug cycle; checked image, same-boot RTC smoke, power-key ownership and traces required
     cmds: [python3 tools/check-pm-stages.py --platform]
 
   device:sleep-rehearse:
-    desc: Awake RTC deadline/key-policy/trace rehearsal; QUALIFICATION required, no sleep submission
+    desc: Awake RTC rehearsal; QUALIFICATION required, ALARM_SECONDS=30 (default) or 60, no sleep submission
     cmds: [python3 tools/check-sleep-rtc.py --rehearse]
 
   device:sleep-battery-rehearse:
-    desc: Awake battery-only RTC rehearsal over Wi-Fi; USB physically absent, QUALIFICATION/UNPLUGGED required
+    desc: Awake battery-only RTC rehearsal; ALARM_SECONDS=30 or 60, QUALIFICATION/UNPLUGGED required
     cmds: [python3 tools/check-sleep-rtc.py --rehearse --connection battery]
 
   device:sleep-battery:
-    desc: One attended battery-only RTC-wake attempt over Wi-Fi; USB absent, QUALIFICATION/REHEARSAL/UNPLUGGED/ATTENDED required
+    desc: One attended battery RTC wake; ALARM_SECONDS=30 or 60 must match REHEARSAL, QUALIFICATION/UNPLUGGED/ATTENDED required
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake --connection battery]
 
   report:sleep-cable:
@@ -556,9 +923,29 @@ tasks:
     desc: Summarize a private journalctl JSON-lines capture supplied after --; no message text or device access
     cmds: [python3 tools/report-journal-volume.py]
 
+  report:audio-timing:
+    desc: Summarize saved audio/PM/sleep cue software timing after --; offline, no sound or acoustic-onset claim
+    cmds: [python3 tools/report-audio-timing.py]
+
   device:sleep-cable-remove-rehearse:
     desc: Awake rehearsal for USB removal scenario; USB connected, QUALIFICATION/CABLE_ACTION required
     cmds: [python3 tools/check-sleep-rtc.py --rehearse --connection usb-remove]
+
+  device:sleep-cable-batch-start:
+    desc: Start four alternating cable sleeps; runs first rehearsal/sleep only, QUALIFICATION/ATTENDED/CABLE_ACTION required
+    cmds: [python3 tools/check-sleep-cable-batch.py --start]
+
+  device:sleep-cable-batch-next:
+    desc: Run the next cable rehearsal/sleep after accepted observation; BATCH/ATTENDED/CABLE_ACTION required
+    cmds: [python3 tools/check-sleep-cable-batch.py --next]
+
+  report:sleep-cable-batch:
+    desc: Record the pending cycle's owner observation; BATCH/OBSERVATION/DISPLAY required, no device action
+    cmds: [python3 tools/check-sleep-cable-batch.py --observe]
+
+  report:sleep-cable-batch-status:
+    desc: Read saved batch state without contacting the device; BATCH required
+    cmds: [python3 tools/check-sleep-cable-batch.py --status]
 
   device:sleep-cable-remove:
     desc: One attended sleep with prompted USB removal; QUALIFICATION/REHEARSAL/CABLE_ACTION/ATTENDED required
@@ -573,7 +960,7 @@ tasks:
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake --connection usb-attach]
 
   device:sleep-rtc:
-    desc: One attended real s2idle attempt; QUALIFICATION, REHEARSAL and fresh ATTENDED=1 required
+    desc: One attended s2idle attempt; ALARM_SECONDS=30 or 60 must match REHEARSAL, QUALIFICATION/ATTENDED required
     cmds: [python3 tools/check-sleep-rtc.py --rtc-wake]
 
   device:sleep-batch:
@@ -641,6 +1028,87 @@ tasks:
   device:check:
     desc: Check running image, services, journal ACLs, country and temporary BPF loopback policies
     cmds: [python3 tools/remote.py device check]
+
+  device:ssh-timing:
+    desc: Measure CYCLES=3 fresh USB/Wi-Fi SSH pairs while awake; no sleep or policy change
+    cmds: [python3 tools/check-ssh-timing.py]
+
+  device:ssh-provenance:
+    desc: Read installed SSH versions, binary hashes and selected global policy; stays awake
+    cmds: [python3 tools/check-ssh-provenance.py]
+
+  device:ssh-socket-smoke:
+    desc: Awake Mac worker/socket identity with board and ambiguity controls; no sleep or network-policy change
+    env:
+      NEO_ROUTE: '{{.ROUTE | default "usb"}}'
+    cmds: [python3 tools/check-forward-socket.py]
+
+  report:ssh-sockets:
+    desc: Recheck saved independent socket identity and ambiguity evidence; CAPTURE required, no device access
+    cmds: [python3 tools/check-forward-socket.py --report]
+
+  device:ssh-failure-smoke:
+    desc: Awake silent/greeting-only SSH controls on Mac loopback plus healthy device routes; no sleep
+    cmds: [python3 tools/check-ssh-failure.py]
+
+  report:ssh-socket-state:
+    desc: Validate original SSH outcomes and opt-in socket observations offline; CAPTURE required
+    cmds: [python3 tools/check-ssh-failure.py --report]
+
+  device:user-startup:
+    desc: Inspect user-manager startup and test Unix98/SSH terminals awake; LEGACY=either/enabled/disabled
+    env:
+      NEO_ROUTE: '{{.ROUTE | default "usb"}}'
+      NEO_LEGACY_PTYS: '{{.LEGACY | default "either"}}'
+    cmds: [python3 tools/check-user-startup.py]
+
+  device:ssh-timing-report:
+    desc: Summarize host timing in CAPTURE=private/diagnostics/directory; no device access
+    cmds: [python3 tools/check-ssh-timing.py --report]
+
+  device:ssh-trace-awake:
+    desc: Bounded Mac/device TCP metadata around three awake USB/Wi-Fi SSH pairs; no payload files or sleep
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py]
+
+  device:ssh-trace-smoke:
+    desc: Awake observer lifecycle in the sleep-test unit plus three SSH probe pairs; no PM or display change
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py --smoke]
+
+  device:ssh-trace-burst:
+    desc: Awake observer smoke plus three fixed 2 MiB USB SSH replies; screen and PM remain unchanged
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py --burst]
+
+  device:ssh-trace-gap-smoke:
+    desc: Awake synthetic Mac capture-handle interruption; tests bounded reopening without changing the USB interface
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py --gap-smoke]
+
+  device:ssh-trace-sleep:
+    desc: One attended RTC sleep with bounded two-ended TCP metadata; QUALIFICATION/REHEARSAL/ATTENDED required
+    env:
+      NEO_ROUTE: usb
+    cmds: [python3 tools/check-ssh-trace.py --sleep]
+
+  device:ssh-trace-collect:
+    desc: Stop/collect only the original bounded TCP recorders in CAPTURE; never resubmit a sleep
+    env:
+      NEO_ROUTE: '{{.ROUTE | default "usb"}}'
+    cmds: [python3 tools/check-ssh-trace.py --collect]
+
+  report:ssh-trace:
+    desc: Validate and correlate private two-ended TCP metadata in CAPTURE; no device access
+    cmds: [python3 tools/check-ssh-trace.py --report]
+
+  report:ssh-trace-partial:
+    desc: Offline positive flow evidence from clean segments; never qualifies continuous coverage across a gap
+    cmds: [python3 tools/check-ssh-trace.py --partial-report]
 
   device:exec:
     desc: Run an explicit device command, e.g. task device:exec -- uname -r
@@ -735,7 +1203,7 @@ tasks:
     cmds: [python3 tools/mac-camera.py setup]
 
   mac:camera-status:
-    desc: Read camera permission through the desktop helper without opening the camera
+    desc: List video cameras and permission through the desktop helper without opening a camera
     cmds: [python3 tools/mac-camera.py status]
 
   mac:camera-capture:

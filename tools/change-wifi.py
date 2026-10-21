@@ -35,6 +35,9 @@ def stage(sftp, directory, candidate):
 
 def update_address(path, original, address):
     address = str(ipaddress.IPv4Address(address))
+    # Worktrees share the owner's .env through a symlink. Replace its target,
+    # not the link, so subsequent credential edits remain visible everywhere.
+    path = path.resolve(strict=True)
     if path.read_bytes() != original:
         raise ValueError('.env changed during verification; device Wi-Fi is committed, update GAMESHELL_IP manually')
     lines = original.decode().splitlines(keepends=True)
@@ -70,7 +73,7 @@ def verify(client, boot, address):
 def main():
     os.umask(0o077)
     config = load_env()
-    source_env = ROOT / '.env'
+    source_env = (ROOT / '.env').resolve(strict=True)
     original_env = source_env.read_bytes()
     candidate = wifi_config_from_key(config['GAMESHELL_WIFI_SSID'], config['GAMESHELL_WIFI_PSK'],
                                     config['GAMESHELL_WIFI_COUNTRY']).encode()

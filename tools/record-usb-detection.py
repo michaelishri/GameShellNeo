@@ -11,6 +11,8 @@ import signal
 import socket
 import time
 
+from battery_sample import sample_age
+
 PMIC = Path('/sys/kernel/debug/regmap/sunxi-rsb-3a3')
 MODE = Path('/sys/devices/platform/soc/1c19000.usb/musb-hdrc.2.auto/mode')
 SUPPLIES = ('axp20x-usb', 'axp22x-ac')
@@ -98,7 +100,7 @@ def properties():
         supplies[name] = {key: int(read(base / key)) for key in ('present', 'online')}
     guard = json.loads(read('/run/gameshellneo/battery.json'))
     if (guard.get('monitoring') != 'valid' or guard.get('capacity_percent', 0) <= 20 or
-            not 0 <= time.monotonic() - guard['monotonic_seconds'] < 35):
+            not 0 <= sample_age(guard) < 35):
         raise ValueError('Battery monitoring invalid, stale, or charge too low for cable tests')
     if int(read('/proc/sys/kernel/tainted')):
         raise ValueError('Kernel tainted')

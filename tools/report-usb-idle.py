@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import sys
 
+from awake_clock import checked_proof, windows
+
 
 def records(phase, kind, filename):
     capture = Path(phase[kind]['capture'])
@@ -30,7 +32,18 @@ def phase_metrics(phase):
     rsb = [row for row in profile[-1]['interrupts'] if 'sunxi-rsb' in row['description'].split()]
     if len(rsb) != 1:
         raise ValueError('Expected one RSB interrupt counter')
+    has_clock = any('awake_proof' in row for row in (idle[-1], profile[-1])) or any(
+        'awake_window' in row for row in [*samples, raw[0]['before'], raw[0]['after']])
+    if has_clock:
+        for row in (idle[-1], profile[-1]):
+            checked_proof(row.get('awake_proof'), seconds=row['duration_seconds'], boot_id=phase['boot_id'])
+        windows(samples)
+        windows([raw[0]['before'], raw[0]['after']])
+        windows([phase['before'], phase['after']])
+    # Old immutable captures remain renderable, without inheriting the new checks.
+    clock_status = 'bounded clock/PM checks passed' if has_clock else 'legacy: sleep observation absent'
     return dict(mode=phase['mode'], boot_id=phase['boot_id'],
+                awake_clock_status=clock_status,
                 idle_capture=Path(phase['idle']['capture']).name,
                 profile_capture=Path(phase['profile']['capture']).name,
                 current_ma=idle[-1]['time_weighted_current_ma'],
@@ -79,6 +92,7 @@ def markdown(summary):
             ('CPU accounting coverage (%)', 'cpu_accounting_coverage_percent', 2),
             ('RSB IRQs/s', 'rsb_irqs_per_second', 3)):
         table(label, [f'{row[key]:.{digits}f}' for row in rows])
+    table('Awake clock evidence', [row['awake_clock_status'] for row in rows])
     for label, key, digits in (
             ('Voltage range (V)', 'voltage_v', 4), ('Temperature range (°C)', 'temperature_c', 2)):
         table(label, [f'{row[key][0]:.{digits}f}–{row[key][1]:.{digits}f}' for row in rows])

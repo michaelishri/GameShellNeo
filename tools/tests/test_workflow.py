@@ -62,9 +62,10 @@ class WorkflowTests(unittest.TestCase):
     def test_build_logger_preserves_failure_and_handles_spaced_paths(self):
         with tempfile.TemporaryDirectory(prefix='neo workflow ') as directory:
             root = Path(directory)
-            (root / 'tools').mkdir()
+            (root / 'tools/build-bin').mkdir(parents=True)
             script = root / 'tools/run-logged.sh'
-            shutil.copyfile(TOOLS / 'run-logged.sh', script)
+            for name in ('run-logged.sh', 'docker-stage.py', 'build-bin/docker'):
+                shutil.copy2(TOOLS / name, root / 'tools' / name)
             result = subprocess.run(['bash', str(script), 'failure-check', 'sh', '-c',
                                      'echo expected failure; exit 7'], capture_output=True, text=True)
             self.assertEqual(result.returncode, 7)

@@ -16,7 +16,467 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
-Current installed image: diagnostic.17.
+[287 — Docker build ownership after host interruption](287-docker-build-ownership.md)
+records durable stage identity, blocked duplicate writers, original-container
+recovery and bounded offline fixture qualification; no image or device change.
+
+[286 — brcmfmac diagnostic console and assertion output bounds](286-brcmfmac-diagnostic-output-bounds.md)
+
+[284 — brcmfmac shared-memory diagnostic admission audit](284-brcmfmac-shared-diagnostic-audit.md)
+
+[285 — brcmfmac shared diagnostic error handling](285-brcmfmac-shared-diagnostic-errors.md)
+
+[283 — brcmfmac asynchronous clock-readiness deadline](283-brcmfmac-clock-deadline.md)
+
+[282 — brcmfmac watchdog failure and late-work ownership](282-brcmfmac-watchdog-errors.md)
+separates transport from local console errors, serializes polling publication
+with bus retirement and records reproducible candidate qualification.
+
+[281 — brcmfmac queued-TX polling error ownership](281-brcmfmac-tx-poll-errors.md)
+reproduces discarded status errors and prepares an isolated first-error fix,
+actual-source caller/worker tests and preserved successful-path checks.
+
+[280 — brcmfmac TX recovery review and offline acceptance](280-brcmfmac-tx-review.md)
+records both review axes, resolved fixture cleanup and verified qualification
+reruns; integration and matching board checks remain with NEO-58.
+
+[279 — brcmfmac transmit FIFO recovery and caller ownership](279-brcmfmac-tx-recovery.md)
+reproduces ignored recovery failures and prepares the isolated TX candidate,
+packet-ownership tests and worker/RX regressions without device access.
+
+[278 — brcmfmac RX candidate review and offline acceptance](278-brcmfmac-rx-review.md)
+records both review axes, resolved fixture cleanup, qualification reruns and
+the separate parent integration/hardware boundaries for NEO-195/196.
+
+[277 — brcmfmac control-response allocation and retry framing](277-brcmfmac-control-rx-recovery.md)
+reproduces unread-body and stale-hint defects with a byte-position FIFO model
+and prepares the isolated control-recovery candidate and saved checks.
+
+[276 — brcmfmac RX packet cleanup and worker qualification](276-brcmfmac-rx-caller-qualification.md)
+reproduces the malformed-packet defects, adds candidate 0047 and exercises
+packet ownership and worker quarantine with saved native/ARM fault tests.
+
+[275 — brcmfmac RX recovery error ownership](275-brcmfmac-rx-recovery.md)
+records the isolated candidate, 44 passing native/ARM helper cases, 13 negative
+controls and pending caller/packet qualification.
+
+[272 — Clock provenance image integration](272-clock-provenance-image.md)
+records the built, offline-verified diagnostic.26 recorder image, matching
+reader admission, recovery checkpoint and pending physical installation.
+
+[271 — Clock capture deployment and admission](271-clock-capture-deployment.md)
+adds kernel build-ID/runtime checks, same-process route inventory, bounded
+process ownership and original-result persistence; the old image is refused
+offline; the matching instrumented image is now prepared in report 272.
+
+[270 — Exact-call userspace clock evidence](270-clock-userspace-boundary.md)
+adds the raw ARM ABI reader, bounded workload and kernel/native/Python replay,
+with preserved regressions and partial failures; deployment and the clock
+fault's cause remain open.
+
+[269 — In-progress board completion audit](269-in-progress-board-audit.md)
+reconciles ticket scope with original evidence, closes proved work and separates
+unfinished software from physical qualification.
+
+[268 — External Razer Kiyo screen observation](268-razer-kiyo-observation.md)
+records exact camera selection, the private default preference, readable still
+and sequence evidence, verified shutdown and the bounded launcher correction.
+
+[267 — Kernel clock-provenance candidate](267-kernel-clock-provenance-candidate.md)
+adds isolated, default-off syscall/counter recording, bounded writer context
+and offline tuple replay. It preserves regressions and separates kernel
+calculation evidence from the pending userspace correlation and live work.
+
+[266 — Kernel counter and timekeeping audit](266-kernel-counter-timekeeping-audit.md)
+checks syscall sequence protection, conversion math, physical-counter access,
+WFI and watchdog configuration. It identifies the missing event-time counter
+and conversion state, specifying bounded diagnostics without claiming a fix.
+
+[265 — Native clock comparison across all four CPUs](265-native-clock-cpu-coverage.md)
+records even CPU 0–3 coverage, verified diagnostic affinity restoration and
+270,000 readings without ordering discrepancies. Raw replay and unchanged
+device state are verified; the original intermittent clock fault remains open.
+
+[264 — Native libc/syscall comparison](264-native-libc-syscall-comparison.md)
+records one complete 270,000-reading capture without ordering discrepancies.
+Raw replay agrees, both network routes and original fault evidence stay intact;
+limited CPU coverage and short duration leave the root cause unresolved.
+
+[263 — Native clock diagnostic and vDSO availability](263-native-clock-vdso-availability.md)
+records a stopped three-route comparison and a successful same-boot export
+inventory. The ARM kernel deliberately hides the clock exports for this timer
+DT configuration, correcting the earlier candidate-route interpretation.
+
+[262 — Installed clock-runtime inventory](262-clock-runtime-inventory.md)
+identifies Python's time64 import and the installed libc's dispatch structure
+from verified binary copies. Repeatable awake inventory and offline report
+tasks pass; event-time vDSO attribution remains unproven.
+
+[261 — ARM clock paths and RAW discrepancy](261-arm-clock-path-source-analysis.md)
+traces physical versus virtual counter access, matching RAW conversion math,
+update ordering and HYP initialization against the pinned sources. It narrows
+the next comparison without assigning an erratum or clearing the original fault.
+
+[260 — Clock comparison and inspection provenance](260-clock-comparison-provenance.md)
+records a validated 15,000-sequence capture with one 750 ns RAW cross-path
+discrepancy. Explicit inspection revision pinning preserves the original
+checkpoint; full offline checks pass. The clock cause remains open and PM
+admission stays blocked.
+
+[259 — Prepared clock-path comparison](259-clock-path-comparison.md)
+adds a fixed awake Python/kernel clock comparison with pinned-source and live
+ARM ABI checks. It preserves the initial preparation and access failures;
+report 260 records the subsequent full-suite and hardware results.
+
+[258 — Battery clock-fault handling](258-battery-clock-fault-handling.md)
+adds degraded publication and retained raw incident evidence, tests service
+restart behavior and keeps diagnostic admission blocked after sample recovery.
+The candidate passes offline checks; the underlying clock cause and deployment
+remain open.
+
+[257 — Awake clock-regression investigation](257-awake-clock-regression-investigation.md)
+preserves the battery guard's original failure and adds a bounded raw-clock
+recorder. A 60,000-sequence awake capture finds no recurrence, without clearing
+the incident or granting PM admission. Guard handling and root cause remain open.
+
+[256 — Camera PM preflight](256-camera-pm-preflight.md) adopts the authorized
+camera workflow and verifies a readable current baseline. PM preparation stops
+before any cycle because the battery guard previously restarted on a backwards
+clock observation. NEO-192 tracks the independent blocker; no human screen
+confirmation is needed once health and camera readiness pass.
+
+[255 — AXP223 charger-control provenance diagnostic](255-axp223-control-provenance-diagnostic.md)
+adds an isolated default-off normal/bypass read candidate and PM/removal
+admission. Seven real-kernel tests and complete ARM driver compilation pass;
+the active image and charger settings are unchanged, with hardware gates open.
+
+[254 — Wi-Fi mailbox transport-error candidate](254-brcmfmac-mailbox-error-candidate.md)
+checks reads and ACKs before decoding status, with 131/133 normal/DEBUG scenarios
+on native and ARM32, 43 negative controls and complete ARM driver builds. The
+candidate remains outside the active image queue pending integration/qualification.
+
+[253 — MUSB failed-queue DMA rollback candidate](253-musb-queue-dma-rollback-candidate.md)
+adds a one-line isolated correction with 74 native/ARM32 scenarios, sanitizer
+checks, six negative controls and board/DMA driver compilation. Active image
+inputs are unchanged; integration and broader teardown remain open.
+
+[252 — Charging-voltage evidence gap](252-charging-voltage-evidence-gap.md)
+identifies a driver-owned fresh-register read path and its PM/lifetime gates;
+cached controls and physical voltage accuracy remain distinct questions.
+
+[251 — Wi-Fi suspend failure audit](251-brcmfmac-suspend-failure-audit.md)
+finds unchecked mailbox read/acknowledgement errors and the all-ones failure
+sentinel, with a focused repair/test plan and separate recovery boundaries.
+
+[250 — MUSB failed-queue DMA ownership](250-musb-queue-failure-audit.md)
+proves the pre-callback rollback gap and records a separate channel-release
+ordering lead. CPI uses PIO; no board DMA fault or performance claim follows.
+
+[249 — Separating speaker confirmation timing](249-speaker-confirmation-timing.md)
+distinguishes input/prompt waits from amplifier startup and playback, adds
+bounded cue phase timestamps and an offline report task, and preserves audible
+behavior. All 16 runtime and 893 tooling tests pass; physical timing remains open.
+
+[248 — Awake validation of bounded kernel evidence](248-kernel-evidence-awake-validation.md)
+records complete boot capture, a sequence-checked userspace marker append,
+protected storage and both-route proof on the unchanged boot, with PM53/0.
+All 16 runtime and 882 tooling tests pass; attended PM qualification remains open.
+
+[247 — Bounded kernel evidence independent of journal retention](247-bounded-kernel-evidence.md)
+implements sequence-checked printk checkpoints and provenance-bound PM/sleep
+admission. Offline checks pass 16 runtime and 874 tooling tests plus C/lint
+checks; hardware qualification is pending. Existing failed records stay intact.
+
+[246 — Battery-repeat preparation stopped by lost journal history](246-battery-repeat-preparation-journal-loss.md)
+records five accepted debug checks followed by an evidence failure in check
+six. PM counters and owner observations are normal, but early kernel history
+is missing; no new battery sleep runs. Read-only checks preserve the failure
+and identify bounded evidence retention as the next work, tracked by NEO-184.
+
+[245 — Sleep collection reply recovery](245-sleep-collection-reply-recovery.md)
+records the host-only malformed-reply fix, bounded private failure capture and
+147 passing offline regressions. One sleep submission and the existing
+deadline remain enforced; NEO-182 still needs a clean attended repeat.
+
+[244 — First 60-second battery RTC trial and collection limitation](244-first-60-second-battery-rtc-trial.md)
+records a successful device sleep, owner confirmation and separately verified
+recovery after the host stops on an incomplete JSON reply. The recovered
+original remains unchanged; full host-workflow qualification, repeatability
+and sleep energy remain open.
+
+[243 — First 60-second USB RTC-wake trial](243-first-60-second-usb-rtc-trial.md)
+records seven passing preparation checks, matching awake rehearsal and one
+owner-confirmed RTC wake with both routes recovered. All four CPUs participate,
+timekeeping freeze is observed and immediate battery endpoints pass. The
+60-second battery-only trial, repeatability and sleep energy remain pending.
+
+[242 — Bounded RTC duration protocol](242-bounded-rtc-duration-protocol.md)
+prepares a capped 60-second one-shot option with matching rehearsal/history,
+duration-aware deadlines and immediate battery endpoints. Offline regressions
+pass; hardware qualification, longer durations and sleep energy remain pending.
+
+[241 — Diagnostic.25 backlight power comparison](241-diagnostic25-backlight-power-comparison.md)
+records a passing continuous battery-only lit/off/lit sequence, 31 samples
+per window, complete brightness/audio restoration and unchanged PM31/0.
+The off window is 11.6–26.9 mW below the two lit references in uncalibrated
+software estimates; lit-window drift is 15.3 mW. Sleep power remains unmeasured.
+
+[240 — Diagnostic.25 battery baseline](240-diagnostic25-battery-measurement-baseline.md)
+records the passing 61-sample awake battery window, approximately 264 mA / 1.05 W
+with the dim display, unchanged PM31/0 and no screen or sleep operation. It
+defines the next backlight/sleep comparison steps and limits of software-only
+sleep-energy measurements.
+
+[239 — Diagnostic.25 MUSB restart integration review](239-musb-restart-integration-review.md)
+records no actionable Standards or Spec findings, verified source/test/image
+provenance and completion of NEO-108's restart scope. Hardware coverage is
+21 debug checks and 10 actual sleep/wake cycles, with zero PM failures.
+Energy, broader reliability and controller removal remain separate.
+
+[238 — Diagnostic.25 guided cable sleeps](238-diagnostic25-guided-cable-sleep-qualification.md)
+records four accepted attended cycles: remove, attach, remove, attach. Both
+insertions stay dark until RTC wake; endpoint-specific network access, original
+keypad, all-CPU callbacks, timekeeping freeze and restored policy pass. Final
+both-route health is PM31/0. Energy and broad reliability remain separate.
+
+[237 — Diagnostic.25 battery-only RTC qualification](237-diagnostic25-battery-rtc-qualification.md)
+records seven fresh debug passes, the awake battery rehearsal and one attended
+battery-only sleep with Wi-Fi recovery, all-CPU callbacks, timekeeping freeze
+and owner-confirmed normal return. Separate USB reattachment and both-route
+health pass; PM is 20/0. Cable changes during sleep and energy remain separate.
+
+[236 — Diagnostic.25 USB reconnects after sleep](236-diagnostic25-post-sleep-usb-reconnects.md)
+records four physical awake reconnects, per-cycle independent USB SSH proofs,
+final USB/Wi-Fi/Mac health and unchanged PM12/0, SDIO usage and keypad identity.
+Remaining battery/cable sleep profiles, latency and energy stay separate.
+
+[235 — Diagnostic.25 connected sleep repeats](235-diagnostic25-connected-sleep-repeatability.md)
+records four passing attended RTC sleep/wake repeats, both-route recovery,
+retained keypad, all-CPU callbacks and timekeeping freeze, with owner-confirmed
+normal warnings/display returns. PM is 12/0; report 236 follows awake USB
+reconnects, while battery/cable sleep coverage and energy remain separate.
+
+[234 — Diagnostic.25 PM qualification](234-diagnostic25-pm-qualification.md)
+records all seven passing freezer/driver/late-noirq checks, retained keypad,
+both-route recovery and owner-confirmed warning/display returns. The awake RTC
+rehearsal and first actual connected-USB sleep pass with all-CPU callback and
+timekeeping-freeze evidence; report 235 follows the four connected-USB repeats.
+
+[233 — Diagnostic.25 installation](233-diagnostic25-installation.md) records
+the warning/shutdown, fresh DEV-card identity, guarded write and complete 4 GiB
+readback, confirmed boot and passing awake prerequisites. Both routes, image,
+battery, CPU-idle/timer, journal, power-key ownership and RTC checks pass;
+attended PM/USB qualification remains open.
+
+[232 — Diagnostic.25 MUSB restart integration](232-musb-restart-image-integration.md)
+records a built and offline-verified image from the reviewed NEO-108/163 endpoint
+restart fix, retaining diagnostic.24 recovery. The later NEO-106 teardown stack
+is excluded. Report 233 follows its verified installation and awake checks;
+attended PM/USB qualification remains separate.
+
+[225 — MUSB deferred restart ownership](225-musb-resume-request-ownership.md)
+records the NEO-108 candidate and NEO-163 review corrections: retaining restart
+ownership across a busy giveback, balancing its temporary PM reference, and
+checking completion requeues and error propagation. It corrects the original
+scenario count and distinguishes host fixtures, Linux UML integration, ARM
+compilation and pending hardware qualification.
+
+[221 — Diagnostic.24 SSH stall awake investigation](221-diagnostic24-ssh-stall-awake-investigation.md)
+narrows two original failures to accepted client greeting bytes with no reply,
+preserves bounded timing/journal limits, and enables the existing opt-in socket
+observer in ordinary PM/RTC tasks. Host checks and awake route observations
+pass without sleep or display changes; the cause remains open as NEO-154.
+
+[220 — Diagnostic.24 connected sleep repeatability](220-diagnostic24-connected-sleep-repeatability.md)
+records four further actual RTC sleep/wake passes, all-CPU participation and
+timekeeping freeze each time, both-route recovery and owner-confirmed untouched
+normal returns. Final PM12/0 and full health pass; collection errors are retained.
+Battery/cable profiles, broader reliability and energy comparisons remain open.
+
+[219 — Diagnostic.24 PM qualification](219-diagnostic24-pm-qualification.md)
+records all seven debug passes, the awake RTC rehearsal and the first actual
+connected-USB RTC sleep at PM8/0. All four CPU callbacks advance, independent
+timekeeping freeze is observed and both routes recover. The owner confirms
+clear warnings and normal untouched returns; broader reliability and energy
+remain unqualified.
+
+[218 — Diagnostic.24 installation](218-diagnostic24-installation.md) records
+the coordinated shutdown, fresh card identity, full image readback and confirmed
+boot. Both SSH routes, all-CPU WFI/timer inventory and awake battery, clock,
+journal, power-key and RTC checks pass; PM and energy qualification remain.
+
+[217 — WFI s2idle image integration](217-wfi-s2idle-image-integration.md) combines
+the one-state CPU-idle candidate, BOOTTIME battery samples and awake measurement
+guards in diagnostic.24, with strict all-CPU/timer and clock-freeze evidence gates.
+Installed-image and energy qualification remain separate.
+
+[216 — SSH greeting source audit](216-ssh-greeting-source-audit.md) binds the
+installed versions to Paramiko, pinned Apple and exact patched Debian source
+references. It explains the local timeout/error sequence, checks forwarding
+and server admission paths, and adds a reusable awake provenance task. The
+original cause remains open as NEO-154; no speculative policy fix or extra
+sleep is introduced.
+
+[215 — RTC wake with socket observations](215-rtc-wake-socket-observation-validation.md)
+qualifies the integrated observer through one attended sleep: normal display and
+both-route recovery, twelve healthy SSH setups and three missing-socket failures
+before PM return. The Mac packet gap remains explicit; final health/continuation
+pass at PM12/0. The original intermittent setup failure remains unresolved.
+
+[214 — SSH failure socket observations](214-ssh-failure-socket-observations.md)
+adds opt-in snapshots after original SSH outcomes, with no inserted greeting
+delay or retry. Awake silent/greeting-only/healthy controls and packet integration
+pass; missing sockets remain explicitly unknown. Full host checks and unchanged
+boot/PM health pass. Attended qualification and the intermittent cause remain.
+
+[213 — Forwarded socket identity](213-forwarded-socket-identity.md) validates
+Mac worker/socket attribution against independent GameShell endpoint records on
+USB and Wi-Fi. Saved awake controls reject ambiguity and unrelated transports;
+offline reassessment and full host checks pass. Failure-path integration remains.
+
+[212 — RTC wake with forwarding byte observations](212-rtc-wake-forwarding-byte-validation.md)
+records a passing attended sleep, healthy post-return SSH with byte counts,
+another explicitly gapped Mac recording and seven matched later flows. An
+integer-flag compatibility correction passes awake validation; the earlier
+intermittent SSH cause remains unresolved.
+
+[211 — Forwarded SSH observations](211-forwarded-ssh-observation.md) separates
+channel confirmation, TCP identity and greeting delivery; records a later
+same-peer/port server closure; and adds passive byte/state counters validated
+with local failure controls and awake probes. The underlying cause remains open.
+
+[210 — RTC wake with a recovered segmented observer](210-rtc-wake-segmented-observer-validation.md)
+records one attended sleep pass, a real Mac interface-disappearance error,
+bounded recorder recovery, zero reported drops and five matched later flows.
+The gap remains unqualified as continuous coverage, and a post-return SSH setup
+failure supplies evidence for the next investigation.
+
+[209 — SSH recorder burst and gap recovery](209-ssh-recorder-burst-and-gap-recovery.md)
+records an awake reproduction of capture drops, reduced metadata volume with
+zero reported drops on the repeated workload, and bounded Mac handle recovery
+with explicitly unqualified gaps. Host checks and unchanged boot/PM health pass;
+real suspend-transition qualification remains separate.
+
+[204 — Unused Ethernet build candidate](204-unused-ethernet-build-candidate.md)
+audits platform MAC support inherited from the generic Sunxi configuration and
+adds a separate paired-kernel comparison. The compressed kernel shrinks by
+103,648 bytes (1.575%), while all ten modules and the DTB stay identical. The
+linked address span is unchanged; reclaimed RAM is not demonstrated. The
+installed image is unchanged; hardware qualification and any energy/boot-time
+effect remain separate.
+
+[203 — Build preflight](203-build-preflight.md) moves locked-input/resource checks
+and public-source preparation ahead of long compilation. Missing explicit inputs
+and low disk headroom fail early; final build checks remain required. This is
+host-only work and does not change the installed image.
+
+Current installed image: diagnostic.23; awake qualification and bounded connected-USB sleep pass.
+[202 — Post-return SSH investigation](202-post-return-ssh-investigation.md)
+correlates the failed setup with a preauthentication closure, distinguishes it
+from user-manager startup and adds Boolean protocol-state observations before
+cleanup. Real local SSH tests and awake USB/Wi-Fi probes pass at unchanged
+PM12/0. The underlying intermittent cause remains open; no new sleep or image
+change was needed.
+[201 — Diagnostic.23 connected sleep repeatability](201-diagnostic23-connected-sleep-repeatability.md)
+records four further actual RTC-wake passes, both routes recovering each time,
+retained keypad and restored policy. The owner confirms clear warnings and
+untouched normal returns. Final PM12/0 covers seven debug cycles and five actual
+sleeps. Timestamp alignment separates collection failures before return from
+one fresh post-return SSH setup failure; cause, CPU retention and energy remain open.
+[200 — Diagnostic.23 PM qualification](200-diagnostic23-pm-qualification.md)
+records seven passing debug checks, both-route recovery, retained keypad and
+stable SDIO usage at PM7/0. All warnings/display returns are owner-confirmed;
+collection failures retain timestamped evidence. Awake rehearsal and the first
+actual connected-USB RTC sleep also pass, with owner-confirmed warning and
+untouched display return at PM8/0. The actual sleep's successful SSH response
+spans sleep; its duration is not wake latency. Report 201 adds bounded
+repeatability; energy remains open.
+[199 — Diagnostic.23 installation](199-diagnostic23-installation-and-pty-validation.md)
+records verified flashing, owner-confirmed login, passing awake checks and
+modern terminal compatibility. Legacy device-unit records fall by 512,
+unit loading drops to 0.59–0.61 seconds and first USB SSH channels to
+1.91–1.96 seconds in repeated samples. Reports 200–201 add PM qualification;
+energy remains separate.
+[198 — Legacy PTY startup candidate](198-legacy-pty-startup-candidate.md)
+identifies 512 legacy-terminal device-unit records, removes their kernel
+preallocation in diagnostic.23 and saves ordinary-user Unix98/SSH terminal
+checks. Report 199 adds the installed-image startup measurements.
+[197 — SSH collection timing](197-ssh-collection-timing.md) records host-only
+instrumentation, three passing awake route batches, unchanged original sleep
+evidence and a reproducible first-session delay with a user-manager unit-loading
+lead. Actual post-sleep failure attribution remains open; no new sleep ran.
+[196 — Connected sleep repeatability](196-diagnostic22-connected-sleep-repeatability.md)
+records four consecutive actual RTC-wake passes, each with both routes, retained
+keypad and restored policy. The owner confirms clear warnings and untouched
+normal returns. Final PM13/0 and stable SDIO usage qualify this bounded USB
+profile; CPU retention and energy remain unqualified.
+[195 — PM qualification](195-diagnostic22-pm-qualification.md) records passing
+freezer, driver and five late/noirq checks with both routes, retained keypad
+and the passing awake RTC rehearsal. Two actual connected-USB RTC sleeps pass
+automated checks at PM9/0. The first warning was missed; the owner confirms
+the requested repeat's warning and untouched normal display return. Energy and
+CPU retention remain unqualified.
+[194 — Installation and ADC validation](194-diagnostic22-installation-and-adc-validation.md)
+records full card readback, owner-confirmed login, healthy startup/both routes
+and a passing read-only masked-helper inventory. Physical measurement accuracy
+and fresh PM qualification remain open.
+[193 — Diagnostic.22 integration](193-diagnostic22-adc-integration.md) records
+passing host/kernel/image checks, verified Mac staging and the recovery
+checkpoint. Report 194 supplies the subsequent installation/awake evidence.
+[192 — ADC width correction](192-axp-adc-width-correction.md) records the
+shared helper audit, candidate low-byte mask, exhaustive native/ARM32 checks
+and read-only comparison. It is now installed in diagnostic.22; the physical
+voltage discrepancy remains unresolved.
+[191 — Connected sleep repeatability](191-diagnostic21-connected-sleep-repeatability.md)
+records four consecutive actual RTC-wake passes, both routes recovering each
+time, owner-confirmed warnings/display and final PM12/0 with fresh B8 reads.
+Other profiles, broader reliability and energy remain unqualified.
+[190 — Suspend/resume qualification](190-diagnostic21-pm-qualification.md)
+records seven passing attended debug stages, confirmed warnings/display returns
+and the awake RTC rehearsal, followed by one actual connected-USB RTC wake.
+Both routes recover, the owner confirms normal display, and fresh B8 reads
+survive resume. Its connected-USB repeatability continuation is in report 191.
+[189 — Installation and gauge validation](189-diagnostic21-installation-and-gauge-validation.md)
+records full card readback, owner-confirmed login, passing awake startup checks
+and fresh B8 reads. Voltage/capacity uncertainty and broader PM qualification
+remain open. [187 — Gauge-status image integration](187-diagnostic21-gauge-integration.md)
+records patch 0035, schema-3 inventory admission and verified build/transfer.
+
+[188 — Historical source compaction](188-historical-driver-source-compaction.md)
+records verified replay of saved patch exports, preserved compiler evidence
+and disk-space recovery for the image build.
+
+The previous diagnostic.20 qualification is preserved below.
+[178 — Guided cable batch](178-guided-cable-batch-hardware-validation.md)
+records four observed alternating USB removal/attachment sleeps, RTC wakes,
+restored endpoints and normal display returns, followed by return to home Wi-Fi.
+Charging during sleep and standby energy remain unqualified.
+[179 — Software charging control](179-software-charge-inhibit-and-discharge.md)
+distinguishes the existing charge-inhibit control from forcing battery discharge
+while USB remains attached. No charging setting was changed in that review.
+[180 — Sleep charge measurement](180-sleep-charge-measurement-design.md)
+records the counter, cache and attribution limits;
+[181 — Charge inventory](181-charge-inventory-validation.md) records the saved
+read-only task and its passing awake hardware inspection.
+[182 — Awake charging baseline](182-awake-charging-baseline.md) records the
+bounded telemetry task, passing two-minute full-battery baseline and its
+uncalibrated measurement limits.
+[183 — Partial discharge and charging validation](183-partial-discharge-charging-validation.md)
+records the completed awake discharge and partial-charge baseline on a new
+boot, the preserved first attempt's transport failure, and the recurring
+voltage/gauge uncertainty. Direct sleep-charge evidence remains open.
+[184 — AXP223 measurement audit](184-axp223-measurement-source-audit.md)
+cross-checks the manuals, vendor code and locked Linux paths. It records the
+conflicting charger-control descriptions, observed percentage cadence, live
+status caching issue and unqualified ADC coherence/accuracy.
+[185 — Extended voltage inventory](185-axp223-voltage-inventory.md) records the
+schema-2 read-only helper and passing hardware capture, preserving raw REG34
+and ADC-byte evidence without interpreting disputed controls or changing settings.
+[186 — AXP223 gauge-status candidate](186-axp223-gauge-status-candidate.md)
+corrects B8 status caching only for AXP223. Native/ARM32 source tests and the
+complete ARM MFD object pass; no new image has been built or installed.
+
+Historical diagnostic.17 checkpoint:
 [118 — Hardware qualification](118-diagnostic17-hardware-qualification.md)
 records verified card installation, startup/awake checks and observed freezer,
 driver and five late/noirq passes. The SDIO count stays at 2 throughout, with

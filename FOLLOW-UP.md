@@ -113,11 +113,16 @@ command ended with status 143 while its Docker kernel build remained running.
 The host log stopped advancing; Docker logs and process activity established
 continued compilation. Attached to that exact container, observed exit 0,
 then verified all 16 kernel artifacts before continuing image assembly. No
-duplicate build was started. Audit host-owned workflow locking, durable logs
-and per-stage container identity across parent interruption; a stopped client
-must not imply retired writers or permit a competing build. Reproduce and fix
-offline before claiming interruption-safe build ownership. This is separate
-from the abandoned SSH-stall work; no GameShell command was involved.
+duplicate build was started. The candidate on `work/build-stage-ownership`
+now reserves per-stage ownership before Docker creation, blocks later logged
+stages until verified retirement, and supplies `build:stage:status/resume/stop`
+with retained container logs and actual exit status. The old wrapper's
+second-writer admission is reproduced in a bounded offline fixture; current
+qualification and review are recorded in
+[report 287](docs/287-docker-build-ownership.md). Recovery collects the original
+container; it does not replay host postprocessing or prove image validity.
+Other branches must adopt the change deliberately. This is separate from the
+abandoned SSH-stall work; no GameShell command was involved.
 
 - [ ] NEO-103 real-kernel concurrency preparation: the locked Linux 6.18.54
   `arch/um/Kconfig` restricts `NR_CPUS` to 1. The later NEO-163 UML suite covers

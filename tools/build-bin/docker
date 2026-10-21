@@ -1,0 +1,8 @@
+#!/bin/bash
+# Installed in PATH only for a serialized repository build stage.
+set -euo pipefail
+if [[ ${1:-} == run ]]; then
+    shift
+    exec python3 "$(dirname "$0")/../docker-stage.py" run "${NEO_BUILD_STAGE:?}" -- "$@"
+fi
+exec "${NEO_BUILD_DOCKER:?}" "$@"

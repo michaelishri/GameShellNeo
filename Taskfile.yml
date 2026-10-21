@@ -68,6 +68,30 @@ env:
   NEO_CAMERA_FPS: '{{.FPS | default "2"}}'
 
 tasks:
+  test:build-workflow:
+    desc: Check build preflight, setup and logger behavior without Docker or device access
+    cmds: [bash tools/run-logged.sh build-workflow python3 -m unittest tools.tests.test_workflow tools.tests.test_build_preflight tools.tests.test_setup -v]
+
+  build:stage:status:
+    desc: Inspect the recorded build container without starting another build
+    cmds: [python3 tools/docker-stage.py status]
+
+  build:stage:resume:
+    desc: Reattach to the original build container and save its complete logs and result
+    cmds: [python3 tools/docker-stage.py resume]
+
+  build:stage:stop:
+    desc: Stop only the recorded build container, then retain its logs and actual exit status
+    cmds: [python3 tools/docker-stage.py stop]
+
+  test:docker-ownership-baseline:
+    desc: Reproduce historical build-lock loss in a bounded offline Docker fixture (expected failure)
+    cmds: [bash tools/run-logged.sh docker-ownership-baseline python3 tools/check-docker-stage.py --baseline]
+
+  test:docker-ownership:
+    desc: Exercise interrupted-build admission and reattachment in bounded offline Docker fixtures
+    cmds: [bash tools/run-logged.sh docker-ownership python3 tools/check-docker-stage.py]
+
   test:brcmfmac-output-baseline:
     desc: Reproduce unchecked diagnostic output in offline native/sanitizer cases (expected failures)
     cmds: [bash tools/run-logged.sh brcmfmac-output-baseline python3 tools/check-brcmfmac-tx-recovery.py --bounds-baseline --native-only]

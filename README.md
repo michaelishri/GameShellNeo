@@ -834,6 +834,9 @@ Armbian, signature and final image checks remain mandatory.
 | `task build:kernel` | Kernel source/configuration work; preserves incremental build outputs |
 | `task kernel:reset` | After changing the patch queue; archives old kernel source/output and artifact metadata/logs under `.local/previous-kernels/`, then run `task build`. Recovery images stay in `.local/artifacts/` |
 | `task build:rootfs` | Exercise Debian bootstrap/cache preparation independently |
+| `task build:stage:status` | Inspect a recorded container after a lost build command or observation timeout |
+| `task build:stage:resume` | Follow the same container, collect its complete log and actual exit code, then retire it |
+| `task build:stage:stop` | Request termination of only the recorded container and retain its result |
 | `task build:prune-driver-scratch SUITE=brcmfmac-pm-tests` | Preview superseded compiler trees; add `APPLY=1` to remove them while retaining current normal/debug build evidence |
 | `task build:compact-driver-sources SUITE=musb-sleep-tests` | Verify duplicate sources against the locked archive and patch queue; add `APPLY=1` to replace them with shared-source links, keeping compiled outputs and evidence |
 | `task check:kernel-source-reuse` | Build two real ARM configurations and regenerate an object, checking isolated outputs and shared read-only source; no device access |
@@ -887,6 +890,59 @@ and `image.log`. For example, use `tail -f .local/build/image.log` while buildin
 Older logs are retained under `.local/build/logs/`. A failed stage returns a
 failure and prints the log tail. The wrappers reject overlapping build stages;
 run build tasks sequentially on this memory-constrained host.
+
+Docker commands launched through `run-logged.sh` also retain a per-checkout
+ownership record in `.local/build/container-active.json` before creation.
+The fixed container name and workspace/stage/run labels identify the same
+container after the foreground command disappears. A running container or an
+uncollected result blocks another logged stage before host preparation or log
+rotation. An observation timeout does not establish that compilation stopped.
+
+From the same checkout, inspect and recover the recorded stage:
+
+```sh
+task build:stage:status
+task build:stage:resume
+# To deliberately terminate that stage instead:
+task build:stage:stop
+```
+
+`resume` follows an existing running container, collects an exited container,
+or starts the original created container if creation was interrupted. It never
+creates a replacement. `stop` verifies the exact container identity, requests
+termination with a ten-second grace period and collects the actual exit code.
+Both commands return the container's exit status; cancelling a job that never
+started returns 125 with `exit_code: null`, rather than inventing a process
+result. A cancelled late creation is retired with `stop` and cannot be resumed.
+
+The daemon retains container output across host interruption. Final collection
+saves `job.json`, `container.log` and `result.json` under
+`.local/build/container-stages/RUN/`; the result records the state, exact ID,
+exit code and log SHA-256. Only after saving that evidence does the helper
+remove the verified container and release admission. Failed observations,
+log collection or removal retain ownership and private failure evidence.
+The interrupted top-level stage log remains unchanged; use the recorded
+`container.log` for the complete container output. Recovery does not replay
+the outer Task or host-side postprocessing: inspect the result, then run the
+appropriate existing artifact checks and remaining build tasks. A container
+exit of zero alone does not verify a completed image.
+
+Keep the ownership records and Docker container intact until collection. If
+Docker is unavailable, identity differs, or a log cannot be verified, inspect
+the saved evidence and restore access before proceeding. Do not clear a lock
+or ledger, start another build or remove unrelated containers to bypass a
+blocked stage. These guarantees apply to logged commands in this checkout;
+direct Docker commands and older worktrees keep their existing behavior.
+Docker log rotation is rejected before starting a managed container so that
+an interrupted build's full output remains available. Logs may include private
+build inputs and stay outside Git.
+
+`task test:docker-ownership` runs bounded fixtures using the locked, already
+cached builder with network access disabled. The historical reproduction
+`task test:docker-ownership-baseline` intentionally exits nonzero when the old
+wrapper admits a second writer. `task test:build-workflow` checks host-only
+workflow behavior. [Report 287](docs/287-docker-build-ownership.md) records the
+contract, evidence and recovery limits.
 
 To reclaim superseded driver compiler trees, first preview the named
 suite, then apply the reviewed selection:

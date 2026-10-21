@@ -200,8 +200,30 @@ twelve-group attempt `87f5a037f59c472ab0607ba0655ac940` passes, all five input
 hashes match, and no ownership records remain. Full host checks pass again
 (24 runtime, 1,007 tooling with two optional skips, C regressions and shell
 checks); see `.local/build/neo194-check-start-receipt.log`. Docker Engine/client
-29.8.1 (daemon commit `464cd50`) was used for these fixtures. Final review
-recheck is pending.
+29.8.1 (daemon commit `464cd50`) was used for these fixtures.
+
+### Final Standards recheck
+
+The independent reviewer cleared all documented-standard and smell findings at
+`3eeffc8`. The authoritative receipt preserves unresolved requests, both guarded
+operations require positive unrequested evidence, and the documentation records
+the recovery limits. The reviewer independently verified all twelve saved
+groups, five current input hashes and retired ownership records without
+running Docker or changing files.
+
+### Final Spec recheck
+
+The independent reviewer cleared every Spec finding at `3eeffc8`, including
+the delayed-start race, and found no unsolicited scope. Original/recovery
+logging gates, late-observer reconciliation and unresolved/legacy start
+ownership now meet the ticket contract. The reviewer independently verified
+the same twelve results, input hashes and retired records without rerunning
+the fixtures.
+
+Final review: Standards zero outstanding findings; Spec zero outstanding
+findings. NEO-194's bounded local implementation, documentation and offline
+qualification are complete. Other worktrees require deliberate adoption; no
+new image or hardware qualification is implied.
 
 ## Scope and limits
 

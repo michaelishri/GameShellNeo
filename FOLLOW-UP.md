@@ -108,17 +108,19 @@ the caller results and their boundary-model limits.
 preserves the initial helper evidence and the two packet findings before
 their reproduction; no observed GameShell fault is attributed to either one.
 
-**NEO-194 local build ownership, 12 October 2026:** the diagnostic.26 host
+**NEO-194 local build ownership, completed 22 October 2026:** the diagnostic.26 host
 command ended with status 143 while its Docker kernel build remained running.
 The host log stopped advancing; Docker logs and process activity established
 continued compilation. Attached to that exact container, observed exit 0,
 then verified all 16 kernel artifacts before continuing image assembly. No
-duplicate build was started. The candidate on `work/build-stage-ownership`
+duplicate build was started. The implementation on `work/build-stage-ownership`
 now reserves per-stage ownership before Docker creation, blocks later logged
 stages until verified retirement, and supplies `build:stage:status/resume/stop`
-with retained container logs and actual exit status. The old wrapper's
-second-writer admission is reproduced in a bounded offline fixture; current
-qualification and review are recorded in
+with retained container logs and actual exit status. A durable start receipt
+blocks repeated starts and created-state removal while an earlier request is
+unresolved. The old wrapper's second-writer admission and five review
+regressions were reproduced before correction. All twelve Docker groups,
+full host checks and both independent review rechecks pass; evidence is in
 [report 287](docs/287-docker-build-ownership.md). Recovery collects the original
 container; it does not replay host postprocessing or prove image validity.
 Other branches must adopt the change deliberately. This is separate from the

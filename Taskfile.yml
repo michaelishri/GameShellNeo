@@ -591,6 +591,14 @@ tasks:
     desc: Test MUSB runtime-PM retirement and callback drain in an isolated UML kernel
     cmds: [bash tools/run-logged.sh musb-pm-kunit python3 tools/check-musb-restart-kunit.py --suite pm]
 
+  test:musb-wake-dpm-kunit:
+    desc: Qualify wake policy and failure unwind through actual Linux device-PM traversal in UML
+    cmds: [bash tools/run-logged.sh musb-wake-dpm-kunit python3 tools/check-musb-wake-dpm-kunit.py]
+
+  test:musb-wake-dpm-control:
+    desc: Require the compiling missing-callback control to fail exact device-PM dispatch assertions
+    cmds: [bash tools/run-logged.sh musb-wake-dpm-control python3 tools/check-musb-wake-dpm-kunit.py --control callbacks-unregistered]
+
   test:musb-irq:
     desc: Test actual core IRQ/work ownership and teardown ordering on native and ARM32
     cmds: [bash tools/run-logged.sh musb-irq python3 tools/check-musb-irq.py]

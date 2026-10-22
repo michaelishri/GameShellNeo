@@ -17,8 +17,8 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 ## Reports
 
 [302 — Finite scheduled clock brackets](302-scheduled-clock-boundaries.md)
-records the separate fixed guard/RAW experiment, pause ABI, offline evidence
-and unchanged clock/PM and exclusive-device gates.
+records the separate fixed guard/RAW experiment, pause ABI, offline evidence,
+one finite GameShell capture and unchanged clock/PM and exclusive-device gates.
 
 [300 — MPFS parent resource and PHY ownership](300-mpfs-removal-ownership.md)
 records the two backend teardown defects, actual-source and selected-object

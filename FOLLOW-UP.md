@@ -325,9 +325,20 @@ combined checks (nine expected skips). The ARM fixture uses a fake recorder
 and supplies no kernel or hardware evidence. Accepted main `49b1c23` is
 incorporated; actual clock/pause ABI pins and all 33 production patches remain
 unchanged. Original failures and all actual qualification receipts are retained.
-Fresh reviews and a separate device lease remain required before one capture;
-no scheduled GameShell operation has occurred. A clean finite sample cannot
-clear NEO-192 or dependent PM gates.
+Entirely fresh Standards/Spec reviews accepted frozen `6524aea` with zero
+findings. The separately leased single GameShell capture completed all 256
+calls / 31 pauses with 458 writer records and no loss; independent replay
+matches. Read CPUs 0/1/2/3 supplied 120/24/8/104 calls across a 3.157333209 s
+RAW interval, with no discrepancy in this finite sample. Fresh source/runtime,
+both routes, protected kernel continuity and mounted-p1 recovery-flag pre/post
+checks pass. The exact Kiyo capture stopped after ten frames; actual first
+and last frames were inspected. Original unit/PIDs/stage and recorder
+ownership are closed. The coordinator verified
+the 45-file postflight receipt and released the lease. Final documentation
+adopts accepted MPFS context in a separate checkout; the physical capture's
+source and 98-artifact checkpoint remain unchanged. Final review/publication
+is pending. NEO-192's historical MONOTONIC/RAW faults and dependent PM gates
+remain open, and diag27 stays unconfirmed with recovery default.
 [Report 302](docs/302-scheduled-clock-boundaries.md).
 
 **Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies

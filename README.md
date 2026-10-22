@@ -1408,6 +1408,9 @@ and `task check:scheduled-clock-workload` qualify its explicit inputs offline.
 It needs its own independent reviews and device lease before execution;
 [report 302](docs/302-scheduled-clock-boundaries.md) records the schedule,
 retained failures and distinction between offline ABI fixtures and hardware.
+One separately reviewed and leased capture completed the fixed plan across
+four CPUs without a discrepancy in that finite sample. The original clock
+faults and dependent PM gates remain open; this is not reliability admission.
 
 The candidate ADC width correction has its own saved checks:
 

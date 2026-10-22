@@ -2,9 +2,10 @@
 
 23 October 2026 NZDT. This is a separate, opt-in diagnostic experiment after
 NEO-213's accepted development-directory admission. It preserves the original
-reader and capture mode. No scheduled GameShell capture has been authorized
-or performed at this checkpoint. The historical MONOTONIC guard fault and
-separate RAW −750 ns discrepancy remain unresolved; PM remains unqualified.
+reader and capture mode. One independently reviewed and authorized scheduled
+GameShell capture completed all 256 calls and 31 pauses without a discrepancy
+in that finite sample. The historical MONOTONIC guard fault and separate RAW
+−750 ns discrepancy remain unresolved; PM remains unqualified.
 
 ## Discriminating observation
 
@@ -104,8 +105,8 @@ task report:clock-scheduled -- --kernel <saved-NDJSON> --users <saved-JSON>
 Live use additionally requires `--apply --hardware-checkout <frozen-checkout>`,
 fresh independent Standards and Spec acceptance, and a separate exclusive
 coordinator device lease. Current boot/root/runtime and health must be measured
-fresh; the old successful capture is not admission for another operation.
-No live lease exists at this checkpoint.
+fresh; an old successful capture is not admission for another operation. The
+single capture below used reviewed source `6524aea`; its lease is now released.
 
 ## Offline qualification and retained limits
 
@@ -205,6 +206,114 @@ The original source image was rehashed unchanged. The proof distinguishes
 actual clock/ABI inputs from generic registry context and historical
 reader/image lock identities.
 
-Fresh independent review, publication permission and a separate live device
-lease remain required. Any complete or clean finite result leaves NEO-192 and
-PM acceptance open unless the underlying evidence actually resolves them.
+## One authorized GameShell capture
+
+Entirely fresh Standards and Spec reviewers accepted frozen
+`6524aea6e2a6226e54fabf336cf63eaf64f0fada` with zero required or optional
+findings. Their retained report SHAs are respectively
+`be6767624c35d0d27824e993979adf4a126110eda0082f328230411d1f9dc597`
+and `c73a83c46408dc97481b1eee37cbe19ee5030d636691574cfcfbd89fd655aaf9`.
+The original checkout and its 98-artifact index remain unchanged.
+
+Exclusive lease `device-neo217-01` authorized exactly one scheduled operation.
+Original host session 60631 / Task PID 997556 started at 13:13:45 UTC on
+22 October and exited 0 at 13:14:51. Original private capture
+`.local/diagnostics/20261022T131425.941685Z/` contains the exact records,
+runtime/source snapshots, health inspections, unit states and replay.
+
+| Observation | Retained result |
+| --- | --- |
+| Clock calls / pauses | 256 / 31; exact declared order and relative requests |
+| Kernel stop / writer records | Manual stop; 458 writers; zero loss |
+| Read CPUs 0 / 1 / 2 / 3 | 120 / 24 / 8 / 104 calls |
+| First-to-last RAW interval | 3,157,333,209 ns |
+| Boundary / kernel / userspace findings | Zero in this sample |
+| Actual contract | 1,950,028 bytes; SHA `01d0e05379c43985e4cca4344c9e8310b65c9b90f48b2d12f88ddcffa1c27eac` |
+| Kernel records | SHA `0285ba8b8778cac662f34d4b583c3ea3bd67b0db44c265127b2af56a4665ce00` |
+| Userspace records | SHA `ba6acd12e6081a525c621bbc134114cba9e86f22c2072b97027a1738672ff7cc` |
+
+The independent saved `report:clock-scheduled` Task exited 0 and exactly
+reproduced the original analysis. Its records retain the actual consumed
+counter, coherent conversion tuple, writer publications and userspace values.
+No recurrence occurred to localize either historical fault. Coverage of four
+CPUs here is a finite observation, not migration, accuracy or reliability
+qualification. A pause does not establish a particular CPU idle state.
+
+Fresh admission measured boot `cea309a9-bea5-49d7-8d41-e462ddd57e89`,
+kernel `6.18.54-gameshellneo26`, build ID
+`a545d309c5f43e3e047cc124322e75e125aef3f5`, and the actual diag27 directory
+root `/systems/diag27/root`, inode 131075 / device 179:3. The card CID,
+store PARTUUID/UUID, release/deployment hashes and actual Python/libc match
+the explicit contract. Before/after snapshots are identical. Both same-process
+vDSO clock exports remain absent. Services remain active with restart counts
+zero, PM success/failure remains 0/0, and the protected 282-record kernel
+checkpoint remains unchanged at SHA
+`aef844482f730b1309d9a112a38c9dc0d1339850ef728ad6cfc15faa4384978a`.
+USB and independent Wi-Fi checks pass. This new boot's clean counters do not
+erase the historical failed boot or permit PM.
+
+The exact Razer Kiyo 5 s / 2 fps session
+`20261022T131121.217516Z` produced 10 frames and stopped. Actual first and last
+JPEGs show the readable tty1 login console. They do not qualify physical input,
+responsiveness, latency or power. A local wrapper initially expected the Task's
+displayed `frame_count` field in the raw result; the original raw schema uses
+`frames`. That KeyError happened before transport loading. It is retained;
+the same actual camera result was inspected without another camera capture.
+
+The separately granted read-only v2 helper, SHA
+`a174dcc4c5a1905f2777c782947d1b21ee54b886b59a758d0ebe860d969df2a7`,
+ran fresh before and after the operation. It verifies the existing whole-root
+vfat p1 mount at device 179:1, the actual block device and pinned PARTUUID,
+then all three flag hashes. NEXT, GOOD and RECOVER all remain recovery; diag27
+is unconfirmed. Unlike NEO-213's historical postflight-only flag observation,
+this operation has a real pre/post comparison. No historical receipt is
+retroactively upgraded.
+
+The original unit is
+`gameshellneo-clock-boundary-3ff9ba9012e94313859cc8d0d2f15080.service`,
+original device PID 923. Retained states show successful exit status 0 followed
+by inactive/not-found with MainPID and ControlPID zero. The owned stage
+`/tmp/gameshellneo-clock-boundary.EVU7EtYL` is absent; no recorder descriptors
+or active diagnostic units remain. The host removed that successful private
+stage only after independent replay and postflight. No second capture, PM,
+reboot, counter reset, clocksource/affinity change, installed replacement or
+boot-selector write occurred.
+
+Postflight receipt SHA
+`38b540462ea4af11e98892cda76535b6673336fa7f2afba2bc56ee58fd981df1`
+links 45 original files. The coordinator independently streamed every linked
+hash and checked state/ownership before accepting and releasing the lease.
+All original host sessions are terminal. An additional local index audit used
+an inappropriate whole-file read of the image and lost its observer result;
+its explicit inconclusive note remains retained. It is not a passing hash
+check and was not repeated. The actual capture's normal admission and the
+independent reviews remain separate evidence.
+
+The separate final checkout's stable `live-evidence-collation-v2.json`, SHA
+`556752e4eafe3b88d80cfbfe9ca9d7a66535e3bee9e3717f5d03af404e241f06`,
+collects 153 expected artifact hashes: the preserved 98-file offline index,
+the 45 accepted postflight files, and the index/receipt/helper/proposal/review
+sources. The original offline hashes are carried from both accepted fresh
+reviews, rather than claimed as a successful result of the lost extra audit.
+The 45 small postflight files were streamed again during collation. The
+original helper, proposal and first collation draft remain retained.
+
+## Final accepted context and remaining gates
+
+Final documentation is prepared in a separate checkout. It adopts accepted
+published main `02c633a0349ad986fe384cc0f94e26663baa3df3`, retaining NEO-215's
+isolated MPFS work, through merge `45ed6cd`. The sole merge conflict was the
+report index; exact report entries 302, 300 and 298 remain in that order.
+The physical capture executed frozen `6524aea`, before this context adoption;
+it is not relabeled as execution of the final merge.
+
+The clock, pause, ABI and reader sources remain byte-identical to the executed
+source. The shared Taskfile additionally contains accepted MPFS Tasks; its
+clock sections remain identical. Generic qualification snapshots therefore
+have explicit context differences rather than whole-tree equality. The final
+private proof records every actual admission input separately and preserves
+the unchanged 33 production patches and immutable image/runtime identities.
+
+Final independent review and publication remain required. NEO-217's finite
+experiment does not close NEO-192 or admit dependent PM. Any later experiment
+needs its own explicit scope, fresh evidence and exclusive device grant.

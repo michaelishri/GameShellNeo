@@ -134,12 +134,25 @@ preservation, strict old-entry refusal, bounded full staging, complete receipt
 maps, source/output corruption, failed managed ownership, unsupported imports,
 failed postflight and cleanup, timeout and no relaunch.
 
-Actual ARM Python/libc workload qualification and final combined host evidence
-are being completed separately. The managed workload uses a private regular
-sparse partition copy under this checkout's ignored workspace, with the source
-image bound read-only. It verifies extracted Python/libc hashes before execution
-and uses a fake recorder explicitly labeled ABI/workload-only. Its outputs
-must never be described as actual kernel or GameShell evidence.
+Actual ARM Python/libc qualification passes in
+`3be43f3e4fab4242ad24f022894a1b84`, receipt SHA
+`8bff42588612c9909938bfd69239532ef911c5f5d624aee16ab97ff4534a9018`.
+Original managed run `d66ac2c10ed14a1792fd6d562112cb1a` exited 0 without
+OOM/stop. Fifteen pure clock/pause/replay tests pass on native Python and the
+actual extracted ARM Python. The ARM workload then executes all 256 clock
+calls and 31 pauses using the unchanged original reader and the new pause
+library, whose SHA is
+`e59c4dda6ef2ed4db4d193c3643ee89a4958873fc17999ee5a950671cf37f639`.
+
+The managed workload uses a private regular sparse partition copy under this
+checkout's ignored workspace, with the source image bound read-only. It verifies
+extracted Python/libc hashes before execution and again afterward. The actual
+files match the verified original inventory: Python SHA
+`c5b8ff962e01a7e6fa49090d2f646e3c85a7e5806907e4e64dd7d619c7c388a7`
+and libc SHA
+`f7854d98c852da9c89d2cbdbeb980c5d1258ba6d624486f76b24c7741a9649b7`.
+It uses a fake recorder explicitly labeled ABI/workload-only. These outputs
+supply no genuine kernel or GameShell evidence.
 
 Original failures are retained: two pre-container source-parser refusals for
 comments and the exact `const clockid_t` declaration; synthetic test setup
@@ -150,6 +163,47 @@ keeps those host tests in their authorized host context and limits managed
 native/ARM tests to the pure clock/pause/replay suite, followed by the actual
 extracted ARM workload. No packages, SSH stubs or network access are added to
 hide the dependency difference.
+
+## Combined source and review checkpoint
+
+After all original writers were terminal, the branch adopted accepted published
+main `49b1c237ea3cd822195362f9462285fc1ee9a75c`. The sole source-merge conflict
+was the report index; both exact entries are retained in order 302, 298. Every
+clock/pause source and actual pause-build admission input remains unchanged.
+The broad qualification snapshot has one context difference,
+`tools/kernel_candidates.py`, which registers the accepted isolated USB
+candidate. The entire old snapshot is not claimed byte-identical.
+
+The selected 33 production patch names and hashes exactly match the completed
+original image. Their canonical map SHA is
+`d88de734919a86545b006d5298c79576938003c57436c4c0ccf4dbccce70e081`.
+The original reader lock keeps its historical `-gameshellneo25` suffix;
+image/pause inputs retain `-gameshellneo26`. The exact ABI sources and all
+other Linux fields remain separately verified; neither receipt is relabeled.
+
+The real read-only plan passes again on the combined source, including every
+required receipt/source check. Its exact executed serialization is 1950028
+bytes, SHA
+`01d0e05379c43985e4cca4344c9e8310b65c9b90f48b2d12f88ddcffa1c27eac`,
+within the unchanged 2 MiB limit. Full combined `task check` passes 24 runtime
+and 1331 tooling tests, nine expected skips, C checks and shell lint. All 30
+focused host tests pass. Combined log SHA is
+`bfd36aec8b47f7e91cb41178c9e4dde2e2e17fc0f9d483050e098396ffae82ad`.
+
+The actual saved replay Task independently retains synthetic MONOTONIC and
+RAW −750 ns events as complete diagnostic evidence, while a synthetic
+2048-writer-loss stream is incomplete. These are explicitly named synthetic
+fixtures, not claims of new hardware failures. Source image, original reader,
+actual extracted runtime, ABI/helper inputs, original failed jobs and exact
+records remain preserved. No current owned container remains active.
+
+Private `.local/scheduled-clock/evidence-index.json`, SHA
+`71915f1eccecb986f9bc258103adb6ac708b39cc8e7c3d88993fd78276adca33`,
+links 98 source/artifact files and the final proof, SHA
+`d0df6e443f2a0e9e51d6cbcb60e59a30a27249301c3f9bde6e78cd1a48276ba1`.
+The original source image was rehashed unchanged. The proof distinguishes
+actual clock/ABI inputs from generic registry context and historical
+reader/image lock identities.
 
 Fresh independent review, publication permission and a separate live device
 lease remain required. Any complete or clean finite result leaves NEO-192 and

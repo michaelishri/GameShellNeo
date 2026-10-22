@@ -319,8 +319,12 @@ experiment requests 32 guard/RAW brackets separated by 31 fixed relative
 or retry. The new pause-only library has separate native/ARM ABI, signal and
 source receipts; original reader/core and 384-call guards stay unchanged.
 Offline admission, replay, partial/error preservation and owned-stage tests
-are being qualified with a separate actual ARM Python/libc workload fixture.
-That fixture uses a fake recorder and supplies no kernel or hardware evidence.
+pass: 30 focused host tests, 15 pure native/ARM tests on each architecture,
+actual ARM Python/libc 256-call/31-pause execution, and 24 runtime / 1331 tooling
+combined checks (nine expected skips). The ARM fixture uses a fake recorder
+and supplies no kernel or hardware evidence. Accepted main `49b1c23` is
+incorporated; actual clock/pause ABI pins and all 33 production patches remain
+unchanged. Original failures and all actual qualification receipts are retained.
 Fresh reviews and a separate device lease remain required before one capture;
 no scheduled GameShell operation has occurred. A clean finite sample cannot
 clear NEO-192 or dependent PM gates.

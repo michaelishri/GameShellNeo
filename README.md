@@ -1634,6 +1634,47 @@ Evidence is saved under `.local/build/musb-queue-dma-tests/`.
 checks and the later source-suite/image integration requirements. It does not
 complete controller teardown or qualify DMA hardware on the PIO-only GameShell.
 
+The NEO-106 probe-unwind follow-up has two host-only tasks, run sequentially:
+
+```sh
+task test:musb-probe-roles       # Actual role helper with registration and mode failures, native/ARM32
+task check:musb-probe-drivers    # The same tests plus gadget, host, dual-role and module ARM builds
+```
+
+Receipts are under `.local/build/musb-probe-roles/`. The helper tests replace
+registration and hardware calls with controlled boundaries; they do not perform
+physical USB registration or controller removal. See
+[report 226](docs/226-musb-probe-role-unwind.md). The native/ARM32 check is also
+part of `task build`.
+
+The core IRQ/work retirement candidate has saved checks (run sequentially):
+
+```sh
+task test:musb-irq             # Actual IRQ/work removal and failure tails, native/ARM32
+task test:musb-irq-kunit       # Real Linux shared IRQ removal and held-handler drain in UML
+task test:musb-work-kunit      # Real work/timer closure and session PM accounting in UML
+task test:musb-pm-kunit        # Real runtime-PM callback drain and teardown accounting in UML
+task check:musb-irq-drivers    # Source regressions and five ARM configurations
+```
+
+The source check is part of `task build`. Its receipts are under
+`.local/build/musb-irq-tests/`; the kernel suite retains its accepted binary,
+configuration and results under `.local/build/musb-irq-kunit/`. The existing
+`test:musb-restart-kunit` task now tests callback retirement as well as its
+original restart/giveback regressions. The work/timer
+suite retains its artifacts under `.local/build/musb-work-kunit/`. These suites
+run entirely on the development machine. [Report 227](docs/227-musb-core-irq-retirement.md)
+and [report 228](docs/228-musb-core-work-retirement.md) distinguish the implemented
+boundaries from wider teardown and hardware qualification. The PM suite stores
+its own accepted artifacts under `.local/build/musb-pm-kunit/`;
+[report 229](docs/229-musb-runtime-pm-retirement.md) covers callback retirement
+before backend resource release and retained-reference accounting.
+[Report 230](docs/230-musb-resume-work-retirement.md) covers pending-resume
+admission/drain, request ownership and completion restart handoffs. The same
+saved tasks exercise the current source candidate; the UML restart suite uses
+real locks/waits and controlled thread interleavings, with hardware restart
+intercepted.
+
 For the CPI WFI s2idle candidate in diagnostic.24, use:
 
 ```sh
@@ -3441,3 +3482,26 @@ Changed helper/image inputs require fresh debug prerequisites and rehearsal.
 [Report 154](docs/154-usb-sleep-session-retirement.md) explains the prospective
 policy, source-test limits and required hardware qualification. Report 153's
 original failed result is unchanged.
+
+
+The `work/sunxi-retirement` integration combines Sunxi child notifier/work
+ownership and extcon provider lifetime with the core teardown queue. Host-only
+checks (run sequentially) are:
+
+```sh
+task test:sunxi-owner            # 240 actual-source scenarios, native and ARM32
+task check:extcon-drivers        # Notifier models and ARM board/module/TINY builds
+task check:musb-irq-drivers      # Combined MUSB + extcon objects, five ARM configurations
+task test:extcon-kunit           # Real notifier/SRCU tests, TREE and TINY kernels
+task test:extcon-provider-kunit  # Real provider/consumer ordering, same cached kernels
+```
+
+Use `VARIANT=tree` or `VARIANT=tiny` to select one KUnit configuration.
+The KUnit runner adds fixtures from `kernel/tests/` only to its isolated
+source tree; the production patch queue contains no extcon test fixtures.
+Accepted kernel/config/log/report copies and hashed receipts are retained
+under `.local/build/extcon-kunit/`; the two suites share compiled kernels
+but retain independent results. Source-test receipts are under
+`.local/build/{sunxi-owner-tests,extcon-notifier-tests,musb-irq-tests}/`.
+[Report 231](docs/231-sunxi-retirement-integration.md) records provenance,
+acceptance, results and remaining hardware/backend boundaries.

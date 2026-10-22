@@ -1,0 +1,296 @@
+From: GameShellNeo <gameshellneo@localhost>
+Subject: [PATCH] usb: musb: retire pending resume callbacks before teardown
+
+Close callback admission under the controller lock and wait for callbacks
+which may have dropped it during giveback, then release pending records.
+Borrowed data and gadget requests remain owned by their clients. Gate
+queues and restart handoffs, preserving completion and PM accounting.
+
+This core barrier does not retire independent backend or DMA producers.
+
+---
+
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2155,6 +2155,7 @@
+ 	INIT_LIST_HEAD(&musb->in_bulk);
+ 	INIT_LIST_HEAD(&musb->out_bulk);
+ 	INIT_LIST_HEAD(&musb->pending_list);
++	init_waitqueue_head(&musb->resume_work_wait);
+ 
+ 	musb->vbuserr_retry = VBUSERR_RETRY_COUNT;
+ 	musb->a_wait_bcon = OTG_TIME_A_WAIT_BCON;
+@@ -2228,39 +2229,80 @@
+ 	disable_delayed_work_sync(&musb->irq_work);
+ }
+ 
+-/* Drain runtime callbacks while their registers and backend resources are live. */
+-static void musb_disable_runtime_pm(struct musb *musb)
+-{
+-	pm_runtime_disable(musb->controller);
+-	pm_runtime_dont_use_autosuspend(musb->controller);
+-}
+-
+-/* Preserve the session hold until all runtime-PM callbacks have been disabled. */
+-static void musb_release_session(struct musb *musb)
+-{
+-	if (musb->session) {
+-		musb->session = false;
+-		pm_runtime_put_noidle(musb->controller);
+-	}
+-}
+-
+-static void musb_free(struct musb *musb)
+-{
+-	/* this has multiple entry modes. it handles fault cleanup after
+-	 * probe(), where things may be partially set up, as well as rmmod
+-	 * cleanup after everything's been de-activated.
+-	 */
+-
+-	musb_free_irq(musb);
+-
+-	musb_host_free(musb);
+-}
+-
+ struct musb_pending_work {
+ 	int (*callback)(struct musb *musb, void *data);
+ 	void *data;
+ 	struct list_head node;
+ };
++
++/*
++ * Terminal teardown, in process context without musb->lock. Never called
++ * from a resume callback. Callback data is borrowed, not owned by the node:
++ * gadget cleanup still owns request giveback after these records are gone.
++ */
++static void musb_shutdown_resume_work(struct musb *musb)
++{
++	struct musb_pending_work *w, *tmp;
++
++	spin_lock_irq(&musb->lock);
++	musb->resume_work_stopping = true;
++	wait_event_lock_irq(musb->resume_work_wait,
++			    !musb->resume_work_count, musb->lock);
++	spin_lock(&musb->list_lock);
++	list_for_each_entry_safe(w, tmp, &musb->pending_list, node) {
++		list_del(&w->node);
++		devm_kfree(musb->controller, w);
++	}
++	spin_unlock(&musb->list_lock);
++	spin_unlock_irq(&musb->lock);
++}
++
++/* Callback completion may temporarily drop musb->lock. */
++int musb_invoke_resume_work(struct musb *musb,
++			    int (*callback)(struct musb *, void *), void *data)
++{
++	int ret;
++
++	lockdep_assert_held(&musb->lock);
++	if (musb->resume_work_stopping)
++		return -ESHUTDOWN;
++	musb->resume_work_count++;
++	ret = callback(musb, data);
++	musb->resume_work_count--;
++	if (!musb->resume_work_count && musb->resume_work_stopping)
++		wake_up_all(&musb->resume_work_wait);
++	return ret;
++}
++
++/* Drain runtime callbacks while their registers and backend resources are live. */
++static void musb_disable_runtime_pm(struct musb *musb)
++{
++	pm_runtime_disable(musb->controller);
++	pm_runtime_dont_use_autosuspend(musb->controller);
++}
++
++/* Preserve the session hold until all runtime-PM callbacks have been disabled. */
++static void musb_release_session(struct musb *musb)
++{
++	if (musb->session) {
++		musb->session = false;
++		pm_runtime_put_noidle(musb->controller);
++	}
++}
++
++static void musb_free(struct musb *musb)
++{
++	musb_shutdown_resume_work(musb);
++
++	/* this has multiple entry modes. it handles fault cleanup after
++	 * probe(), where things may be partially set up, as well as rmmod
++	 * cleanup after everything's been de-activated.
++	 */
++
++	musb_free_irq(musb);
++
++	musb_host_free(musb);
++}
+ 
+ #ifdef CONFIG_PM
+ /*
+@@ -2278,8 +2320,10 @@
+ 	unsigned long flags;
+ 	int error = 0;
+ 
++	lockdep_assert_held(&musb->lock);
+ 	spin_lock_irqsave(&musb->list_lock, flags);
+-	while ((w = list_first_entry_or_null(&musb->pending_list,
++	while (!musb->resume_work_stopping &&
++	       (w = list_first_entry_or_null(&musb->pending_list,
+ 					     struct musb_pending_work, node))) {
+ 		int	(*callback)(struct musb *musb, void *data);
+ 		void	*data;
+@@ -2291,7 +2335,7 @@
+ 		devm_kfree(musb->controller, w);
+ 		spin_unlock_irqrestore(&musb->list_lock, flags);
+ 
+-		ret = callback(musb, data);
++		ret = musb_invoke_resume_work(musb, callback, data);
+ 		if (ret < 0) {
+ 			if (!error)
+ 				error = ret;
+@@ -2313,9 +2357,9 @@
+  * on resume. Caller must take musb->lock and must hold an RPM reference.
+  * Callbacks run without list_lock held and may queue further work.
+  *
+- * Note that we cowardly refuse queuing work after musb PM runtime
+- * resume is done calling musb_run_resume_work() and return -EINPROGRESS
+- * instead.
++ * Terminal shutdown rejects new work with -ESHUTDOWN. Queued data remains
++ * owned by the caller and must stay valid until execution or client cleanup.
++ * Teardown discards the callback record, never the borrowed data.
+  */
+ int musb_queue_resume_work(struct musb *musb,
+ 			   int (*callback)(struct musb *musb, void *data),
+@@ -2325,6 +2369,10 @@
+ 	unsigned long flags;
+ 	bool is_suspended;
+ 	int error;
++
++	lockdep_assert_held(&musb->lock);
++	if (musb->resume_work_stopping)
++		return -ESHUTDOWN;
+ 
+ 	if (WARN_ON(!callback))
+ 		return -EINVAL;
+@@ -2350,7 +2398,7 @@
+ 	spin_unlock_irqrestore(&musb->list_lock, flags);
+ 
+ 	if (!is_suspended)
+-		error = callback(musb, data);
++		error = musb_invoke_resume_work(musb, callback, data);
+ 
+ 	return error;
+ }
+@@ -2412,6 +2460,7 @@
+ 		return status;
+ 
+ cleanup:
++	musb_shutdown_resume_work(musb);
+ 	/* Keep core IRQ, DMA and platform resources alive for client cleanup. */
+ 	if (gadget_registered)
+ 		musb_gadget_cleanup(musb);
+@@ -2663,6 +2712,7 @@
+ 	return 0;
+ 
+ fail3:
++	musb_shutdown_resume_work(musb);
+ 	musb_disable_runtime_pm(musb);
+ 	musb_shutdown_irq(musb);
+ 	musb_shutdown_work(musb);
+@@ -2671,18 +2721,21 @@
+ 	goto shutdown_phy;
+ 
+ fail2_5:
++	musb_shutdown_resume_work(musb);
+ 	musb_disable_runtime_pm(musb);
+ shutdown_phy:
+ 	usb_phy_shutdown(musb->xceiv);
+ 	goto release_pm;
+ 
+ err_usb_phy_init:
++	musb_shutdown_resume_work(musb);
+ 	musb_disable_runtime_pm(musb);
+ release_pm:
+ 	pm_runtime_put_noidle(musb->controller);
+ 	musb_release_session(musb);
+ 
+ fail2:
++	musb_shutdown_resume_work(musb);
+ 	if (musb->irq_wake)
+ 		device_init_wakeup(dev, 0);
+ 	musb_platform_exit(musb);
+@@ -2735,6 +2788,7 @@
+ 	cancel_delayed_work_sync(&musb->finish_resume_work);
+ 	cancel_delayed_work_sync(&musb->deassert_reset_work);
+ 	pm_runtime_get_sync(musb->controller);
++	musb_shutdown_resume_work(musb);
+ 	musb_host_cleanup(musb);
+ 	musb_gadget_cleanup(musb);
+ 
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -315,6 +315,10 @@
+ 	struct list_head	in_bulk;	/* of musb_qh */
+ 	struct list_head	out_bulk;	/* of musb_qh */
+ 	struct list_head	pending_list;	/* pending work list */
++	/* Resume callback admission/count are protected by lock. */
++	bool			resume_work_stopping;
++	unsigned int		resume_work_count;
++	wait_queue_head_t	resume_work_wait;
+ 
+ 	struct timer_list	otg_timer;
+ 	struct timer_list	dev_timer;
+@@ -513,6 +517,9 @@
+ 
+ extern void musb_hnp_stop(struct musb *musb);
+ 
++/* Internal dispatch also covers gadget giveback's deferred restart handoff. */
++int musb_invoke_resume_work(struct musb *musb,
++			    int (*callback)(struct musb *, void *), void *data);
+ int musb_queue_resume_work(struct musb *musb,
+ 			   int (*callback)(struct musb *musb, void *data),
+ 			   void *data);
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -124,8 +124,8 @@
+ 		return;
+ 
+ 	ep->restart_deferred = false;
+-	if (restart)
+-		musb_ep_restart_resume_work(musb, ep);
++	if (restart && !musb->resume_work_stopping)
++		musb_invoke_resume_work(musb, musb_ep_restart_resume_work, ep);
+ 	else
+ 		ep->restart_pending = false;
+ 	pm_runtime_mark_last_busy(musb->controller);
+@@ -221,6 +221,8 @@
+ 
+ 	/* nuke keeps busy set: retire any restart handed to a giveback. */
+ 	musb_ep_finish_restart(ep, false);
++	if (musb->resume_work_stopping)
++		ep->restart_pending = false;
+ }
+ 
+ /* ----------------------------------------------------------------------- */
+@@ -1211,7 +1213,7 @@
+ 	do {
+ 		ep->restart_again = false;
+ 		req = next_request(ep);
+-		if (!ep->desc)
++		if (!ep->desc || musb->resume_work_stopping)
+ 			break;
+ 		if (ep->busy) {
+ 			/*
+@@ -1279,8 +1281,8 @@
+ 
+ 	spin_lock_irqsave(&musb->lock, lockflags);
+ 
+-	/* don't queue if the ep is down */
+-	if (!musb_ep->desc) {
++	/* Do not accept a request after endpoint or controller shutdown. */
++	if (!musb_ep->desc || musb->resume_work_stopping) {
+ 		musb_dbg(musb, "req %p queued to %s while ep %s",
+ 				req, ep->name, "disabled");
+ 		status = -ESHUTDOWN;

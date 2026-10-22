@@ -1,0 +1,167 @@
+Subject: [PATCH] extcon: provide synchronous consumer notifier removal
+
+Keep raw notifier callback contexts and cover selection through return
+with a per-device SRCU domain. Add an opt-in process-context unlink/drain
+API. Provider lifetime and ordinary asynchronous unregister contracts
+are unchanged.
+
+This is the framework prerequisite for Sunxi child notifier ownership;
+it does not by itself fix MUSB removal or modify the installed image.
+
+diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
+--- a/drivers/extcon/extcon.c
++++ b/drivers/extcon/extcon.c
+@@ -436,6 +436,7 @@
+ 	int length;
+ 	int index;
+ 	int state;
++	int srcu_idx;
+ 	unsigned long flags;
+ 
+ 	if (!edev)
+@@ -449,6 +450,12 @@
+ 	state = !!(edev->state & BIT(index));
+ 	spin_unlock_irqrestore(&edev->lock, flags);
+ 
++	/*
++	 * Preserve raw callback contexts, including IRQ callers and sleepable
++	 * process-context callbacks. Synchronous removal waits for this whole
++	 * dispatch, including a selected block whose callback has not entered.
++	 */
++	srcu_idx = srcu_read_lock(&edev->notifier_srcu);
+ 	/*
+ 	 * Call functions in a raw notifier chain for the specific one
+ 	 * external connector.
+@@ -460,6 +467,7 @@
+ 	 * external connectors.
+ 	 */
+ 	raw_notifier_call_chain(&edev->nh_all, state, edev);
++	srcu_read_unlock(&edev->notifier_srcu, srcu_idx);
+ 
+ 	spin_lock_irqsave(&edev->lock, flags);
+ 	/* This could be in interrupt handler */
+@@ -961,6 +969,39 @@
+ EXPORT_SYMBOL_GPL(extcon_unregister_notifier);
+ 
+ /**
++ * extcon_unregister_notifier_sync() - Remove and drain an extcon notifier.
++ * @edev: the extcon device, kept alive by the caller
++ * @id: the external connector id
++ * @nb: the registered notifier block
++ *
++ * On success, no dispatch through this chain can still reference @nb. The
++ * caller must serialize registration and unregistration of the same block.
++ * Existing asynchronous unregister operations retain their caller-managed
++ * lifetime requirements. A failed unlink does not imply a completed drain.
++ *
++ * The wait can include callbacks for other connectors on @edev. The provider
++ * must remain registered until this operation returns; this is a consumer
++ * barrier, not a replacement for quiescing provider event producers.
++ *
++ * Context: Process context. Must not be called from an extcon callback for
++ * this device, or while holding a lock needed by any of its callbacks.
++ * Return: 0 on success, or the error from extcon_unregister_notifier().
++ */
++int extcon_unregister_notifier_sync(struct extcon_dev *edev, unsigned int id,
++				    struct notifier_block *nb)
++{
++	int ret;
++
++	might_sleep();
++	ret = extcon_unregister_notifier(edev, id, nb);
++	if (!ret)
++		synchronize_srcu(&edev->notifier_srcu);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(extcon_unregister_notifier_sync);
++
++/**
+  * extcon_register_notifier_all() - Register a notifier block for all connectors.
+  * @edev:	the extcon device
+  * @nb:		a notifier block to be registered
+@@ -1056,6 +1097,7 @@
+ struct extcon_dev *extcon_dev_allocate(const unsigned int *supported_cable)
+ {
+ 	struct extcon_dev *edev;
++	int ret;
+ 
+ 	if (!supported_cable)
+ 		return ERR_PTR(-EINVAL);
+@@ -1064,6 +1106,12 @@
+ 	if (!edev)
+ 		return ERR_PTR(-ENOMEM);
+ 
++	ret = init_srcu_struct(&edev->notifier_srcu);
++	if (ret) {
++		kfree(edev);
++		return ERR_PTR(ret);
++	}
++
+ 	edev->max_supported = 0;
+ 	edev->supported_cable = supported_cable;
+ 
+@@ -1076,6 +1124,10 @@
+  */
+ void extcon_dev_free(struct extcon_dev *edev)
+ {
++	if (!edev)
++		return;
++
++	cleanup_srcu_struct(&edev->notifier_srcu);
+ 	kfree(edev);
+ }
+ EXPORT_SYMBOL_GPL(extcon_dev_free);
+diff --git a/drivers/extcon/extcon.h b/drivers/extcon/extcon.h
+--- a/drivers/extcon/extcon.h
++++ b/drivers/extcon/extcon.h
+@@ -3,6 +3,7 @@
+ #define __LINUX_EXTCON_INTERNAL_H__
+ 
+ #include <linux/extcon-provider.h>
++#include <linux/srcu.h>
+ 
+ /**
+  * struct extcon_dev - An extcon device represents one external connector.
+@@ -26,6 +27,7 @@
+  * @nh_all:		Notifier for the state change events for all supported
+  *			external connectors from this extcon.
+  * @nh:			Notifier for the state change events from this extcon
++ * @notifier_srcu:	Protects dispatched notifier blocks until callbacks return.
+  * @entry:		To support list of extcon devices so that users can
+  *			search for extcon devices based on the extcon name.
+  * @lock:		Protects device state and serialises device registration
+@@ -50,6 +52,7 @@
+ 	unsigned int id;
+ 	struct raw_notifier_head nh_all;
+ 	struct raw_notifier_head *nh;
++	struct srcu_struct notifier_srcu;
+ 	struct list_head entry;
+ 	int max_supported;
+ 	spinlock_t lock;	/* could be called by irq handler */
+diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+--- a/include/linux/extcon.h
++++ b/include/linux/extcon.h
+@@ -202,6 +202,8 @@
+ 				struct notifier_block *nb);
+ int extcon_unregister_notifier(struct extcon_dev *edev, unsigned int id,
+ 				struct notifier_block *nb);
++int extcon_unregister_notifier_sync(struct extcon_dev *edev, unsigned int id,
++				    struct notifier_block *nb);
+ int devm_extcon_register_notifier(struct device *dev,
+ 				struct extcon_dev *edev, unsigned int id,
+ 				struct notifier_block *nb);
+@@ -258,6 +260,13 @@
+ 
+ static inline int extcon_unregister_notifier(struct extcon_dev *edev,
+ 				unsigned int id, struct notifier_block *nb)
++{
++	return 0;
++}
++
++static inline int extcon_unregister_notifier_sync(struct extcon_dev *edev,
++						  unsigned int id,
++						  struct notifier_block *nb)
+ {
+ 	return 0;
+ }

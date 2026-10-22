@@ -278,6 +278,34 @@ restart fix, retaining diagnostic.24 recovery. The later NEO-106 teardown stack
 is excluded. Report 233 follows its verified installation and awake checks;
 attended PM/USB qualification remains separate.
 
+[231 — Sunxi retirement integration](231-sunxi-retirement-integration.md)
+combines child notifier/work ownership and provider lifetime with the core
+teardown stack, with isolated framework KUnit fixtures and explicit limits.
+
+[230 — MUSB pending-resume callback retirement](230-musb-resume-work-retirement.md)
+records terminal admission, callback drain and borrowed-data ownership, including
+gadget giveback restart handoffs. Independent producer lifetime remains open.
+
+[229 — MUSB runtime-PM retirement](229-musb-runtime-pm-retirement.md)
+records core runtime callback retirement before backend resource release,
+source-bound teardown tests and real Linux runtime-PM tests. Independent
+backend and pending-resume producer lifetime remains under NEO-106.
+
+[228 — MUSB core work and timer retirement](228-musb-core-work-retirement.md)
+records permanent core-work/timer closure and session-reference accounting,
+with source tests and real Linux workqueue/timer/PM tests. Backend producer
+and runtime-PM retirement remain under NEO-106.
+
+[227 — MUSB core IRQ retirement](227-musb-core-irq-retirement.md)
+records the NEO-165 action-release boundary before backend/DMA resource release,
+source-order tests and Linux shared-IRQ tests. Full producer retirement remains
+under NEO-106.
+
+[226 — MUSB probe role cleanup](226-musb-probe-role-unwind.md)
+records the NEO-164 fix for successful host/gadget registrations left behind
+after a later mode-selection failure, with source fault tests and ARM builds.
+It is a bounded NEO-106 prerequisite, not complete controller teardown.
+
 [225 — MUSB deferred restart ownership](225-musb-resume-request-ownership.md)
 records the NEO-108 candidate and NEO-163 review corrections: retaining restart
 ownership across a busy giveback, balancing its temporary PM reference, and

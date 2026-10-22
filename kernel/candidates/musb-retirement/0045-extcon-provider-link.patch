@@ -1,0 +1,143 @@
+Subject: [PATCH] extcon: link consumers to bound providers during lookup
+
+Resolve registration and managed driver dependency under the extcon list
+lock. Require a fully bound supplier and a link protecting this probing
+consumer before returning its resources. Keep existing raw getters intact.
+Use the new lookup in Sunxi so parent removal drains the child before the
+extcon supplier releases registration and notifier state.
+
+Consumer failure paths must drain before returning a probe error, because
+the driver core releases links before failed-probe devres cleanup.
+
+diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
+--- a/drivers/extcon/extcon.c
++++ b/drivers/extcon/extcon.c
+@@ -1448,6 +1448,68 @@
+ }
+ EXPORT_SYMBOL_GPL(extcon_dev_unregister);
+ 
++/**
++ * extcon_get_edev_by_fwnode() - Look up a provider with driver lifetime ordering.
++ * @consumer: device whose probe is acquiring the provider
++ * @fwnode: firmware node of the provider's parent device
++ *
++ * Creates a managed device link to the provider's parent. The parent driver
++ * must own the extcon registration for its bound lifetime and stop its event
++ * producers before unregistering it. This does not protect providers which
++ * independently unregister their extcon while their parent remains bound.
++ *
++ * Call only from @consumer's probe. On success, the supplier must unbind the
++ * consumer first. Drain users/notifiers in remove and before returning a
++ * failed probe; driver-core probe failure drops links before devres cleanup.
++ * The driver core owns the link. New links are removed on failed probe or
++ * unbind; existing links can retain a longer-lived policy. No put operation
++ * is needed. Existing raw lookup APIs are unchanged.
++ *
++ * Return: provider pointer, -EPROBE_DEFER if unavailable/not fully bound,
++ * or -EINVAL for invalid use or failed link creation.
++ */
++struct extcon_dev *extcon_get_edev_by_fwnode(struct device *consumer,
++					     struct fwnode_handle *fwnode)
++{
++	struct extcon_dev *edev, *result = ERR_PTR(-EPROBE_DEFER);
++	struct device_link *link;
++	struct device *supplier;
++
++	if (!consumer || IS_ERR_OR_NULL(fwnode) ||
++	    READ_ONCE(consumer->links.status) != DL_DEV_PROBING)
++		return ERR_PTR(-EINVAL);
++
++	/* Keep registration alive from lookup through link admission. */
++	mutex_lock(&extcon_dev_list_lock);
++	list_for_each_entry(edev, &extcon_dev_list, entry) {
++		supplier = edev->dev.parent;
++		if (!supplier || !device_match_fwnode(supplier, fwnode))
++			continue;
++
++		link = device_link_add(consumer, supplier,
++				       DL_FLAG_AUTOREMOVE_CONSUMER);
++		if (!link) {
++			result = ERR_PTR(-EINVAL);
++			break;
++		}
++
++		/*
++		 * Link creation serializes with supplier unbind. A newly admitted
++		 * probing consumer keeps a bound supplier from releasing resources.
++		 * A still-probing supplier can fail without unbinding consumers,
++		 * so do not publish its resources before driver binding completes.
++		 */
++		if (READ_ONCE(link->status) == DL_STATE_CONSUMER_PROBE &&
++		    READ_ONCE(supplier->links.status) == DL_DEV_DRIVER_BOUND)
++			result = edev;
++		break;
++	}
++	mutex_unlock(&extcon_dev_list_lock);
++
++	return result;
++}
++EXPORT_SYMBOL_GPL(extcon_get_edev_by_fwnode);
++
+ #ifdef CONFIG_OF
+ 
+ /*
+diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+--- a/include/linux/extcon.h
++++ b/include/linux/extcon.h
+@@ -225,6 +225,9 @@
+ /*
+  * Following APIs get the extcon_dev from devicetree or by through extcon name.
+  */
++struct fwnode_handle;
++struct extcon_dev *extcon_get_edev_by_fwnode(struct device *consumer,
++					     struct fwnode_handle *fwnode);
+ struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name);
+ struct extcon_dev *extcon_find_edev_by_node(struct device_node *node);
+ struct extcon_dev *extcon_get_edev_by_phandle(struct device *dev,
+@@ -304,6 +307,13 @@
+ static inline void devm_extcon_unregister_notifier_all(struct device *dev,
+ 						       struct extcon_dev *edev,
+ 						       struct notifier_block *nb) { }
++
++struct fwnode_handle;
++static inline struct extcon_dev *
++extcon_get_edev_by_fwnode(struct device *consumer, struct fwnode_handle *fwnode)
++{
++	return ERR_PTR(-ENODEV);
++}
+ 
+ static inline struct extcon_dev *extcon_get_extcon_dev(const char *extcon_name)
+ {
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -17,6 +17,7 @@
+ #include <linux/of.h>
+ #include <linux/phy/phy-sun4i-usb.h>
+ #include <linux/platform_device.h>
++#include <linux/property.h>
+ #include <linux/reset.h>
+ #include <linux/soc/sunxi/sunxi_sram.h>
+ #include <linux/usb/musb.h>
+@@ -696,6 +697,7 @@
+ 	struct platform_device_info	pinfo;
+ 	struct sunxi_glue		*glue;
+ 	struct device_node		*np = pdev->dev.of_node;
++	struct fwnode_handle		*extcon_node;
+ 	const struct sunxi_musb_cfg	*cfg;
+ 	int ret;
+ 
+@@ -769,7 +771,12 @@
+ 					     "Error getting reset\n");
+ 	}
+ 
+-	glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
++	extcon_node = fwnode_find_reference(dev_fwnode(&pdev->dev), "extcon", 0);
++	if (IS_ERR(extcon_node))
++		return dev_err_probe(&pdev->dev, PTR_ERR(extcon_node),
++				     "Invalid or missing extcon reference\n");
++	glue->extcon = extcon_get_edev_by_fwnode(&pdev->dev, extcon_node);
++	fwnode_handle_put(extcon_node);
+ 	if (IS_ERR(glue->extcon))
+ 		return dev_err_probe(&pdev->dev, PTR_ERR(glue->extcon),
+ 				     "Invalid or missing extcon\n");

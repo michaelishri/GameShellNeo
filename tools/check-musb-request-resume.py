@@ -11,9 +11,9 @@ import shutil
 import subprocess
 import tarfile
 
+from kernel_candidates import patch_path
 from kernel_checks import ROOT, archive_for, compile_objects, run, sha256
 
-WORK = ROOT / '.local/build/musb-request-resume-tests'
 PREFIX = 'drivers/usb/musb/'
 FILES = ('musb_core.c', 'musb_core.h', 'musb_regs.h', 'musb_gadget.c',
           'musb_gadget.h', 'musb_gadget_ep0.c', 'sunxi.c')
@@ -23,6 +23,9 @@ PRIOR_PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup
                   '0030-musb-gadget-callback-lifetime.patch',
                   '0033-musb-sleep-session-retirement.patch')
 CORE_FUNCTIONS = ('musb_queue_resume_work', 'musb_run_resume_work')
+LATER_PATCHES = ('0038-musb-probe-role-unwind.patch', '0039-musb-core-irq-retirement.patch',
+                 '0040-musb-core-work-retirement.patch', '0041-musb-runtime-pm-retirement.patch',
+                 '0042-musb-resume-work-retirement.patch')
 GADGET_FUNCTIONS = ('musb_ep_restart_resume_work', 'musb_ep_finish_restart',
                     'musb_free_request', 'musb_g_giveback',
                     'musb_gadget_dequeue', 'musb_gadget_queue')
@@ -30,11 +33,12 @@ PATCH = ROOT / 'kernel/patches/0037-musb-resume-request-ownership.patch'
 HARNESS = ROOT / 'kernel/tests/musb_request_resume_test.c'
 
 
-def scenario_count(output):
+def scenario_count(output, retirement=False):
     match = re.fullmatch(r'MUSB deferred-request audit: (\d+) source scenarios pass '
                          r'\((\d+) per direction\)\n?', output)
-    if not match or (int(match[1]), int(match[2])) != (48, 24):
-        raise ValueError('Expected the complete 48-scenario suite (24 per direction)')
+    expected = (52, 26) if retirement else (48, 24)
+    if not match or (int(match[1]), int(match[2])) != expected:
+        raise ValueError('Expected the complete request suite: ' + str(expected))
     return dict(total=int(match[1]), per_direction=int(match[2]))
 
 
@@ -55,8 +59,9 @@ def function(text, name):
     raise ValueError('Unbalanced function body: ' + name)
 
 
-def header_functions(core, gadget):
-    parts = [function(core, name) for name in CORE_FUNCTIONS]
+def header_functions(core, gadget, retirement=False):
+    names = (('musb_invoke_resume_work',) if retirement else ()) + CORE_FUNCTIONS
+    parts = [function(core, name) for name in names]
     parts += [function(gadget, name) for name in GADGET_FUNCTIONS]
     return ''.join(parts)
 
@@ -68,7 +73,8 @@ def splice(source, name, body):
     return source.replace(original, body)
 
 
-def mutate(gadget, resume):
+def mutate(gadget, resume, retirement=False):
+    invoke = ('musb_invoke_resume_work(musb, callback, data)' if retirement else 'callback(musb, data)')
     def queue_body():
         return function(gadget, 'musb_gadget_queue')
 
@@ -83,13 +89,13 @@ def mutate(gadget, resume):
         '\t\tif (true) {\n\t\t\tmusb_ep->restart_pending = true;\n')
     assert ignore != queue_body()
     drop = resume_body().replace(
-        '\t\tret = callback(musb, data);',
+        '\t\tret = ' + invoke + ';',
         '\t\tret = 0; (void)callback; (void)data; /* dropped work */')
     assert drop != resume_body()
     holds = resume_body().replace(
         '\t\tspin_unlock_irqrestore(&musb->list_lock, flags);\n\n'
-        '\t\tret = callback(musb, data);',
-        '\t\tret = callback(musb, data);')
+        '\t\tret = ' + invoke + ';',
+        '\t\tret = ' + invoke + ';')
     assert holds != resume_body()
     holds = holds.replace(
         '\t\tspin_lock_irqsave(&musb->list_lock, flags);\n\t}\n',
@@ -115,7 +121,7 @@ def mutate(gadget, resume):
     first_error = resume_body().replace('\t\t\tif (!error)\n\t\t\t\terror = ret;',
                                         '\t\t\terror = ret;')
     assert first_error != resume_body()
-    return dict(ignores_coalescing=(resume, splice(gadget, 'musb_gadget_queue', ignore)),
+    result = dict(ignores_coalescing=(resume, splice(gadget, 'musb_gadget_queue', ignore)),
                 drops_pending_work=(splice(resume, 'musb_run_resume_work', drop), gadget),
                 holds_list_lock_through_callbacks=(
                     splice(resume, 'musb_run_resume_work', holds), gadget),
@@ -126,23 +132,39 @@ def mutate(gadget, resume):
                 skips_giveback_handoff=(resume, splice(gadget, 'musb_g_giveback', no_handoff)),
                 skips_completed_head=(resume, splice(gadget, 'musb_ep_restart_resume_work', no_repeat)),
                 loses_first_error=(splice(resume, 'musb_run_resume_work', first_error), gadget))
+    if retirement:
+        closed_queue = queue_body().replace('!musb_ep->desc || musb->resume_work_stopping',
+                                             '!musb_ep->desc')
+        closed_api = function(resume, 'musb_queue_resume_work').replace(
+            '\tif (musb->resume_work_stopping)\n\t\treturn -ESHUTDOWN;\n', '')
+        assert closed_queue != queue_body()
+        assert closed_api != function(resume, 'musb_queue_resume_work')
+        result.update(accepts_closed_queue=(resume, splice(gadget, 'musb_gadget_queue', closed_queue)),
+                      stages_after_shutdown=(splice(resume, 'musb_queue_resume_work', closed_api), gadget))
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--compile-drivers', action='store_true')
+    parser.add_argument('--retirement-candidate', action='store_true',
+                        help='Use isolated retirement patches; default checks production source')
     args = parser.parse_args()
-    WORK.mkdir(parents=True, exist_ok=True)
-    with (WORK / '.lock').open('a') as guard:
+    retirement = args.retirement_candidate
+    later = LATER_PATCHES if retirement else ()
+    work = ROOT / ('.local/build/musb-retirement-resume-tests' if retirement else
+                   '.local/build/musb-request-resume-tests')
+    work.mkdir(parents=True, exist_ok=True)
+    with (work / '.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        output = WORK / ('compile-evidence.json' if args.compile_drivers else 'evidence.json')
+        output = work / ('compile-evidence.json' if args.compile_drivers else 'evidence.json')
         output.unlink(missing_ok=True)
         lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
         archive = archive_for(lock)
-        shutil.rmtree(WORK / 'locked', ignore_errors=True)
-        shutil.rmtree(WORK / 'patched', ignore_errors=True)
-        target = WORK / 'locked' / PREFIX
-        patched = WORK / 'patched' / PREFIX
+        shutil.rmtree(work / 'locked', ignore_errors=True)
+        shutil.rmtree(work / 'patched', ignore_errors=True)
+        target = work / 'locked' / PREFIX
+        patched = work / 'patched' / PREFIX
         target.mkdir(parents=True, exist_ok=True)
         patched.mkdir(parents=True, exist_ok=True)
         prefix = 'linux-' + lock['linux']['tag'][1:] + '/' + PREFIX
@@ -160,10 +182,10 @@ def main():
         if found != set(FILES):
             raise ValueError('Incomplete locked source')
         for name in PRIOR_PATCHES:
-            for tree in (WORK / 'locked', WORK / 'patched'):
+            for tree in (work / 'locked', work / 'patched'):
                 run(['patch', '--batch', '--fuzz=0', '-p1', '-i',
-                     str(ROOT / 'kernel/patches' / name)], cwd=tree)
-        run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(PATCH)], cwd=WORK / 'patched')
+                     str(patch_path(ROOT, name))], cwd=tree)
+        run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(PATCH)], cwd=work / 'patched')
 
         locked_core = (target / 'musb_core.c').read_text()
         locked_gadget = (target / 'musb_gadget.c').read_text()
@@ -177,29 +199,38 @@ def main():
         for name in ('musb_free_request', 'musb_gadget_dequeue'):
             assert function(locked_gadget, name) == function(patched_gadget, name), name
 
-        good = header_functions(patched_core, patched_gadget)
+        # Retain the 0037 boundary audit, then exercise the current queued candidate.
+        for name in later:
+            run(['patch', '--batch', '--fuzz=0', '-p1', '-i',
+                 str(patch_path(ROOT, name))], cwd=work / 'patched')
+        patched_core = (patched / 'musb_core.c').read_text()
+        patched_gadget = (patched / 'musb_gadget.c').read_text()
+
+        good = header_functions(patched_core, patched_gadget, retirement)
         cases = {'candidate': good}
-        cases.update({name: header_functions(core, gadget)
+        cases.update({name: header_functions(core, gadget, retirement)
                       for name, (core, gadget)
-                      in mutate(patched_gadget, patched_core).items()})
+                      in mutate(patched_gadget, patched_core, retirement).items()})
         for name, value in cases.items():
             if name != 'candidate' and value == good:
                 raise RuntimeError('Negative control did not mutate: ' + name)
-        header = WORK / 'musb_request_resume_functions.h'
+        header = work / 'musb_request_resume_functions.h'
         flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
-                 '-Wno-unused-parameter', '-I', str(WORK), str(HARNESS)]
+                 '-Wno-unused-parameter', '-I', str(work), str(HARNESS)]
+        if retirement:
+            flags.append('-DMUSB_RETIREMENT_CANDIDATE=1')
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         results = {}
         try:
             for name, value in cases.items():
                 header.write_text(value)
-                binary = WORK / name
+                binary = work / name
                 run(['cc', *flags, '-o', str(binary)])
                 result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=40)
-                (WORK / (name + '.txt')).write_text(result.stdout + result.stderr)
+                (work / (name + '.txt')).write_text(result.stdout + result.stderr)
                 if name == 'candidate':
                     result.check_returncode()
-                    scenario_count(result.stdout)
+                    scenario_count(result.stdout, retirement)
                 elif result.returncode == 0 or 'Assertion' not in result.stderr:
                     raise RuntimeError('Expected assertion failure: ' + name)
                 results[name] = dict(returncode=result.returncode,
@@ -210,18 +241,20 @@ def main():
             # With real allocation lifetimes the fixed paths must not touch
             # freed requests anywhere in the audited scenarios.
             header.write_text(good)
-            binary = WORK / 'candidate-real-free'
+            binary = work / 'candidate-real-free'
             run(['cc', *flags, '-DREAL_FREE', '-o', str(binary)])
             real = subprocess.run([str(binary)], capture_output=True, text=True, timeout=40)
-            (WORK / 'candidate-real-free.txt').write_text(real.stdout + real.stderr)
+            (work / 'candidate-real-free.txt').write_text(real.stdout + real.stderr)
             real.check_returncode()
-            scenario_count(real.stdout)
+            scenario_count(real.stdout, retirement)
             results['candidate_real_free'] = dict(returncode=real.returncode,
                                                   output=real.stdout.strip())
             print('candidate-real-free: ' + real.stdout.strip(), flush=True)
         finally:
             header.write_text(good)
         builder = lock['builder']
+        relative = work.relative_to(ROOT).as_posix()
+        define = '-DMUSB_RETIREMENT_CANDIDATE=1 ' if retirement else ''
         arm = subprocess.check_output([
             'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
             '--platform', builder['platform'], '--entrypoint', 'bash',
@@ -229,18 +262,18 @@ def main():
             'set -euo pipefail\n'
             'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror '
             '-Wno-unused-parameter -static '
-            '-I.local/build/musb-request-resume-tests kernel/tests/musb_request_resume_test.c '
-            '-o .local/build/musb-request-resume-tests/arm\n'
-            'qemu-arm .local/build/musb-request-resume-tests/arm'], text=True)
+            + define + f'-I{relative} kernel/tests/musb_request_resume_test.c '
+            f'-o {relative}/arm\n'
+            f'qemu-arm {relative}/arm'], text=True)
         print(arm, end='', flush=True)
-        counts = scenario_count(arm)
-        inputs = (PATCH, HARNESS, *(ROOT / 'kernel/patches' / p for p in PRIOR_PATCHES),
-                  Path(__file__), ROOT / 'tools/kernel_checks.py',
+        counts = scenario_count(arm, retirement)
+        inputs = (PATCH, HARNESS, *(patch_path(ROOT, p) for p in (*PRIOR_PATCHES, *later)),
+                  Path(__file__), ROOT / 'tools/kernel_candidates.py', ROOT / 'tools/kernel_checks.py',
                   ROOT / 'tools/kernel_sources.py', ROOT / 'tools/kernel-inputs.py',
                   ROOT / 'build/sources.lock.json')
         evidence = dict(linux=lock['linux']['tag'], archive_sha256=sha256(archive),
             inputs={str(path.relative_to(ROOT)): sha256(path) for path in inputs},
-            extracted={name: sha256(WORK / 'patched' / PREFIX / name) for name in FILES},
+            extracted={name: sha256(work / 'patched' / PREFIX / name) for name in FILES},
             generated={'musb_request_resume_functions.h': sha256(header)},
             native=results, arm32=arm.strip(), scenarios_per_execution=counts, builder=builder,
             limits='Actual queue/dequeue/giveback/queue-resume-work/resume-run functions with '
@@ -250,8 +283,8 @@ def main():
                 'separate tasks. General dequeue progress outside an owned deferred restart '
                 'and failed-queue DMA mapping remain outside this change.')
         if args.compile_drivers:
-            evidence['arm_build'] = compile_objects(archive, lock, WORK,
-                ['drivers/usb/musb/musb_core.o', 'drivers/usb/musb/musb_gadget.o'])
+            evidence['arm_build'] = compile_objects(archive, lock, work,
+                ['drivers/usb/musb/musb_core.o', 'drivers/usb/musb/musb_gadget.o'], candidate_profile='musb-retirement' if retirement else None)
         output.write_text(json.dumps(evidence, indent=2) + '\n')
         print('Evidence:', output.relative_to(ROOT), flush=True)
 

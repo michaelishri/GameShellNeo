@@ -1,0 +1,76 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: disable runtime PM before teardown releases resources
+
+Runtime suspend saves controller registers. In removal, the final core put
+can reach zero after platform exit has disabled clocks or asserted reset.
+Failed probe can likewise drop the last hold after DMA/PHY cleanup.
+
+Disable and drain runtime callbacks before final IRQ/work closure and resource
+release. Disable autosuspend policy afterward, then balance the retained core
+hold with a passive put. Keep client cleanup before the PM barrier. Route each
+PM-enabled probe failure through the barrier once, without touching core work
+before it has been initialized. Earlier failures never acquired that PM hold.
+
+This does not retire independent backend producers, pending resume-list data,
+DMA sources or PM on parent devices, nor establish failed-get register access.
+
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -2228,6 +2228,13 @@
+ 	disable_delayed_work_sync(&musb->irq_work);
+ }
+ 
++/* Drain runtime callbacks while their registers and backend resources are live. */
++static void musb_disable_runtime_pm(struct musb *musb)
++{
++	pm_runtime_disable(musb->controller);
++	pm_runtime_dont_use_autosuspend(musb->controller);
++}
++
+ /* Preserve the session hold until all runtime-PM callbacks have been disabled. */
+ static void musb_release_session(struct musb *musb)
+ {
+@@ -2656,18 +2663,23 @@
+ 	return 0;
+ 
+ fail3:
++	musb_disable_runtime_pm(musb);
+ 	musb_shutdown_irq(musb);
+ 	musb_shutdown_work(musb);
+ 	if (musb->dma_controller)
+ 		musb_dma_controller_destroy(musb->dma_controller);
++	goto shutdown_phy;
+ 
+ fail2_5:
++	musb_disable_runtime_pm(musb);
++shutdown_phy:
+ 	usb_phy_shutdown(musb->xceiv);
++	goto release_pm;
+ 
+ err_usb_phy_init:
+-	pm_runtime_dont_use_autosuspend(musb->controller);
+-	pm_runtime_put_sync(musb->controller);
+-	pm_runtime_disable(musb->controller);
++	musb_disable_runtime_pm(musb);
++release_pm:
++	pm_runtime_put_noidle(musb->controller);
+ 	musb_release_session(musb);
+ 
+ fail2:
+@@ -2726,13 +2738,12 @@
+ 	musb_host_cleanup(musb);
+ 	musb_gadget_cleanup(musb);
+ 
++	musb_disable_runtime_pm(musb);
+ 	musb_shutdown_irq(musb);
+ 	musb_shutdown_work(musb);
+ 	musb_platform_exit(musb);
+ 
+-	pm_runtime_dont_use_autosuspend(musb->controller);
+-	pm_runtime_put_sync(musb->controller);
+-	pm_runtime_disable(musb->controller);
++	pm_runtime_put_noidle(musb->controller);
+ 	musb_release_session(musb);
+ 	musb_phy_callback = NULL;
+ 	if (musb->dma_controller)

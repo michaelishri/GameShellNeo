@@ -44,3 +44,9 @@ def include_candidates(root, profile, production):
         queue.append((name, (root / 'kernel/candidates' / relative).read_bytes()))
         names.append(name)
     return sorted(queue)
+
+
+def candidate_paths(root, profile):
+    if profile not in PROFILES:
+        raise ValueError('Unknown offline candidate profile: ' + str(profile))
+    return tuple(root / 'kernel/candidates' / relative for relative in PROFILES[profile])

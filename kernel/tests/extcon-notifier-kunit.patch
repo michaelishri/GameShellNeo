@@ -1,0 +1,31 @@
+Subject: [PATCH] extcon: add consumer notifier lifetime KUnit tests
+
+Exercise selected and active callback retirement using real kernel threads,
+SRCU, nested dispatch and an isolated softirq callback path. The suite is
+disabled with KUnit and does not enable production diagnostics.
+
+diff --git a/drivers/extcon/Kconfig b/drivers/extcon/Kconfig
+--- a/drivers/extcon/Kconfig
++++ b/drivers/extcon/Kconfig
+@@ -227,4 +227,13 @@
+ 	  The DHC (Digital Home Hub) RTD series SoC contains a type c module.
+ 	  This driver will detect the status of the type-c port.
+ 
++config EXTCON_NOTIFIER_KUNIT_TEST
++	tristate "Extcon notifier lifetime KUnit tests" if !KUNIT_ALL_TESTS
++	depends on KUNIT
++	default KUNIT_ALL_TESTS
++	help
++	  Exercise extcon consumer unlink/drain and raw callback lifetime
++	  against the real SRCU and scheduler implementation. These tests
++	  create synthetic providers and do not need physical connectors.
++
+ endif
+diff --git a/drivers/extcon/Makefile b/drivers/extcon/Makefile
+--- a/drivers/extcon/Makefile
++++ b/drivers/extcon/Makefile
+@@ -28,3 +28,4 @@
+ obj-$(CONFIG_EXTCON_USBC_CROS_EC) += extcon-usbc-cros-ec.o
+ obj-$(CONFIG_EXTCON_USBC_TUSB320) += extcon-usbc-tusb320.o
+ obj-$(CONFIG_EXTCON_RTK_TYPE_C) += extcon-rtk-type-c.o
++obj-$(CONFIG_EXTCON_NOTIFIER_KUNIT_TEST) += extcon-notifier-test.o

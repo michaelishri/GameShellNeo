@@ -434,6 +434,10 @@ tasks:
     desc: Simulate sleep during awake measurements and verify rejection/restoration; no device access
     cmds: [bash tools/run-logged.sh awake-clock python3 -m unittest discover -s tools/tests -p test_awake_clock.py -v]
 
+  test:awake-result-admission:
+    desc: Test standalone host awake-result admission through local scripted transports
+    cmds: [bash tools/run-logged.sh awake-result-admission python3 -m unittest discover -s tools/tests -p test_awake_result_admission.py -v]
+
   test:charge-result-admission:
     desc: Test charging host result admission through local scripted channels; no device access
     cmds: [bash tools/run-logged.sh charge-result-admission python3 -m unittest discover -s tools/tests -p test_charge_result_admission.py -v]
@@ -554,6 +558,22 @@ tasks:
     desc: Test actual MPFS remove with Linux platform child, PHY and clock cleanup in UML
     cmds: [bash tools/run-logged.sh mpfs-ownership-kunit python3 tools/check-mpfs-ownership-kunit.py]
 
+  test:omap-musb-mailbox-reference:
+    desc: Reproduce four OMAP mailbox dispatch/work lifetime schedules without device access
+    cmds: [bash tools/run-logged.sh omap-musb-mailbox-reference python3 tools/check-omap-musb-mailbox.py --reference]
+
+  test:omap-musb-mailbox:
+    desc: Qualify bounded OMAP mailbox and parent-PM lifetime on native, sanitizers and ARM32
+    cmds: [bash tools/run-logged.sh omap-musb-mailbox python3 tools/check-omap-musb-mailbox.py]
+
+  check:omap-musb-mailbox-drivers:
+    desc: Qualify OMAP mailbox lifetime and compile six explicitly selected complete configurations
+    cmds: [bash tools/run-logged.sh omap-musb-mailbox-drivers python3 tools/check-omap-musb-mailbox.py --compile-drivers]
+
+  test:omap-musb-mailbox-kunit:
+    desc: Qualify real Linux SRCU, work, parent runtime PM and OMAP child lifetime under UML
+    cmds: [bash tools/run-logged.sh omap-musb-mailbox-kunit python3 tools/check-omap-musb-mailbox-kunit.py]
+
   test:extcon-kunit:
     desc: Build and run real Linux UML notifier lifetime tests with TREE and TINY SRCU; no device access
     env:
@@ -595,9 +615,33 @@ tasks:
     desc: Test MUSB runtime-PM retirement and callback drain in an isolated UML kernel
     cmds: [bash tools/run-logged.sh musb-pm-kunit python3 tools/check-musb-restart-kunit.py --suite pm]
 
+  test:musb-wake-dpm-kunit:
+    desc: Qualify wake policy and failure unwind through actual Linux device-PM traversal in UML
+    cmds: [bash tools/run-logged.sh musb-wake-dpm-kunit python3 tools/check-musb-wake-dpm-kunit.py]
+
+  test:musb-wake-dpm-control:
+    desc: Require the compiling missing-callback control to fail exact device-PM dispatch assertions
+    cmds: [bash tools/run-logged.sh musb-wake-dpm-control python3 tools/check-musb-wake-dpm-kunit.py --control callbacks-unregistered]
+
   test:musb-irq:
     desc: Test actual core IRQ/work ownership and teardown ordering on native and ARM32
     cmds: [bash tools/run-logged.sh musb-irq python3 tools/check-musb-irq.py]
+
+  test:musb-terminal-wake-reference:
+    desc: Reproduce naive terminal IRQ/wake composition with actual source references
+    cmds: [bash tools/run-logged.sh musb-terminal-wake-reference python3 tools/check-musb-terminal-wake.py --reference-only]
+
+  test:musb-terminal-wake:
+    desc: Test combined terminal IRQ/wake ownership on native, sanitizers and ARM32
+    cmds: [bash tools/run-logged.sh musb-terminal-wake python3 tools/check-musb-terminal-wake.py]
+
+  check:musb-terminal-wake-drivers:
+    desc: Test terminal IRQ/wake ownership and six complete combined ARM configurations
+    cmds: [bash tools/run-logged.sh musb-terminal-wake-drivers python3 tools/check-musb-terminal-wake.py --compile-drivers]
+
+  test:musb-terminal-wake-kunit:
+    desc: Test combined action/wake cleanup with real Linux IRQ, SRCU and wakeup sources
+    cmds: [bash tools/run-logged.sh musb-terminal-wake-kunit python3 tools/check-musb-terminal-wake-kunit.py]
 
   check:musb-irq-drivers:
     desc: Test MUSB IRQ/work teardown and compile five isolated ARM configurations

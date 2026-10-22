@@ -13,6 +13,19 @@ device or calibration/safety qualification occurs; original NEO-121 evidence
 and NEO-10/101/192 gates remain unchanged.
 [Report 310](docs/310-charge-result-admission.md).
 
+**NEO-101/224 standalone host result admission:** ten retained local baseline
+cases reproduce acceptance of missing or disturbed raw awake proof in five
+actual host consumers, including six helper-stage deletions. The shared host
+admission now recomputes unchanged raw proof before success/deletion and saves
+exact owned helper/unit context. Fifteen methods / 130 local scripted-channel
+cases pass, including duration rounding boundaries, raw retention and original
+error/restoration behavior. No SSH, collector or device operation occurs.
+The combined check on accepted NEO-225 context passes 24 runtime / 1370 tooling
+tests (nine expected skips), C and shell checks. Fresh independent review and
+publication remain pending. Parent NEO-101 physical/observer-cost and
+NEO-192/PM gates stay open.
+[Report 308](docs/308-awake-result-admission.md).
+
 **NEO-211 development-store expansion:** the remote expansion from 4 GiB to
 55.6171875 GiB completed from fixed recovery after a fresh fully verified
 off-device checkpoint, independent Standards/Spec reviews and disposable native
@@ -1807,6 +1820,16 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] Audit MUSB request DMA mapping on failed `musb_queue_resume_work()`. `musb_gadget_queue()` removes the queued list node on failure without the unmap used by its disabled-endpoint path. Check synchronous callback/error semantics, buffer ownership and retry across DMA backends before changing it. CPI's Sunxi backend uses PIO; this is a shared-driver finding, not an observed board DMA fault. [Discovery in report 139](docs/139-musb-teardown-power-audit.md).
 
 - [ ] NEO-106 backend boundaries: [report 141](docs/141-musb-removal-backend-contracts.md) extends the removal audit to all nine platform and four DMA backends. Resolve or explicitly bound MPFS clock-before-child removal, DSPS parent VBUS IRQ/timer retirement and synchronous-wait locking, MTK parent/child PM and rebind, OMAP mailbox/parent PM, role setters admitted before unregister, independent DMA callback retirement and partial-probe role cleanup. The proposed opt-in per-extcon SRCU dispatch envelope addresses selected-before-entry consumer callbacks only; provider lifetime and Allwinner detector MMIO retirement remain separate. Source dependencies do not establish live CPI faults. The prepared source is reconciled in the isolated profiles mapped by [report 291](docs/291-legacy-musb-source-integration.md); the wider backend software and qualification work remains open. These original experiments did not change diagnostic.18.
+- [ ] NEO-222 bounds the OMAP mailbox publisher, admitted dispatch/work and two
+  parent runtime callbacks with candidate 0063 in explicit `musb-omap-mailbox`.
+  Four unchanged reference schedules reproduce the lifetime gaps; 32 native,
+  sanitizer and ARM cases, nine assertion controls and six selected OMAP
+  configurations pass. Twelve actual Linux cases, including real parent
+  PM/glue/PHY consistency, also pass; independent acceptance remains pending.
+  The existing production and candidate queues are preserved. Cached status across rebind
+  is retained information, not a fresh physical-state guarantee. See
+  [report 306](docs/306-omap-mailbox-ownership.md); wider NEO-102/106 and physical
+  gates remain open.
 
 - [x] NEO-107: the [repeat RTC-wake runner](docs/143-repeat-rtc-wake-runner.md) now passes live initial admission, successor continuation and a four-cycle attended batch on unchanged diagnostic.18. Fresh seven-debug prerequisites and same-source awake rehearsal passed first; all four actual sleeps restored policies, traces, RTC, original keypad and both SSH routes, with PM15→19/fail0, RTC IRQ5→9 and stable SDIO2. The owner confirmed every dim-console return without intervention. Final read-only inspection independently recomputed all seven debug and four sleep records against the unchanged source/image/boot; Mac sleep history stayed unchanged. [Report 148](docs/148-diagnostic18-repeat-rtc-wake.md) preserves results, hashes and transient collection failures. Source/transport failure tests remain in report143. NEO-95 cable/host coverage, CPU retention and energy qualification remain open; no image or production sleep policy changed.
 - [x] NEO-109: [battery-only RTC-wake qualification](docs/150-battery-rtc-qualification.md) is complete for the saved one-shot workflow and first attended hardware pass. Explicit battery admission retains common health requirements, original-result collection, profile/source-bound history and durable successor ownership; USB absence never counts as USB recovery. Source checks pass (13 runtime, 513 tooling, two optional skips, C and shell checks). Fresh seven-debug prerequisites, awake battery rehearsal and one actual battery sleep pass on unchanged diagnostic.18: PM19→26→27/fail0, RTC9→10→11, stable SDIO2, cable absent throughout sleep, original input/memory/policies restored and independent Wi-Fi recovery. The owner confirmed normal dim-console return without intervention. Separate physical reattachment then passed USB/Wi-Fi SSH, configured UDC/carrier1, external power, PHY/IRQ state and Mac enumeration on the same boot; PM27/0 and settings stayed unchanged, with no new kernel entries. NEO-95 retains cable changes during sleep, Mac sleep and repeat-boot coverage. CPU retention, standby energy, wake-button/product policy and latency remain separate; no image or charging policy changed.
@@ -1855,7 +1878,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   and Spec reviews accepted the source, published at `49b1c23`; see
   [report 298](docs/298-usb-removal-producer-lifetime.md). This does
   not retire every generic-PHY consumer or complete NEO-106.
-- [ ] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
+- [x] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
   `mpfs_remove()` disables the parent clock before child teardown and passes
   the parent to `usb_phy_generic_unregister()` rather than the registered
   `glue->phy`. That helper directly unregisters its argument. Actual platform
@@ -1867,6 +1890,21 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   complete MPFS-selected PIO/DMA/module objects and three real Linux platform-device
   cases pass. The final accepted-`49b1c23` combination preserves all maintained
   qualification inputs and passes 1,301 host regressions (nine skipped);
-  independent review and serialized publication remain pending in
-  [report 300](docs/300-mpfs-removal-ownership.md).
+  fresh independent Standards and Spec accepted the bounded change, published
+  at `02c633a`; see [report 300](docs/300-mpfs-removal-ownership.md).
+- [ ] NEO-219 composes wake/startup and retirement explicitly: unchanged 0029
+  and retirement inputs plus bridge 0062 preserve 0026 policy semantics while
+  handing owned wake/source cleanup to the valid IRQ action before free and
+  `nIrq` invalidation. Native reference controls reproduce the naive
+  double/invalid-disarm risk; failed-final-disarm debt remains explicit.
+  All 147 native/sanitizer/ARM scenarios, seven assertion controls, six complete
+  ARM configurations and eight real Linux IRQ/wakeup-source context cases
+  pass; fresh independent pre-integration reviews accepted the source. Final
+  published-`4925a67` context preserves all 18 qualification inputs and full
+  queues, with exact source/test-patch equivalence and a fresh combined host
+  pass (24 runtime/1,379 tooling tests, nine skipped). Fresh final reviews and
+  serialized publication remain pending in
+  [report 303](docs/303-musb-terminal-wake-composition.md).
+  Existing profiles, production inputs, complete failed-power/backend/DMA
+  removal and NEO-102/98/106 physical/clock gates remain separate.
 - [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

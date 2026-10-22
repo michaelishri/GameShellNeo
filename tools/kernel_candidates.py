@@ -23,6 +23,19 @@ PROFILES = {
     )),
 }
 
+# 0062 carries the wake handoff adapted to terminal action ownership. The
+# original 0026 remains unchanged in its independently qualified profile.
+PROFILES['musb-terminal-wake'] = PROFILES['musb-retirement'] + (
+    'musb-wake-startup/0029-musb-startup-runtime-pm.patch',
+    'musb-terminal-wake/0062-musb-terminal-wake-handoff.patch',
+)
+
+# Mailbox lifetime is deliberately independent of the wake/IRQ bridge profile.
+PROFILES['musb-omap-mailbox'] = PROFILES['musb-retirement'] + (
+    'musb-wake-startup/0029-musb-startup-runtime-pm.patch',
+    'musb-omap-mailbox/0063-musb-omap-mailbox-lifetime.patch',
+)
+
 
 def patch_path(root, name):
     """Locate a named source input without falling back for missing candidates."""

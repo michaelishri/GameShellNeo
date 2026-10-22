@@ -24,9 +24,25 @@ unchanged collector/transport and separate charging/clock qualification gates.
 records refusal of successful command exits with failing control output,
 actual-runner host regressions and preservation of historical kernel evidence.
 
+[308 — Standalone host awake-result admission](308-awake-result-admission.md)
+records reproduced host proof acceptance, raw/context retention, finite local
+consumer qualification and separate physical/clock/PM gates.
+
+[306 — OMAP2430 MUSB mailbox ownership](306-omap-mailbox-ownership.md)
+records the original publisher/work schedules, opt-in ownership candidate,
+source-context boundaries and separate Linux and hardware qualification gates.
+
 [305 — MMIO reference feasibility](305-clock-reference-feasibility.md)
 records the bounded offline STOP outcome, primary ordering/configuration audit,
 conditional native/ARM fixtures and unchanged underlying clock/PM gates.
+
+[304 — MUSB wake policy through device-PM traversal](304-musb-wake-device-pm-qualification.md)
+records actual Linux DPM dispatch and error unwind, the exact missing-callback
+control, guarded evidence admission and separate physical/composition limits.
+
+[303 — MUSB terminal IRQ/wake composition](303-musb-terminal-wake-composition.md)
+records the explicit combined candidate, action/wake ownership handoff,
+actual-source controls and separate software/hardware boundaries.
 
 [302 — Finite scheduled clock brackets](302-scheduled-clock-boundaries.md)
 records the separate fixed guard/RAW experiment, pause ABI, offline evidence,

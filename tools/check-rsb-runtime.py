@@ -2,11 +2,11 @@
 """Run the saved RSB delay comparison over USB under independent device recovery."""
 import argparse
 import fcntl
-import json
 import os
 import re
 import shlex
 
+from awake_result import admit_capture, save_context
 from private_config import load_env
 from remote import LOCAL, ROOT, device, device_source, evidence_directory, run, upload, python_command
 
@@ -63,11 +63,10 @@ def main():
                     upload(sftp, source, directory + '/' + name)
             (capture / 'sources.lock.json').write_bytes((ROOT / 'build/sources.lock.json').read_bytes())
             print('Helper retained on failure:', directory, flush=True)
+            save_context(capture, 'rsb-compare', seconds, directory)
             with (capture / 'rsb-comparison.jsonl').open('wb') as output:
                 run(client, shlex.join(command), output=output, timeout=seconds + 90)
-            records = [json.loads(line) for line in (capture / 'rsb-comparison.jsonl').read_text().splitlines()]
-            if not records or records[-1].get('event') != 'complete' or records[-1].get('passed') is not True:
-                raise ValueError('Incomplete RSB comparison; use device:rsb-restore before another test')
+            admit_capture(capture / 'rsb-comparison.jsonl', operation='rsb-compare', seconds=seconds, setting=delay)
             with client.open_sftp() as sftp:
                 for _, name in files:
                     sftp.remove(directory + '/' + name)

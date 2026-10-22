@@ -1,0 +1,473 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] usb: musb: retire OMAP mailbox and parent-PM child users
+
+Keep one owned mailbox publisher and drain admitted atomic dispatch before
+closing backend work. Retire sleepable OMAP child users with SRCU before
+clients or PHY resources disappear. Retain the cached status level for
+initial state on rebind; no old actor crosses child retirement.
+
+The parent runtime callbacks keep their admitted hardware/PM sequence. This
+does not establish failed-power MMIO safety, DMA retirement or system PM.
+
+---
+
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -65,6 +65,7 @@
+  */
+ 
+ #include <linux/module.h>
++#include <linux/srcu.h>
+ #include <linux/kernel.h>
+ #include <linux/sched.h>
+ #include <linux/slab.h>
+@@ -1831,22 +1832,64 @@
+ #define use_dma			0
+ #endif
+ 
+-static int (*musb_phy_callback)(enum musb_vbus_id_status status);
++static DEFINE_MUTEX(musb_mailbox_lock);
++DEFINE_STATIC_SRCU(musb_mailbox_srcu);
++static struct musb __rcu *musb_mailbox_owner;
++
++static int musb_register_mailbox(struct musb *musb)
++{
++	int ret = 0;
++
++	if (!musb->ops->phy_callback)
++		return 0;
++	if (!musb->ops->phy_callback_quiesce)
++		return -EINVAL;
++
++	mutex_lock(&musb_mailbox_lock);
++	if (rcu_access_pointer(musb_mailbox_owner))
++		ret = -EBUSY;
++	else
++		rcu_assign_pointer(musb_mailbox_owner, musb);
++	mutex_unlock(&musb_mailbox_lock);
++	return ret;
++}
++
++/* Process context, outside musb->lock, before clients or resources retire. */
++static void musb_quiesce_mailbox(struct musb *musb)
++{
++	if (!musb->ops->phy_callback)
++		return;
++
++	mutex_lock(&musb_mailbox_lock);
++	if (rcu_access_pointer(musb_mailbox_owner) == musb) {
++		RCU_INIT_POINTER(musb_mailbox_owner, NULL);
++		synchronize_srcu(&musb_mailbox_srcu);
++	}
++	/* Also close backend admission after a failed registration attempt. */
++	if (musb->ops->phy_callback_quiesce)
++		musb->ops->phy_callback_quiesce(musb);
++	mutex_unlock(&musb_mailbox_lock);
++}
+ 
+ /*
+- * musb_mailbox - optional phy notifier function
+- * @status phy state change
++ * musb_mailbox - optional non-sleeping PHY event publication
++ * @status: PHY state change
+  *
+- * Optionally gets called from the USB PHY. Note that the USB PHY must be
+- * disabled at the point the phy_callback is registered or unregistered.
++ * SRCU protects the owning controller and backend callback in atomic callers.
++ * The callback only records status and queues work; retirement drains both.
+  */
+ int musb_mailbox(enum musb_vbus_id_status status)
+ {
+-	if (musb_phy_callback)
+-		return musb_phy_callback(status);
+-
+-	return -ENODEV;
+-};
++	struct musb *musb;
++	int idx, ret = -ENODEV;
++
++	idx = srcu_read_lock(&musb_mailbox_srcu);
++	musb = srcu_dereference(musb_mailbox_owner, &musb_mailbox_srcu);
++	if (musb)
++		ret = musb->ops->phy_callback(musb, status);
++	srcu_read_unlock(&musb_mailbox_srcu, idx);
++	return ret;
++}
+ EXPORT_SYMBOL_GPL(musb_mailbox);
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -2460,6 +2503,7 @@
+ 		return status;
+ 
+ cleanup:
++	musb_quiesce_mailbox(musb);
+ 	musb_shutdown_resume_work(musb);
+ 	/* Keep core IRQ, DMA and platform resources alive for client cleanup. */
+ 	if (gadget_registered)
+@@ -2625,8 +2669,9 @@
+ 		musb->xceiv->io_ops = &musb_ulpi_access;
+ 	}
+ 
+-	if (musb->ops->phy_callback)
+-		musb_phy_callback = musb->ops->phy_callback;
++	status = musb_register_mailbox(musb);
++	if (status)
++		goto fail2;
+ 
+ 	/*
+ 	 * We need musb_read/write functions initialized for PM.
+@@ -2717,6 +2762,7 @@
+ 	return 0;
+ 
+ fail3:
++	musb_quiesce_mailbox(musb);
+ 	musb_shutdown_resume_work(musb);
+ 	musb_disable_runtime_pm(musb);
+ 	musb_shutdown_irq(musb);
+@@ -2726,6 +2772,7 @@
+ 	goto shutdown_phy;
+ 
+ fail2_5:
++	musb_quiesce_mailbox(musb);
+ 	musb_shutdown_resume_work(musb);
+ 	musb_disable_runtime_pm(musb);
+ shutdown_phy:
+@@ -2733,6 +2780,7 @@
+ 	goto release_pm;
+ 
+ err_usb_phy_init:
++	musb_quiesce_mailbox(musb);
+ 	musb_shutdown_resume_work(musb);
+ 	musb_disable_runtime_pm(musb);
+ release_pm:
+@@ -2740,6 +2788,7 @@
+ 	musb_release_session(musb);
+ 
+ fail2:
++	musb_quiesce_mailbox(musb);
+ 	musb_shutdown_resume_work(musb);
+ 	if (musb->irq_wake)
+ 		device_init_wakeup(dev, 0);
+@@ -2793,6 +2842,7 @@
+ 	cancel_delayed_work_sync(&musb->finish_resume_work);
+ 	cancel_delayed_work_sync(&musb->deassert_reset_work);
+ 	pm_runtime_get_sync(musb->controller);
++	musb_quiesce_mailbox(musb);
+ 	musb_shutdown_resume_work(musb);
+ 	musb_host_cleanup(musb);
+ 	musb_gadget_cleanup(musb);
+@@ -2804,7 +2854,6 @@
+ 
+ 	pm_runtime_put_noidle(musb->controller);
+ 	musb_release_session(musb);
+-	musb_phy_callback = NULL;
+ 	if (musb->dma_controller)
+ 		musb_dma_controller_destroy(musb->dma_controller);
+ 	usb_phy_shutdown(musb->xceiv);
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -140,7 +140,8 @@
+  * @set_vbus:	forces vbus status
+  * @pre_root_reset_end: called before the root usb port reset flag gets cleared
+  * @post_root_reset_end: called after the root usb port reset flag gets cleared
+- * @phy_callback: optional callback function for the phy to call
++ * @phy_callback: non-sleeping PHY event publication for the owning controller
++ * @phy_callback_quiesce: drain backend event/child users before client teardown
+  */
+ struct musb_platform_ops {
+ 
+@@ -190,7 +191,8 @@
+ 
+ 	void	(*pre_root_reset_end)(struct musb *musb);
+ 	void	(*post_root_reset_end)(struct musb *musb);
+-	int	(*phy_callback)(enum musb_vbus_id_status status);
++	int	(*phy_callback)(struct musb *musb, enum musb_vbus_id_status status);
++	void	(*phy_callback_quiesce)(struct musb *musb);
+ 	void	(*clear_ep_rxintr)(struct musb *musb, int epnum);
+ };
+ 
+--- a/drivers/usb/musb/omap2430.c
++++ b/drivers/usb/musb/omap2430.c
+@@ -9,6 +9,7 @@
+  * This file is part of the Inventra Controller Driver for Linux.
+  */
+ #include <linux/module.h>
++#include <linux/srcu.h>
+ #include <linux/kernel.h>
+ #include <linux/sched.h>
+ #include <linux/init.h>
+@@ -33,6 +34,10 @@
+ 	struct platform_device	*musb;
+ 	enum musb_vbus_id_status status;
+ 	struct work_struct	omap_musb_mailbox_work;
++	struct srcu_struct	child_srcu;
++	struct musb __rcu	*active_musb;
++	/* Protect cached status only; no callback or wait holds this lock. */
++	spinlock_t		status_lock;
+ 	struct device		*control_otghs;
+ 	unsigned int		is_runtime_suspended:1;
+ 	unsigned int		needs_resume:1;
+@@ -40,7 +45,27 @@
+ };
+ #define glue_to_musb(g)		platform_get_drvdata(g->musb)
+ 
+-static struct omap2430_glue	*_glue;
++static void omap2430_cleanup_srcu(void *data)
++{
++	struct omap2430_glue *glue = data;
++
++	cleanup_srcu_struct(&glue->child_srcu);
++}
++
++/* Child device lock serializes init/quiesce; readers never acquire that lock. */
++static void omap2430_musb_quiesce(struct musb *musb)
++{
++	struct omap2430_glue *glue = dev_get_drvdata(musb->controller->parent);
++
++	if (rcu_access_pointer(glue->active_musb) != musb)
++		return;
++
++	/* A running worker may still need the parent's runtime-resume callback. */
++	disable_work_sync(&glue->omap_musb_mailbox_work);
++	RCU_INIT_POINTER(glue->active_musb, NULL);
++	synchronize_srcu(&glue->child_srcu);
++}
++
+ 
+ static inline void omap2430_low_level_exit(struct musb *musb)
+ {
+@@ -61,24 +86,25 @@
+ 	musb_writel(musb->mregs, OTG_FORCESTDBY, l);
+ }
+ 
+-static int omap2430_musb_mailbox(enum musb_vbus_id_status status)
+-{
+-	struct omap2430_glue	*glue = _glue;
+-
+-	if (!glue) {
+-		pr_err("%s: musb core is not yet initialized\n", __func__);
+-		return -EPROBE_DEFER;
+-	}
++static int omap2430_musb_mailbox(struct musb *musb,
++				 enum musb_vbus_id_status status)
++{
++	struct omap2430_glue *glue = dev_get_drvdata(musb->controller->parent);
++	unsigned long flags;
++	int idx, ret = -EPROBE_DEFER;
++
++	idx = srcu_read_lock(&glue->child_srcu);
++	if (srcu_dereference(glue->active_musb, &glue->child_srcu) != musb)
++		goto out;
++
++	spin_lock_irqsave(&glue->status_lock, flags);
+ 	glue->status = status;
+-
+-	if (!glue_to_musb(glue)) {
+-		pr_err("%s: musb core is not yet ready\n", __func__);
+-		return -EPROBE_DEFER;
+-	}
+-
++	spin_unlock_irqrestore(&glue->status_lock, flags);
+ 	schedule_work(&glue->omap_musb_mailbox_work);
+-
+-	return 0;
++	ret = 0;
++out:
++	srcu_read_unlock(&glue->child_srcu, idx);
++	return ret;
+ }
+ 
+ /*
+@@ -88,9 +114,9 @@
+  * Note that we're skipping A_WAIT_VFALL -> A_IDLE and jumping right to B_IDLE
+  * as set by musb_set_peripheral().
+  */
+-static void omap_musb_set_mailbox(struct omap2430_glue *glue)
+-{
+-	struct musb *musb = glue_to_musb(glue);
++static void omap_musb_set_mailbox(struct omap2430_glue *glue,
++				  struct musb *musb, enum musb_vbus_id_status status)
++{
+ 	int error;
+ 
+ 	pm_runtime_get_sync(musb->controller);
+@@ -99,7 +125,7 @@
+ 		usb_otg_state_string(musb->xceiv->otg->state),
+ 		musb_readb(musb->mregs, MUSB_DEVCTL));
+ 
+-	switch (glue->status) {
++	switch (status) {
+ 	case MUSB_ID_GROUND:
+ 		dev_dbg(musb->controller, "ID GND\n");
+ 		switch (musb->xceiv->otg->state) {
+@@ -162,8 +188,21 @@
+ {
+ 	struct omap2430_glue *glue = container_of(mailbox_work,
+ 				struct omap2430_glue, omap_musb_mailbox_work);
+-
+-	omap_musb_set_mailbox(glue);
++	enum musb_vbus_id_status status;
++	struct musb *musb;
++	unsigned long flags;
++	int idx;
++
++	idx = srcu_read_lock(&glue->child_srcu);
++	musb = srcu_dereference(glue->active_musb, &glue->child_srcu);
++	if (!musb)
++		goto out;
++	spin_lock_irqsave(&glue->status_lock, flags);
++	status = glue->status;
++	spin_unlock_irqrestore(&glue->status_lock, flags);
++	omap_musb_set_mailbox(glue, musb, status);
++out:
++	srcu_read_unlock(&glue->child_srcu, idx);
+ }
+ 
+ static irqreturn_t omap2430_musb_interrupt(int irq, void *__hci)
+@@ -191,6 +230,7 @@
+ 	u32 l;
+ 	int status = 0;
+ 	struct device *dev = musb->controller;
++	struct omap2430_glue *glue = dev_get_drvdata(dev->parent);
+ 	struct musb_hdrc_platform_data *plat = dev_get_platdata(dev);
+ 	struct omap_musb_board_data *data = plat->board_data;
+ 
+@@ -246,6 +286,8 @@
+ 			musb_readl(musb->mregs, OTG_INTERFSEL),
+ 			musb_readl(musb->mregs, OTG_SIMENABLE));
+ 
++	rcu_assign_pointer(glue->active_musb, musb);
++	enable_work(&glue->omap_musb_mailbox_work);
+ 	return 0;
+ }
+ 
+@@ -253,10 +295,15 @@
+ {
+ 	struct device *dev = musb->controller;
+ 	struct omap2430_glue *glue = dev_get_drvdata(dev->parent);
+-
++	enum musb_vbus_id_status status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&glue->status_lock, flags);
+ 	if (glue->status == MUSB_UNKNOWN)
+ 		glue->status = MUSB_VBUS_OFF;
+-	omap_musb_set_mailbox(glue);
++	status = glue->status;
++	spin_unlock_irqrestore(&glue->status_lock, flags);
++	omap_musb_set_mailbox(glue, musb, status);
+ }
+ 
+ static void omap2430_musb_disable(struct musb *musb)
+@@ -264,21 +311,19 @@
+ 	struct device *dev = musb->controller;
+ 	struct omap2430_glue *glue = dev_get_drvdata(dev->parent);
+ 
+-	if (glue->status != MUSB_UNKNOWN)
++	if (READ_ONCE(glue->status) != MUSB_UNKNOWN)
+ 		omap_control_usb_set_mode(glue->control_otghs,
+ 			USB_MODE_DISCONNECT);
+ }
+ 
+ static int omap2430_musb_exit(struct musb *musb)
+ {
+-	struct device *dev = musb->controller;
+-	struct omap2430_glue *glue = dev_get_drvdata(dev->parent);
++	omap2430_musb_quiesce(musb);
+ 
+ 	omap2430_low_level_exit(musb);
+ 	phy_power_off(musb->phy);
+ 	phy_exit(musb->phy);
+ 	musb->phy = NULL;
+-	cancel_work_sync(&glue->omap_musb_mailbox_work);
+ 
+ 	return 0;
+ }
+@@ -296,6 +341,7 @@
+ 	.disable	= omap2430_musb_disable,
+ 
+ 	.phy_callback	= omap2430_musb_mailbox,
++	.phy_callback_quiesce = omap2430_musb_quiesce,
+ };
+ 
+ static u64 omap2430_dmamask = DMA_BIT_MASK(32);
+@@ -319,6 +365,13 @@
+ 	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+ 	if (!glue)
+ 		return -ENOMEM;
++	ret = init_srcu_struct(&glue->child_srcu);
++	if (ret)
++		return ret;
++	ret = devm_add_action_or_reset(&pdev->dev, omap2430_cleanup_srcu, glue);
++	if (ret)
++		return ret;
++	spin_lock_init(&glue->status_lock);
+ 
+ 	musb = platform_device_alloc("musb-hdrc", PLATFORM_DEVID_AUTO);
+ 	if (!musb)
+@@ -386,13 +439,8 @@
+ 
+ 	platform_set_drvdata(pdev, glue);
+ 
+-	/*
+-	 * REVISIT if we ever have two instances of the wrapper, we will be
+-	 * in big trouble
+-	 */
+-	_glue	= glue;
+-
+ 	INIT_WORK(&glue->omap_musb_mailbox_work, omap_musb_mailbox_work);
++	disable_work_sync(&glue->omap_musb_mailbox_work);
+ 
+ 	ret = platform_device_add_resources(musb, pdev->resource, pdev->num_resources);
+ 	if (ret) {
+@@ -484,10 +532,13 @@
+ static int omap2430_runtime_suspend(struct device *dev)
+ {
+ 	struct omap2430_glue		*glue = dev_get_drvdata(dev);
+-	struct musb			*musb = glue_to_musb(glue);
+-
++	struct musb *musb;
++	int idx;
++
++	idx = srcu_read_lock(&glue->child_srcu);
++	musb = srcu_dereference(glue->active_musb, &glue->child_srcu);
+ 	if (!musb)
+-		return 0;
++		goto out;
+ 
+ 	musb->context.otg_interfsel = musb_readl(musb->mregs,
+ 						 OTG_INTERFSEL);
+@@ -501,16 +552,21 @@
+ 
+ 	glue->is_runtime_suspended = 1;
+ 
++out:
++	srcu_read_unlock(&glue->child_srcu, idx);
+ 	return 0;
+ }
+ 
+ static int omap2430_runtime_resume(struct device *dev)
+ {
+ 	struct omap2430_glue		*glue = dev_get_drvdata(dev);
+-	struct musb			*musb = glue_to_musb(glue);
+-
++	struct musb *musb;
++	int idx;
++
++	idx = srcu_read_lock(&glue->child_srcu);
++	musb = srcu_dereference(glue->active_musb, &glue->child_srcu);
+ 	if (!musb)
+-		return 0;
++		goto out;
+ 
+ 	if (!glue->phy_suspended) {
+ 		phy_init(musb->phy);
+@@ -526,6 +582,8 @@
+ 
+ 	glue->is_runtime_suspended = 0;
+ 
++out:
++	srcu_read_unlock(&glue->child_srcu, idx);
+ 	return 0;
+ }
+ 

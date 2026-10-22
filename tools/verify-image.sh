@@ -4,9 +4,11 @@ set -euo pipefail
 [[ $# == 1 ]] || { echo 'Usage: verify-image.sh IMAGE' >&2; exit 2; }
 image=$(realpath "$1")
 cd "$(dirname "$0")/.."
+provisioning=$(python3 tools/image_provisioning.py)
 python3 tools/image.py verify "$image"
 builder=$(python3 -c 'import json; print(json.load(open("build/sources.lock.json"))["builder"]["image"])')
 docker run --rm --privileged --entrypoint bash -v "$PWD:/project" \
+    -v "$provisioning:/project/.local/provisioning/device:ro" \
     -v "$image:/image.img:ro" "$builder" -c '
     set -euo pipefail
     loop=$(losetup --find --show --read-only --partscan /image.img)

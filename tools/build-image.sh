@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-[[ -f .local/provisioning/device/identity.json ]] || { echo 'Prepare private provisioning first.' >&2; exit 1; }
+provisioning=$(python3 tools/image_provisioning.py)
 action=${1:-build}
 [[ $action == build || $action == rootfs ]] || { echo 'Usage: build-image.sh [build|rootfs]' >&2; exit 2; }
 # Recheck storage after preparation; final Armbian/image checks remain in place.
@@ -29,6 +29,7 @@ fi
 # The wrapper never selects or writes a physical card.
 docker run --rm --privileged --entrypoint bash \
     -v "$PWD:/project" -v "$PWD/.local/sources/armbian:/armbian" \
+    -v "$provisioning:/project/.local/provisioning/device:ro" \
     -e NEO_DEBIAN_SNAPSHOT="${locked[1]}" -e NEO_SECURITY_SNAPSHOT="${locked[2]}" \
     -e ZSTD_NBTHREADS=1 -e NEO_BUILD_ACTION="$action" -e NEO_IGNORE_CACHE="$ignore_cache" \
     -e NEO_ROOTFS_CACHE_NAME="$cache_name" -e NEO_ROOTFS_CACHE_SHA="$cache_sha" "${locked[0]}" -c '

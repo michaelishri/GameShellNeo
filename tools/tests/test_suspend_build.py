@@ -2,7 +2,9 @@
 import importlib.util
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
@@ -15,6 +17,38 @@ spec.loader.exec_module(config)
 
 
 class SuspendBuildTests(unittest.TestCase):
+    def test_checker_rejects_missing_or_disabled_ext4_security_without_fragment_entry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'kernel').mkdir()
+            (root / 'build').mkdir()
+            (root / 'kernel/gameshellneo.config').write_text('CONFIG_EXT4_FS=y\n')
+            (root / 'build/sources.lock.json').write_text('{}\n')
+            resolved = root / 'resolved.config'
+            base = ''.join(key + '=y\n' for key in (
+                'CONFIG_EXT4_FS', 'CONFIG_MMC_BLOCK', 'CONFIG_BLK_DEV_SD',
+                'CONFIG_SERIAL_8250_CONSOLE', 'CONFIG_UNIX', 'CONFIG_INET',
+                'CONFIG_PROC_FS', 'CONFIG_SYSFS'))
+            with patch.object(config, 'ROOT', root), \
+                    patch.object(sys, 'argv', ['check-kernel-config.py', str(resolved)]):
+                for option in ('', 'CONFIG_EXT4_FS_SECURITY=n\n'):
+                    resolved.write_text(base + option)
+                    with self.subTest(option=option), self.assertRaisesRegex(
+                            SystemExit, 'CONFIG_EXT4_FS_SECURITY: requested y, resolved n'):
+                        config.main()
+                resolved.write_text(base + 'CONFIG_EXT4_FS_SECURITY=y\n')
+                with patch('builtins.print'):
+                    config.main()
+
+    def test_ext4_security_attributes_are_required_without_lsms_or_experiments(self):
+        for lock, variant in (({}, None), ({}, 'enabled'), ({}, 'disabled'),
+                              ({'experiments': {'suspend_diagnostics': True}}, None)):
+            with self.subTest(lock=lock, variant=variant):
+                required = config.requirements({'CONFIG_EXT4_FS_SECURITY': 'n'}, lock,
+                                               clock_diagnostics_test=variant)
+                self.assertEqual(required['CONFIG_EXT4_FS_SECURITY'], 'y')
+                self.assertNotIn('CONFIG_SECURITY', required)
+
     def test_current_image_composition_and_unknown_experiments(self):
         import json
         lock = json.loads((TOOLS.parent / 'build/sources.lock.json').read_text())

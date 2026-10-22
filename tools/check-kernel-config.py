@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when Kconfig silently drops a requested diagnostic option."""
+"""Fail when Kconfig drops a required filesystem or requested diagnostic option."""
 import argparse
 import json
 from pathlib import Path
@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def requirements(requested, lock, *, clock_diagnostics_test=None):
     keypad_retention(lock)
     requested = dict(requested)
+    # Debian packages use security.capability independently of the LSM framework.
+    requested['CONFIG_EXT4_FS_SECURITY'] = 'y'
     experiments = lock.get('experiments', {})
     clock = experiments.get('clock_provenance', False)
     if type(clock) is not bool:

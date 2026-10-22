@@ -137,7 +137,10 @@ class BuildPreflight(unittest.TestCase):
         tools=self.root/'tools';tools.mkdir()
         (tools/'build_preflight.py').write_text('raise SystemExit(7)\n')
         provision=self.root/'.local/provisioning/device';provision.mkdir(parents=True)
-        (provision/'identity.json').write_text('{}')
+        from image_provisioning import FILES
+        for name in FILES:
+            (provision/name).write_text('fixture')
+        shutil.copyfile(TOOLS/'image_provisioning.py',tools/'image_provisioning.py')
         for name in ('build-kernel.sh','build-image.sh'):
             with self.subTest(wrapper=name):
                 path=tools/name;shutil.copyfile(TOOLS/name,path)

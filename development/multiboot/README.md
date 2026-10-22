@@ -1,0 +1,135 @@
+# Development SD-card systems
+
+NEO-208 prepares multiple diagnostic systems on one card for driver development.
+This is opt-in tooling. Normal image construction does not install the loader,
+selector, catalog or administration scripts. The final release will not carry
+this development arrangement. See [report 292](../../docs/292-development-sd-systems.md)
+for evidence and outstanding board qualification.
+
+## Storage and selection
+
+The development image retains the verified MBR/SPL/U-Boot prefix, original FAT
+boot partition and byte-identical recovery root partition. A third ext4
+partition stores `systems/<version>/{root,boot,release.json}`. Each version has
+its own complete root, settings, kernel modules, kernel, DTB and external
+initramfs. Private identities stay on ext4. Games, saves and settings are not
+shared between versions.
+
+The fixed FAT `boot.scr` reads `NEXT.SCR` and `GOOD.SCR`. A different NEXT is a
+one-shot trial: before executing it, the loader rewrites NEXT from GOOD and
+checks the actual readback. A successful trial must be explicitly confirmed
+from that running root. Normal confirmed boots do not rewrite the flag.
+A missing, damaged or returning descriptor enters the fixed recovery system.
+Recovery uses its own old kernel, DTB and unchanged root partition.
+
+A reset after an unconfirmed trial returns to the confirmed system. A complete
+hang still needs a reset or separately qualified watchdog. FAT writes are not
+power-cut atomic, and sharing a card and boot filesystem leaves common failure
+modes. No product OTA, signed-update service or automatic health policy is
+provided here.
+
+## Prepare an image
+
+Use `task dev:busybox -- --help`, `task dev:initramfs -- --help` and
+`task dev:card -- --help` for current options. Arguments after `--` are parsed
+as data; Task does not evaluate them as shell code. BusyBox is authenticated
+against signed Debian snapshot metadata and the development dependency lock.
+The initramfs builder verifies the static ARM ELF and needed applets through
+the builder's ARM emulator. Card assembly verifies its archive and source-pin
+receipt; an x86 test loader cannot be installed as the ARM loader.
+Use `--builder` with `dev:initramfs` for the pinned offline ARM builder.
+
+The card command requires explicit recovery/system raw image paths and SHA-256
+pins, a verified ARM `uInitrd` with its `.json` sidecar, a fresh `.img` output
+under this checkout's ignored `.local`, and a fresh lowercase version name.
+Without `--build` it reports the proposed layout. With `--build` it operates
+only on regular image files in the locked, network-disabled builder, checks all
+three filesystems and compares every recovery-root byte. Choose `--bytes` for
+the desired MiB-aligned image size (default 8 GiB, minimum 6 GiB); the physical
+card must be at least that large. It does not resize a physical card.
+
+Before installation, use the established fresh DEV-spare identity, original-card
+preservation, backup/checkpoint, guarded write, full readback and ejection
+procedure. A new partition layout needs the initial reflash already agreed by
+the owner. No source image or device is modified by preparation.
+
+`task dev:pack -- --image <development.img> --receipt <development.json>
+--output <fresh-private-transfer-directory>` validates the completed development
+receipt and creates a separate gzip transfer. Existing output directories are
+rejected, including production transfers and recovery checkpoints. For the
+8 GiB image, the guarded write/readback/eject budget is 2168 seconds; the
+ordinary image's 900-second default is unchanged and the development bound is
+3600 seconds. Oversized images whose conservative budget exceeds that bound
+reject.
+
+Use the **new checkout's** Mac Tasks with both environment values set:
+`NEO_HARDWARE_CHECKOUT=<established-hardware-checkout>` and
+`NEO_DEVELOPMENT_TRANSFER=<fresh-private-transfer-directory>`. The new helper
+reuses existing credentials/keys/known-host records in place and stages into a
+receipt-addressed development directory. `mac:stage` skips production packing
+only with that explicit development selection; `mac:inspect`, `mac:preflight`
+and `mac:flash` retain target identity, mount veto, full readback and ejection.
+All actions must use the same explicit selection. Before transferring the large
+archive, establish that the current connection is ordinary Wi-Fi rather than
+assuming an old hotspot/network answer is still valid.
+
+## Import and switch over SSH
+
+The image places the administration tree at `<store>/admin`. When running a
+directory system, the complete store is mounted at
+`/run/gameshellneo-store`; the boot filesystem must also be mounted read/write
+at an explicit path, such as `/mnt/devboot`. In recovery, mount the store
+separately using its recorded PARTUUID. Check `DEVBOOT.JSON` on both mounts.
+
+These commands run **on the GameShell** as root through the established pinned
+SSH connection. Substitute the actual mounted boot/store paths. The examples
+use a newly uploaded, complete version bundle and its independently known
+SHA-256. Prepare that bundle on the build machine:
+
+```sh
+task dev:bundle -- --image <raw-image> --sha256 <raw-image-sha256> \
+  --system diag27 --store-partuuid <card-store-partuuid> \
+  --initramfs .local/multiboot/uInitrd --output .local/multiboot/diag27.tar
+```
+
+It uses host loop mounts and retains the image's complete metadata.
+The GameShell kernel has loop devices disabled;
+its bundle import needs only Python, GNU tar and the mounted store.
+
+```sh
+python3 /run/gameshellneo-store/admin/tools/dev-systems.py \
+  --boot /mnt/devboot --store /run/gameshellneo-store status
+
+python3 /run/gameshellneo-store/admin/tools/dev-systems.py \
+  --boot /mnt/devboot --store /run/gameshellneo-store \
+  import-bundle diag27 --bundle /run/gameshellneo-store/incoming/diag27.tar \
+  --sha256 <verified-bundle-sha256>
+
+python3 /run/gameshellneo-store/admin/tools/dev-systems.py \
+  --boot /mnt/devboot --store /run/gameshellneo-store select diag27
+```
+
+Host preparation verifies the image, root/modules/kernel match and boot assets.
+Device import verifies the whole bundle and safe archive paths, preserves
+ownership/modes/links/xattrs, and publishes a fresh version without selecting
+it. Failed imports leave the prior selected system alone. A complete imported
+directory whose registration was interrupted can be registered with
+`register diag27`. Existing version names cannot be replaced. The upload needs
+room for the upload, a private verified archive snapshot and extracted version;
+remove an upload only after
+checking its successful import and retained provenance.
+
+Selection never reboots. Use the existing warned `task device:reboot` from the
+hardware-access checkout after the applicable clock/test admission permits it.
+After observing the correct boot and checking display, inputs and both required
+management routes, `confirm diag27` sets the default. It verifies the running
+root inode, early-userspace marker and exact kernel. `recovery` queues the fixed
+recovery system without replacing the confirmed default. `status` validates the
+catalog and reports next and confirmed versions.
+
+Original image manifests/fstab are retained beside each imported release. The
+copied image manifest explicitly records a `development-directory` deployment
+and the store PARTUUID, and root/boot fstab entries are removed from the copied
+root. Strict clock/PM tools must continue to reject this different deployment
+until their separate provenance adapter and matching qualification are ready.
+Importing or confirming a version does not resolve NEO-192 or qualify sleep.

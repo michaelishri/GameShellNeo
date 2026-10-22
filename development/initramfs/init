@@ -1,0 +1,162 @@
+#!/bin/sh
+# Development images only. Recovery boots its fixed root without this loader.
+set -eu
+export PATH=/bin:/sbin LC_ALL=C
+
+fail() {
+    printf 'GameShellNeo development initramfs: %s\n' "$*" >&2
+    exit 1
+}
+
+parse_cmdline() {
+    [ "${#1}" -le 4096 ] || fail 'kernel command line is too long'
+    slot='' store='' development=''
+    set -f
+    for argument in $1; do
+        case "$argument" in
+            neo.dev=*)
+                [ -z "$development" ] || fail 'duplicate neo.dev'
+                development=${argument#neo.dev=}
+                [ "$development" = 1 ] || fail 'neo.dev must be 1'
+                ;;
+            neo.slot=*)
+                [ -z "$slot" ] || fail 'duplicate neo.slot'
+                slot=${argument#neo.slot=}
+                case "$slot" in ''|*[!a-z0-9-]*) fail 'invalid neo.slot' ;; esac
+                [ "${#slot}" -le 48 ] || fail 'neo.slot is too long'
+                ;;
+            neo.store=*)
+                [ -z "$store" ] || fail 'duplicate neo.store'
+                store=${argument#neo.store=}
+                printf '%s\n' "$store" | grep -Eq '^PARTUUID=[0-9a-f]{8}-03$' || fail 'invalid neo.store'
+                ;;
+            neo.*) fail 'unknown development boot argument' ;;
+        esac
+    done
+    set +f
+    [ "$development" = 1 ] && [ -n "$slot" ] && [ -n "$store" ] || fail 'missing development boot argument'
+}
+
+mount_virtualfs() {
+    mount --make-rprivate / || fail 'cannot isolate initramfs mounts'
+    mkdir -p /dev /proc /sys /run /store /newroot
+    mount -t devtmpfs -o nosuid devtmpfs /dev || fail 'cannot mount /dev'
+    exec </dev/console >/dev/console 2>&1
+    mount -t proc -o nosuid,nodev,noexec proc /proc || fail 'cannot mount /proc'
+    mount -t sysfs -o nosuid,nodev,noexec sysfs /sys || fail 'cannot mount /sys'
+    mount -t tmpfs -o nosuid,nodev,mode=0755 tmpfs /run || fail 'cannot mount /run'
+}
+
+find_store() {
+    # Linux 6.18 supplies the partition UUID in each sysfs uevent file. This
+    # avoids depending on udev links or BusyBox's optional blkid support.
+    # A separate bounded shell also caps time spent scanning sysfs, rather than
+    # bounding only the number of one-second sleeps.
+    # shellcheck disable=SC2016 # Expand the validated positional argument in the child.
+    timeout -s KILL 10 /bin/sh -c '
+    store=$1
+    attempt=0
+    while [ "$attempt" -lt 10 ]; do
+        device=
+        for event in /sys/class/block/*/uevent; do
+            [ -f "$event" ] || continue
+            if grep -qx "${store}" "$event"; then
+                [ -z "$device" ] || { printf "ambiguous store PARTUUID\n" >&2; exit 1; }
+                name=${event%/uevent}
+                name=${name##*/}
+                case "$name" in ""|*[!a-zA-Z0-9._-]*) exit 1 ;; esac
+                device=/dev/$name
+            fi
+        done
+        if [ -n "$device" ] && [ -b "$device" ]; then
+            printf "%s\n" "$device"
+            exit 0
+        fi
+        attempt=$((attempt + 1))
+        [ "$attempt" -eq 10 ] || sleep 1
+    done
+    exit 1
+    ' find-store "$store" || fail 'unique store block device did not appear within 10 seconds'
+}
+
+resolve_root_path() {
+    # Resolve absolute links against the selected root, including Debian's
+    # /sbin -> usr/sbin and /sbin/init -> /lib/systemd/systemd layouts.
+    pending=${2#/}
+    resolved=
+    links=0
+    while [ -n "$pending" ]; do
+        component=${pending%%/*}
+        case "$pending" in */*) pending=${pending#*/} ;; *) pending= ;; esac
+        case "$component" in
+            ''|.) continue ;;
+            ..) resolved=${resolved%/*} ;;
+            *)
+                resolved=$resolved/$component
+                if [ -L "$1$resolved" ]; then
+                    links=$((links + 1))
+                    [ "$links" -le 32 ] || fail 'too many init symlinks'
+                    # Preserve trailing bytes until newline admission is checked;
+                    # ordinary command substitution would trim a target's LF.
+                    target=$(readlink -n "$1$resolved" && printf '.') || fail 'unreadable init symlink'
+                    target=${target%.}
+                    [ -n "$target" ] && [ "${#target}" -le 4096 ] || fail 'invalid init symlink'
+                    [ "$(printf '%s' "$target" | wc -l)" -eq 0 ] || fail 'newline in init symlink'
+                    resolved=${resolved%/*}
+                    case "$target" in /*) resolved=; target=${target#/} ;; esac
+                    pending=$target${pending:+/$pending}
+                fi
+                ;;
+        esac
+        [ "${#pending}" -le 4096 ] && [ "${#resolved}" -le 4096 ] || fail 'init path is too long'
+    done
+    printf '%s\n' "$1$resolved"
+}
+
+validate_marker() {
+    marker=$1/etc/gameshellneo/development-slot
+    [ -f "$marker" ] && [ ! -L "$marker" ] || fail 'missing regular development slot marker'
+    [ "$(readlink -f "$marker")" = "$marker" ] || fail 'development marker path contains a symlink'
+    expected=$(printf 'schema=1\nid=%s\nkernel=%s\n' "$2" "$3")
+    [ "${#expected}" -lt 512 ] || fail 'development marker is too long'
+    [ "$(head -c 513 "$marker" | wc -c)" -eq "$((${#expected} + 1))" ] || fail 'development marker has wrong size'
+    [ "$(head -c 513 "$marker" | wc -l)" -eq 3 ] || fail 'development marker must contain exactly three lines'
+    [ "$(head -c 513 "$marker")" = "$expected" ] || fail 'development marker does not match slot and running kernel'
+}
+
+validate_root() {
+    root=/store/systems/$slot/root
+    [ -d "$root" ] && [ ! -L "$root" ] || fail 'selected root is not a real directory'
+    [ "$(readlink -f "$root")" = "$root" ] || fail 'selected root path contains a symlink'
+    kernel=$(uname -r)
+    validate_marker "$root" "$slot" "$kernel"
+    init=$(resolve_root_path "$root" /sbin/init) || fail 'cannot resolve selected init'
+    [ -f "$init" ] && [ -x "$init" ] || fail 'selected /sbin/init is not executable'
+    for directory in dev proc sys run; do
+        [ ! -L "$root/$directory" ] || fail 'virtual mount target is a symlink'
+        mkdir -p "$root/$directory" || fail 'cannot prepare virtual mount target'
+        [ -d "$root/$directory" ] || fail 'virtual mount target is not a directory'
+    done
+}
+
+boot_slot() {
+    parse_cmdline "$1"
+    device=$(find_store) || fail 'cannot select development store'
+    mount -t ext4 -o rw,data=ordered "$device" /store || fail 'cannot mount ext4 development store'
+    validate_root
+    mount -o bind "$root" /newroot || fail 'cannot bind selected root'
+    mkdir -p /run/gameshellneo-store
+    printf 'schema=1\nid=%s\nkernel=%s\n' "$slot" "$kernel" > /run/gameshellneo-development-slot
+    mount -o move /run /newroot/run || fail 'cannot move /run'
+    mount -o move /store /newroot/run/gameshellneo-store || fail 'cannot retain development store'
+    for directory in dev sys proc; do
+        mount -o move "/$directory" "/newroot/$directory" || fail 'cannot move virtual mount'
+    done
+    printf 'GameShellNeo development initramfs: starting slot %s (%s)\n' "$slot" "$kernel"
+    exec switch_root /newroot /sbin/init
+}
+
+# The namespace qualification harness calls these same functions with a fixture
+# command line. A real boot always reads the kernel's /proc/cmdline here.
+mount_virtualfs
+boot_slot "$(cat /proc/cmdline)"

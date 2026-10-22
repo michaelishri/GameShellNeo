@@ -1,0 +1,33 @@
+{
+  "authentication": {
+    "keyring_sha256": "506b815cbb32d9b6066b4a2aa524071e071761e7e7f68c3ac74f3061ba852017",
+    "valid_signatures": [
+      "4CB50190207B4758A3F73A796ED0E7B82643E131",
+      "B8E5F13176D2A7A75220028078DBA3BC47EF2265",
+      "41587F7DB8C774BCCF131416762F67A0B2C39DE4"
+    ]
+  },
+  "busybox": {
+    "architecture": "armhf",
+    "binary_sha256": "0a58280553462be5d8064f510a8abceef2610fb549d82f52027bcfc9cbdf9d1d",
+    "filename": "pool/main/b/busybox/busybox-static_1.37.0-6+b9_armhf.deb",
+    "package": "busybox-static",
+    "sha256": "8b35210e08d559ecc0ddb660dd96f6f9694f69eb27f1dc608f5eeda56d94509e",
+    "size": 827896,
+    "source": "busybox (1:1.37.0-6)",
+    "version": "1:1.37.0-6+b9"
+  },
+  "development_only": true,
+  "purpose": "Development SD-card loader only; excluded from release images.",
+  "repository": {
+    "component": "main",
+    "inrelease_sha256": "0584fba32e13e0ab8285fb16c27adea1ec03a73669c18702821094fd6ca86675",
+    "packages_path": "main/binary-armhf/Packages.xz",
+    "packages_sha256": "2ec499ef1d8375da19217b500d389c3d40410d930fe709013758c1746aba5cec",
+    "packages_size": 9246492,
+    "snapshot": "20260926T202543Z",
+    "suite": "trixie",
+    "url": "https://snapshot.debian.org/archive/debian/20260926T202543Z/"
+  },
+  "schema_version": 1
+}

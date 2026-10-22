@@ -3,6 +3,34 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
+
+#define DEFAULT_GUARD_SECONDS 900U
+#define MAX_GUARD_SECONDS 3600U
+
+static int guard_seconds(const char *text, unsigned int *seconds)
+{
+    unsigned int value = 0;
+    if (!text || !*text)
+        return 0;
+    for (const char *p = text; *p; p++) {
+        if (*p < '0' || *p > '9' || value > MAX_GUARD_SECONDS / 10U)
+            return 0;
+        value = value * 10U + (unsigned int)(*p - '0');
+        if (value > MAX_GUARD_SECONDS)
+            return 0;
+    }
+    if (!value)
+        return 0;
+    *seconds = value;
+    return 1;
+}
+
+static int guard_expired(unsigned long long start, unsigned long long now,
+                         unsigned int seconds)
+{
+    return now < start || now - start >= seconds;
+}
 
 static int valid_disk(const char *name)
 {
@@ -34,6 +62,15 @@ static int matches(const char *name, const char *whole)
 #include <assert.h>
 int main(void)
 {
+    unsigned int seconds = DEFAULT_GUARD_SECONDS;
+    assert(seconds == 900U && guard_seconds("2168", &seconds) && seconds == 2168U);
+    assert(guard_seconds("3600", &seconds) && seconds == MAX_GUARD_SECONDS);
+    assert(!guard_seconds("3601", &seconds) && !guard_seconds("0", &seconds));
+    assert(!guard_seconds("-1", &seconds) && !guard_seconds("+900", &seconds));
+    assert(!guard_seconds("900;anything", &seconds) && !guard_seconds("", &seconds));
+    assert(!guard_seconds("999999999999999999999", &seconds));
+    assert(!guard_expired(100U, 2267U, 2168U));
+    assert(guard_expired(100U, 2268U, 2168U) && guard_expired(100U, 99U, 2168U));
     assert(valid_disk("disk16") && !valid_disk("disk0") && !valid_disk("disk16s1"));
     assert(!valid_disk("") && !valid_disk("disk") && !valid_disk("disk-1"));
     assert(matches("disk16", "disk16") && matches("disk16s1", "disk16"));
@@ -63,10 +100,15 @@ static DADissenterRef deny_mount(DADiskRef disk, void *context)
 
 int main(int argc, char **argv)
 {
-    if (argc != 2 || !valid_disk(argv[1]) || geteuid() != 0) {
-        fprintf(stderr, "Usage: sudo macos-mount-guard diskN (N > 0)\n");
+    unsigned int seconds = DEFAULT_GUARD_SECONDS;
+    if ((argc != 2 && argc != 3) || !valid_disk(argv[1]) || geteuid() != 0 ||
+        (argc == 3 && !guard_seconds(argv[2], &seconds))) {
+        fprintf(stderr, "Usage: sudo macos-mount-guard diskN [seconds <= 3600] (N > 0)\n");
         return 2;
     }
+    struct timespec start;
+    if (clock_gettime(CLOCK_MONOTONIC, &start))
+        return 4;
     DASessionRef session = DASessionCreate(NULL);
     if (!session)
         return 3;
@@ -75,8 +117,15 @@ int main(int argc, char **argv)
     /* Parent verifies an actual veto before opening the disk for writing. */
     puts("READY");
     fflush(stdout);
-    alarm(900);
+    alarm(seconds);
     for (;;) {
+        struct timespec now;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) ||
+            guard_expired((unsigned long long)start.tv_sec,
+                          (unsigned long long)now.tv_sec, seconds)) {
+            fprintf(stderr, "Mount guard duration expired\n");
+            break;
+        }
         CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.25, false);
         struct pollfd input = { .fd = STDIN_FILENO, .events = POLLIN | POLLHUP };
         int result = poll(&input, 1, 0);

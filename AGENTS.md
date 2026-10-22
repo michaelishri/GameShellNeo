@@ -78,6 +78,7 @@ Current worktrees are under the canonical checkout's `.local/worktrees/`:
 | `remaining-legacy-integration` | code through `58eeadd` plus final report commits: independent wake/startup profile, six ARM configurations and mapped older histories; see report 291 |
 | `remaining-legacy-validation` | `58eeadd` (detached): production sleep/callback regression and explicitly historical teardown reproduction |
 | `remaining-final-integration` | final merge documentation and host checks; source/candidate receipts stay in the frozen validation worktrees above |
+| `multiboot-boot-selection` | NEO-208 opt-in development SD systems, original recovery, authenticated ARM loader and loop-free bundle updates; physical qualification remains open |
 
 Merged branch references are removed; their worktrees, ignored evidence and
 private configuration remain at their original revisions. Create a branch
@@ -198,6 +199,19 @@ routine reconnect. No microphone, background camera service or persistent
 recording is authorized by this workflow. The camera stops after each request.
 
 ## Hardware gates and evidence
+
+- NEO-208 is **development only**; the owner explicitly excludes this card
+  selector from the final release. [Report 292](docs/292-development-sd-systems.md)
+  and `development/multiboot/README.md` describe the opt-in card/bundle Tasks.
+  The initial reflash is authorized, but fresh DEV-spare identity, physical card
+  movement, current-network transfer check and full guarded readback remain.
+  Use the new checkout's Mac helper with explicit `NEO_HARDWARE_CHECKOUT` and
+  `NEO_DEVELOPMENT_TRANSFER` to retain established credentials/known-host checks;
+  do not overwrite private configuration or production transfer/checkpoints.
+  Directory deployments need separate clock/PM provenance admission. New PM
+  tooling rejects them; frozen older worktrees retain their historical guards
+  and must not be used to bypass this. Flag readback does not establish FAT
+  power-cut safety or a reset for a complete kernel hang.
 
 - **NEO-154's SSH-stall investigation was abandoned at the owner's request.**
   Do not reopen it or run the old SSH trace/stall experiments merely because

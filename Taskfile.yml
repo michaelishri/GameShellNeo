@@ -69,6 +69,42 @@ env:
   NEO_DOCKER_OWNERSHIP_CASE: '{{.CASE | default ""}}'
 
 tasks:
+  dev:card:
+    desc: Plan or build an opt-in development card regular image; arguments after --, never flash
+    cmds: [bash tools/run-logged.sh dev-card python3 tools/dev-command.py card]
+
+  dev:initramfs:
+    desc: Build the development loader from an authenticated static BusyBox; arguments after --
+    cmds: [bash tools/run-logged.sh dev-initramfs python3 tools/dev-command.py initramfs]
+
+  dev:busybox:
+    desc: Fetch the pinned development BusyBox dependency in the locked builder; arguments after --
+    cmds: [bash tools/run-logged.sh dev-busybox python3 tools/dev-command.py busybox]
+
+  dev:systems:
+    desc: Inspect, import or select a development card system; arguments after --, never reboot
+    cmds: [python3 tools/dev-command.py systems]
+
+  dev:bundle:
+    desc: Prepare a complete version in the host builder for loop-free SSH import; arguments after --
+    cmds: [bash tools/run-logged.sh dev-bundle python3 tools/dev-command.py bundle]
+
+  dev:pack:
+    desc: Pack a verified development-card artifact to a fresh private transfer directory; arguments after --
+    cmds: [bash tools/run-logged.sh dev-pack python3 tools/dev-command.py pack-card]
+
+  check:dev-card:
+    desc: Qualify bundle import and copied administration on a disposable regular-image copy; arguments after --
+    cmds: [bash tools/run-logged.sh dev-card-check python3 tools/dev-command.py check-card]
+
+  test:dev-boot:
+    desc: Check development image, selector and loader behavior without a physical card
+    cmds: [bash tools/run-logged.sh dev-boot-tests python3 -m unittest discover -s tools/tests -p 'test_dev_*.py' -v]
+
+  test:dev-root:
+    desc: Run development archive and mixed-owner/device metadata fixtures as real root in the offline builder
+    cmds: [bash tools/run-logged.sh dev-root-tests python3 tools/check-dev-root.py]
+
   check:musb-callback-kunit:
     desc: Exercise real MUSB callback/UDC races on four emulated ARM CPUs
     cmds: [bash tools/run-logged.sh musb-callback-kunit python3 tools/check-musb-callback-kunit.py]
@@ -1306,10 +1342,14 @@ tasks:
     cmds: [python3 tools/check-mac-usb.py]
 
   mac:stage:
-    desc: Pack and upload the current verified image and flash helper; no disk write
+    desc: Upload explicitly selected development transfer, or pack/upload current verified image; no disk write
     cmds:
-      - task: image:pack
-      - python3 tools/remote.py mac stage
+      - |
+        set -eu
+        if [ -z "${NEO_DEVELOPMENT_TRANSFER:-}" ]; then
+          task image:pack
+        fi
+        python3 tools/remote.py mac stage
 
   mac:stage-recovery:
     desc: Select a verified recovery checkpoint on the Mac; reuse its existing archive when present; NAME required

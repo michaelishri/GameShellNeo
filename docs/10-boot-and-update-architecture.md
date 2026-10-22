@@ -2,6 +2,11 @@
 
 Research date: 2026-09-27. This report evaluates architecture against the [agreed requirements](06-base-requirements.md). Recommendations are proposals, not implementations. No kernel, bootloader or image was built; no device or card was modified.
 
+Development update, 22 October: [report 292](292-development-sd-systems.md)
+describes the separate opt-in diagnostic card selector. The owner requested
+this only during development; it will not be included in the final release.
+It does not implement the future product OTA architecture proposed below.
+
 ## Recommendation
 
 Use a pinned Armbian build framework to assemble minimal Debian armhf userspace and explicitly selected board support. Keep the bootloader, kernel, firmware, device tree and userspace manifest versioned together. Retain full U-Boot and diagnostic access during initial bring-up. Measure cold boot before choosing optimizations. For later OTA, evaluate signed A/B system images with RAUC as the first candidate, while keeping the bootloader outside routine updates initially.

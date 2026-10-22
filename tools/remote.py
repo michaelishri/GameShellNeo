@@ -3,6 +3,7 @@
 import argparse
 import base64
 import hashlib
+import importlib.util
 from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
 import json
@@ -51,14 +52,14 @@ def private_path(value, default):
     return Path(value or default).expanduser().resolve()
 
 
-def connect_mac(config):
+def connect_mac(config, *, identity_local=None):
     identity = config.get('M2_MACBOOK_AIR_IP') or config.get('M2_MACBOOK_AIR_TAILNET')
     endpoint = config.get('M2_MACBOOK_AIR_TAILNET') or identity
     if not identity:
         raise ValueError('Configure the Mac SSH address in .env')
     client = paramiko.SSHClient()
     client.load_system_host_keys()
-    known = LOCAL / 'ssh/known_hosts'
+    known = (Path(identity_local) if identity_local is not None else LOCAL) / 'ssh/known_hosts'
     if known.exists():
         client.load_host_keys(str(known))
     client.set_missing_host_key_policy(paramiko.RejectPolicy())
@@ -543,15 +544,84 @@ def sudo(config, arguments):
     return shlex.join(flags + arguments), password
 
 
-def staged_arguments(sftp, directory):
+def development_packer():
+    spec = importlib.util.spec_from_file_location('remote_development_packer', ROOT / 'tools/pack-dev-card.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def development_transfer(value):
+    """Admit a private explicit transfer before opening any SSH connection."""
+    original = Path(value).expanduser()
+    if original.is_symlink():
+        raise ValueError('Development transfer directory must not be a symlink')
+    directory = original.resolve(strict=True)
+    if not directory.is_dir() or directory.stat().st_uid != os.getuid() or directory.stat().st_mode & 0o077:
+        raise ValueError('Development transfer directory must be private and caller-owned')
+    manifest_path = directory / 'transfer.json'
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise ValueError('Expected a regular development transfer manifest')
+    manifest = json.loads(manifest_path.read_text())
+    if (not isinstance(manifest, dict) or manifest.get('development_only') is not True or
+            manifest.get('development_receipt_file') != 'development-card.json'):
+        raise ValueError('Expected an explicitly packed development transfer')
+    name = manifest.get('compressed_file')
+    if not isinstance(name, str) or Path(name).name != name or not name.endswith('.img.gz'):
+        raise ValueError('Unexpected development transfer filename')
+    archive, receipt = directory / name, directory / 'development-card.json'
+    if any(path.is_symlink() or not path.is_file() for path in (archive, receipt)):
+        raise ValueError('Development transfer inputs must be regular files')
+    record = json.loads(receipt.read_text())
+    packing = development_packer()
+    packing.validate_receipt(record, manifest.get('image'), manifest.get('image_bytes'))
+    if (manifest.get('image') != name.removesuffix('.gz') or
+            manifest.get('image_sha256') != record['sha256'] or
+            hashlib.sha256(receipt.read_bytes()).hexdigest() != manifest.get('development_receipt_sha256') or
+            archive.stat().st_size != manifest.get('compressed_bytes')):
+        raise ValueError('Development transfer receipt or sizes differ')
+    with archive.open('rb') as stream:
+        if hashlib.file_digest(stream, 'sha256').hexdigest() != manifest.get('compressed_sha256'):
+            raise ValueError('Development transfer archive hash differs')
+    policy = packing.helper('flash-macos.py')
+    if manifest['image_bytes'] > policy.LARGE_IMAGE_BYTES and 'guard_timeout_seconds' not in manifest:
+        raise ValueError('Larger development transfer needs an explicit guard duration')
+    policy.selected_guard_seconds(manifest, manifest.get('guard_timeout_seconds'))
+    return directory, manifest
+
+
+def hardware_mac_config(checkout):
+    """Read the selected existing identity in place; never copy private values."""
+    root = Path(checkout).expanduser().resolve(strict=True)
+    if not root.is_dir() or not (root / '.env').is_file():
+        raise ValueError('Expected an established hardware checkout with private configuration')
+    config = load_env(root / '.env')
+    key = config.get('M2_MACBOOK_AIR_KEY')
+    if key:
+        path = Path(key).expanduser()
+        config['M2_MACBOOK_AIR_KEY'] = str((root / path).resolve())
+    return config, root / '.local'
+
+
+def staged_arguments(sftp, directory, expected=None):
     with sftp.open(directory + '/transfer.json') as stream:
         manifest = json.load(stream)
+    if expected is not None and manifest != expected:
+        raise ValueError('Staged development transfer differs from the selected local transfer')
     name = manifest['compressed_file']
     if posixpath.basename(name) != name or not name.endswith('.img.gz'):
         raise ValueError('Unexpected transfer filename')
-    return ['/usr/bin/python3', '-u', directory + '/flash-macos.py',
+    arguments = ['/usr/bin/python3', '-u', directory + '/flash-macos.py',
             '--image', directory + '/' + name, '--manifest', directory + '/transfer.json',
             '--target', directory + '/target.json']
+    if manifest.get('development_only') is True:
+        policy = development_packer().helper('flash-macos.py')
+        if manifest['image_bytes'] > policy.LARGE_IMAGE_BYTES and 'guard_timeout_seconds' not in manifest:
+            raise ValueError('Larger development transfer needs an explicit guard duration')
+        seconds = policy.selected_guard_seconds(manifest, manifest.get('guard_timeout_seconds'))
+        if seconds != policy.DEFAULT_GUARD_SECONDS:
+            arguments += ['--guard-seconds', str(seconds)]
+    return arguments
 
 
 def stage_recovery(client, sftp, directory, recovery, allow_upload=False):
@@ -577,18 +647,28 @@ def stage_recovery(client, sftp, directory, recovery, allow_upload=False):
     print('Recovery archive verified and selected; no card written:', manifest['image'], flush=True)
 
 
-def mac_action(config, action, disk):
+def mac_action(config, action, disk, *, identity_local=None):
     if action in ('inspect', 'flash', 'backup', 'compare') and not re.fullmatch(r'disk[1-9][0-9]*', disk):
         raise ValueError('Supply the inspected external whole disk as DISK=diskN')
     recovery = None
+    selected = os.environ.get('NEO_DEVELOPMENT_TRANSFER')
+    if selected and action == 'stage-recovery':
+        raise ValueError('Unset development transfer selection before choosing a recovery checkpoint')
+    selection = development_transfer(selected) if selected and action in ('stage', 'inspect', 'preflight', 'flash', 'compare') else None
+    flash_directory, expected_transfer = selection if selection else (LOCAL / 'flash', None)
     if action == 'stage-recovery':
         from recovery_image import resolve
         recovery = resolve(ROOT, os.environ.get('NEO_CHECKPOINT_NAME', ''))
-    with connect_mac(config) as client, client.open_sftp() as sftp:
+    connection = connect_mac(config, identity_local=identity_local) if identity_local is not None else connect_mac(config)
+    with connection as client, client.open_sftp() as sftp:
         if action == 'status':
             run(client, 'sw_vers; diskutil list external physical; route -n get 192.168.10.1')
             return
         directory = posixpath.join(sftp.normalize('.'), '.local/share/GameShellNeo')
+        if expected_transfer is not None:
+            # Keep development candidates and their active target records away
+            # from the production transfer and retained recovery archives.
+            directory = posixpath.join(directory, 'development', expected_transfer['development_receipt_sha256'])
         run(client, 'umask 077; mkdir -p {0}; chmod 700 {0}'.format(shlex.quote(directory)), display=False)
         if action == 'backup':
             mac_backup(client, sftp, config, directory, disk)
@@ -602,23 +682,27 @@ def mac_action(config, action, disk):
                 raise ValueError('UPLOAD must be 0 or 1')
             stage_recovery(client, sftp, directory, recovery, option == '1')
         elif action == 'stage':
-            manifest = json.loads((LOCAL / 'flash/transfer.json').read_text())
+            manifest = expected_transfer or json.loads((flash_directory / 'transfer.json').read_text())
             name = manifest['compressed_file']
             if Path(name).name != name:
                 raise ValueError('Unexpected transfer filename')
             print('Uploading private image to the Mac...', flush=True)
-            upload(sftp, LOCAL / 'flash' / name, directory + '/' + name)
-            upload(sftp, LOCAL / 'flash/transfer.json', directory + '/transfer.json')
+            upload(sftp, flash_directory / name, directory + '/' + name)
+            if expected_transfer is not None:
+                upload(sftp, flash_directory / 'development-card.json', directory + '/development-card.json')
+            upload(sftp, flash_directory / 'transfer.json', directory + '/transfer.json')
             # Verify the transferred source even when no card is inserted.
-            args = staged_arguments(sftp, directory) + ['--source-only']
+            args = staged_arguments(sftp, directory, expected_transfer) + ['--source-only']
             run(client, shlex.join(args))
         elif action == 'inspect':
+            if expected_transfer is not None:
+                staged_arguments(sftp, directory, expected_transfer)
             run(client, shlex.join(['/usr/bin/python3', directory + '/flash-macos.py',
                                     '--inspect', disk, '--target', directory + '/target.json']))
-            (LOCAL / 'flash').mkdir(mode=0o700, parents=True, exist_ok=True)
-            sftp.get(directory + '/target.json', str(LOCAL / 'flash/target.json'))
+            flash_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            sftp.get(directory + '/target.json', str(flash_directory / 'target.json'))
         elif action == 'preflight':
-            run(client, shlex.join(staged_arguments(sftp, directory)))
+            run(client, shlex.join(staged_arguments(sftp, directory, expected_transfer)))
         elif action == 'compare':
             with sftp.open(directory + '/target.json') as stream:
                 target = json.load(stream)
@@ -627,7 +711,7 @@ def mac_action(config, action, disk):
             capture = evidence_directory()
             print('Private card comparison:', capture, flush=True)
             report = directory + '/card-compare-' + capture.name + '.json'
-            arguments = staged_arguments(sftp, directory) + ['--compare-card', '--report', report]
+            arguments = staged_arguments(sftp, directory, expected_transfer) + ['--compare-card', '--report', report]
             command, password = sudo(config, arguments)
             try:
                 with (capture / 'card-compare.log').open('wb') as output:
@@ -647,7 +731,7 @@ def mac_action(config, action, disk):
                 raise ValueError('DISK differs from the recorded inspection; inspect the intended spare again')
             capture = evidence_directory()
             report = directory + '/flash-' + capture.name + '.json'
-            arguments = staged_arguments(sftp, directory) + ['--write', '--report', report]
+            arguments = staged_arguments(sftp, directory, expected_transfer) + ['--write', '--report', report]
             command, password = sudo(config, arguments)
             with (capture / 'flash.log').open('wb') as output:
                 run(client, command, password, output)
@@ -706,15 +790,23 @@ def main():
     mac = sub.add_parser('mac')
     mac.add_argument('action', choices=['status', 'backup', 'stage', 'stage-recovery', 'inspect', 'preflight', 'flash', 'compare'])
     mac.add_argument('--disk', default=os.environ.get('NEO_DISK', ''))
+    mac.add_argument('--hardware-checkout', type=Path, default=os.environ.get('NEO_HARDWARE_CHECKOUT'),
+                     help='Reuse an existing checkout identity for an explicit development transfer')
     args = parser.parse_args()
     os.umask(0o077)
-    config = load_env()
     if args.host == 'device':
+        config = load_env()
         if args.route not in ('wifi', 'usb'):
             parser.error('ROUTE must be wifi or usb')
         device_action(config, args.action, args.route)
     else:
-        mac_action(config, args.action, args.disk)
+        if args.hardware_checkout:
+            if not os.environ.get('NEO_DEVELOPMENT_TRANSFER'):
+                raise ValueError('Hardware identity selection requires an explicit development transfer')
+            config, identity_local = hardware_mac_config(args.hardware_checkout)
+            mac_action(config, args.action, args.disk, identity_local=identity_local)
+        else:
+            mac_action(load_env(), args.action, args.disk)
 
 
 if __name__ == '__main__':

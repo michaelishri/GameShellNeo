@@ -6,6 +6,11 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+For development-only selectable SD systems, use the opt-in
+[multi-system card tooling](development/multiboot/README.md). It keeps a fixed
+recovery system and imports complete diagnostic versions for selection over
+SSH. Normal release images do not include it; board qualification remains open.
+
 NEO-207 reconciles the old MUSB wake/startup and removal histories in
 [report 291](docs/291-legacy-musb-source-integration.md). Use
 `task test:musb-wake-startup` or `task check:musb-wake-startup-configs` for the

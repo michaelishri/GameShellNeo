@@ -195,6 +195,9 @@ def snapshot():
 def validate(snapshot, lock, connection='usb'):
     if connection not in ('usb', 'battery'):
         raise ValueError('Unknown PM connection profile')
+    if ('deployment' in snapshot.get('image', {}) or
+            any(argument.startswith('neo.dev=') for argument in snapshot.get('cmdline', '').split())):
+        raise ValueError('Development deployment requires separate clock/PM provenance admission')
     experiments = lock.get('experiments', {})
     retention = experiments.get('keypad_supply_retention', False)
     wfi = cpi_idle.enabled(lock)

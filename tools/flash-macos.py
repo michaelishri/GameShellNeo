@@ -20,6 +20,30 @@ import sys
 import time
 
 CHUNK = 4 * 1024 * 1024
+DEFAULT_GUARD_SECONDS = 900
+MAX_GUARD_SECONDS = 3600
+LARGE_IMAGE_BYTES = 4 * 1024 ** 3
+
+
+def development_guard_seconds(image_bytes):
+    """Budget both passes at 8 MiB/s, plus two minutes for sync and ejection."""
+    require(type(image_bytes) is int and image_bytes > 0, 'Expected a positive image size')
+    rate = 8 * 1024 * 1024
+    seconds = max(DEFAULT_GUARD_SECONDS, (2 * image_bytes + rate - 1) // rate + 120)
+    require(seconds <= MAX_GUARD_SECONDS, 'Image exceeds the bounded development flash duration')
+    return seconds
+
+
+def selected_guard_seconds(manifest, requested=None):
+    if requested is None:
+        return DEFAULT_GUARD_SECONDS
+    require(manifest.get('development_only') is True and
+            type(manifest.get('image_bytes')) is int and manifest['image_bytes'] > LARGE_IMAGE_BYTES,
+            'Extended guard duration requires an explicitly selected larger development image')
+    require(type(requested) is int and
+            development_guard_seconds(manifest['image_bytes']) <= requested <= MAX_GUARD_SECONDS,
+            'Development guard duration is insufficient or exceeds 3600 seconds')
+    return requested
 
 
 def require(condition, message):
@@ -29,8 +53,10 @@ def require(condition, message):
 
 class MountGuard:
     """Veto mounts of this card until the verified image has been ejected."""
-    def __init__(self, disk):
-        self.disk, self.process = disk, None
+    def __init__(self, disk, seconds=DEFAULT_GUARD_SECONDS):
+        require(type(seconds) is int and DEFAULT_GUARD_SECONDS <= seconds <= MAX_GUARD_SECONDS,
+                'Mount guard duration must be between 900 and 3600 seconds')
+        self.disk, self.process, self.seconds = disk, None, seconds
 
     def __enter__(self):
         source = Path(__file__).with_name('macos-mount-guard.c')
@@ -41,7 +67,10 @@ class MountGuard:
                             '-O2', '-framework', 'DiskArbitration', '-framework', 'CoreFoundation',
                             str(source), '-o', str(temporary)], check=True)
             temporary.replace(binary)
-            self.process = subprocess.Popen([str(binary), self.disk], stdin=subprocess.PIPE,
+            command = [str(binary), self.disk]
+            if self.seconds != DEFAULT_GUARD_SECONDS:
+                command.append(str(self.seconds))
+            self.process = subprocess.Popen(command, stdin=subprocess.PIPE,
                                             stdout=subprocess.PIPE, bufsize=0)
             self.wait_line('READY', 10)
             return self
@@ -169,6 +198,21 @@ def verify_source(image, manifest):
         digest, size = digest_stream(stream)
     require((digest, size) == (manifest['image_sha256'], manifest['image_bytes']),
             'Decompressed image checksum/size mismatch')
+    if manifest.get('development_only') is True:
+        require(manifest.get('development_receipt_file') == 'development-card.json',
+                'Development transfer receipt filename differs')
+        receipt_bytes = (image.parent / 'development-card.json').read_bytes()
+        require(hashlib.sha256(receipt_bytes).hexdigest() == manifest.get('development_receipt_sha256'),
+                'Transferred development card receipt checksum mismatch')
+        report = json.loads(receipt_bytes)
+        require(isinstance(report, dict) and report.get('schema') == 1 and
+                report.get('operation') == 'development-card-assembly' and
+                report.get('development_only') is True and
+                report.get('offline_filesystem_checks') == 'passed' and
+                report.get('recovery_root_byte_identical') is True and
+                report.get('reserved_bootloader_prefix_byte_identical') is True and
+                report.get('sha256') == digest and report.get('bytes') == size,
+                'Transferred development receipt does not qualify this image')
     print('Compressed and decompressed image checksums passed.', flush=True)
 
 
@@ -240,11 +284,16 @@ def compare_card(image, expected, manifest):
     return result
 
 
-def flash(image, expected, manifest):
+def flash(image, expected, manifest, *, guard_seconds=DEFAULT_GUARD_SECONDS):
     require(os.geteuid() == 0, '--write requires administrator privileges')
+    if guard_seconds != DEFAULT_GUARD_SECONDS:
+        guard_seconds = selected_guard_seconds(manifest, guard_seconds)
     validate_target(expected, manifest['image_bytes'])
-    with MountGuard(expected['device']) as guard:
-        return guarded_flash(image, expected, manifest, guard)
+    with MountGuard(expected['device'], guard_seconds) as guard:
+        result = guarded_flash(image, expected, manifest, guard)
+        if guard_seconds != DEFAULT_GUARD_SECONDS:
+            result['guard_timeout_seconds'] = guard_seconds
+        return result
 
 
 def guarded_flash(image, expected, manifest, guard):
@@ -304,6 +353,8 @@ def main():
     parser.add_argument('--manifest', type=Path)
     parser.add_argument('--target', required=True, type=Path)
     parser.add_argument('--write', action='store_true')
+    parser.add_argument('--guard-seconds', type=int,
+                        help='Explicit bounded duration for a larger development image')
     parser.add_argument('--report', type=Path)
     parser.add_argument('--inspect', metavar='diskN', help='Record current external-card identity without writing')
     parser.add_argument('--source-only', action='store_true', help='Verify the transfer without accessing a card')
@@ -325,6 +376,7 @@ def main():
             'Select only one of --source-only, --write or --compare-card')
     manifest = json.loads(args.manifest.read_text())
     verify_source(args.image, manifest)
+    guard_seconds = selected_guard_seconds(manifest, args.guard_seconds)
     if args.source_only:
         return
     expected = json.loads(args.target.read_text())
@@ -341,7 +393,7 @@ def main():
         print('Preflight complete; no disk was written.', flush=True)
         return
     require(args.report is not None, '--write requires a report destination')
-    report = flash(args.image, expected, manifest)
+    report = flash(args.image, expected, manifest, guard_seconds=guard_seconds)
     args.report.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2), flush=True)
 

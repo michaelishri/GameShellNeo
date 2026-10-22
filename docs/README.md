@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[292 — Development SD systems](292-development-sd-systems.md) records the
+opt-in directory roots, matched boot bundles, one-shot selection and recovery
+design, offline qualification and remaining physical-card/clock-admission gates.
+
 [291 — Legacy MUSB source reconciliation](291-legacy-musb-source-integration.md)
 maps the five earlier histories, preserves unique wake/startup candidates and
 historical audits, and separates remaining software composition from physical

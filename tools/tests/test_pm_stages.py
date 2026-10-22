@@ -194,6 +194,15 @@ else:
 
 
 class Evidence(unittest.TestCase):
+    def test_development_root_cannot_reuse_pristine_image_admission(self):
+        good, lock = healthy_fixture()
+        pm.validate(good, lock)
+        for deployment in ('development-directory', None, False):
+            with self.subTest(deployment=deployment), self.assertRaisesRegex(ValueError, 'Development deployment'):
+                pm.validate(good | {'image': good['image'] | {'deployment': deployment}}, lock)
+        with self.assertRaisesRegex(ValueError, 'Development deployment'):
+            pm.validate(good | {'cmdline': good['cmdline'] + ' neo.dev=1 neo.slot=diag25'}, lock)
+
     def test_disabled_supply_wake_is_image_bound_and_required_for_both_paths(self):
         good, lock = healthy_fixture()
         lock['features'] = {'usb_system_wakeup': False, 'power_supply_system_wakeup': False,

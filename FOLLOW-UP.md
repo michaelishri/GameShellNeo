@@ -2,6 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-208 development-only SD systems:** opt-in tooling prepares complete
+directory systems, per-version boot bundles, a one-shot selection flag and
+fixed original recovery root; [report 292](docs/292-development-sd-systems.md)
+records validation. Keep this out of the final release. The initial DEV-spare
+installation, exact vendor U-Boot trial/readback, real board root handoff,
+explicit confirmation/recovery and subsequent SSH image import need matching
+hardware qualification. FAT persistence under power loss and a complete-hang
+watchdog are not established. Strict clock/PM admission needs an explicit
+development-deployment provenance adapter before NEO-192 captures; do not
+relax it or relabel a directory root as its original flashed image. NEO-192
+and the dependent NEO-191/182 gates remain open.
+
 **NEO-207 legacy MUSB branch reconciliation:** source review and offline
 qualification are complete; wider parent gates remain. Exact wake/startup patches
 0026/0029 now have an independent offline profile, preserving current sleep

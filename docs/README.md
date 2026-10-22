@@ -20,6 +20,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 records the Sun4i detector generation guard, offline qualification and separate
 remaining provider/backend and physical gates.
 
+[297 — brcmfmac firmware startup ownership](297-brcmfmac-startup-ownership.md)
+records reproduced setup-error loss, the isolated fail-fast candidate,
+actual-source qualification and separate reset/reprobe boundaries.
+
 [295 — Development-store expansion](295-development-store-expansion.md)
 records the guarded offline grow operation, fresh checkpoint requirements,
 partition-byte preservation and qualification gates.

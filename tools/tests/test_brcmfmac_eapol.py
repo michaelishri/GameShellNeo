@@ -12,6 +12,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import brcmfmac_eapol_checks as checks
 
 
+def observation(name):
+    return (f'OBSERVE {name} result=0 pending=0 other_pending=0 firmware_calls=0 '
+            'frees=0 barriers=0 wakes=0 tx_errors=0\n')
+
+
 class EapolBoundaryTests(unittest.TestCase):
     def test_actual_deadline_whitespace_and_numeric_value(self):
         for whitespace in (' ', '\t\t\t'):
@@ -73,7 +78,9 @@ class EapolBoundaryTests(unittest.TestCase):
                 checks.prepare(root, archive, root)
             self.assertFalse((root / 'upstream').exists())
 
-    def run_oracle(self, output, raw=0, stderr='', *, failure=False, assertion=None):
+    def run_oracle(self, output, raw=0, stderr='', *, failure=False, assertion=None, observe=True):
+        if observe:
+            output = observation('timeout_single') + output
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary)
             def execute(argv, directory, name, **kwargs):
@@ -89,7 +96,7 @@ class EapolBoundaryTests(unittest.TestCase):
                                             assertion=assertion)
 
     def test_positive_requires_current_success_and_raw_zero(self):
-        self.run_oracle('OBSERVE timeout_single result=0\nPASS timeout_single\n')
+        self.run_oracle('PASS timeout_single\n')
         with self.assertRaises(RuntimeError):
             self.run_oracle('PASS timeout_single\n', raw=1)
 
@@ -121,6 +128,34 @@ class EapolBoundaryTests(unittest.TestCase):
             self.run_oracle('FAIL timeout_single timeout_errno expected=-110 actual=1\n',
                             raw=1, stderr='runtime error: broken\n', failure=True,
                             assertion=('timeout_errno', -110, 1))
+
+    def test_observe_route_rejects_added_wrong_case_assertion_and_diagnostic(self):
+        terminal = 'FAIL timeout_single timeout_errno expected=-110 actual=1\n'
+        for extra in ('FAIL interface_isolation unexpected expected=1 actual=0\n',
+                      'FAIL timeout_single unrelated expected=1 actual=0\n',
+                      'runtime error: unexpected diagnostic\n'):
+            for output in (terminal + extra, extra + terminal):
+                with self.subTest(output=output), self.assertRaises(RuntimeError):
+                    self.run_oracle(output, raw=1, failure=True, assertion=('timeout_errno', -110, 1))
+
+    def test_observe_route_requires_exactly_one_complete_observation(self):
+        terminal = 'PASS timeout_single\n'
+        for output in (terminal, observation('timeout_multiple') + terminal,
+                       observation('timeout_single') * 2 + terminal,
+                       observation('timeout_single').replace('frees=0', 'frees=bad') + terminal,
+                       observation('timeout_single') + terminal.rstrip('\n')):
+            with self.subTest(output=output), self.assertRaises(RuntimeError):
+                self.run_oracle(output, observe=False)
+
+    def test_successful_observe_route_rejects_extra_failure_or_diagnostic(self):
+        for extra in ('FAIL interface_isolation unrelated expected=0 actual=1\n', 'unexpected diagnostic\n'):
+            with self.subTest(extra=extra), self.assertRaises(RuntimeError):
+                self.run_oracle('PASS timeout_single\n' + extra)
+
+    def test_bool_is_not_an_original_process_exit_code(self):
+        with self.assertRaises(RuntimeError):
+            self.run_oracle('FAIL timeout_single timeout_errno expected=-110 actual=1\n',
+                            raw=True, failure=True, assertion=('timeout_errno', -110, 1))
 
 
 class NativeProvenanceTests(unittest.TestCase):
@@ -175,6 +210,7 @@ class NativeProvenanceTests(unittest.TestCase):
                     output = f'FAIL {name} {assertion} expected={expected} actual={actual}\n'
                 else:
                     output = 'PASS ' + name + '\n'
+                output = observation(name) + output
                 (directory / (name + '.stdout')).write_text(output)
                 (directory / (name + '.stderr')).write_text('')
                 case = dict(command=[str(directory / 'fixture'), name],
@@ -246,6 +282,7 @@ class NativeProvenanceTests(unittest.TestCase):
         if raw is not None:
             case['returncode'] = raw
         if text is not None:
+            text = observation(name) + text
             (directory / (name + '.stdout')).write_text(text)
             case['stdout_sha256'] = checks.digest(text.encode())
         self.write(directory / (name + '.json'), case)
@@ -260,6 +297,15 @@ class NativeProvenanceTests(unittest.TestCase):
         self.change_control(text='FAIL timeout_single timeout_errno expected=-110 actual=10\n')
         with self.assertRaisesRegex(RuntimeError, 'different assertion/value'):
             self.admit()
+
+    def test_admit_route_rejects_added_wrong_case_assertion_and_diagnostic(self):
+        terminal = 'FAIL timeout_single timeout_errno expected=-110 actual=1\n'
+        for extra in ('FAIL interface_isolation unexpected expected=1 actual=0\n',
+                      'FAIL timeout_single unrelated expected=1 actual=0\n',
+                      'runtime error: unexpected diagnostic\n'):
+            with self.subTest(extra=extra), self.assertRaisesRegex(RuntimeError, 'Unexpected actual fixture'):
+                self.change_control(text=terminal + extra)
+                self.admit()
 
 
 if __name__ == '__main__':

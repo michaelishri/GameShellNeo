@@ -174,7 +174,8 @@ The managed-only operation is terminal:
 | `brcmfmac.o` board | n | `b30c77bb271e95b4667b7cb8b1792bf7cf14daafc390b50a118ae2f966fd7a24` | `7e12dbb20507c838ea3c674e3db21ff25f012742d36cd3286fe0844355b7df02` |
 | `brcmfmac.o` debug | y | `8e08273fa505e7c56135fa16f1ee1fb6607553135b24a19d70844762a998a88f` | `bbe048986ab9a98b8ececb20b4627ccf21768947085a0c3aba55753c211a63c2` |
 
-After terminal release, nine additional host regressions exercise read-only
+At the original `269e511` source checkpoint, nine additional host regressions
+exercise read-only
 provenance admission with disposable metadata fixtures: altered source,
 fixture/applicator dependency, binary, output hash, compile flags, raw exit and
 numeric-prefix outcomes reject; identical valid evidence passes without
@@ -185,13 +186,51 @@ inputs remain unchanged. The single full host check at
 `0a8d02a007864440644ed1eebd00ac653f891f88`, original session 65296, is terminal
 exit 0: 24 runtime tests, 1463 tooling tests (nine expected skips), both compiled
 C checks, Bash syntax and ShellCheck pass. The retained log is
-`.local/build/neo230-host-check.log`. Subsequent source edits are documentation
-only; the qualified executable and test inputs are unchanged.
+`.local/build/neo230-host-check.log`. The final original-base `269e511` commit
+changed documentation only. This is historical qualification with its own
+tested inputs, distinct from the subsequent host correction below.
+
+## Complete per-case result grammar
+
+A read-only self-audit at frozen `269e511` found a host admission gap: raw exit 1
+with the exact declared control failure plus an additional unrelated `FAIL`
+line was accepted. The original counterexample is retained separately as
+`.local/audit/neo230-extra-result-counterexample.json`, SHA256
+`c3e30e9b21d7996a93fd8ab028f8ab139d19bbc877230d5cf18d6fba354b17bd`.
+The entire original checkout/ref, 950-file manifest and 329-artifact index
+remain unchanged; all genuine saved executions have the expected output.
+
+The correction lives in a new `wifi-eapol-final-admission` checkout. The shared
+per-case validator now requires exactly two complete newline-terminated lines:
+one `OBSERVE` with the original case name and complete numeric field schema,
+then exactly one expected `PASS` or numeric `FAIL`. An extra wrong-case failure,
+assertion, diagnostic, duplicate/malformed observation or missing final newline
+rejects. Raw exit must be an integer with the original expected value; stderr
+still rejects. The full helper's same-suite source/ownership guards are retained.
+
+All 30 focused host checks pass, including the actual maintained observer and
+native-admission routes with additional wrong-case/assertion/diagnostic lines.
+Metadata fixtures exercise the admission boundary; they are not kernel runs.
+The new read-only proof
+`.local/audit/neo230-grammar-proof/proof.json`, SHA256
+`a6c99935daec76031e48596dc71b0aaccf5a89a5499549c998d10f408ddb857d`,
+checks all 329 original artifact pins and re-admits all 63 genuine original case
+outputs: baseline 14, native 14, sanitizer 14, controls 7 and ARM 14. AST comparison
+proves the validator is the only changed helper body. Candidate 0057, driver
+fixtures/types, compiler flags, source projections, shared helpers, ARM binaries
+and objects are unchanged. No binary/container is executed and no historical
+receipt is relabeled or rewritten. Cross-checkout output validation uses the
+current shared validator with original hashes/provenance; it does not bypass or
+extend the complete helper's existing same-suite reuse contract.
+
+The combined current host check and explicit upstream publication boundary are
+recorded after local context reconciliation. No new native/sanitizer/ARM/object
+run is needed for this host-only validator change.
 
 NEO-55/58 remain open for original
 cause/recovery ownership, deliberate candidate composition/image integration
 and matching hardware qualification. Clock/provenance blocks live PM admission;
 no image or device change is part of this child. Source qualification is
 complete on original base `d5d67790668f4cb2b3d308a5b60da03c26b04911`;
-accepted-context reconciliation and fresh independent final reviews remain
-required before publication or child closure.
+fresh independent final reviews and publication of the identical upstream
+dependency remain required before publication or child closure.

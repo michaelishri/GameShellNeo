@@ -229,9 +229,15 @@ def compile_fixture(root, source, destination, *, reference=False, sanitizer=Fal
 
 def validate_case(result, output, error, name, *, failure=False, assertion=None):
     expected = 1 if failure else 0
-    if (result['returncode'] != expected or error or
-            output.count('PASS ' + name + '\n') != (expected == 0) or
-            output.count('FAIL ' + name + ' ') != expected):
+    integer = r'-?(?:0|[1-9][0-9]*)'
+    count = r'(?:0|[1-9][0-9]*)'
+    case = re.escape(name)
+    observation = (rf'OBSERVE {case} result={integer} pending={integer} other_pending={integer} '
+                   rf'firmware_calls={count} frees={count} barriers={count} wakes={count} tx_errors={count}\n')
+    terminal = (rf'FAIL {case} [a-z_]+ expected={integer} actual={integer}' if failure else
+                'PASS ' + case)
+    if (type(result['returncode']) is not int or result['returncode'] != expected or error or
+            not re.fullmatch(observation + terminal + r'\n', output)):
         raise RuntimeError('Unexpected actual fixture outcome: ' + name)
     if assertion:
         label, expected_value, actual_value = assertion

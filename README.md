@@ -11,6 +11,13 @@ For development-only selectable SD systems, use the opt-in
 recovery system and imports complete diagnostic versions for selection over
 SSH. Normal release images do not include it; board qualification remains open.
 
+NEO-229's isolated managed-wakeup API candidate is documented in
+[report 315](docs/315-managed-wakeup-init-error.md). Use
+`task test:managed-wakeup-init` for native/sanitizer/ARM references,
+`task check:managed-wakeup-init-drivers` for selected complete ARM objects and
+`task test:managed-wakeup-init-kunit` for actual Linux ownership and its exact
+original-wrapper control. Candidate 0072 stays outside the image queue.
+
 NEO-207 reconciles the old MUSB wake/startup and removal histories in
 [report 291](docs/291-legacy-musb-source-integration.md). Use
 `task test:musb-wake-startup` or `task check:musb-wake-startup-configs` for the

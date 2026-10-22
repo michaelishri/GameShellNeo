@@ -1,0 +1,31 @@
+From: GameShellNeo development <gameshellneo@example.invalid>
+Subject: [PATCH] PM: wakeup: preserve managed initialization errors
+
+Do not register a managed disable action when wakeup initialization failed.
+Otherwise the wrapper reports the action-registration result instead of the
+initial error, and its later cleanup can disable an existing wakeup source.
+
+Keep device_init_wakeup() capability behavior and the add-action-or-reset
+failure path unchanged.
+
+---
+ include/linux/pm_wakeup.h | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/pm_wakeup.h b/include/linux/pm_wakeup.h
+--- a/include/linux/pm_wakeup.h
++++ b/include/linux/pm_wakeup.h
+@@ -238,7 +238,12 @@ static void device_disable_wakeup(void *dev)
+  */
+ static inline int devm_device_init_wakeup(struct device *dev)
+ {
+-	device_init_wakeup(dev, true);
++	int ret;
++
++	ret = device_init_wakeup(dev, true);
++	if (ret)
++		return ret;
++
+ 	return devm_add_action_or_reset(dev, device_disable_wakeup, dev);
+ }
+ 

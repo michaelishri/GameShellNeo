@@ -659,6 +659,20 @@ tasks:
     desc: Test MUSB probe roles and compile gadget, host, dual-role and module ARM configurations
     cmds: [bash tools/run-logged.sh musb-probe-drivers python3 tools/check-musb-probe-roles.py --compile-drivers]
 
+  test:managed-wakeup-init:
+    desc: Qualify five managed-wakeup inline cases and exact return-ignored control on native, sanitizers and ARM32
+    cmds: ['bash tools/run-logged.sh managed-wakeup-init python3 tools/check-managed-wakeup-init.py {{.CLI_ARGS}}']
+
+  check:managed-wakeup-init-drivers:
+    desc: Compile selected PM and no-sleep ARM callers using the opt-in managed-wakeup candidate
+    cmds: [bash tools/run-logged.sh managed-wakeup-init-drivers python3 tools/check-managed-wakeup-init.py --compile-drivers]
+
+  test:managed-wakeup-init-kunit:
+    desc: Require the exact two-failure managed-wakeup control, then five positive real Linux PM/devres cases
+    cmds:
+      - bash tools/run-logged.sh managed-wakeup-init-control python3 tools/check-managed-wakeup-init-kunit.py --control return-ignored
+      - bash tools/run-logged.sh managed-wakeup-init-kunit python3 tools/check-managed-wakeup-init-kunit.py
+
   test:wakeup-sysfs:
     desc: Qualify wakeup sysfs errors/idempotency with actual frontend references and ARM PM objects
     cmds: ['bash tools/run-logged.sh wakeup-sysfs python3 tools/check-wakeup-sysfs.py {{.CLI_ARGS}}']

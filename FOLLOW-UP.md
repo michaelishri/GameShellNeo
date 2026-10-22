@@ -2,6 +2,15 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-98/229 managed wakeup initialization:** candidate 0072 returns the exact
+initialization error before registering managed disable cleanup. The five-case
+native/ASan/UBSan/ARM reference passes, with the original wrapper failing exactly
+two cases/eight assertions. Real Linux PM/devres/IDA and selected driver
+qualification, fresh independent reviews and serialized publication remain
+pending. The underlying capability and action-reset contracts are preserved;
+no installed CPI fault, image or parent98/102/106 completion is inferred.
+[Report 315](docs/315-managed-wakeup-init-error.md).
+
 **NEO-10/227 charging inventory host admission:** a retained eight-route local
 baseline accepts four invalid inventories. The host now checks raw registers,
 24 clock points with explicit boundary-derived PM context, profile/metadata and

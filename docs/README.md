@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[315 — Managed wakeup initialization errors](315-managed-wakeup-init-error.md)
+records primary-source API research, the isolated return-preserving candidate,
+finite actual-source controls and separate Linux/image/hardware gates.
+
 [312 — Charging inventory host admission](312-charge-inventory-result-admission.md)
 records the original invalid acceptances, raw register/clock/profile replay,
 unchanged collector/transport and separate electrical/clock qualification gates.

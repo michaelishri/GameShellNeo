@@ -192,7 +192,7 @@ def main():
                         inputs={str(p.relative_to(ROOT)): sha256(p) for p in
                                 (*patches, harness, Path(__file__), ROOT / 'tools/kernel_checks.py',
                                  ROOT / 'tools/musb_callback_checks.py', ROOT / 'tools/kernel_candidates.py',
-                                 ROOT / 'tools/musb_wake_checks.py',
+                                 ROOT / 'tools/musb_wake_checks.py', ROOT / 'tools/native_source_variants.py',
                                  *((ROOT / 'kernel/tests' / name for name in (
                                      'musb_wake_probe_test.c', 'musb_startup_test.c')) if profile else ()))},
                         native=results, arm32=arm.strip(), builder=builder,

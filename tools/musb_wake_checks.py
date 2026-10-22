@@ -2,7 +2,41 @@
 import os
 import subprocess
 
-from kernel_checks import ROOT, run, sha256
+from kernel_checks import ROOT, sha256
+from native_source_variants import run_variants
+
+
+def _run_fixture(work, stem, functions, variants, builder, expected):
+    """Share execution only; each fixture keeps its own source and mutations."""
+    directory = work / stem
+    directory.mkdir(exist_ok=True)
+    for name, value in variants.items():
+        if name != 'candidate' and value == functions:
+            raise ValueError('Negative control did not mutate: ' + name)
+    header = directory / (stem + '_functions.h')
+    harness = ROOT / 'kernel/tests' / (stem + '_test.c')
+    flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror']
+    print('Actual-source fixture:', stem, flush=True)
+    results = run_variants(directory, header, functions, variants, harness, flags, expected)
+    relative = directory.relative_to(ROOT).as_posix()
+    arm = subprocess.check_output([
+        'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
+        '--platform', builder['platform'], '--entrypoint', 'bash',
+        '-v', f'{ROOT}:/project', '-w', '/project',
+        '-e', f'NEO_MUSB_CHECK_WORK=/project/{relative}',
+        '-e', f'NEO_MUSB_CHECK_SOURCE=/project/{harness.relative_to(ROOT).as_posix()}',
+        '-e', f'NEO_MUSB_CHECK_CROSS={builder["cross_compile"]}',
+        builder['image'], '-c',
+        'set -euo pipefail\n'
+        '"${NEO_MUSB_CHECK_CROSS}gcc" -std=gnu11 -O2 -Wall -Wextra -Werror -static '
+        '-I"$NEO_MUSB_CHECK_WORK" "$NEO_MUSB_CHECK_SOURCE" '
+        '-o "$NEO_MUSB_CHECK_WORK/arm"\n'
+        'qemu-arm "$NEO_MUSB_CHECK_WORK/arm"'], text=True).strip()
+    if arm != expected:
+        raise ValueError('Incomplete ARM source scenario result: ' + stem)
+    print(arm, flush=True)
+    return dict(native=results, arm32=arm, harness_sha256=sha256(harness),
+                extracted_sha256=sha256(header), arm_binary_sha256=sha256(directory / 'arm'))
 
 
 def probe_checks(work, core, irq_source, pm_source, builder, function):
@@ -41,39 +75,8 @@ def probe_checks(work, core, irq_source, pm_source, builder, function):
             '\t\tgoto fail2;\n\t}\n\n\tstatus = usb_phy_init',
             '\t\tgoto fail1;\n\t}\n\n\tstatus = usb_phy_init'),
     }
-    header = work / 'musb_wake_probe_functions.h'
-    harness = ROOT / 'kernel/tests/musb_wake_probe_test.c'
-    results = {}
-    try:
-        for name, value in variants.items():
-            if name != 'candidate' and value == functions:
-                raise ValueError('Probe negative control did not mutate: ' + name)
-            header.write_text(value)
-            binary = work / ('probe-' + name)
-            run(['cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
-                 '-I', str(work), str(harness), '-o', str(binary)])
-            result = subprocess.run([str(binary)], capture_output=True, text=True)
-            (work / ('probe-' + name + '.txt')).write_text(result.stdout + result.stderr)
-            if name == 'candidate':
-                result.check_returncode()
-            elif result.returncode == 0 or 'Assertion' not in result.stderr:
-                raise RuntimeError('Probe negative control did not fail: ' + name)
-            results[name] = dict(returncode=result.returncode, output=result.stdout.strip(), error=result.stderr.strip())
-            print('probe-' + name + ': ' + (result.stdout.strip() or 'expected assertion failure'), flush=True)
-    finally:
-        header.write_text(functions)
-    relative = work.relative_to(ROOT).as_posix()
-    arm = subprocess.check_output([
-        'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
-        '--platform', builder['platform'], '--entrypoint', 'bash',
-        '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
-        'set -euo pipefail\n'
-        'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror -static '
-        f'-I{relative} kernel/tests/musb_wake_probe_test.c '
-        f'-o {relative}/probe-arm\n'
-        f'qemu-arm {relative}/probe-arm'], text=True)
-    print(arm, end='', flush=True)
-    return dict(native=results, arm32=arm.strip(), harness_sha256=sha256(harness))
+    return _run_fixture(work, 'musb_wake_probe', functions, variants, builder,
+                        'MUSB probe/remove wake: 141 actual-source scenarios passed')
 
 
 def startup_checks(work, gadget, pm_source, udc_source, builder, function):
@@ -94,38 +97,5 @@ def startup_checks(work, gadget, pm_source, udc_source, builder, function):
         'positive_resume_is_error': functions.replace(
             '\tif (ret < 0) {', '\tif (ret) {'),
     }
-    header = work / 'musb_startup_functions.h'
-    harness = ROOT / 'kernel/tests/musb_startup_test.c'
-    results = {}
-    try:
-        for name, value in variants.items():
-            if name != 'candidate' and value == functions:
-                raise ValueError('Startup negative control did not mutate: ' + name)
-            header.write_text(value)
-            binary = work / ('startup-' + name)
-            run(['cc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
-                 '-I', str(work), str(harness), '-o', str(binary)])
-            result = subprocess.run([str(binary)], capture_output=True, text=True)
-            (work / ('startup-' + name + '.txt')).write_text(result.stdout + result.stderr)
-            if name == 'candidate':
-                result.check_returncode()
-            elif result.returncode == 0 or 'Assertion' not in result.stderr:
-                raise RuntimeError('Startup negative control did not fail: ' + name)
-            results[name] = dict(returncode=result.returncode, output=result.stdout.strip(), error=result.stderr.strip())
-            print('startup-' + name + ': ' + (result.stdout.strip() or 'expected assertion failure'), flush=True)
-    finally:
-        header.write_text(functions)
-    relative = work.relative_to(ROOT).as_posix()
-    arm = subprocess.check_output([
-        'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
-        '--platform', builder['platform'], '--entrypoint', 'bash',
-        '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
-        'set -euo pipefail\n'
-        'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror -static '
-        f'-I{relative} kernel/tests/musb_startup_test.c '
-        f'-o {relative}/startup-arm\n'
-        f'qemu-arm {relative}/startup-arm'], text=True)
-    print(arm, end='', flush=True)
-    return dict(native=results, arm32=arm.strip(), harness_sha256=sha256(harness))
-
-
+    return _run_fixture(work, 'musb_startup', functions, variants, builder,
+                        'MUSB UDC startup: 42 actual-source scenarios passed')

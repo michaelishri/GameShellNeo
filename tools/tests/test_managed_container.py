@@ -110,6 +110,72 @@ class ManagedResults(unittest.TestCase):
             self.assertEqual((destination / 'original').read_text(), 'preserve')
 
 
+class CompletedCommandFailures(unittest.TestCase):
+    def test_only_original_clean_terminal_failure_with_released_ownership_is_typed(self):
+        for mode in ('expected', 'unresolved', 'stopped', 'oom', 'running', 'wrong-returncode',
+                     'wrong-original', 'changed-original'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temporary, \
+                    patch.object(managed, 'ROOT', Path(temporary)):
+                root = Path(temporary)
+                destination = root / '.local/attempt'
+                identity = dict(schema=1, workspace=hashlib.sha256(str(root).encode()).hexdigest()[:20],
+                                stage='fixture', run='a' * 32)
+                directory = root / '.local/build/container-stages' / identity['run']
+                active = root / '.local/build/container-active.json'
+                reads = 0
+                original_result_for = managed.result_for
+
+                def command(argv, **kwargs):
+                    if argv[2] == 'run':
+                        destination.mkdir(parents=True, exist_ok=True)
+                        (destination / 'managed-run.json').write_text(json.dumps(identity))
+                        directory.mkdir(parents=True)
+                        (directory / 'container.log').write_bytes(b'actual original output\n')
+                        job = dict(identity, run='b' * 32) if mode == 'wrong-original' else identity
+                        result = dict(job=job, outcome='exited', exit_code=1, returncode=1,
+                            stop_requested=mode == 'stopped',
+                            state=dict(Running=mode == 'running', Status='exited', ExitCode=1,
+                                       OOMKilled=mode == 'oom', Error=''),
+                            log_sha256=hashlib.sha256((directory / 'container.log').read_bytes()).hexdigest())
+                        (directory / 'result.json').write_text(json.dumps(result))
+                        if mode == 'unresolved':
+                            active.write_text(json.dumps(identity))
+                        return subprocess.CompletedProcess(argv, 2 if mode == 'wrong-returncode' else 1)
+                    if argv[2] == 'status':
+                        return subprocess.CompletedProcess(argv, 0, 'original still owns cleanup', '')
+                    self.assertEqual(argv[2], 'stop')
+                    self.assertEqual(argv[-2:], ['--run', identity['run']])
+                    # Terminal exit 1 is not sufficient: removal still failed.
+                    return subprocess.CompletedProcess(argv, 1, '', 'removal failed')
+
+                def result_for(receipt):
+                    nonlocal reads
+                    reads += 1
+                    if mode == 'changed-original' and reads == 2:
+                        path = directory / 'result.json'
+                        changed = json.loads(path.read_text())
+                        changed['different_observation'] = True
+                        path.write_text(json.dumps(changed))
+                    return original_result_for(receipt)
+
+                expected = managed.ManagedCommandFailure if mode == 'expected' else ValueError if mode == 'wrong-original' else RuntimeError
+                with patch.object(managed.subprocess, 'run', side_effect=command), \
+                        patch.object(managed, 'result_for', side_effect=result_for):
+                    with self.assertRaises(expected) as raised:
+                        managed.execute('fixture', ['image'], destination, timeout=1)
+                if mode == 'expected':
+                    self.assertIsInstance(raised.exception, RuntimeError)
+                    self.assertEqual(raised.exception.identity, identity)
+                    self.assertEqual(raised.exception.result['exit_code'], 1)
+                    self.assertFalse(active.exists())
+                    self.assertTrue((destination / 'managed-result.json').is_file())
+                else:
+                    self.assertNotIsInstance(raised.exception, managed.ManagedCommandFailure)
+                if mode == 'unresolved':
+                    self.assertEqual(json.loads(active.read_text()), identity)
+                    self.assertTrue((destination / 'cleanup-pending.json').is_file())
+
+
 class StageReceipts(unittest.TestCase):
     def test_receipt_survives_failed_create_with_the_same_reserved_identity(self):
         with tempfile.TemporaryDirectory() as temporary:

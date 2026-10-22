@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[301 — MUSB wake ownership through kernel IRQ traversal](301-musb-wake-irq-kernel-qualification.md)
+records the isolated wake/startup KUnit suite, real Linux global IRQ traversal,
+source control, retained original failures and separate DPM/physical gates.
+
 [300 — MPFS parent resource and PHY ownership](300-mpfs-removal-ownership.md)
 records the two backend teardown defects, actual-source and selected-object
 qualification, real platform-device fixture and retained wider boundaries.

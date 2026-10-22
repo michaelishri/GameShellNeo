@@ -575,6 +575,14 @@ tasks:
     desc: Execute the MUSB release helper with Linux shared IRQs and a held handler in UML
     cmds: [bash tools/run-logged.sh musb-irq-kunit python3 tools/check-musb-restart-kunit.py --suite irq]
 
+  test:musb-wake-kunit:
+    desc: Qualify the separate MUSB wake/startup profile through real Linux IRQ suspend/resume traversal in UML
+    cmds: [bash tools/run-logged.sh musb-wake-kunit python3 tools/check-musb-restart-kunit.py --suite wake]
+
+  test:musb-wake-policy-control:
+    desc: Require the disposable policy-ignored source control to compile and fail real wake IRQ assertions
+    cmds: [bash tools/run-logged.sh musb-wake-policy-control python3 tools/check-musb-restart-kunit.py --suite wake --wake-control policy-ignored]
+
   test:musb-work-kunit:
     desc: Test terminal MUSB work/timer shutdown with real Linux APIs in UML
     cmds: [bash tools/run-logged.sh musb-work-kunit python3 tools/check-musb-restart-kunit.py --suite work]

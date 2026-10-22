@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[309 — MUSB wake negative-control command exit](309-musb-wake-control-exit.md)
+records refusal of successful command exits with failing control output,
+actual-runner host regressions and preservation of historical kernel evidence.
+
 [308 — Standalone host awake-result admission](308-awake-result-admission.md)
 records reproduced host proof acceptance, raw/context retention, finite local
 consumer qualification and separate physical/clock/PM gates.

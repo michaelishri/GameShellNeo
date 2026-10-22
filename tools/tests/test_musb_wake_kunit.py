@@ -207,7 +207,7 @@ class WakeRunnerFreshness(unittest.TestCase):
             for name in prior:
                 targets[name].write_bytes(payload[name])
             harness = SimpleNamespace(root=root, work=work, scratch=scratch, targets=targets,
-                                      payload=payload, before_execution=None)
+                                      payload=payload, before_execution=None, result_observations=0)
             identity = dict(schema=1, workspace='fixture-workspace', stage='musb-wake-kunit', run='a' * 32)
             terminal = dict(outcome='exited', exit_code=1, returncode=1, stop_requested=False,
                             job=identity, state=dict(Running=False, Status='exited', ExitCode=1,
@@ -229,8 +229,17 @@ class WakeRunnerFreshness(unittest.TestCase):
                     targets[name].write_bytes(payload[name])
                 if failure == 'unresolved':
                     raise RuntimeError('Managed run remains unresolved')
+                if failure == 'zero-exit':
+                    result = copy.deepcopy(terminal)
+                    result.update(exit_code=0, returncode=0)
+                    result['state']['ExitCode'] = 0
+                    return result
                 # Both a compiler failure and an executed negative control use exit 1.
                 raise runner.ManagedCommandFailure(identity, terminal)
+
+            def result_for(receipt):
+                harness.result_observations += 1
+                return identity, observed, root
 
             support = SimpleNamespace(__file__=str(root / 'tools/musb_wake_kunit.py'),
                 test_patch=lambda *args, **kwargs: ('9999-fixture.patch', b'fixture'),
@@ -239,7 +248,7 @@ class WakeRunnerFreshness(unittest.TestCase):
                                 ('archive_for', lambda lock: root / 'archive'),
                                 ('include_candidates', lambda *args: []),
                                 ('ensure_source', lambda *args, **kwargs: (root / 'source', {}, metadata)),
-                                ('execute', execute), ('result_for', lambda receipt: (identity, observed, root)),
+                                ('execute', execute), ('result_for', result_for),
                                 ('owns_active', lambda identity: failure == 'active-owner')):
                 stack.enter_context(mock.patch.object(runner, name, value))
             stack.enter_context(mock.patch.object(runner.importlib, 'import_module', return_value=support))
@@ -282,6 +291,15 @@ class WakeRunnerFreshness(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     runner.main()
                 self.assertFalse((harness.work / 'control-evidence.json').exists())
+
+    def test_control_rejects_successful_command_with_fresh_expected_failed_outputs(self):
+        with self.cached_runner(produced=('test.log', 'results.json'),
+                                failure='zero-exit') as harness:
+            with self.assertRaisesRegex(RuntimeError, 'expected original command exit 1'):
+                runner.main()
+            self.assertEqual(harness.before_execution, {'test.log': False, 'results.json': False})
+            self.assertEqual(harness.result_observations, 0)
+            self.assertFalse((harness.work / 'control-evidence.json').exists())
 
 
 if __name__ == '__main__':

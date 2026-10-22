@@ -502,6 +502,24 @@ and preservation evidence. At completion all owned sessions had ended and the
 ledger/lock were clear. R3 has not been flashed or board-qualified; the board
 observations above belong to the physical r2 card after repair.
 
+## Capable bootstrap preparation
+
+[Report 293](293-ext4-security-attributes.md) now records the completed,
+offline-verified diagnostic.27/kernel26 image with ext4 security attributes.
+The original recovery can remain fixed: while it runs from p2, NEO-210 can
+install a complete host-prepared filesystem into the inactive p3 store without
+asking the old kernel to create security attributes through TAR. This remote
+alternative is undergoing qualification in
+[report 294](294-development-store-bootstrap.md); another physical card move
+is only a fallback if that path cannot qualify.
+
+The original boot and store partitions were cleanly unmounted, passed read-only
+filesystem checks, and were backed up with full compressed and decompressed
+verification before remounting on the same recovery boot. The exact p3 snapshot
+preserves diagnostic.26, the original failed import/unit evidence and repair
+backups. Fixed p2 and the partition table remain unchanged. This preparation
+has not yet performed a remote store write or selected diagnostic.27.
+
 ## Remaining acceptance
 
 NEO-208 stays open for the capable maintenance-system bootstrap, completed

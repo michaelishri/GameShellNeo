@@ -16,6 +16,13 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[294 — Remote development-store bootstrap](294-development-store-bootstrap.md)
+records the guarded inactive-store package and installer, original recovery
+backup requirements and remote qualification gates.
+
+[293 — Ext4 security attributes](293-ext4-security-attributes.md) records the
+capable diagnostic.27 image, early import guard and preserved source identities.
+
 [292 — Development SD systems](292-development-sd-systems.md) records the
 opt-in directory roots, matched boot bundles, one-shot selection and recovery
 design, offline qualification and remaining physical-card/clock-admission gates.

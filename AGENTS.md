@@ -228,6 +228,18 @@ recording is authorized by this workflow. The camera stops after each request.
   flash. Retain development-r2 as the original failed candidate. Do not repair an old uppercase entry with
   atomic replacement alone: the FAT metadata can retain its uppercase name.
 
+  Diagnostic.27/kernel26 is now built and offline verified in the isolated
+  NEO-209 worktree; report 293 pins its exact artifact and unchanged inputs.
+  NEO-210's `dev:store:pack`, `dev:store:install` and `check:dev-store` are being
+  qualified to bootstrap it remotely while running original recovery p2.
+  Report 294 records the complete verified unmounted p1/p3 checkpoint and the
+  passed synthetic exclusive-claim/readback/fsck fixture. No remote block write
+  has occurred at this checkpoint. The installer requires matching current
+  boot/card/backup admission, keeps all flags at recovery, never writes FAT or
+  p2, and retains a p2 ledger that rejects unresolved destructive retries.
+  Never run it from a directory deployment or substitute ordinary TAR for the
+  complete filesystem bootstrap under the old incapable kernel.
+
 - **NEO-154's SSH-stall investigation was abandoned at the owner's request.**
   Do not reopen it or run the old SSH trace/stall experiments merely because
   their Tasks remain in the tree. Normal remote access/status is still used.

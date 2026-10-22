@@ -111,7 +111,11 @@ The running kernel/filesystem must also support every required xattr, including
 `CONFIG_EXT4_FS_SECURITY=y` for Debian file capabilities. The importer probes
 the exact required capability values before extraction. The original
 diagnostic.25/26 kernels lack this option; first bootstrap a capable maintenance
-system through offline card preparation. Older kernels can then be imported
+system from an offline-prepared complete filesystem. NEO-210's opt-in
+`dev:store:pack` / `dev:store:install` path is being qualified to install only the
+inactive store from fixed recovery, with a complete verified backup; see
+[report 294](../../docs/294-development-store-bootstrap.md). A regular complete
+card image remains the physical-flash fallback. Older kernels can then be imported
 and tested from that capable system. Keep a capable maintenance version
 available for later full-metadata imports.
 

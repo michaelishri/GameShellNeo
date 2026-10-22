@@ -93,6 +93,18 @@ tasks:
     desc: Pack a verified development-card artifact to a fresh private transfer directory; arguments after --
     cmds: [bash tools/run-logged.sh dev-pack python3 tools/dev-command.py pack-card]
 
+  dev:store:pack:
+    desc: Prepare a complete inactive development store from a verified regular card image; arguments after --
+    cmds: [bash tools/run-logged.sh dev-store-pack python3 tools/dev-command.py store-pack]
+
+  dev:store:install:
+    desc: Plan a guarded development-store replacement on fixed recovery; explicit --apply writes only the unmounted store
+    cmds: [python3 tools/dev-command.py store-install]
+
+  check:dev-store:
+    desc: Qualify inactive store registration and selection on disposable old-boot and store image copies; arguments after --
+    cmds: [bash tools/run-logged.sh dev-store-check python3 tools/dev-command.py store-check]
+
   check:dev-card:
     desc: Qualify bundle import and copied administration on a disposable regular-image copy; arguments after --
     cmds: [bash tools/run-logged.sh dev-card-check python3 tools/dev-command.py check-card]
@@ -108,6 +120,10 @@ tasks:
   test:dev-fat-writer:
     desc: Reproduce legacy U-Boot FAT filename replacement on disposable FAT16 files; no hardware
     cmds: [bash tools/run-logged.sh dev-fat-writer python3 tools/check-dev-fat-writer.py]
+
+  test:dev-store-install:
+    desc: Qualify exclusive development-store writes and read-only filesystem checks on a new disposable loop image
+    cmds: [bash tools/run-logged.sh dev-store-claim python3 tools/check-dev-store-install.py]
 
   check:musb-callback-kunit:
     desc: Exercise real MUSB callback/UDC races on four emulated ARM CPUs

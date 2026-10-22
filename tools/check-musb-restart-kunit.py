@@ -100,6 +100,8 @@ def main():
             try:
                 try:
                     managed_result = execute(stem + '-kunit', ['--pull=never', *arguments], attempt, timeout=7200)
+                    if args.wake_control:
+                        raise RuntimeError('Wake control exited successfully; expected original command exit 1')
                 except ManagedCommandFailure as failure:
                     if not args.wake_control:
                         raise

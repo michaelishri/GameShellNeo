@@ -18,6 +18,16 @@ NEO-229's isolated managed-wakeup API candidate is documented in
 `task test:managed-wakeup-init-kunit` for actual Linux ownership and its exact
 original-wrapper control. Candidate 0072 stays outside the image queue.
 
+NEO-230's EAPOL drain ownership candidate is documented in
+[report 314](docs/314-brcmfmac-eapol-ownership.md). Use
+`task test:brcmfmac-eapol-reference -- --archive /path/to/linux-6.18.54.tar.xz`
+for the source baseline, and `task test:brcmfmac-eapol` with the same archive
+argument for native/sanitizer/control checks. Its `--compile-drivers` mode also
+requires `--native-evidence` naming the retained native attempt; it proves
+executable equivalence before managed ARM/full-driver qualification. The
+950 ms wait stays unchanged; failed drains block key programming. This does
+not attribute NEO-55's outage or select an image patch.
+
 NEO-207 reconciles the old MUSB wake/startup and removal histories in
 [report 291](docs/291-legacy-musb-source-integration.md). Use
 `task test:musb-wake-startup` or `task check:musb-wake-startup-configs` for the
@@ -1425,6 +1435,14 @@ an offline timer-reference feasibility study. Its outcome is STOP: the study
 does not justify a two-sided MMIO/counter bracket or authorize instrumentation.
 [Report 305](docs/305-clock-reference-feasibility.md) records pinned ordering,
 conditional synthetic evidence and the unchanged NEO-192/PM gates.
+
+`task report:clock-transitions FILE=<saved-kernel.ndjson>` checks the recorded
+publication/accepted-reader boundary offline and conditionally decomposes
+regressions using the unchanged conversion. `task test:clock-transitions`
+covers the 24 declared cases plus an independent complete-CLOSED variant.
+Legal sequence gaps, incomplete coverage and source changes remain unknown;
+the report grants no clock or PM admission. [Report313](docs/313-clock-publication-reconciliation.md)
+records the primary-source argument and separate historical-capture analysis.
 
 The candidate ADC width correction has its own saved checks:
 

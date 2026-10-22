@@ -14,6 +14,17 @@ for the selected-object runner correction described below. It reuses the
 original verified source read-only; it does not relabel old whole-file input
 pins as executions of the corrected runner.
 
+The final-admission checkout now adopts exact local NEO-230 context
+`bc3ae1b6a62afbb350589444a08b8c903bbe48b7`, including its NEO-228 base
+`631a5451b14de1c3e19abe387aaff66c5631afc5`. Both dependencies remain
+provisional and unpublished. The merge preserves their complete entries and
+the already qualified managed-wakeup execution payloads; only shared
+navigation/Task context changes. Fresh independent review may inspect this
+fixed provisional dependency, but whole-ticket acceptance, integration,
+publication and closure require the identical dependencies actually published
+and a separate grant. A changed dependency must be remapped and receive fresh
+required review. The one current combined host check is still pending.
+
 ## Primary-source findings
 
 The locked Linux 6.18.54 archive is SHA-256

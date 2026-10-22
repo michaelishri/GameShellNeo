@@ -112,12 +112,23 @@ The running kernel/filesystem must also support every required xattr, including
 the exact required capability values before extraction. The original
 diagnostic.25/26 kernels lack this option; first bootstrap a capable maintenance
 system from an offline-prepared complete filesystem. NEO-210's opt-in
-`dev:store:pack` / `dev:store:install` path is being qualified to install only the
-inactive store from fixed recovery, with a complete verified backup; see
+`dev:store:pack` / `dev:store:install` path has passed the real inactive-store
+replacement from fixed recovery, with a complete verified backup; see
 [report 294](../../docs/294-development-store-bootstrap.md). A regular complete
 card image remains the physical-flash fallback. Older kernels can then be imported
 and tested from that capable system. Keep a capable maintenance version
 available for later full-metadata imports.
+
+The installed prototype uses a 4 GiB store on the 64 GB DEV spare; the remaining
+card capacity is unallocated. Ordinary imports do not resize partitions. The
+bootstrap leaves an empty catalog and recovery selected; register its verified
+inactive release with the normal `register` command, then select a trial
+separately. Its real diag27 trial preserves the exact capability value and
+returns NEXT to the confirmed recovery descriptor. A subsequent complete
+diag25 import, directory-root trial and next-boot return to fixed recovery also
+pass. Confirmation still requires
+the checks below; registered input-device names alone do not prove button
+response.
 
 ```sh
 python3 /run/gameshellneo-store/admin/tools/dev-systems.py \

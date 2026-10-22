@@ -12,14 +12,24 @@ first trial safely entered recovery after the vendor FAT writer created a
 duplicate uppercase flag. The `ef1fca6` application fix was deployed over SSH;
 diag26's directory boot, actual trial consumption/readback, both SSH routes and
 return to fixed recovery on the next boot without confirmation have passed.
-The remote bundle import rejected a missing filesystem capability attribute;
-NEO-209 is preparing a capable maintenance system and an early destination
-check. Import/select/confirmation acceptance remains open. The clock/PM
-deployment adapter and matching awake qualification
-remain separate, and NEO-192 is unresolved. The corrected r3 image and transfer
-are offline-verified FAT-fix artifacts, but still contain the incapable original
-kernel; wait for the capable maintenance artifact before another flash. Board observations below
-belong to the repaired physical r2 installation.
+The first remote bundle import rejected a missing filesystem capability attribute;
+NEO-209 subsequently prepared diagnostic.27/kernel26, and NEO-210's guarded
+remote bootstrap passed. The physical card retains the repaired r2 dispatcher
+and fixed recovery, with its p3 store replaced remotely; the complete R4 card
+image has not been flashed. Diagnostic.27 has now booted as a directory trial,
+with the expected source identity, security capability and store roundtrip,
+consumed trial flags, and later successful USB/Wi-Fi observations.
+The subsequent real import from that capable kernel has passed metadata
+verification, publication and registration of diag25, preserving selection and
+the prior diag27 catalog entry. The imported diag25 directory trial now passes
+matched root/kernel, consumed-flag and both-route checks, followed by an
+observed next-boot return to fixed recovery without further selection.
+An explicit subsequent trial selection has returned to capable diag27; it
+remains unconfirmed, with fixed recovery still GOOD. Confirmation, physical
+input response and clock acceptance remain open. The deployment
+provenance adapter and matching awake qualification remain required, and
+NEO-192 is unresolved. R2's original failures, the old store checkpoint and
+the offline r3 artifacts remain preserved.
 
 ## Layout and boot contract
 
@@ -471,7 +481,8 @@ Saved `dev:card` and `dev:pack` Tasks built a separate r3 from clean `ef1fca6`,
 using the same two pinned raw source images and authenticated ARM loader.
 Retain r3 as the FAT-fix candidate and original r2 with its failed trial evidence.
 Neither contains the capable maintenance kernel; do not spend another card
-swap flashing r3 while NEO-209's bootstrap artifact is being prepared.
+swap flashing r3. The completed capable image and remote bootstrap below
+provide the subsequent maintenance path.
 Managed assembly `97b7fb8352a3442f920894ebcbbd74a2` and independent read-only
 audit `fccd4f33a8574091b0c51acd0de5c970` both exited 0 without OOM/stop.
 
@@ -502,37 +513,265 @@ and preservation evidence. At completion all owned sessions had ended and the
 ledger/lock were clear. R3 has not been flashed or board-qualified; the board
 observations above belong to the physical r2 card after repair.
 
-## Capable bootstrap preparation
+## Remote bootstrap and capable diagnostic.27 trial
 
 [Report 293](293-ext4-security-attributes.md) now records the completed,
 offline-verified diagnostic.27/kernel26 image with ext4 security attributes.
-The original recovery can remain fixed: while it runs from p2, NEO-210 can
-install a complete host-prepared filesystem into the inactive p3 store without
-asking the old kernel to create security attributes through TAR. This remote
-alternative is undergoing qualification in
-[report 294](294-development-store-bootstrap.md); another physical card move
-is only a fallback if that path cannot qualify.
+NEO-210's remote bootstrap has passed, as recorded in
+[report 294](294-development-store-bootstrap.md) and published commit `c7dc810`.
+While the original fixed recovery ran from p2, the installer replaced only the
+inactive p3 with the complete host-prepared filesystem, without asking the old
+kernel to create security attributes through TAR. The exact 4 GiB write and
+full readback matched the prepared store; read-only ext4 checking and copied
+administration admission passed. Registration, selection and reboot were not
+part of that installer operation.
 
-The original boot and store partitions were cleanly unmounted, passed read-only
-filesystem checks, and were backed up with full compressed and decompressed
-verification before remounting on the same recovery boot. The exact p3 snapshot
-preserves diagnostic.26, the original failed import/unit evidence and repair
-backups. Fixed p2 and the partition table remain unchanged. This preparation
-has not yet performed a remote store write or selected diagnostic.27.
+The original unmounted boot/store checkpoints retain their complete verified
+compressed and decompressed bytes. The old p3 snapshot preserves diagnostic.26,
+the original failed import evidence and repair backups. The bootstrap did not
+raw-replace p1, p2, the partition table or bootloader; its private staging and
+evidence are ordinary files on p2. The live card therefore combines the repaired
+r2 boot/recovery installation with the remotely installed new store, rather
+than a full R4 flash. All three flags remained fixed recovery at completion.
+The terminal installer observation
+`.local/multiboot/installation/store-bootstrap/apply-result.json` has SHA
+`05ba6336f9847a6a8c5e24db90f5a6caceb81579fcf546c69007d80f91de6062`;
+the postflight `completion-evidence.json` in the same directory has SHA
+`551911ff9b5d043525f0aa8ac8dbbd0c23f6b2f91ff5fa31731d26a896bea95e`.
+
+On original recovery boot `9caf10b6-a94f-4c9b-8ca9-e8e6c1580cab`, ordinary
+registration added diag27's matched boot assets without changing selection.
+A separate explicit selection then set NEXT to diag27 while GOOD and fixed
+recovery remained recovery. Neither command rebooted. Their receipts are
+`.local/multiboot/installation/bootstrap-register27-result.json`, SHA
+`25840758ce7b65286a05d1d48cf37b40b58dd1bbe39d389b2c398cbbf63e5190`,
+and `bootstrap-trial27-result.json`, SHA
+`90458796c7bb93693cce1086fb08b781e19231d2f317179c46ae0d862b325199`.
+
+The warned reboot used speaker run `684a6e8708a844ca9c94a89a404210b8`, retained
+in hardware capture `20261022T055420.060881Z`; all three cues and mixer
+restoration passed. Kiyo sequence `20261022T055336.932404Z` retained 249 frames
+and stopped, but its inspected final frame was overexposed. That sequence alone
+does not establish a completed new boot. A separate five-second capture,
+`20261022T055615.521954Z`, retained ten frames and stopped; inspected first/last
+frames show readable login text. Each capture retains its
+`visual-observation.json`. These video-only observations do not establish
+physical input response, audio audibility or boot timing.
+
+The new boot is `ac69afbc-179c-4e36-857d-1e7f92a35881`, running diag27 kernel
+`6.18.54-gameshellneo26` from the exact selected directory root, inode 131075.
+Its source image SHA is
+`f51b91fe7cfcfb24747e137a0c2bac46e9a0d12e0dc995500fad5dd9200f8617`.
+The early marker, deployment/source manifests and release identity match.
+The actual `fping` capability is
+`0100000200200000000000000000000000000000`; an exact capability roundtrip on
+the store passed and its probe was removed. NEXT, GOOD and RECOVER all read
+back as recovery after the real trial consumption. Unmounted read-only FAT
+checking returned 0. This is an unconfirmed trial, with fixed recovery still
+the confirmed fallback.
+
+The first early USB readiness read failed with no route to host; its original
+failure remains in
+`.local/multiboot/installation/capable27-initial-usb-readiness-failure.json`, SHA
+`f310e72c6a6684f775f0675a15127c3bb7f2980ca1d943f5d44cb6287825acd9`.
+Later hardware USB capture `20261022T055550.303841Z` and Wi-Fi capture
+`20261022T055525.080277Z` both pass on the same new boot. Strong identity and
+attribute observations are retained in hardware capture
+`20261022T055616.758545Z` and the qualification receipt
+`.local/multiboot/installation/capable27-trial.json`, SHA
+`4d4582e58e09d0475a5f1b656e75b71352d06be4d4b46642631232eec47004a3`.
+No restart, clock or PM qualification is inferred from these observations.
+The consolidated first capable27 checkpoint is
+`.local/multiboot/installation/capable27-bootstrap-qualification.json`, SHA
+`059304980b4d7e83436ea06ceb9e2ea007e151f31d1c10b67f11cfb3f5641779`.
+It pins registration, selection, boot/capability/FAT proof, both route logs,
+the early USB failure, warning receipts and both camera observations.
+
+## Real version import from the capable kernel
+
+The ordinary import CLI completed on diag27 boot
+`ac69afbc-179c-4e36-857d-1e7f92a35881`, kernel
+`6.18.54-gameshellneo26`. It used the original 678348800-byte diag25 TAR,
+SHA `d1b40e7c333e652904c60c9d7df7fb4412f7411b8ca5568a8bda34b8069adaa4`,
+retained on original recovery p2. That source was mounted `ro,relatime,norecovery`;
+its original manifest and archive identity matched before and after import.
+
+Unit `gameshellneo-capable-diag25-import-dbda2c3cdd5041b69bd4bf9feae6247e`
+completed normal extraction, `dev_bundle._verify_tree`, no-replace publication
+and registration. Ownership, modes, links and extended attributes passed the
+ordinary archive metadata checks. The imported release uses kernel
+`6.18.54-gameshellneo24` and source image SHA
+`c88d158d446b6ed14617b815ec17bfd2b3e90fee858ddd30e008ed74640aeb77`.
+Its release manifest SHA is
+`eb0969d7e8c757c4b72234426ffbfc957176bb05ac1a73dd440471ef6fff6bc0`;
+the development deployment manifest SHA is
+`7fe63a315742e0723fe01742cf482ab4b2d508933c07559c5853220642db854b`.
+The imported `fping` capability is exactly
+`0100000200200000000000000000000000000000` on disk, verified from the running
+capable kernel. The imported old kernel's subsequent directory trial is
+recorded separately below.
+
+The catalog now contains exactly diag25 and diag27. The prior diag27 entry and
+all three recovery selection flags are unchanged. Import performed no selection,
+reboot or PM action. Authoritative completion includes the retained, loaded
+unit at `active/exited`, `MainPID=0`, `ExecMainPID=712`, `ExecMainStatus=0`,
+`Result=success` and no queued job, together with the matching original passing
+worker result. Receipt
+`.local/multiboot/installation/capable-bundle-import/result.json` has SHA
+`614a08302081999191e56ca741d9c77ef47dca524de857a1d4880ac4db6465bf`;
+`completion-evidence.json` in the same directory has SHA
+`b385fe8a7035197ff597ff31f63a18dd98e7ff364e56cf5acf16d1e70496c846`.
+
+The ordinary importer removed its successful private snapshot and
+extraction-stage paths after publication. Its retained `operation.log` contains
+only the exact TAR argv, without warnings, SHA
+`525ff731ad9d4dd3081a16564083b32d235873519ef80cdab6af7e1459fd11c4`.
+Two observer-error records remain alongside the completion evidence. The
+earlier incapable-kernel import remains a separate failed operation, with its
+original failed stage retained in the fully verified host checkpoint.
+
+## Imported diagnostic.25 directory trial
+
+A separate ordinary selection on the running diag27 boot queued diag25 without
+rebooting or changing GOOD/fixed recovery. Receipt
+`.local/multiboot/installation/capable-import-trial25-result.json` has SHA
+`0228439d0fdba96bf9b3b29e94ffbb9592cf266aadad56b4402f852404ec0c7c`.
+The warned reboot used speaker run `80d6556d0b33473ea03df25363fafd12`, hardware
+capture `20261022T061515.401337Z`: three 1000 ms cues, mixer restoration and
+reboot acceptance passed. Its `result.json` SHA is
+`83f00902a6417d03314008f98f8fcc0da63e1c62dce5068549121601aa5471f3`.
+
+Boot `356a631d-874b-457a-abc1-b117dc58f11a` runs the imported diag25 directory
+with kernel `6.18.54-gameshellneo24`, root inode 154609 and the exact original
+diagnostic.25 source image, release and deployment identities recorded above.
+The early marker and root inode identify the imported p3 root rather than the
+fixed p2 recovery system, which uses the same kernel release. NEXT, GOOD and
+RECOVER all read back as recovery after the actual trial consumption;
+unmounted read-only FAT checking returned 0. The strong qualification receipt
+`.local/multiboot/installation/imported25-trial.json` has SHA
+`f0c1d243ab7955837ada83d9085e719792ec3b2a8ab9724867359656ad8aa73b`.
+The capability preservation check belongs to the preceding import from the
+capable kernel; this older-kernel trial adds no capability-runtime qualification.
+
+USB capture `20261022T061829.628230Z` and Wi-Fi capture
+`20261022T061827.036433Z` agree on the new boot and kernel, and both management
+checks pass. Their `status.txt` hashes are respectively
+`bcf08b42de3c24778cac08dbbd152cdbb5ca420f0eb694a112dcbc3c0d780824`
+and `f7752bd7f308e8c88396ff38a353336fca768bc54ed2fd7e11bf8cb92b746e73`.
+Kiyo capture `20261022T061500.584317Z` retained 118 frames and stopped. The
+inspected first/last frames show readable tty1/login text before and after
+the reboot; its retained `visual-observation.json` has SHA
+`81d52690d1f1a45038bf28312c6bffe9d4ef9eef64d36e7aa970916e6f0463a8`.
+These observations do not establish physical input response, owner audibility,
+boot latency, clock or PM qualification.
+
+No confirmation or further selection followed this trial before the next
+warned reboot. Its actual fallback observation follows.
+
+## Imported trial's next-boot return to fixed recovery
+
+The next warned reboot used speaker run `572d883229b24621bade4392113d66a5`,
+hardware capture `20261022T061908.025064Z`. Three 1000 ms cues, mixer
+restoration and reboot acceptance passed; its `result.json` SHA is
+`acefd87370b91bece92fe164dbd5cc5df0af3032cfbfce19047d15080e312a3c`.
+No selection or confirmation intervened between the imported diag25 trial
+and this reboot.
+
+Boot `840a8868-c8ef-48bd-b051-32dc979c14da` runs fixed recovery from p2,
+PARTUUID `b9dab681-02`, kernel `6.18.54-gameshellneo24`. The original recovery
+image-manifest SHA matches
+`d45bcea1e79e9d2518c9e8632642183eb06387a0868cce75e78838f50fd0faf9`.
+All three selection flags remain recovery, with no pending trial. The catalog
+still contains the same diag25 and diag27 release entries. Strong observation
+is retained in hardware capture `20261022T062011.001632Z` and
+`.local/multiboot/installation/imported25-recovery-rollback.json`, SHA
+`5f6e2ada7cc8693ad3bff5fc58893e9847d575b8404ea6ce320ab76517d605cf`.
+This observes the automatic fallback on the next separately initiated boot,
+rather than inferring it from flag contents.
+
+USB `20261022T062021.326021Z` and Wi-Fi `20261022T062020.340399Z` checks pass
+on that same recovery boot, with no failed units. Their `status.txt` hashes
+are respectively
+`e59d03b02de409433c68b87d0465d210a5de428ead88363b8d931138c3fca05d`
+and `cea71313c943deaf6eaf64e4ada3d129aed4e62d531aed9f9b32db8e13f68e6b`.
+Kiyo sequence `20261022T061846.567273Z` completed 118 frames and stopped;
+inspected first/last frames show readable Trixie tty1/login text, with the new
+store UUID in the final mount log. Its `result.json` SHA is
+`c21ced2cf44c2468e2d7cda0f3b3ebc12c1b9a8b00152c20da474c49ac292519`;
+`visual-observation.json` SHA is
+`1b9df305915360cc94ec0c880f2a2115235bd86f3c9249b7391901f72ad52d75`.
+No physical input response, owner audibility, clock or PM qualification is
+claimed. The separately selected return to diag27 follows.
+
+## Return to capable diagnostic.27 after import
+
+On fixed recovery, a separate ordinary selection queued another diag27 trial
+while preserving GOOD/fixed recovery. The original selection unit
+`gameshellneo-card-command-2873ea0004174cab977e017eec0aaf3c` completed
+authoritatively at 06:23:12 UTC. Its receipt
+`.local/multiboot/installation/post-import-return27-result.json` has SHA
+`74fcc856452fba39a454a747fe4ec72c38b1914b88e722e93b4a8db8f89acfa6`.
+The separate warned reboot used speaker run
+`429da049ea2541b98096f1407577c2bd`, capture `20261022T062354.923485Z`;
+three 1000 ms cues, mixer restoration and reboot acceptance passed. Its
+`result.json` SHA is
+`c925f259cc4e367bc35221669ab7965ebc27bcca9d4b1cc15c43619f17cd0bd9`.
+
+Boot `926d517d-1a83-43d6-8702-1a83008025b5` runs diag27 kernel
+`6.18.54-gameshellneo26`, the same exact directory root inode 131075 and
+source/release/deployment identities as the first capable trial above. The
+actual `fping` capability matches
+`0100000200200000000000000000000000000000`; the exact store capability
+roundtrip passes and its probe is removed. NEXT, GOOD and RECOVER all read
+back as recovery after trial consumption; unmounted read-only FAT checking
+returns 0. No default confirmation has occurred. Strong observation is retained
+in hardware capture `20261022T062531.241908Z` and
+`.local/multiboot/installation/capable27-after-import-qualified.json`, SHA
+`5e9bb29a97d1b9c7a0ff8ddc82d0a44120de45547d3822ede1a4694850a6b559`.
+
+An earlier USB attempt failed with no route to host before starting its board
+script; that attempt made no board changes. Its original hardware capture is
+`20261022T062452.716733Z`, with retained receipt
+`.local/multiboot/installation/capable27-after-import-initial-usb-failure.json`,
+SHA `e1570fa065e0a545793a0587e84729264db81607f3fc98c83a300d2f3b11bee1`.
+The later successful qualification is a separate observation; no corrective
+action, reset or latency result is inferred. USB `20261022T062505.063000Z`
+and Wi-Fi `20261022T062505.242980Z` checks agree on the new boot, with no failed
+units. Both `status.txt` files have SHA
+`4ae8e29bceccba4a9d39d9a9f21c834a117383bf5750e9e8d33ef381d1cc1842`.
+
+Kiyo sequence `20261022T062338.650959Z` completed 118 frames and stopped.
+Inspected first/last frames show readable Trixie tty1/login text before and
+after reboot. Its `result.json` SHA is
+`333ef4cebaf999bd84dc88258b137f633f45715ce67878211ec54ff5c76ccc8c`;
+`visual-observation.json` SHA is
+`7fab34fe1e2bec9ff45d43ab814cdfe2f28cf6a1e35bb396bee8c6f7338bbb51`.
+Input response, owner audibility, timing, clock and PM qualification remain
+outside these observations.
+
+The consolidated end-to-end evidence index is
+`.local/multiboot/installation/remote-update-end-to-end-qualification.json`, SHA
+`adf50aca63fbab9d61e010374de96ef1bd88770a0297dbdbbb9ffaa8c61d8ce9`.
+It pins bootstrap, import, the imported-version trial and fixed-recovery rollback,
+the actual return to capable diag27, warning, camera and management-route
+receipts. Implementation source remains `61d46da`; the report was updated
+afterward to record these results. Original failed operations and observation
+gaps remain separate from the completed successor observations.
 
 ## Remaining acceptance
 
-NEO-208 stays open for the capable maintenance-system bootstrap, completed
-on-device bundle import, the subsequent
-version's matched boot/management observations and explicit confirmation.
-Actual diag26 trial consumption/readback, directory-root handoff and
-unconfirmed-boot return to fixed recovery have the bounded board evidence above.
-Physical input response, broader reliability and reset/power-loss behavior
-remain unqualified. Use the existing long speaker warning for any later board
-reboot. Clock/PM provenance admission and matching awake qualification remain
-separate work; preserve NEO-192's original failures and do not use frozen older
-PM runners to bypass development-deployment rejection. The selector alone does
-not establish power-cut safety or a reset for a complete kernel hang.
+NEO-208 stays open for physical input response, explicit default confirmation
+and clock acceptance. The remote bootstrap, actual diag27 trial, real
+capable-kernel import, imported diag25 directory trial/next-boot fallback and
+actual return to diag27 now pass; the earlier diag26 trial and next-boot return
+to fixed recovery retain their separate bounded evidence. The development
+deployment needs its provenance adapter and matching awake qualification.
+Explicit confirmation must wait for the
+documented human input check. Preserve NEO-192's original failures and do
+not use frozen older PM runners to bypass development-deployment rejection.
+Broader reliability and reset/power-loss behavior remain unqualified; the
+selector does not establish power-cut safety or a reset for a complete kernel
+hang. Use the existing long speaker warning for any later board reboot.
 
 Primary references: [Linux 6.18 initramfs handoff](https://docs.kernel.org/6.18/filesystems/ramfs-rootfs-initramfs.html),
 [U-Boot legacy bootm arguments](https://docs.u-boot-project.org/en/latest/usage/cmd/bootm.html),

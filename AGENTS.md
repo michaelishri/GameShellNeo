@@ -78,8 +78,8 @@ Current worktrees are under the canonical checkout's `.local/worktrees/`:
 | `remaining-legacy-integration` | code through `58eeadd` plus final report commits: independent wake/startup profile, six ARM configurations and mapped older histories; see report 291 |
 | `remaining-legacy-validation` | `58eeadd` (detached): production sleep/callback regression and explicitly historical teardown reproduction |
 | `remaining-final-integration` | final merge documentation and host checks; source/candidate receipts stay in the frozen validation worktrees above |
-| `multiboot-boot-selection` | NEO-208 development SD systems; real directory boot/one-shot/recovery rollback pass; complete-metadata import needs NEO-209's capable maintenance bootstrap |
-| `ext4-security-attributes` | NEO-209: enable ext4 security attributes and prepare diagnostic.27 / kernel26 through managed stages; original hardware worktree remains frozen |
+| `multiboot-boot-selection` | NEO-208 development SD systems and NEO-210's completed remote store bootstrap; complete import, directory trials, recovery rollback and return to capable diag27 pass; retain its artifacts and live-operation evidence |
+| `ext4-security-attributes` | `cd4eb25`: completed NEO-209 diagnostic.27 / kernel26 image and managed-stage evidence; original hardware worktree remains frozen |
 
 Merged branch references are removed; their worktrees, ignored evidence and
 private configuration remain at their original revisions. Create a branch
@@ -208,8 +208,12 @@ recording is authorized by this workflow. The camera stops after each request.
   are complete. Diagnostic.26 directory boot, real flag consumption/readback,
   automatic return to fixed recovery and both SSH routes pass. Remote import
   failed closed on a missing `security.capability` xattr: both original kernels
-  disable `CONFIG_EXT4_FS_SECURITY`. NEO-209 prepares a capable maintenance
-  system; bootstrap, complete import and confirmation remain open. Consult
+  disable `CONFIG_EXT4_FS_SECURITY`. NEO-209's capable diagnostic.27 image and
+  NEO-210's real remote store bootstrap are complete. Its actual directory-root
+  trial, capability roundtrip, consumed flag, FAT check and both SSH routes pass.
+  Real complete-metadata diag25 import, its directory-root trial and next-boot
+  return to fixed recovery also pass. Physical input, default confirmation and
+  clock/provenance acceptance remain open. Consult
   report 292 and the live
   evidence before selecting a system. Future flashes still require fresh
   DEV-spare identity, owner card movement/readiness, a current-network transfer
@@ -224,19 +228,21 @@ recording is authorized by this workflow. The camera stops after each request.
   Use canonical lowercase `next.scr`, `good.scr`, `recover.scr` on `vfat` with
   `shortname=mixed`. The initial uppercase-entry failure and SSH repair are
   preserved. Development-r3 fixes FAT flags but still has the incapable old
-  kernel; wait for the capable bootstrap artifact before another physical
-  flash. Retain development-r2 as the original failed candidate. Do not repair an old uppercase entry with
+  kernel. R4 and a full-card fallback transfer are verified, but the installed
+  card uses repaired r2 p1/p2 plus the remotely replaced new p3. Retain
+  development-r2 as the original failed candidate. Do not repair an old uppercase entry with
   atomic replacement alone: the FAT metadata can retain its uppercase name.
 
   Diagnostic.27/kernel26 is now built and offline verified in the isolated
   NEO-209 worktree; report 293 pins its exact artifact and unchanged inputs.
-  NEO-210's `dev:store:pack`, `dev:store:install` and `check:dev-store` are being
-  qualified to bootstrap it remotely while running original recovery p2.
+  NEO-210's `dev:store:pack`, `dev:store:install` and `check:dev-store` pass offline
+  qualification and the real remote bootstrap from original recovery p2.
   Report 294 records the complete verified unmounted p1/p3 checkpoint and the
-  passed synthetic exclusive-claim/readback/fsck fixture. No remote block write
-  has occurred at this checkpoint. The installer requires matching current
-  boot/card/backup admission, keeps all flags at recovery, never writes FAT or
-  p2, and retains a p2 ledger that rejects unresolved destructive retries.
+  full 4 GiB write/readback, read-only fsck and complete inactive-release checks.
+  The installer requires matching current boot/card/backup admission, keeps all
+  flags at recovery and never raw-replaces FAT or p2. Its private staging and
+  evidence are ordinary files on p2, including a ledger that rejects unresolved
+  destructive retries. Normal registration/selection are separate operations.
   Never run it from a directory deployment or substitute ordinary TAR for the
   complete filesystem bootstrap under the old incapable kernel.
 
@@ -250,23 +256,40 @@ recording is authorized by this workflow. The camera stops after each request.
   qualification and NEO-182 battery RTC trial remain dependent on this work.
 - Diagnostic.26's original raw image remains built/offline-verified in
   `musb-restart-integration`; `docs/272-clock-provenance-image.md` records its
-  image/reader/build-ID pins and recovery checkpoint. Its extracted root now
-  boots on the DEV card with explicit `development-directory` provenance;
+  image/reader/build-ID pins and recovery checkpoint. An earlier extracted-root
+  trial booted on the DEV card with explicit `development-directory` provenance;
   report 292 records the exact root inode, markers, source hashes and kernel.
   This deployment needs its own clock/PM adapter and matching awake admission
   before advancing NEO-192. Do not infer pristine-image admission from a login
   banner or reuse the original raw-image checks against the directory root.
-- Latest completed selector checks (22 October): diagnostic.26 boot
+- Earlier selector checks (22 October): diagnostic.26 boot
   `6d4ee9eb-1dcd-4adc-af47-1e340e88d123`, kernel
   `6.18.54-gameshellneo25`, consumed its trial and returned on the next warned
   reboot to fixed recovery boot `9caf10b6-a94f-4c9b-8ca9-e8e6c1580cab`, kernel
   `6.18.54-gameshellneo24`. Both USB and Wi-Fi SSH worked and inspected Kiyo
   frames showed readable login consoles. These are selector/access results,
   not clock/PM clearance; recheck current boot and any active import job.
-  The import job `gameshellneo-bundle-import-8c5876d51cac48de8e6a5d530f8a32ce`
-  is an expected retained failed unit. Its private staging is unpublished;
-  flags and catalog are unchanged. Do not clear the failure or discard its
-  archive/staging to obtain a clean status.
+  The failed import job
+  `gameshellneo-bundle-import-8c5876d51cac48de8e6a5d530f8a32ce` and its unpublished
+  staging are retained in the original checkpoint and logs; it was still failed
+  on recovery immediately after the bootstrap. Do not clear original failures
+  or discard their archive/staging to obtain a clean status.
+- The first capable diagnostic.27 trial is boot
+  `ac69afbc-179c-4e36-857d-1e7f92a35881`, kernel `6.18.54-gameshellneo26`, with
+  exact directory/source provenance and file capabilities. NEXT and GOOD remain
+  recovery after the consumed trial. Both management routes and inspected
+  postboot Kiyo login frames pass; the early USB no-route observation and the
+  earlier overexposed sequence remain explicit. The real capable-kernel import
+  then completed; imported diag25 trial `356a631d-874b-457a-abc1-b117dc58f11a`
+  used the exact directory root and consumed NEXT to recovery. Its next warned
+  reboot, without another selection, reached fixed p2 recovery boot
+  `840a8868-c8ef-48bd-b051-32dc979c14da`. Both routes and inspected Kiyo consoles
+  pass for each boot. The final return to capable diag27 is boot
+  `926d517d-1a83-43d6-8702-1a83008025b5`, kernel `6.18.54-gameshellneo26`, with
+  exact root/capability/FAT proof and both routes. Its initial early USB no-route
+  observation is retained separately. It remains unconfirmed, with NEXT, GOOD
+  and RECOVER at recovery. Physical input response, explicit default confirmation
+  and clock/provenance acceptance remain open; input registration is insufficient.
 - Use the saved PM/RTC/cable test Tasks and their exact matching runtime/image
   admission, original-result ledger, restoration and postflight checks. Keep
   debug stages distinct from actual sleep. The current RTC trial cap is sixty

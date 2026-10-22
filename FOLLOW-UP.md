@@ -9,11 +9,18 @@ records validation. Keep this out of the final release. The initial DEV-spare
 installation/readback, actual vendor trial consumption/readback, diagnostic.26
 directory-root handoff, both management routes and automatic return to fixed
 recovery now pass. The SSH bundle import rejected a missing capability xattr;
-NEO-209's capable image is built and offline verified; capable maintenance
-bootstrap, complete import and confirmation remain open. NEO-210 is qualifying
-a complete-store replacement from fixed recovery to avoid another card move.
+NEO-209's capable image and NEO-210's real remote store bootstrap are complete.
+The actual diag27 directory trial, capability roundtrip, consumed flag, FAT
+check, both management routes and inspected postboot console pass. Real complete
+version import, imported diag25's directory-root trial and its next-boot return
+to fixed recovery also pass, including both routes and readable consoles.
+The later return to capable diag27 passes exact root/capability/FAT and both-route
+checks. It remains unconfirmed with recovery as the default. Physical button
+response needs the owner before default confirmation; registered input devices
+do not establish that response.
+The current card retains repaired r2 p1/p2 and the new
+remotely installed p3; R4's full-card transfer is a verified fallback.
 Development-r3 fixes FAT flags but still has the incapable kernel;
-wait for the qualified capable bootstrap before another physical flash, and
 retain the failed uppercase-flag development-r2 and reviewed SSH repair evidence.
 The legacy FAT writer needs unique lowercase flag entries on a `vfat` mount
 with `shortname=mixed`; replacing an existing uppercase entry atomically does
@@ -29,20 +36,25 @@ when `fping` lost `security.capability`; the actual-store probe confirms errno95
 while user xattrs work. Diagnostic.27/kernel26 now enables the narrow filesystem
 option and passes managed kernel/image and additional capability verification;
 [report 293](docs/293-ext4-security-attributes.md) records the exact artifact.
-The early import guard and native metadata regressions pass; the running old
-kernel cannot install the capable system's complete TAR itself. Keep the
+The early import guard and native metadata regressions pass; the original
+diagnostic.25/26 kernels could not install the capable system's complete TAR.
+Keep the
 unpublished failed stage/unit and unchanged recovery flags as evidence. Initial
-capable-system installation and subsequent real import/confirmation remain
-NEO-208 gates; this does not admit clock/PM work.
+capable-system installation and subsequent real import/confirmation are
+NEO-208 gates. Bootstrap, real import and imported-version trial/rollback pass;
+confirmation remains open. These results do
+not admit clock/PM work. NEO-209 is closed with its implementation and artifact
+evidence preserved.
 
 **NEO-210 remote development-store bootstrap:** the original unmounted boot
-and store checkpoints are fully verified and remounted on the same fixed
-recovery boot. The installer/package source and actual old-FAT compatibility
-are undergoing qualification. The synthetic exclusive block-claim/write/full
-readback/read-only-fsck fixture passes; no remote block write has occurred.
-Preserve the original import failure and checkpoint. See
-[report 294](docs/294-development-store-bootstrap.md). All flags must remain
-fixed recovery until a verified new store is registered through normal tooling.
+and store checkpoints are fully verified. The reviewed installer/package,
+actual old-FAT compatibility and real remote replacement all pass: exact 4 GiB
+write/readback, read-only fsck, new store mount and complete inactive-release
+verification. The original unit completed authoritatively; its two observation
+timeouts remain recorded, with no write retry. The installer left an empty
+catalog and all flags at recovery; ordinary registration/selection followed
+separately. NEO-210 is closed. Preserve the original import failure and full
+checkpoint; see [report 294](docs/294-development-store-bootstrap.md).
 
 **NEO-207 legacy MUSB branch reconciliation:** source review and offline
 qualification are complete; wider parent gates remain. Exact wake/startup patches

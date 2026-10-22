@@ -23,7 +23,7 @@ navigation/Task context changes. Fresh independent review may inspect this
 fixed provisional dependency, but whole-ticket acceptance, integration,
 publication and closure require the identical dependencies actually published
 and a separate grant. A changed dependency must be remapped and receive fresh
-required review. The one current combined host check is still pending.
+required review. The one current combined host check passes as recorded below.
 
 ## Primary-source findings
 
@@ -225,8 +225,19 @@ storage. After qualification the combined original/new kernel footprint is
 2,014,769,152 bytes and free disk is 5,938,335,744 bytes. The new checkout has
 zero copied source caches. All owned heavy operations are terminal and their
 ownership is resolved. Existing caches and original proof remain immutable.
-The coordinator-allocated current host/context check remains pending; no
-unpublished upstream candidate is described as accepted or published here.
+The coordinator-allocated single current host check completed at clean combined
+`44a7a647255c583bd84792a5f17b1711819d0541`, original session **39950**, exit 0.
+It passes 24 runtime tests and 1,488 tooling tests (nine expected skips), both
+compiled host guard programs and Bash/ShellCheck. All 967 tracked pre-run inputs
+were verified unchanged afterward. Its complete log is
+`.local/build/neo229-current-host.log`, SHA-256
+`d0e810dee091ce150ed00b7bc21b198a545a75b3a0c645a14a0d01a787d1ba46`;
+the terminal receipt is
+`.local/notes/managed-wakeup-init-error/current-host-terminal-01.json`, SHA-256
+`359d4d3f400b9274c63e5d0973abaf2eed60b9d3b27a0aa3d9c3dec6aff806fa`.
+Only factual documentation changes follow that run; no candidate native,
+sanitizer, guest or object qualification was repeated for the context merge.
+No unpublished upstream candidate is described as accepted or published here.
 
 The read-only original-to-corrected comparison records the exact unchanged
 candidate/native/Linux fixture/configuration and shared source helpers,
@@ -242,6 +253,18 @@ SHA-256 `2306c7b40b4a0e5e10df0bb92876394d8c26762a3245fb96acf7369fcce508be`.
 Those index and comparison records identify `702fa7a` as the corrected code
 capture; later documentation-only descendants do not change that execution
 provenance. They remain historical when final context is allocated.
+
+The allocated-context comparison is
+`.local/notes/managed-wakeup-init-error/current-context-equivalence-01.json`,
+SHA-256 `c0bf84def856cb28b9cc0d755de648a739667bd98c24d6e327f29d8cf306d69e`.
+It verifies every Task body from both histories, all qualified executable
+dependencies and production pins, and the retained original artifact files.
+Only README/FOLLOW-UP/report navigation required conflict resolution; both
+complete entries were retained. Indexes 01 and 02 remain byte-identical.
+Index 02's tracked report pin describes historical `e6d01dd` bytes, retained at
+`.local/notes/managed-wakeup-init-error/context-premerge-e6d01dd/315-managed-wakeup-init-error.md`
+and bound to that commit's Git blob. It does not describe the current report
+path after this factual update; the final handoff distinguishes those versions.
 
 Fresh independent Standards and Spec review, a fixed complete evidence handoff
 and a separate integration/publication grant remain required. This ticket

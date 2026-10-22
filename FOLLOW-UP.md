@@ -9,9 +9,11 @@ two cases/eight assertions. Actual Linux PM/devres/IDA also passes all five,
 with the exact same original-wrapper control. A retained selected-object
 runner setup failure precedes driver compilation; the corrected separate
 checkout reuses the immutable qualified source read-only. Both genuinely
-selected ARM PM-sleep/no-sleep object builds now pass. Current context,
-fresh independent reviews and serialized publication remain
-pending. The underlying capability and action-reset contracts are preserved;
+selected ARM PM-sleep/no-sleep object builds now pass. One combined host check
+on explicitly provisional/unpublished NEO-230/228 context passes 24 runtime /
+1488 tooling tests (nine skips), compiled host guards and shell lint. Identical
+upstream publication, fresh independent reviews and serialized publication
+remain pending. The capability and action-reset contracts are preserved;
 no installed CPI fault, image or parent98/102/106 completion is inferred.
 [Report 315](docs/315-managed-wakeup-init-error.md).
 

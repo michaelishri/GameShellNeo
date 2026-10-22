@@ -181,9 +181,17 @@ numeric-prefix outcomes reject; identical valid evidence passes without
 execution or original-file writes. Together with the 16 initial admission
 checks, all 25 focused checks pass. This adds tests only to the qualified
 checkpoint; candidate, driver fixture, checker, shared helpers and all kernel
-inputs remain unchanged. The combined host check is still pending here.
+inputs remain unchanged. The single full host check at
+`0a8d02a007864440644ed1eebd00ac653f891f88`, original session 65296, is terminal
+exit 0: 24 runtime tests, 1463 tooling tests (nine expected skips), both compiled
+C checks, Bash syntax and ShellCheck pass. The retained log is
+`.local/build/neo230-host-check.log`. Subsequent source edits are documentation
+only; the qualified executable and test inputs are unchanged.
 
 NEO-55/58 remain open for original
 cause/recovery ownership, deliberate candidate composition/image integration
 and matching hardware qualification. Clock/provenance blocks live PM admission;
-no image or device change is part of this child.
+no image or device change is part of this child. Source qualification is
+complete on original base `d5d67790668f4cb2b3d308a5b60da03c26b04911`;
+accepted-context reconciliation and fresh independent final reviews remain
+required before publication or child closure.

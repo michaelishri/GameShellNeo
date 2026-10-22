@@ -28,6 +28,10 @@ consumer qualification and separate physical/clock/PM gates.
 records the bounded offline STOP outcome, primary ordering/configuration audit,
 conditional native/ARM fixtures and unchanged underlying clock/PM gates.
 
+[303 — MUSB terminal IRQ/wake composition](303-musb-terminal-wake-composition.md)
+records the explicit combined candidate, action/wake ownership handoff,
+actual-source controls and separate software/hardware boundaries.
+
 [302 — Finite scheduled clock brackets](302-scheduled-clock-boundaries.md)
 records the separate fixed guard/RAW experiment, pause ABI, offline evidence,
 one finite GameShell capture and unchanged clock/PM and exclusive-device gates.

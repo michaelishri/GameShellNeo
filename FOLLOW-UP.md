@@ -1857,7 +1857,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   and Spec reviews accepted the source, published at `49b1c23`; see
   [report 298](docs/298-usb-removal-producer-lifetime.md). This does
   not retire every generic-PHY consumer or complete NEO-106.
-- [ ] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
+- [x] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
   `mpfs_remove()` disables the parent clock before child teardown and passes
   the parent to `usb_phy_generic_unregister()` rather than the registered
   `glue->phy`. That helper directly unregisters its argument. Actual platform
@@ -1869,6 +1869,17 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   complete MPFS-selected PIO/DMA/module objects and three real Linux platform-device
   cases pass. The final accepted-`49b1c23` combination preserves all maintained
   qualification inputs and passes 1,301 host regressions (nine skipped);
-  independent review and serialized publication remain pending in
-  [report 300](docs/300-mpfs-removal-ownership.md).
+  fresh independent Standards and Spec accepted the bounded change, published
+  at `02c633a`; see [report 300](docs/300-mpfs-removal-ownership.md).
+- [ ] NEO-219 composes wake/startup and retirement explicitly: unchanged 0029
+  and retirement inputs plus bridge 0062 preserve 0026 policy semantics while
+  handing owned wake/source cleanup to the valid IRQ action before free and
+  `nIrq` invalidation. Native reference controls reproduce the naive
+  double/invalid-disarm risk; failed-final-disarm debt remains explicit.
+  All 147 native/sanitizer/ARM scenarios, seven assertion controls, six complete
+  ARM configurations and eight real Linux IRQ/wakeup-source context cases
+  pass; independent pre-integration review is pending in
+  [report 303](docs/303-musb-terminal-wake-composition.md).
+  Existing profiles, production inputs, complete failed-power/backend/DMA
+  removal and NEO-102/98/106 physical/clock gates remain separate.
 - [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

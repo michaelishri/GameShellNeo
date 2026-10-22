@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[313 — Saved clock publication reconciliation](313-clock-publication-reconciliation.md)
+records protected tuple checks, legal ambiguity/CLOSED coverage, finite host
+qualification and retrospective analysis with unchanged clock/PM gates.
+
 [312 — Charging inventory host admission](312-charge-inventory-result-admission.md)
 records the original invalid acceptances, raw register/clock/profile replay,
 unchanged collector/transport and separate electrical/clock qualification gates.

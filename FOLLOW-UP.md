@@ -2,6 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-192/228 offline publication reconciliation:** a separate report checks
+protected timekeeper publication/reader projections and conditionally separates
+recorded regression components. Legal leap-state sequence gaps, interleavings,
+incomplete coverage and CLOSED/drain remain explicit unknowns. Current saved
+checks pass five methods/25 variants and 24 runtime/1443 tooling tests (nine
+expected skips), C guards and shell lint. Original 24-case/source receipts and
+both unchanged clean capture streams remain distinct from new retrospective
+analysis. No producer/reader/ABI change, independent reference, clock fix or PM
+clearance follows. Fresh independent review/publication remain pending;
+NEO-192 and NEO-191/182 gates stay open.
+[Report313](docs/313-clock-publication-reconciliation.md).
+
 **NEO-10/227 charging inventory host admission:** a retained eight-route local
 baseline accepts four invalid inventories. The host now checks raw registers,
 24 clock points with explicit boundary-derived PM context, profile/metadata and

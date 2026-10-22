@@ -1419,6 +1419,14 @@ does not justify a two-sided MMIO/counter bracket or authorize instrumentation.
 [Report 305](docs/305-clock-reference-feasibility.md) records pinned ordering,
 conditional synthetic evidence and the unchanged NEO-192/PM gates.
 
+`task report:clock-transitions FILE=<saved-kernel.ndjson>` checks the recorded
+publication/accepted-reader boundary offline and conditionally decomposes
+regressions using the unchanged conversion. `task test:clock-transitions`
+covers the 24 declared cases plus an independent complete-CLOSED variant.
+Legal sequence gaps, incomplete coverage and source changes remain unknown;
+the report grants no clock or PM admission. [Report313](docs/313-clock-publication-reconciliation.md)
+records the primary-source argument and separate historical-capture analysis.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

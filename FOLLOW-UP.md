@@ -169,11 +169,15 @@ outside the image queue, with integration/hardware ownership in NEO-58.
 passes 959/2088 native and sanitizer cases, reproducing discarded clock,
 protocol/mask/watermark and save/restore setup errors. Candidate 0055 checks
 each boundary before later setup, preserves the first error through clock
-cleanup and releases its firmware inputs once. Full qualification and
-independent review are in progress in
-[report 297](docs/297-brcmfmac-startup-ownership.md). It stays outside the image
-queue; the active-worker candidates do not by themselves qualify startup.
-Separate probe/buscore setup and reset/reprobe ownership still need audit.
+cleanup and releases its firmware inputs once. All 2088 startup cases pass
+native/sanitizer/ARM, with 41 meaningful mutations and the combined Wi-Fi
+regressions; complete board/debug objects, host checks, independent source
+reviews and final input/artifact/source verification pass. One optional
+positional-chip fixture maintainability note is retained in
+[report 297](docs/297-brcmfmac-startup-ownership.md). This completes NEO-212's
+offline candidate scope. It stays outside the image queue; NEO-58 retains
+deliberate integration, board checks, probe/buscore setup and reset/reprobe
+ownership. The active-worker candidates do not by themselves qualify startup.
 
 **NEO-58/198 polling status, 12 October 2026:** actual-source tests reproduce
 discarded queued-TX polling errors and I/O after a prior error arrives at host

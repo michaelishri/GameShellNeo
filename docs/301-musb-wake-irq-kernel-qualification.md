@@ -10,8 +10,9 @@ cases. The corrected compiling control produces exactly five required failing
 cases and six passing cases. Final review preparation uses the separate
 `work/musb-wake-irq-final` checkout on accepted main
 `02c633a0349ad986fe384cc0f94e26663baa3df3`, with new owned executions described
-below. Independent reviews precede publication/closure; the wider parent remains
-open.
+below. Required review corrections and their final executions use the separate
+`work/musb-wake-irq-fresh-results` checkout. Independent reviews precede
+publication/closure; the wider parent remains open.
 
 ## Acceptance boundary
 
@@ -181,6 +182,61 @@ the prior executions. Repeated context checks pass 24 runtime and 1,310 tooling
 tests (nine existing skips), the compiled checks and ShellCheck. The final
 checkout's private `.local/audit/neo218-final-review-index.json` binds the new
 receipts, preflight equality proof and host log to the frozen original index.
+
+## Review corrections and guarded executions
+
+Fresh Standards review of `4057559` found one required issue; Spec found that
+same issue and a second required issue. The raw saved kernel executions were
+independently verified genuine. The first defect left prior KTAP/JSON at their
+active paths, so a cached build failure could reuse them. The second caught any
+managed `RuntimeError`, including unresolved cleanup, and could accept a terminal
+result before original ownership was released. Both frozen review reports,
+checkpoints and original evidence remain retained.
+
+The corrected runner verifies and retains every prior result independently,
+including an orphaned log or JSON, then removes those active names before launch.
+Both current-execution files must exist before validation. It accepts identical
+new output bytes; changed content is not a freshness test. The managed API now
+emits `ManagedCommandFailure`, still a `RuntimeError`, only after original
+result/log retention, released ownership and a repeated check of the unchanged
+clean terminal result. The control catches only this outcome and independently
+requires matching original identity/result, released ownership and raw exit 1.
+Cleanup, timeout, stopped, OOM, running and changed-result failures reject.
+
+Actual frozen-runner host reproductions demonstrate false acceptance for stale
+files after failed rebuild, unresolved cleanup, active ownership and the wrong
+original result. Fixed actual-runner regressions reject those paths and partial
+new output while accepting a new identical-byte execution. Thirteen focused wake
+guards and five managed-container groups pass; optional validator-duplication
+refactoring remains outside this correction.
+
+Before the new cached executions, both generated source specifications, complete
+source metadata, unchanged fixture/control and kernel/config hashes match the
+frozen accepted-base evidence exactly. Both old active result files are present
+at preflight, then are verified in retained history before the newly produced
+outputs are admitted. The new maintained inputs differ only in the corrected
+generic runner, managed helper and its wake regression file; the additional
+managed-helper regression file is bound in the evidence index.
+
+| Guarded execution | Managed run | Actual result |
+| --- | --- | --- |
+| Positive | `72b676caa7f54c4981933533ed5cd59a` | Raw exit 0; eleven PASS |
+| Policy-ignored control | `f0da99d65d734b8c87708b829931a542` | Raw exit 1; exact five FAIL/six PASS; strict checker succeeds after ownership release |
+
+Both original jobs are authoritative terminal exits without stop/OOM/error;
+maintained input hashes match before/after execution and no writer remains.
+The receipt hashes are
+`888b7302325a2f9e83f71f8735863a0505ddced77eed7fdc1a8d8eba7ccd22da`
+and `7702659356bf6cd7d26728b8821a36f22aca4260b932fb50081164859e3a1e6c`.
+The kernel, config and result-JSON hashes are unchanged; current complete KTAP
+hashes are `6e711ff8ec98fa31aa7e805a4c36377de8e7cd6d47798a4b3fbb50d8b18835bf`
+and `242e179529cedbb21d3c269414fe35fef6e190e73708e42a94d7ad9cf569ce6d`.
+Final host checks pass 24 runtime and 1,315 tooling tests, nine existing skips,
+the compiled checks and ShellCheck. The correction checkout's private
+`.local/audit/neo218-fixed-review-index.json` binds all new receipts, baseline
+reproductions, regression logs, review findings, source equality and retained
+prior outputs to the unchanged original indexes. Fresh independent reviews
+must assess this corrected bundle before publication/closure.
 
 ## Remaining NEO-98 gates
 

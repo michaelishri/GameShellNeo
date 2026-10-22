@@ -1814,7 +1814,13 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   Four unchanged reference schedules reproduce the lifetime gaps; 32 native,
   sanitizer and ARM cases, nine assertion controls and six selected OMAP
   configurations pass. Twelve actual Linux cases, including real parent
-  PM/glue/PHY consistency, also pass; independent acceptance remains pending.
+  PM/glue/PHY consistency, also pass. Fresh pre-integration reviews accepted
+  original `db1078b`; provisional final context merges frozen, unaccepted and
+  unpublished NEO-220 `a2688ac`. An exact current-source/evidence audit passes
+  627 checks with one explicit registry-file delta; one combined host check
+  passes 24 runtime/1,402 tooling tests (nine skipped), C guards and shell lint.
+  Original execution provenance is retained. Identical dependency publication,
+  fresh final reviews and serialized integration remain required.
   The existing production and candidate queues are preserved. Cached status across rebind
   is retained information, not a fresh physical-state guarantee. See
   [report 306](docs/306-omap-mailbox-ownership.md); wider NEO-102/106 and physical

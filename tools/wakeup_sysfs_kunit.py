@@ -59,13 +59,18 @@ def checked_control(report, log):
             expected = re.match(r'\s*Expected (.*), but\s*$', line)
             if expected:
                 active['expression'] = expected[1]
-    wanted = Counter((name, 'result == -ENOMEM') for name in CONTROL_CASES)
+    # Pinned KUnit macros expand ENOMEM before stringification. Its formatter
+    # omits the redundant value line for the literal right operand (-12).
+    wanted = Counter((name, 'result == -12') for name in CONTROL_CASES)
     if Counter((failure['case'], failure['expression']) for failure in failures) != wanted:
         raise ValueError('Unexpected or missing sysfs control assertion')
     for failure in failures:
-        block = '\n'.join(failure['lines'])
-        if 'result == 8' not in block or '-ENOMEM == -12' not in block:
-            raise ValueError('Missing actual write/error value in sysfs control')
+        block = [line.strip() for line in failure['lines'] if line.strip()]
+        marker = (r'# ' + re.escape(failure['case']) + r': EXPECTATION FAILED at '
+                  r'drivers/base/power/wakeup-sysfs-kunit\.c:[1-9][0-9]*')
+        if (len(block) != 3 or not re.fullmatch(marker, block[0]) or
+                block[1:] != ['Expected result == -12, but', 'result == 8 (0x8)']):
+            raise ValueError('Different or incomplete compiled sysfs control assertion')
     observations = re.findall(r'#\s*(\w+_test): fault-observation '
         r'result=(-?\d+) disabled=([01]) hits=(\d+) objects=(\d+) names=(\d+) ids=(\d+)', log)
     expected_observations = Counter((name, '8', '1', '1', '0', '0', '0') for name in CONTROL_CASES)

@@ -31,13 +31,54 @@ def report(control=False):
             for name in CASES])])
 
 
+# Verbatim KTAP from pinned Linux 6.18.54 control run8402ea6f. The original
+# wrapper rejected its numeric errno rendering; that historical result remains.
+COMPILED_CONTROL_KTAP = '''KTAP version 1
+1..1
+    KTAP version 1
+    # Subtest: wakeup-sysfs
+    # module: wakeup
+    1..12
+    ok 1 sysfs_enable_test
+    ok 2 sysfs_disable_test
+    ok 3 sysfs_enabled_idempotent_test
+    ok 4 sysfs_disabled_idempotent_test
+    ok 5 sysfs_invalid_request_test
+    # sysfs_object_alloc_error_test: fault-observation result=8 disabled=1 hits=1 objects=0 names=0 ids=0
+    # sysfs_object_alloc_error_test: EXPECTATION FAILED at drivers/base/power/wakeup-sysfs-kunit.c:318
+    Expected result == -12, but
+        result == 8 (0x8)
+    not ok 6 sysfs_object_alloc_error_test
+    # sysfs_name_alloc_error_test: fault-observation result=8 disabled=1 hits=1 objects=0 names=0 ids=0
+    # sysfs_name_alloc_error_test: EXPECTATION FAILED at drivers/base/power/wakeup-sysfs-kunit.c:318
+    Expected result == -12, but
+        result == 8 (0x8)
+    not ok 7 sysfs_name_alloc_error_test
+    # sysfs_id_alloc_error_test: fault-observation result=8 disabled=1 hits=1 objects=0 names=0 ids=0
+    # sysfs_id_alloc_error_test: EXPECTATION FAILED at drivers/base/power/wakeup-sysfs-kunit.c:318
+    Expected result == -12, but
+        result == 8 (0x8)
+    not ok 8 sysfs_id_alloc_error_test
+    # sysfs_registration_error_test: fault-observation result=8 disabled=1 hits=1 objects=0 names=0 ids=0
+    # sysfs_registration_error_test: EXPECTATION FAILED at drivers/base/power/wakeup-sysfs-kunit.c:318
+    Expected result == -12, but
+        result == 8 (0x8)
+    not ok 9 sysfs_registration_error_test
+    ok 10 sysfs_two_enables_test
+    # sysfs_disable_enable_srcu_test: srcu-observation observer=500 detached=1 blocked=1 old-alive=1 enabled=8
+    ok 11 sysfs_disable_enable_srcu_test
+    # sysfs_unregister_active_write_test: context-observation entered=500 unpublished=500 finished-early=0 foreign-result=0
+    ok 12 sysfs_unregister_active_write_test
+# wakeup-sysfs: pass:8 fail:4 skip:0 total:12
+# Totals: pass:8 fail:4 skip:0 total:12
+not ok 1 wakeup-sysfs
+reboot: System halted
+
+'''
+
+
 def control_log():
-    lines = ['wakeup-sysfs', *CASES]
-    for name in CONTROL_CASES:
-        lines.extend((f'# {name}: fault-observation result=8 disabled=1 hits=1 objects=0 names=0 ids=0',
-                      f'# {name}: EXPECTATION FAILED', 'Expected result == -ENOMEM, but',
-                      'result == 8', '-ENOMEM == -12', 'not ok 1 ' + name))
-    return '\n'.join(lines)
+    return COMPILED_CONTROL_KTAP
 
 
 class KernelOutcomeAdmission(unittest.TestCase):
@@ -75,12 +116,26 @@ class KernelOutcomeAdmission(unittest.TestCase):
     def test_exact_assertions_observed_values_gate_and_ownership_are_required(self):
         good = control_log()
         for bad in (good.replace('result == 8', 'result == -5', 1),
-                    good.replace('Expected result == -ENOMEM', 'Expected other == -ENOMEM', 1),
+                    good.replace('Expected result == -12', 'Expected other == -12', 1),
                     good.replace('disabled=1', 'disabled=0', 1), good.replace('hits=1', 'hits=0', 1),
                     good.replace('ids=0', 'ids=1', 1), good.replace('objects=0', 'objects=1', 1),
                     good.replace('names=0', 'names=1', 1),
                     good + '\n# sysfs_enable_test: EXPECTATION FAILED\nExpected other == 1, but\nother == 0'):
             with self.subTest(tail=bad[-100:]), self.assertRaises(ValueError):
+                checked_control(report(True), bad)
+
+    def test_compiled_numeric_errno_and_exact_rendered_values_are_required(self):
+        good = control_log()
+        self.assertEqual(len(checked_control(report(True), good)), 12)
+        for bad in (good.replace('Expected result == -12', 'Expected result == -5', 1),
+                    good.replace('Expected result == -12', 'Expected result == -ENOMEM', 1),
+                    good.replace('result == 8 (0x8)', 'result == 80 (0x50)', 1),
+                    good.replace('result == 8 (0x8)', 'result == 8 (0x9)', 1),
+                    good.replace('result == 8 (0x8)', 'result == 8', 1),
+                    good.replace('result == 8 (0x8)', 'result == 8 (0x8)\n-ENOMEM == -12', 1),
+                    good.replace('EXPECTATION FAILED', 'ASSERTION FAILED', 1),
+                    good.replace('drivers/base/power/wakeup-sysfs-kunit.c:', 'other.c:', 1)):
+            with self.subTest(log=bad[-100:]), self.assertRaises(ValueError):
                 checked_control(report(True), bad)
 
     def test_candidate_must_be_explicit_once_before_source_preparation(self):
@@ -191,6 +246,8 @@ class RunnerAdmission(unittest.TestCase):
             self.assertEqual(f.before_execution, {'test.log': False, 'results.json': False})
             evidence = json.loads((f.work / 'control-evidence.json').read_text())
             self.assertEqual(evidence['managed_result']['exit_code'], 1)
+            self.assertEqual(evidence['expected_ktap_assertion'], 'result == -12')
+            self.assertEqual(evidence['expected_ktap_value'], 'result == 8 (0x8)')
             for name in f.payload:
                 self.assertEqual(evidence['artifacts'][name], hashlib.sha256(f.payload[name]).hexdigest())
 

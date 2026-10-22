@@ -124,7 +124,9 @@ def main():
             managed_attempt=str(attempt.relative_to(ROOT)), managed_result=result, limits=support.LIMITS)
         if args.control:
             record.update(control=args.control, expected_failures=list(support.CONTROL_CASES),
-                          expected_assertion='result == -ENOMEM')
+                          expected_assertion='result == -ENOMEM',
+                          expected_ktap_assertion='result == -12',
+                          expected_ktap_value='result == 8 (0x8)')
         atomic_json(accepted / 'evidence.json', record)
         atomic_json(evidence, record)
         print('Wakeup sysfs KUnit evidence:', evidence.relative_to(ROOT), flush=True)

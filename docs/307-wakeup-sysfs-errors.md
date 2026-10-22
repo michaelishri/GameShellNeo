@@ -53,7 +53,10 @@ with exactly one `result == -ENOMEM` assertion per case and actual result 8 for
 zero fixture source/IDA ownership. The other eight cases pass. Missing or extra
 assertions/cases, compilation/setup failure, diagnostics, skips and any different
 outcome reject the control. All original failed output stays separate from
-positive evidence.
+positive evidence. The pinned KUnit macro/formatter renders the source assertion
+as `Expected result == -12, but` and `result == 8 (0x8)`, without a redundant
+right-hand literal value line. The parser requires that exact three-line named
+expectation block, not a substring match or a second symbolic representation.
 
 ## Qualification status
 
@@ -163,6 +166,33 @@ native/ARM/production-object receipt still matches. The first preparation
 comparison remains separately retained; a pair of fixture-only gate writes was
 made explicit with `WRITE_ONCE()` before the final comparison, without executing
 the earlier preparation.
+
+The repaired fixture's managed positive `62a4c313f309482bb9ee3fb120087bf9`
+completed with twelve passes, no rejected diagnostics and released ownership.
+Its retained log observes the old source alive while detached, a successful new
+enable, and context unpublication unable to finish until the unrelated hook
+reader releases its pin. The same outer session 32730 then stopped with exit
+201 because control `8402ea6fa7f14545979b0722475c8052` was rejected by the first
+host assertion parser. The kernel actually executed exactly the planned four
+failing cases and eight passes, with raw exit 1 and all fault/readback/ownership
+observations correct. The parser's synthetic host fixture had assumed symbolic
+errno text and a redundant right-value line that pinned KUnit does not emit.
+The original rejected wrapper/raw result remains at
+`.local/audit/neo223-original-control-8402/receipt.json` (SHA-256
+`de221d80294cbc61f2a8a4d120dba06f758ca89371b1449c5d8fd546dab8c843`).
+
+The oracle now follows `KUNIT_EXPECT_EQ` macro expansion and
+`lib/kunit/assert.c:is_literal()` from the pinned source. The host regression
+embeds the original compiled KTAP verbatim and rejects a wrong errno, decimal or
+hex value, missing or extra assertion line, different case/source, fatal
+assertion, diagnostic, raw-0 command or unresolved ownership. Seventeen focused
+host checks pass. The private
+`.local/audit/neo223-compiled-ktap-oracle-proof.json` receipt (SHA-256
+`6a4aa79e82db4a8c0b105ccce1367744f7f41653d2874cbaa2dd67fe4a674ad0`)
+proves the captured text is exact and the source-generation function, fixture
+and semantic control map are unchanged. Changed maintained host inputs require
+new owned cached positive/control execution and fresh output files; the earlier
+positive and rejected control are preserved as historical observations.
 
 MUSB IRQ timing/device-DPM traversal, terminal destruction/composition, image
 selection and physical hardware behavior remain separate. NEO-98 stays open.

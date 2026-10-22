@@ -178,17 +178,27 @@ def supervise(client, unit, target, capture, now=time.monotonic, pause=time.slee
 def execute(client, directory, contract, capture, *, extra_files=None,
             runner='capture-clock-boundary.py'):
     extra_files = extra_files or {}
-    if runner not in ('capture-clock-boundary.py', 'capture-development-clock.py'):
+    if runner not in ('capture-clock-boundary.py', 'capture-development-clock.py', 'capture-scheduled-clock.py'):
         raise ValueError('Unknown clock capture runner')
-    if bool(extra_files) != (runner == 'capture-development-clock.py'):
+    development = runner != 'capture-clock-boundary.py'
+    scheduled = runner == 'capture-scheduled-clock.py'
+    if bool(extra_files) != development:
         raise ValueError('Development runner requires its explicit adapter inputs')
     if ('development' in contract) != bool(extra_files):
         raise ValueError('Development contracts require the explicit development runner')
+    if ('scheduled' in contract) != scheduled:
+        raise ValueError('Scheduled contracts require their explicit scheduled runner')
     hashes = dict(contract['files'])
     if extra_files:
         from development_clock import ADAPTERS, validate_development_contract
         validate_development_contract(contract)
-        if set(extra_files) != set(ADAPTERS):
+        required = set(ADAPTERS)
+        if scheduled:
+            from clock_scheduled import FILES as SCHEDULED_FILES, validate_contract as validate_scheduled
+            validate_scheduled(contract)
+            required.update(SCHEDULED_FILES)
+            hashes.update(contract['scheduled']['files'])
+        if set(extra_files) != required:
             raise ValueError('Incomplete development adapter files')
         hashes.update(contract['development']['adapter_files'])
         for name, path in extra_files.items():

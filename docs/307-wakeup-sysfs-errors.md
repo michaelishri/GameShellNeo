@@ -78,11 +78,10 @@ host source/oracle regression tests also passed. The first host receipt is
 
 The saved `test:wakeup-sysfs` Task runs native/sanitizer, managed ARM reference
 and selected full PM/sysfs objects; `-- --host-only` deliberately runs just the
-host references. ARM and kernel qualification are still pending. Actual
-allocation, IDA, kernfs and SRCU semantics require the separate twelve-case
-kernel suite. The later final receipt must include the finalized checker/test
-input set; the first host observations remain historical when those inputs
-change during preparation.
+host references. Actual allocation, IDA, kernfs and SRCU semantics require the
+separate twelve-case kernel suite. The later final receipt must include the
+finalized checker/test input set; the first host observations remain historical
+when those inputs change during preparation.
 
 Any managed nonzero control will use the accepted published NEO-218 result API;
 the shared helper will not be copied or forked. Current inputs, source profile,
@@ -102,7 +101,7 @@ retained before any kernel job started; the queue now materializes the actual
 Sixteen focused host tests pass (eleven frontend/kernel admission tests and five
 accepted managed-result groups). They include raw-0 refusal with fresh valid
 failed output, typed original raw-1 acceptance and the previous freshness and
-ownership refusals. Actual kernel execution remains pending.
+ownership refusals.
 
 The fixture reads actual kernfs deactivation state while its writer holds an
 active reference, proving the unregister path began draining that callback.
@@ -123,6 +122,47 @@ source lock/configuration, source preparation, managed helper and maintained
 production patches are unchanged. The imported context consists of accepted
 clock tooling/documentation and the separately reviewed wake-control host fix.
 Previous host evidence remains historical when maintained context inputs change.
+
+The first complete native/sanitizer/ARM source Task passed at `70db7ef`, including
+managed ARM reference `b0aaa621458d457382ac0c8cefb9a6c3` and the full ARM
+`sysfs.o`, `wakeup.o` and `wakeup_stats.o` objects in managed run
+`d687478239fd4591979a9df7be44fd33`. All three are verified ELF32 ARM objects.
+These source-reference and production-object inputs are unaffected by the later
+test-fixture changes.
+
+The original outer session 63443 then stopped with exit 201. Its UML run
+`487ea977ccc24650b483cc9d866efdba` executed all twelve passing assertions and
+exited normally, but the strict runner rejected the actual lockdep circular
+dependency diagnostic. The coordinator had held a production `wakeup_srcu`
+reader while issuing a real sysfs write, reversing the sysfs writer-to-SRCU
+ordering. The control did not start. Original logs, JSON, configuration, source,
+binary and released managed-result pins remain at
+`.local/audit/neo223-original-kernel-487ea/receipt.json` (SHA-256
+`019d4963cde62364a86f0d48b1fa3ca9a89429107461b2d79a03c75ee92d8314`).
+This is rejected evidence and does not qualify the subsequent fixture repair.
+
+The fixture now gives the retained old-source reader its own joined worker,
+so the coordinator performs sysfs I/O outside that production SRCU read section.
+An independent test-context SRCU domain pins each global-context hook lookup;
+unpublication drains every admitted hook before KUnit-managed memory can free.
+The unregister case also starts a uniquely named unrelated normal source reader,
+holds its context pin at the test boundary, observes that unpublication cannot
+finish while that pin remains, then releases and joins both workers before
+assertions. Actual allocation, IDA, registration, kernfs and production SRCU
+bodies remain unchanged. This adds no case or frontend-control exception: the
+twelve names and exact four-error/eight-pass control remain fixed. Fresh kernel
+qualification of the repaired fixture is pending.
+
+The repaired positive/control profiles were compared before their execution at
+`.local/audit/neo223-fixture-repair-final-plan/plan.json` (SHA-256
+`f31ac1ca406c5b8f8cc8dea91999bac21c5c0d368134fee4f53c4e944cce5474`).
+Both use identical fixture and actual `wakeup.c` bytes; actual production source
+and candidate 0071 match the original run. The frontend differs only at the
+predeclared final return. Every maintained input admitted by the complete
+native/ARM/production-object receipt still matches. The first preparation
+comparison remains separately retained; a pair of fixture-only gate writes was
+made explicit with `WRITE_ONCE()` before the final comparison, without executing
+the earlier preparation.
 
 MUSB IRQ timing/device-DPM traversal, terminal destruction/composition, image
 selection and physical hardware behavior remain separate. NEO-98 stays open.

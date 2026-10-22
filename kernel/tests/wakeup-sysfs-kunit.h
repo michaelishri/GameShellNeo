@@ -21,6 +21,7 @@
 #include <linux/fs.h>
 #include <linux/kthread.h>
 #include <linux/mount.h>
+#include <linux/srcu.h>
 
 #define WAKEUP_SYSFS_SLOTS 8
 #define WAKEUP_SYSFS_TIMEOUT (5 * HZ)
@@ -48,6 +49,7 @@ struct wakeup_sysfs_fixture {
 	struct vfsmount *mount;
 	struct file_system_type *fs;
 	char *name;
+	char foreign_name[80];
 	spinlock_t lock;
 	struct wakeup_sysfs_slot slots[WAKEUP_SYSFS_SLOTS];
 	unsigned int slots_used;
@@ -62,15 +64,23 @@ struct wakeup_sysfs_fixture {
 	atomic_t release_count;
 	bool gate_allocation;
 	bool gate_attachment;
+	bool gate_foreign_allocation;
 	bool observe_srcu;
 	bool registered;
 	bool initialized;
 	struct completion gate_entered[2];
 	struct completion gate_release;
 	struct completion srcu_entered;
+	struct completion observer_entered;
+	struct completion observer_release;
+	struct completion foreign_entered;
+	struct completion foreign_release;
+	struct completion context_unpublished;
 };
 
-static struct wakeup_sysfs_fixture *wakeup_sysfs_active;
+/* Independent of the production wakeup_srcu whose lifetime is under test. */
+DEFINE_STATIC_SRCU(wakeup_sysfs_context_srcu);
+static struct wakeup_sysfs_fixture __rcu *wakeup_sysfs_active;
 
 /* Defined in sysfs.c solely for the incapable-device frontend subvariant. */
 ssize_t wakeup_sysfs_kunit_store(struct device *dev, const char *buf, size_t n);
@@ -115,11 +125,19 @@ static struct wakeup_sysfs_slot *wakeup_sysfs_object_slot(struct wakeup_sysfs_fi
 
 static struct wakeup_source *wakeup_sysfs_object_alloc(const char *name)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	struct wakeup_sysfs_fixture *f;
 	struct wakeup_sysfs_slot *slot;
 	struct wakeup_source *ws;
 	unsigned long flags;
 
+	guard(srcu)(&wakeup_sysfs_context_srcu);
+	f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
+	/* A normal unrelated source can retain this context during unpublication. */
+	if (f && READ_ONCE(f->gate_foreign_allocation) && name &&
+	    !strcmp(f->foreign_name, name)) {
+		complete(&f->foreign_entered);
+		wait_for_completion(&f->foreign_release);
+	}
 	if (!wakeup_sysfs_target(f, name))
 		return kzalloc(sizeof(*ws), GFP_KERNEL);
 	if (READ_ONCE(f->gate_allocation)) {
@@ -148,11 +166,13 @@ static struct wakeup_source *wakeup_sysfs_object_alloc(const char *name)
 
 static const char *wakeup_sysfs_name_alloc(const char *name)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	struct wakeup_sysfs_fixture *f;
 	struct wakeup_sysfs_slot *slot;
 	const char *copy;
 	unsigned long flags;
 
+	guard(srcu)(&wakeup_sysfs_context_srcu);
+	f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
 	if (!wakeup_sysfs_target(f, name))
 		return kstrdup_const(name, GFP_KERNEL);
 	if (wakeup_sysfs_fault_hit(f, WAKEUP_SYSFS_NAME_FAULT))
@@ -175,11 +195,13 @@ static const char *wakeup_sysfs_name_alloc(const char *name)
 
 static int wakeup_sysfs_id_alloc(const char *name)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	struct wakeup_sysfs_fixture *f;
 	struct wakeup_sysfs_slot *slot;
 	unsigned long flags;
 	int id;
 
+	guard(srcu)(&wakeup_sysfs_context_srcu);
+	f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
 	if (!wakeup_sysfs_target(f, name))
 		return ida_alloc(&wakeup_ida, GFP_KERNEL);
 	if (wakeup_sysfs_fault_hit(f, WAKEUP_SYSFS_ID_FAULT))
@@ -200,10 +222,12 @@ static int wakeup_sysfs_id_alloc(const char *name)
 
 static void wakeup_sysfs_name_free(const char *name)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	struct wakeup_sysfs_fixture *f;
 	unsigned long flags;
 	unsigned int i;
 
+	guard(srcu)(&wakeup_sysfs_context_srcu);
+	f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
 	if (f) {
 		spin_lock_irqsave(&f->lock, flags);
 		for (i = 0; i < f->slots_used; i++)
@@ -219,11 +243,13 @@ static void wakeup_sysfs_name_free(const char *name)
 
 static void wakeup_sysfs_id_free(struct wakeup_source *ws)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	struct wakeup_sysfs_fixture *f;
 	struct wakeup_sysfs_slot *slot;
 	unsigned long flags;
 	bool owned = false;
 
+	guard(srcu)(&wakeup_sysfs_context_srcu);
+	f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
 	if (f) {
 		spin_lock_irqsave(&f->lock, flags);
 		slot = wakeup_sysfs_object_slot(f, ws);
@@ -246,10 +272,12 @@ static void wakeup_sysfs_id_free(struct wakeup_source *ws)
 
 static void wakeup_sysfs_object_free(struct wakeup_source *ws)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	struct wakeup_sysfs_fixture *f;
 	struct wakeup_sysfs_slot *slot;
 	unsigned long flags;
 
+	guard(srcu)(&wakeup_sysfs_context_srcu);
+	f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
 	if (f) {
 		spin_lock_irqsave(&f->lock, flags);
 		slot = wakeup_sysfs_object_slot(f, ws);
@@ -266,19 +294,25 @@ static void wakeup_sysfs_object_free(struct wakeup_source *ws)
 
 static int wakeup_sysfs_source_add(struct device *dev, struct wakeup_source *ws)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	{
+		struct wakeup_sysfs_fixture *f;
 
-	if (wakeup_sysfs_target(f, ws->name) &&
-	    wakeup_sysfs_fault_hit(f, WAKEUP_SYSFS_REGISTRATION_FAULT))
-		return -EIO;
+		guard(srcu)(&wakeup_sysfs_context_srcu);
+		f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
+		if (wakeup_sysfs_target(f, ws->name) &&
+		    wakeup_sysfs_fault_hit(f, WAKEUP_SYSFS_REGISTRATION_FAULT))
+			return -EIO;
+	}
 	return wakeup_source_sysfs_add(dev, ws);
 }
 
 static void wakeup_sysfs_before_attach(struct device *dev, struct wakeup_source *ws)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	struct wakeup_sysfs_fixture *f;
 	int index;
 
+	guard(srcu)(&wakeup_sysfs_context_srcu);
+	f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
 	if (!wakeup_sysfs_target(f, ws->name))
 		return;
 	index = atomic_inc_return(&f->attach_entries) - 1;
@@ -290,18 +324,24 @@ static void wakeup_sysfs_before_attach(struct device *dev, struct wakeup_source 
 
 static void wakeup_sysfs_after_attach(struct device *dev, struct wakeup_source *ws, int ret)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	struct wakeup_sysfs_fixture *f;
 
+	guard(srcu)(&wakeup_sysfs_context_srcu);
+	f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
 	if (wakeup_sysfs_target(f, ws->name) && ret == -EEXIST)
 		atomic_inc(&f->duplicate_attaches);
 }
 
 static void wakeup_sysfs_srcu_wait(struct wakeup_source *ws)
 {
-	struct wakeup_sysfs_fixture *f = READ_ONCE(wakeup_sysfs_active);
+	{
+		struct wakeup_sysfs_fixture *f;
 
-	if (wakeup_sysfs_target(f, ws->name) && READ_ONCE(f->observe_srcu))
-		complete(&f->srcu_entered);
+		guard(srcu)(&wakeup_sysfs_context_srcu);
+		f = srcu_dereference(wakeup_sysfs_active, &wakeup_sysfs_context_srcu);
+		if (wakeup_sysfs_target(f, ws->name) && READ_ONCE(f->observe_srcu))
+			complete(&f->srcu_entered);
+	}
 	synchronize_srcu(&wakeup_srcu);
 }
 #endif

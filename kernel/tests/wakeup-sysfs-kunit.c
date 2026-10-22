@@ -4,14 +4,23 @@
 #include <linux/kernfs.h>
 #include "../../../fs/kernfs/kernfs-internal.h"
 
+enum wakeup_sysfs_operation {
+	WAKEUP_SYSFS_WRITE,
+	WAKEUP_SYSFS_UNREGISTER,
+	WAKEUP_SYSFS_OBSERVE_SOURCE,
+	WAKEUP_SYSFS_FOREIGN_SOURCE,
+	WAKEUP_SYSFS_DRAIN_CONTEXT,
+};
+
 struct wakeup_sysfs_worker {
 	struct wakeup_sysfs_fixture *fixture;
 	struct file *file;
 	struct task_struct *task;
 	struct completion finished;
 	const char *request;
+	struct wakeup_source *source;
 	ssize_t result;
-	bool unregister;
+	enum wakeup_sysfs_operation operation;
 };
 
 static atomic_t wakeup_sysfs_sequence = ATOMIC_INIT(0);
@@ -23,9 +32,19 @@ static void wakeup_sysfs_device_release(struct device *dev)
 	atomic_inc(&f->release_count);
 }
 
+static void wakeup_sysfs_unpublish_context(struct wakeup_sysfs_fixture *f)
+{
+	rcu_assign_pointer(wakeup_sysfs_active, NULL);
+	complete(&f->context_unpublished);
+	/* Every admitted hook reader must finish before KUnit frees this context. */
+	synchronize_srcu(&wakeup_sysfs_context_srcu);
+}
+
 static void wakeup_sysfs_cleanup(struct wakeup_sysfs_fixture *f)
 {
 	complete_all(&f->gate_release);
+	complete_all(&f->observer_release);
+	complete_all(&f->foreign_release);
 	if (f->registered) {
 		device_unregister(&f->dev);
 		f->registered = false;
@@ -42,7 +61,7 @@ static void wakeup_sysfs_cleanup(struct wakeup_sysfs_fixture *f)
 		put_filesystem(f->fs);
 		f->fs = NULL;
 	}
-	WRITE_ONCE(wakeup_sysfs_active, NULL);
+	wakeup_sysfs_unpublish_context(f);
 }
 
 static int wakeup_sysfs_init(struct kunit *test)
@@ -57,11 +76,17 @@ static int wakeup_sysfs_init(struct kunit *test)
 	if (!f->name)
 		return -ENOMEM;
 	snprintf(f->name, 64, "neo-wakeup-sysfs-%u", atomic_inc_return(&wakeup_sysfs_sequence));
+	snprintf(f->foreign_name, sizeof(f->foreign_name), "%s-unrelated", f->name);
 	spin_lock_init(&f->lock);
 	init_completion(&f->gate_entered[0]);
 	init_completion(&f->gate_entered[1]);
 	init_completion(&f->gate_release);
 	init_completion(&f->srcu_entered);
+	init_completion(&f->observer_entered);
+	init_completion(&f->observer_release);
+	init_completion(&f->foreign_entered);
+	init_completion(&f->foreign_release);
+	init_completion(&f->context_unpublished);
 	atomic_set(&f->fault, WAKEUP_SYSFS_NO_FAULT);
 	atomic_set(&f->fault_hits, 0);
 	atomic_set(&f->attach_entries, 0);
@@ -75,7 +100,7 @@ static int wakeup_sysfs_init(struct kunit *test)
 	if (ret)
 		goto failed;
 	device_set_wakeup_capable(&f->dev, true);
-	WRITE_ONCE(wakeup_sysfs_active, f);
+	rcu_assign_pointer(wakeup_sysfs_active, f);
 	ret = device_add(&f->dev);
 	if (ret)
 		goto failed;
@@ -97,14 +122,14 @@ failed:
 	return ret;
 }
 
-static unsigned int wakeup_sysfs_sources(struct wakeup_sysfs_fixture *f)
+static unsigned int wakeup_sysfs_sources_named(const char *name)
 {
 	struct wakeup_source *ws;
 	unsigned int count = 0;
 	int index = wakeup_sources_read_lock();
 
 	for (ws = wakeup_sources_walk_start(); ws; ws = wakeup_sources_walk_next(ws))
-		if (!strcmp(ws->name, f->name))
+		if (!strcmp(ws->name, name))
 			count++;
 	wakeup_sources_read_unlock(index);
 	return count;
@@ -131,7 +156,7 @@ static void wakeup_sysfs_expect_owned(struct kunit *test, unsigned int owned)
 	KUNIT_EXPECT_EQ(test, f->names_allocated - f->names_freed, owned);
 	KUNIT_EXPECT_EQ(test, f->ids_allocated - f->ids_freed, owned);
 	KUNIT_EXPECT_EQ(test, f->ownership_errors, 0U);
-	KUNIT_EXPECT_EQ(test, wakeup_sysfs_sources(f), owned);
+	KUNIT_EXPECT_EQ(test, wakeup_sysfs_sources_named(f->name), owned);
 	for (i = 0; i < f->slots_used; i++)
 		if (f->slots[i].id_live) {
 			live_ids++;
@@ -319,16 +344,39 @@ static void sysfs_registration_error_test(struct kunit *test)
 static int wakeup_sysfs_worker_run(void *data)
 {
 	struct wakeup_sysfs_worker *worker = data;
+	struct wakeup_sysfs_fixture *f = worker->fixture;
 	loff_t pos = 0;
+	int index;
 
-	if (worker->unregister) {
-		device_unregister(&worker->fixture->dev);
-		worker->fixture->registered = false;
-		worker->fixture->initialized = false;
+	switch (worker->operation) {
+	case WAKEUP_SYSFS_UNREGISTER:
+		device_unregister(&f->dev);
+		f->registered = false;
+		f->initialized = false;
 		worker->result = 0;
-	} else {
+		break;
+	case WAKEUP_SYSFS_OBSERVE_SOURCE:
+		/* This task holds the reader; the coordinator performs no I/O under it. */
+		index = wakeup_sources_read_lock();
+		worker->source = wakeup_sysfs_attached(f);
+		complete(&f->observer_entered);
+		wait_for_completion(&f->observer_release);
+		wakeup_sources_read_unlock(index);
+		worker->result = 0;
+		break;
+	case WAKEUP_SYSFS_FOREIGN_SOURCE:
+		worker->source = wakeup_source_register(NULL, f->foreign_name);
+		worker->result = worker->source ? 0 : -ENOMEM;
+		wakeup_source_unregister(worker->source);
+		break;
+	case WAKEUP_SYSFS_DRAIN_CONTEXT:
+		wakeup_sysfs_unpublish_context(f);
+		worker->result = 0;
+		break;
+	case WAKEUP_SYSFS_WRITE:
 		worker->result = kernel_write(worker->file, worker->request,
 					      strlen(worker->request), &pos);
+		break;
 	}
 	complete(&worker->finished);
 	return 0;
@@ -409,17 +457,24 @@ static void sysfs_disable_enable_srcu_test(struct kunit *test)
 {
 	struct wakeup_sysfs_fixture *f = test->priv;
 	struct wakeup_sysfs_worker worker = { .fixture = f, .request = "disabled\n" };
-	struct wakeup_source *old, *new = NULL;
-	unsigned long entered = 0;
+	struct wakeup_sysfs_worker observer = { .fixture = f,
+		.operation = WAKEUP_SYSFS_OBSERVE_SOURCE };
+	struct wakeup_source *old = NULL, *new = NULL;
+	unsigned long observed = 0, entered = 0;
 	bool detached = false, blocked = false, old_alive = false;
 	ssize_t enabled = -EINVAL;
-	int index, ret;
+	int observer_ret, ret = -EINVAL;
 
 	KUNIT_ASSERT_EQ(test, wakeup_sysfs_write(f, "enabled\n"), 8);
 	worker.file = wakeup_sysfs_open(f, f->name, O_WRONLY);
 	KUNIT_ASSERT_FALSE(test, IS_ERR(worker.file));
-	index = wakeup_sources_read_lock();
-	old = wakeup_sysfs_attached(f);
+	observer_ret = wakeup_sysfs_start(&observer);
+	if (observer_ret)
+		goto restore;
+	observed = wait_for_completion_timeout(&f->observer_entered, WAKEUP_SYSFS_TIMEOUT);
+	if (!observed)
+		goto restore;
+	old = observer.source;
 	f->observe_srcu = true;
 	ret = wakeup_sysfs_start(&worker);
 	if (!ret) {
@@ -427,15 +482,21 @@ static void sysfs_disable_enable_srcu_test(struct kunit *test)
 		if (entered) {
 			detached = !wakeup_sysfs_attached(f);
 			blocked = !completion_done(&worker.finished);
-			old_alive = f->slots[0].object_live && ida_exists(&wakeup_ida, old->id);
+			old_alive = old && f->slots[0].object_live && ida_exists(&wakeup_ida, old->id);
 			enabled = wakeup_sysfs_write(f, "enabled\n");
 			new = wakeup_sysfs_attached(f);
 		}
 	}
-	wakeup_sources_read_unlock(index);
+restore:
+	complete_all(&f->observer_release);
+	wakeup_sysfs_join(&observer);
 	wakeup_sysfs_join(&worker);
 	__fput_sync(worker.file);
 	f->observe_srcu = false;
+	kunit_info(test, "srcu-observation observer=%lu detached=%u blocked=%u old-alive=%u enabled=%zd\n",
+		   observed, detached, blocked, old_alive, enabled);
+	KUNIT_EXPECT_EQ(test, observer_ret, 0);
+	KUNIT_EXPECT_NE(test, observed, 0UL);
 	KUNIT_EXPECT_EQ(test, ret, 0);
 	KUNIT_EXPECT_NE(test, entered, 0UL);
 	KUNIT_EXPECT_TRUE(test, detached);
@@ -452,11 +513,55 @@ static void sysfs_disable_enable_srcu_test(struct kunit *test)
 	wakeup_sysfs_expect_owned(test, 1);
 }
 
+static void wakeup_sysfs_expect_context_drain(struct kunit *test)
+{
+	struct wakeup_sysfs_fixture *f = test->priv;
+	struct wakeup_sysfs_worker foreign = { .fixture = f,
+		.operation = WAKEUP_SYSFS_FOREIGN_SOURCE };
+	struct wakeup_sysfs_worker drain = { .fixture = f,
+		.operation = WAKEUP_SYSFS_DRAIN_CONTEXT };
+	unsigned long entered = 0, unpublished = 0, finished_early = 1;
+	int foreign_ret, drain_ret = -EINVAL;
+
+	/* The device and its tracked source have already been removed. */
+	WRITE_ONCE(f->gate_foreign_allocation, true);
+	foreign_ret = wakeup_sysfs_start(&foreign);
+	if (!foreign_ret) {
+		entered = wait_for_completion_timeout(&f->foreign_entered, WAKEUP_SYSFS_TIMEOUT);
+		if (entered) {
+			drain_ret = wakeup_sysfs_start(&drain);
+			if (!drain_ret) {
+				unpublished = wait_for_completion_timeout(&f->context_unpublished,
+								 WAKEUP_SYSFS_TIMEOUT);
+				if (unpublished)
+					finished_early = wait_for_completion_timeout(&drain.finished,
+									msecs_to_jiffies(20));
+			}
+		}
+	}
+	complete_all(&f->foreign_release);
+	wakeup_sysfs_join(&foreign);
+	wakeup_sysfs_join(&drain);
+	WRITE_ONCE(f->gate_foreign_allocation, false);
+	kunit_info(test, "context-observation entered=%lu unpublished=%lu finished-early=%lu foreign-result=%zd\n",
+		   entered, unpublished, finished_early, foreign.result);
+	/* Restore and join even on setup failure before reporting any expectation. */
+	KUNIT_EXPECT_EQ(test, foreign_ret, 0);
+	KUNIT_EXPECT_NE(test, entered, 0UL);
+	KUNIT_EXPECT_EQ(test, drain_ret, 0);
+	KUNIT_EXPECT_NE(test, unpublished, 0UL);
+	KUNIT_EXPECT_EQ(test, finished_early, 0UL);
+	KUNIT_EXPECT_EQ(test, foreign.result, 0);
+	KUNIT_EXPECT_EQ(test, drain.result, 0);
+	KUNIT_EXPECT_EQ(test, wakeup_sysfs_sources_named(f->foreign_name), 0U);
+}
+
 static void sysfs_unregister_active_write_test(struct kunit *test)
 {
 	struct wakeup_sysfs_fixture *f = test->priv;
 	struct wakeup_sysfs_worker writer = { .fixture = f, .request = "enabled\n" };
-	struct wakeup_sysfs_worker remover = { .fixture = f, .unregister = true };
+	struct wakeup_sysfs_worker remover = { .fixture = f,
+		.operation = WAKEUP_SYSFS_UNREGISTER };
 	struct kernfs_node *node;
 	unsigned long entered = 0, deadline;
 	bool blocked = false;
@@ -493,6 +598,8 @@ static void sysfs_unregister_active_write_test(struct kunit *test)
 	after = kernel_write(writer.file, "enabled\n", 8, &pos);
 	__fput_sync(writer.file);
 	kernfs_put(node);
+	/* Include unrelated admitted hooks in the context-free boundary. */
+	wakeup_sysfs_expect_context_drain(test);
 	KUNIT_EXPECT_EQ(test, writer_ret, 0);
 	KUNIT_EXPECT_NE(test, entered, 0UL);
 	KUNIT_EXPECT_EQ(test, remove_ret, 0);

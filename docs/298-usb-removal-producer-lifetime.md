@@ -6,6 +6,16 @@ main `98aff1fe86689c916cd930f2b5c5a8bb218088f0` in the isolated
 source caches and frozen hardware checkout are unchanged. No Mac or GameShell
 operation has been performed.
 
+The review checkout also combines published main
+`5a2f362a39e49415b6a73e732219007ab8f4eb00`. The original qualified feature
+commit `57f885ea34412fe35ff99a58a4c20268bc9865eb` and its evidence checkout
+remain intact. The only overlapping edits were Task/FOLLOW-UP/report-index
+context; both report entries are retained. Every native and kernel receipt
+input hash matches the combined source byte for byte. A fresh combined
+`task check` passes all 1,283 regressions (nine skipped) and shell/workflow
+checks; its log SHA-256 is
+`07a5b6bd9ad7691112994c477ea9b37aaf783aa8a4e281feb9751eb990731dee`.
+
 ## Sun4i post-notification resource ownership (NEO-214)
 
 The actual detector drops `phy0->mutex` before extcon dispatch. A consumer can
@@ -122,7 +132,11 @@ child, violating the child's client/IRQ/DMA cleanup prerequisite. It also
 passes the parent `pdev` to `usb_phy_generic_unregister()` although probe
 registered and saved a distinct `glue->phy`. The actual generic helper directly
 calls `platform_device_unregister()` on its argument. Partial-probe unwind
-must distinguish an acquired PHY from NULL/ERR_PTR as part of that fix.
+is being traced against the actual platform helpers as part of that audit.
+Both `platform_device_del()` and `platform_device_put()` guard
+`IS_ERR_OR_NULL()`, so early NULL/error-pointer PHY cleanup is benign; it is
+not an additional demonstrated crash. The confirmed correction remains
+parent-clock lifetime and unregistering the actual owned PHY.
 
 Caller/global-accessor frames, other backend and DMA producer retirement,
 source masking, wake/startup composition and inaccessible-hardware teardown

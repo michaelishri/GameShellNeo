@@ -1774,7 +1774,8 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
   `mpfs_remove()` disables the parent clock before child teardown and passes
   the parent to `usb_phy_generic_unregister()` rather than the registered
-  `glue->phy`. That helper directly unregisters its argument. Audit partial
-  probe ownership too before correcting its common unwind labels. No physical
+  `glue->phy`. That helper directly unregisters its argument. Actual platform
+  helpers ignore NULL/error pointers, so those early unwind calls are benign;
+  retain their error/ownership regressions. No physical
   MPFS/CPI fault or complete backend DMA/timer retirement is claimed.
 - [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

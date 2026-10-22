@@ -1,5 +1,6 @@
 """Shared locked-source and isolated kernel-object checks; never access devices."""
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -50,7 +51,8 @@ def check_overrides(config, overrides):
             raise RuntimeError('Requested driver-check configuration was not applied: ' + setting)
 
 
-def compile_objects(archive, lock, work, objects, *, extra_config=(), project_config=True):
+def compile_objects(archive, lock, work, objects, *, extra_config=(), project_config=True,
+                    candidate_profile=None):
     # Content-addressed scratch source/output; never overwrite diagnostic.3's
     # source tree, kernel objects, installed modules or completed image.
     if not objects or any(not re.fullmatch(r'(?:drivers/|kernel/|arch/arm/)[A-Za-z0-9_./-]+[.]o', name) or
@@ -61,14 +63,25 @@ def compile_objects(archive, lock, work, objects, *, extra_config=(), project_co
     if type(project_config) is not bool or (not project_config and not extra_config):
         raise ValueError('Compile-only configurations require explicit overrides')
     with locked(work / '.source-lock'):
-        return compile_locked(archive, lock, work, objects, extra_config, project_config)
+        return compile_locked(archive, lock, work, objects, extra_config, project_config, candidate_profile)
 
 
-def compile_locked(archive, lock, work, objects, extra_config, project_config):
+def compile_locked(archive, lock, work, objects, extra_config, project_config, candidate_profile=None):
     extra_text = ''.join(line + '\n' for line in extra_config)
-    queue = work / 'patches'
-    run(['python3', str(ROOT / 'tools/kernel-inputs.py'), '--export', str(queue)])
-    identity_bytes = ((queue / 'manifest.json').read_bytes() +
+    recorded = None
+    if candidate_profile is None:
+        queue = work / 'patches'
+        run(['python3', str(ROOT / 'tools/kernel-inputs.py'), '--export', str(queue)])
+        manifest = json.loads((queue / 'manifest.json').read_text())
+    else:
+        from kernel_candidates import include_candidates
+        spec = importlib.util.spec_from_file_location('kernel_inputs', ROOT / 'tools/kernel-inputs.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        recorded = include_candidates(ROOT, candidate_profile, module.patches())
+        manifest = [dict(name=name, sha256=hashlib.sha256(data).hexdigest()) for name, data in recorded]
+    manifest_bytes = (json.dumps(manifest, indent=2) + '\n').encode()
+    identity_bytes = (manifest_bytes +
                       (ROOT / 'kernel/gameshellneo.config').read_bytes() +
                       json.dumps(lock, sort_keys=True).encode() + extra_text.encode())
     if not project_config:
@@ -81,7 +94,7 @@ def compile_locked(archive, lock, work, objects, extra_config, project_config):
         raise ValueError('Unexpected extra configuration symlink')
     (scratch / 'extra.config').write_text(extra_text)
     source, entries, metadata = ensure_source(
-        ROOT, work, archive, lock, json.loads((queue / 'manifest.json').read_text()))
+        ROOT, work, archive, lock, manifest, recorded_patches=recorded)
     real_directory(scratch)
     attach_source(scratch, source, entries)
     return build_objects(source, scratch, lock, objects, extra_config, project_config, metadata)

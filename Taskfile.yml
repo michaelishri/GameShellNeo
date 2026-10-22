@@ -101,6 +101,14 @@ tasks:
     desc: Plan a guarded development-store replacement on fixed recovery; explicit --apply writes only the unmounted store
     cmds: [python3 tools/dev-command.py store-install]
 
+  dev:store:backup:
+    desc: Preserve and fully verify fresh unmounted development-card regions through the established hardware checkout
+    cmds: [python3 tools/dev-command.py store-backup]
+
+  dev:store:grow:
+    desc: Inspect development-store growth; explicit --apply requires a fresh backup, --status observes the original operation
+    cmds: [python3 tools/dev-command.py store-grow]
+
   check:dev-store:
     desc: Qualify inactive store registration and selection on disposable old-boot and store image copies; arguments after --
     cmds: [bash tools/run-logged.sh dev-store-check python3 tools/dev-command.py store-check]
@@ -124,6 +132,10 @@ tasks:
   test:dev-store-install:
     desc: Qualify exclusive development-store writes and read-only filesystem checks on a new disposable loop image
     cmds: [bash tools/run-logged.sh dev-store-claim python3 tools/check-dev-store-install.py]
+
+  test:dev-store-grow:
+    desc: Qualify offline partition and filesystem growth on a disposable partitioned loop image
+    cmds: [bash tools/run-logged.sh dev-store-grow python3 tools/check-dev-store-grow.py]
 
   check:musb-callback-kunit:
     desc: Exercise real MUSB callback/UDC races on four emulated ARM CPUs

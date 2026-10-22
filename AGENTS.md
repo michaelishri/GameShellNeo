@@ -80,6 +80,7 @@ Current worktrees are under the canonical checkout's `.local/worktrees/`:
 | `remaining-final-integration` | final merge documentation and host checks; source/candidate receipts stay in the frozen validation worktrees above |
 | `multiboot-boot-selection` | NEO-208 development SD systems and NEO-210's completed remote store bootstrap; complete import, directory trials, recovery rollback and return to capable diag27 pass; retain its artifacts and live-operation evidence |
 | `ext4-security-attributes` | `cd4eb25`: completed NEO-209 diagnostic.27 / kernel26 image and managed-stage evidence; original hardware worktree remains frozen |
+| `development-store-expansion` | isolated NEO-211 source and disposable qualification; physical expansion requires the fresh checkpoint and review gates in report 295 |
 
 Merged branch references are removed; their worktrees, ignored evidence and
 private configuration remain at their original revisions. Create a branch
@@ -200,6 +201,14 @@ routine reconnect. No microphone, background camera service or persistent
 recording is authorized by this workflow. The camera stops after each request.
 
 ## Hardware gates and evidence
+
+- **NEO-211 development-store expansion is in progress.** Report 295 records
+  the approved 4 GiB to 55.6171875 GiB target, opt-in plan/backup/apply/status
+  Tasks and independent review/native qualification gates. Physical expansion
+  has not yet occurred. Preserve every MBR byte except p3's length: `sfdisk`
+  recalculates legacy CHS, so validate its layout on a private sparse surrogate
+  and use the guarded exact four-byte length update. Keep prior bootstrap
+  receipts historical after expansion; never weaken their geometry guards.
 
 - NEO-208 is **development only**; the owner explicitly excludes this card
   selector from the final release. [Report 292](docs/292-development-sd-systems.md)

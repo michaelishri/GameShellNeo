@@ -2,6 +2,16 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-211 development-store expansion:** the approved remote expansion from
+4 GiB to 55.6171875 GiB is being qualified in an isolated checkout. It requires
+a fresh full off-device checkpoint, original recovery p2, strict identity and
+writer guards, independent Standards/Spec reviews and disposable native
+qualification before hardware writes. The direct `sfdisk` proposal recalculates
+legacy CHS bytes; [report 295](docs/295-development-store-expansion.md) records
+the strict four-byte length update derived from a validated private surrogate.
+Leave diagnostic.27 unconfirmed with recovery as the default, and retain
+NEO-208's physical-input and clock/provenance gates.
+
 **NEO-208 development-only SD systems:** opt-in tooling prepares complete
 directory systems, per-version boot bundles, a one-shot selection flag and
 fixed original recovery root; [report 292](docs/292-development-sd-systems.md)

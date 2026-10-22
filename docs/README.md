@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[295 — Development-store expansion](295-development-store-expansion.md)
+records the guarded offline grow operation, fresh checkpoint requirements,
+partition-byte preservation and qualification gates.
+
 [294 — Remote development-store bootstrap](294-development-store-bootstrap.md)
 records the guarded inactive-store package and installer, original recovery
 backup requirements and remote qualification gates.

@@ -121,6 +121,11 @@ available for later full-metadata imports.
 
 The installed prototype uses a 4 GiB store on the 64 GB DEV spare; the remaining
 card capacity is unallocated. Ordinary imports do not resize partitions. The
+opt-in `dev:store:backup` / `dev:store:grow` workflow is being qualified to use
+that space from fixed recovery, with a fresh full off-device checkpoint; see
+[report 295](../../docs/295-development-store-expansion.md). Its default growth
+command is read-only; `--apply` is a separate owned offline operation and
+`--status` observes the original job without resubmitting it. The
 bootstrap leaves an empty catalog and recovery selected; register its verified
 inactive release with the normal `register` command, then select a trial
 separately. Its real diag27 trial preserves the exact capability value and

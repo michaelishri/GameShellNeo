@@ -240,6 +240,36 @@ class RebootWarning(unittest.TestCase):
         self.assertFalse(record['accepted'])
 
 
+class PoweroffWarning(RebootWarning):
+    def request(self):
+        audio_host.request_poweroff({}, 'wifi', self.capture, 'a'*32, self.before, self.result)
+
+    def test_only_verified_audio_can_queue_one_reboot(self):
+        with patch.object(audio_host, 'run', side_effect=[b'boot\n', b'']) as run:
+            self.request()
+        self.assertEqual(run.call_count, 2)
+        command = run.call_args_list[-1].args[1]
+        self.assertIn('--on-active=2s', command)
+        self.assertIn('/usr/bin/systemctl poweroff', command)
+        self.assertIn('--unit=gameshellneo-audible-poweroff-', command)
+        self.assertTrue(json.loads((self.capture/'poweroff.json').read_text())['accepted'])
+
+    def test_uncertain_submission_is_recorded_and_never_retried(self):
+        with patch.object(audio_host, 'run', side_effect=[b'boot\n', OSError('transport')]) as run, \
+                self.assertRaisesRegex(RuntimeError, 'uncertain'):
+            self.request()
+        self.assertEqual(run.call_count, 2)
+        record = json.loads((self.capture/'poweroff.json').read_text())
+        self.assertTrue(record['submission_attempted'])
+        self.assertFalse(record['accepted'])
+
+    def test_arbitrary_power_actions_cannot_be_submitted(self):
+        with patch.object(audio_host, 'run') as run, self.assertRaises(ValueError):
+            audio_host.request_power_action({}, 'wifi', self.capture, 'a'*32,
+                                            self.before, self.result, 'poweroff; id')
+        run.assert_not_called()
+
+
 class PMWarning(unittest.TestCase):
     def test_failed_notice_prevents_device_suspend_but_freezer_needs_no_notice(self):
         @contextmanager

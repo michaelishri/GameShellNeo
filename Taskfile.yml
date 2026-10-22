@@ -964,6 +964,10 @@ tasks:
     desc: Play three GameShell speaker warning tones, restore audio, then queue one reboot; ROUTE=usb/wifi
     cmds: [python3 tools/check-audio.py --reboot]
 
+  device:poweroff:
+    desc: Play three GameShell speaker warning tones, restore audio, then queue one safe shutdown; ROUTE=usb/wifi
+    cmds: [python3 tools/check-audio.py --poweroff]
+
   device:audio-collect:
     desc: Retrieve a saved speaker test result; RUN required
     cmds: [python3 tools/check-audio.py --collect]

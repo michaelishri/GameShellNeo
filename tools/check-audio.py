@@ -48,7 +48,17 @@ def validate(result, before, run_id, path_test=False, path_level=5):
 
 
 def request_reboot(config, route, capture, run_id, before, result):
+    request_power_action(config, route, capture, run_id, before, result, 'reboot')
+
+
+def request_poweroff(config, route, capture, run_id, before, result):
+    request_power_action(config, route, capture, run_id, before, result, 'poweroff')
+
+
+def request_power_action(config, route, capture, run_id, before, result, action):
     """Queue once, only after the original cue and mixer restoration passed."""
+    if action not in ('reboot', 'poweroff'):
+        raise ValueError('Unsupported warned power action')
     if (result.get('passed') is not True or result.get('restored') is not True or
             result.get('run_id') != run_id or
             [(c.get('level'), c.get('duration_ms')) for c in result.get('cues', [])] != [(WARNING_LEVEL, WARNING_DURATION_MS)] * 3 or
@@ -56,31 +66,31 @@ def request_reboot(config, route, capture, run_id, before, result):
             result['after']['boot_id'] != before['boot_id'] or
             result['before']['controls'] != before['controls'] or
             result['after']['controls'] != before['controls']):
-        raise ValueError('A completed same-boot speaker warning is required before reboot')
+        raise ValueError('A completed same-boot speaker warning is required before ' + action)
     record = dict(run_id=run_id, boot_id=before['boot_id'], route=route,
-                  unit='gameshellneo-audible-reboot-' + run_id,
+                  unit='gameshellneo-audible-' + action + '-' + run_id,
                   submission_attempted=False, accepted=False)
-    path = capture / 'reboot.json'
+    path = capture / (action + '.json')
     with device(config, route) as client:
         boot = run(client, 'cat /proc/sys/kernel/random/boot_id', display=False).decode().strip()
         if boot != before['boot_id']:
-            raise ValueError('Boot changed after the speaker warning; refusing another reboot')
+            raise ValueError('Boot changed after the speaker warning; refusing ' + action)
         record['submission_attempted'] = True
         path.write_text(json.dumps(record, indent=2) + '\n')
         # Defer briefly so acceptance can return before SSH disconnects. Never
         # retry an uncertain submission: this timer has a unique recorded name.
         command = ['sudo', '-n', 'systemd-run', '--quiet', '--collect',
                    '--unit=' + record['unit'], '--on-active=2s',
-                   '--timer-property=AccuracySec=1s', '/usr/bin/systemctl', 'reboot']
+                   '--timer-property=AccuracySec=1s', '/usr/bin/systemctl', action]
         try:
             run(client, shlex.join(command), display=False, timeout=20)
         except (OSError, RuntimeError, paramiko.SSHException) as error:
             record['error'] = type(error).__name__ + ': ' + str(error)
             path.write_text(json.dumps(record, indent=2) + '\n')
-            raise RuntimeError('Reboot submission uncertain; inspect its recorded unit and boot, do not retry') from error
+            raise RuntimeError(action.capitalize() + ' submission uncertain; inspect its recorded unit and boot, do not retry') from error
         record['accepted'] = True
         path.write_text(json.dumps(record, indent=2) + '\n')
-    print('Speaker warning and restoration passed; one reboot queued. Verify the new boot separately.')
+    print('Speaker warning and restoration passed; one ' + action + ' queued. Verify the device state separately.')
 
 
 def restore(client):
@@ -102,6 +112,7 @@ def main():
     mode.add_argument('--test', action='store_true')
     mode.add_argument('--path-test', action='store_true', help='Play one long tone with active path observations')
     mode.add_argument('--reboot', action='store_true', help='Play the three speaker cues, then queue one reboot')
+    mode.add_argument('--poweroff', action='store_true', help='Play the three speaker cues, then queue one safe shutdown')
     mode.add_argument('--collect', action='store_true')
     mode.add_argument('--restore', action='store_true')
     args = parser.parse_args()
@@ -175,6 +186,8 @@ def main():
                   ' completed; mixer and amplifier idle state restored. Audibility needs owner confirmation.')
             if args.reboot:
                 request_reboot(config, route, capture, run_id, before, result)
+            elif args.poweroff:
+                request_poweroff(config, route, capture, run_id, before, result)
             return
         raise TimeoutError('Collect/recover audio RUN=' + run_id + '; do not resubmit blindly')
 

@@ -348,6 +348,12 @@ The 33 production patch names/hashes and original image/runtime identities
 remain unchanged. NEO-221's separately qualified reference-feasibility result
 is STOP, as recorded in report 305.
 
+The first local container-postflight observer rejected Docker's lowercase
+missing-object message. Its original script and incomplete result are retained;
+the corrected exact-ID parser confirms all three original containers absent,
+separately backed by their successful terminal receipts. No fixture or capture
+was repeated for that parser correction.
+
 At this checkpoint, fresh final independent review and publication remain
 required. No current device lease is held. NEO-217's finite
 experiment does not close NEO-192 or admit dependent PM. Any later experiment

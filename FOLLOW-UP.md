@@ -1659,5 +1659,5 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   earlier separate-branch integration status, not its hardware limits. Finish
   the Allwinner PHY detector's independent IRQ/work/resource audit and other PHY
   consumer ordering, caller-frame/global-accessor lifetime and other backend/DMA
-  prerequisites before complete removal qualification. Keep NEO-106 open and
+  prerequisites before complete removal qualification. Keep NEO-106 open.
 - [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

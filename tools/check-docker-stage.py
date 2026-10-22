@@ -654,7 +654,19 @@ assert not (root / '.local/build/container-active.json').exists()
                                       stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
             deadline = time.monotonic() + 7
             while time.monotonic() < deadline:
+                if not record.exists():
+                    if worker.poll() is not None:
+                        raise RuntimeError('Managed fixture exited before publishing ownership')
+                    time.sleep(0.1)
+                    continue
                 status = fixture_call(workspace, 'status')
+                if status.returncode:
+                    # Creation holds ownership while the daemon acknowledges
+                    # it. A busy read is unavailable evidence, not JSON state.
+                    (workspace.parent / 'pending-status.json').write_text(json.dumps(dict(
+                        returncode=status.returncode, stdout=status.stdout, stderr=status.stderr)))
+                    time.sleep(0.1)
+                    continue
                 value = json.loads(status.stdout)
                 if value['active'] and (value['container_state'] or {}).get('Running'):
                     job = value['active']
@@ -680,8 +692,11 @@ assert not (root / '.local/build/container-active.json').exists()
         if worker is not None and worker.poll() is None:
             os.killpg(worker.pid, signal.SIGKILL)
             worker.wait(timeout=5)
-        if record.exists() and job is not None:
-            fixture_call(workspace, 'stop', '--run', job['run'])
+        receipt = workspace / '.local/timeout/managed-run.json'
+        if record.exists() and receipt.exists():
+            identity = json.loads(receipt.read_text())
+            assert identity['workspace'] == hashlib.sha256(str(workspace).encode()).hexdigest()[:20]
+            fixture_call(workspace, 'stop', '--run', identity['run'])
 
 
 CASES = {

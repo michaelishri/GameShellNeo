@@ -1005,6 +1005,16 @@ tasks:
       NEO_CLOCK_RECORDS: '{{.FILE | default ""}}'
     cmds: [python3 tools/clock_provenance.py]
 
+  test:clock-transitions:
+    desc: Test 24 declared saved-record cases and complete CLOSED coverage offline
+    cmds: [bash tools/run-logged.sh clock-transitions python3 -m unittest discover -s tools/tests -p test_clock_transitions.py -v]
+
+  report:clock-transitions:
+    desc: Reconcile saved clock publications conditionally; no clock or PM qualification
+    env:
+      NEO_CLOCK_RECORDS: '{{.FILE | default ""}}'
+    cmds: [python3 tools/report-clock-transitions.py]
+
   test:clock-boundary:
     desc: Test exact-call raw ABI replay and partial-capture cleanup offline; no device access
     cmds: [python3 -m unittest discover -s tools/tests -p test_clock_boundary.py -v]

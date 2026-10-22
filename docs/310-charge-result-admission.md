@@ -4,8 +4,9 @@
 `completed`/`passed` claim without replaying the raw samples or checking the
 claimed charge summary. NEO-226 adds host-only admission after the original
 command returns. Focused and combined local qualification pass on an explicitly provisional
-NEO-220/222 context. The identical upstream source must still be accepted and
-published; entirely fresh final review and serialized publication remain pending. This does not qualify charging, calibrate telemetry or
+NEO-220/222 context. Entirely fresh final review may inspect the exact frozen
+provisional dependencies. Whole-ticket acceptance, integration, publication and
+closure require those identical dependencies to be accepted and published. This does not qualify charging, calibrate telemetry or
 change any collector, image, runtime, clock or power setting.
 
 ## Original actual-host baseline
@@ -169,7 +170,12 @@ Only the charging Task and own document context are reconciled. All upstream
 code/queues are preserved. At these checks both driver dependencies are still
 **unaccepted and unpublished**; accepted published main is `4d680d7` and the
 accepted final-base field is deliberately null. Preparation is not dependency
-acceptance, source publication or child completion.
+acceptance, source publication or child completion. A later report-only
+scheduling revision adopts exact NEO-222 `b5a89cef12c446b65daad8325ae86aa54b2f67d6`.
+Its diff from `ad3ce13` is only two procedural passages in report 306. All
+current executable/Task/import inputs and retained wire evidence remain exact;
+the original focused/full executions keep their original source attribution.
+No host check is repeated for this verified documentation-only change.
 
 The new actual focused execution is source `8f56a29`, original Task PID
 `1264976` / wrapper `1264951`, saved attempt
@@ -216,7 +222,10 @@ The original five-case baseline, first 38-case qualification and original
 39-case qualification remain immutable at their actual old sources. The new
 current receipts supplement rather than relabel them. Separate inventory-host
 baseline/planning evidence is outside this child and is not an implemented fix
-or a dependency. Entirely new final Standards/Spec review of the full fixed
-source/spec/evidence, identical upstream acceptance/publication and a separate
-serialized integration grant are still required. No main/device lease is held;
-NEO-10/101/192 and electrical/physical/clock/PM gates remain open.
+or a dependency. Entirely new final Standards/Spec review may inspect the full
+fixed source/spec/evidence against the exact frozen provisional dependencies.
+Whole-ticket acceptance, integration, publication and closure still require
+those identical dependencies to be accepted and published, plus a separate
+serialized integration grant. A changed dependency invalidates the fixed
+context until remapped and freshly reviewed as required. No main/device lease
+is held; NEO-10/101/192 and electrical/physical/clock/PM gates remain open.

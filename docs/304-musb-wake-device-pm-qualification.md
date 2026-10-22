@@ -8,11 +8,11 @@ adopts published NEO-218 at `7120990` for its accepted managed-result API; it
 does not change NEO-218's runner, helper or fixture. NEO-219 separately owns
 terminal wake/IRQ cleanup and combined retirement qualification.
 
-The first final-admission checkout starts from fixed guard checkpoint `9de70c2` and
-adopts independently published `4d680d7` through merge `e78f96d`. The actual DPM
+The first final-admission checkout starts from fixed guard checkpoint `9de70c2`
+and adopts independently published `4d680d7` through merge `e78f96d`. The actual DPM
 fixture, configuration, support, runner and tests remain byte-identical to that
-fixed checkpoint at `1f432d4`. Both saved Task entries are retained alongside the accepted
-clock, host-admission and terminal-composition context. This milestone still
+fixed checkpoint at `1f432d4`. Both saved Task entries are retained alongside
+the accepted clock, host-admission and terminal-composition context. This milestone still
 selects unchanged wake/startup 0026/0029; the published terminal profile is a
 separate opt-in qualification. New owned positive and control executions pass
 the final current-input guards at `1f432d4`; their source, configuration and
@@ -188,8 +188,40 @@ and five managed-result groups. The tests use a verbatim genuine compiled KTAP
 section rather than constructing observed values from the admission map, and
 exercise both direct control parsing and actual runner admission with fresh
 raw-1 output. New owned current-input cached positive/control executions and
-the complete host check are pending. A new final Standards and Spec pair is
-required before publication or closing NEO-220.
+the complete host check now pass at clean `41eb8cd`.
+
+The single new kernel chain, original observer `40816`, completed with exit 0.
+Positive `4912f05a34f74bffa964452c5a335cd5` is raw 0 with nine passes; separate
+control `4452757423894ec8afa62c0768582d72` is raw 1 with exactly the one named
+failure, eight passes and fourteen assertions. Both original managed results
+are terminal and ownership is released, without stop, OOM or rejected kernel
+diagnostic. Their durable receipt SHA-256 values are, respectively,
+`e2c7b42d142a73a619f13bd5d4f7ba5331e7a2e32857161542e0ae4048058b82`
+and `db6093e282f9fc15da405be7a62508ea7a0d5e9ce85b8eaab4a63020f768ca7b`.
+The final numeric checkout's
+`.local/audit/neo220-numeric-current-qualification.json` (SHA-256
+`4eb7e9882b661377bd853bdf0fc7a94284870a851fcff4f62235f11ad516f4df`)
+binds all fifteen current maintained hashes and confirms unchanged actual
+source/configuration/binaries. Only the numeric helper and focused tests differ
+from the first final-admission inputs. Separate cache copies were provisioning;
+all 94,037 regular files per suite have distinct source/destination inodes.
+Neither copied nor original receipts were relabeled as new executions.
+
+A private post-run observer initially failed because it incorrectly compared
+the entire retained job metadata to its four identity fields. The subsequent
+read-only identity-subset observation confirmed the matching saved original
+results and released ownership. Its original failure and corrected observation
+remain distinct artifacts; the managed chain was not repeated. This is not
+described as a first-attempt-clean observer.
+
+The required full current `task check`, original observer `52782`, completed
+with exit 0 at clean `41eb8cd`: 24 runtime tests, 1,393 tooling tests with nine
+expected skips, compiled C checks, Bash syntax and ShellCheck. Retained log
+`.local/build/neo220-numeric-host-check.log` has SHA-256
+`4017e6641bc0edb06bc540378cfcce8e4e3a90ecb16c92decec8244b94651635`.
+Only report304 receives these results afterward; all executable inputs remain
+unchanged. A completely new final Standards and Spec pair is required before
+publication or closing NEO-220.
 
 The saved Tasks use the pinned local builder, disabled networking, one build
 job, unique managed attempts and retained source/config/binary/KTAP/result

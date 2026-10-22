@@ -90,7 +90,7 @@ def arm_objects(work, lock, archive, expected_frontend):
     spec = importlib.util.spec_from_file_location('wakeup_object_inputs', ROOT / 'tools/kernel-inputs.py')
     inputs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(inputs)
-    queue = inputs.patches()
+    queue = list(inputs.patches())
     patch = ROOT / PATCH
     queue.append((patch.name, patch.read_bytes()))
     manifest = [dict(name=name, sha256=hashlib.sha256(data).hexdigest()) for name, data in queue]

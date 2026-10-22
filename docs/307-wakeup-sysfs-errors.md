@@ -90,5 +90,33 @@ binary/config and original managed results must be retained. No existing NEO-218
 or NEO-220 evidence is modified. Fresh independent Standards and Spec reviews
 and a separate publication grant are required before closure.
 
+The new kernel fixture and strict expected-nonzero runner are now prepared.
+Before the first kernel execution, the twelve-case/four-failure plan and actual
+generated source comparison were retained at
+`.local/audit/neo223-kernel-pre-run/plan.json` (SHA-256
+`d5a90c4652310b191417312af4f3d4693f977b266d53630eef50606a07ee8fc6`).
+Positive and control use identical actual `wakeup.c` and fixture code; only the
+final frontend return differs. A generator/list setup mistake was caught and
+retained before any kernel job started; the queue now materializes the actual
+`kernel-inputs.py` generator, also modeled by the actual-runner guard fixtures.
+Sixteen focused host tests pass (eleven frontend/kernel admission tests and five
+accepted managed-result groups). They include raw-0 refusal with fresh valid
+failed output, typed original raw-1 acceptance and the previous freshness and
+ownership refusals. Actual kernel execution remains pending.
+
+The fixture reads actual kernfs deactivation state while its writer holds an
+active reference, proving the unregister path began draining that callback.
+It does not infer draining merely from a started thread. Each worker's task
+storage is retained before wakeup and returned by `kthread_stop_put()` after
+gate/SRCU restoration. The incapable subvariant registers a separate stably
+incapable device, verifies its real attribute is absent, then invokes the actual
+unchanged static frontend through a test-only accessor. It does not simulate an
+incapable sysfs file or concurrent capability changes.
+
+The prepared checkpoint will adopt accepted published main `0886549` before
+its first managed ARM/object/kernel writer. That context adoption must preserve
+the candidate and all own fixture/source bytes; previous host evidence remains
+historical when maintained context inputs change.
+
 MUSB IRQ timing/device-DPM traversal, terminal destruction/composition, image
 selection and physical hardware behavior remain separate. NEO-98 stays open.

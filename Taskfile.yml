@@ -611,6 +611,12 @@ tasks:
     desc: Qualify wakeup sysfs errors/idempotency with actual frontend references and ARM PM objects
     cmds: ['bash tools/run-logged.sh wakeup-sysfs python3 tools/check-wakeup-sysfs.py {{.CLI_ARGS}}']
 
+  test:wakeup-sysfs-kunit:
+    desc: Test actual wakeup sysfs allocation/lifetime and its four-failure control in disposable UML
+    cmds:
+      - bash tools/run-logged.sh wakeup-sysfs-kunit python3 tools/check-wakeup-sysfs-kunit.py
+      - bash tools/run-logged.sh wakeup-sysfs-control python3 tools/check-wakeup-sysfs-kunit.py --control errors-ignored
+
   test:cpuidle-s2idle:
     desc: Test actual CPU-idle entry, scheduler, registration and tick-freeze functions on native and ARM32
     cmds: [bash tools/run-logged.sh cpuidle-s2idle python3 tools/check-cpuidle-s2idle.py]

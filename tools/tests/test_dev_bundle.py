@@ -1,4 +1,5 @@
 """Real GNU pax metadata round trips and archive admission before extraction."""
+import errno
 import hashlib
 import io
 import json
@@ -130,6 +131,145 @@ class DevelopmentBundle(unittest.TestCase):
         self.unpack()
         self.assertEqual(os.getxattr(self.destination / 'root/usr/bin/tool',
                                    'system.posix_acl_access'), acl)
+
+    def capability_archive(self, values):
+        names = {}
+        for index, value in enumerate(values):
+            path = self.root / 'usr/bin' / ('capability-' + str(index))
+            path.write_bytes(b'capability fixture\n')
+            names[self.version.name + '/' + str(path.relative_to(self.version))] = value
+
+        def metadata(member):
+            if member.name in names:
+                member.pax_headers['SCHILY.xattr.security.capability'] = names[member.name].decode(
+                    'utf-8', 'surrogateescape')
+            return member
+
+        self.crafted(mutate=metadata)
+
+    def test_missing_capability_support_rejects_before_extraction_and_preserves_evidence(self):
+        capability = struct.pack('<5I', 0x02000001, 1 << 13, 0, 0, 0)
+        self.capability_archive([capability])
+        previous = self.systems / '.diagnostic-26-bundle-original'
+        previous.mkdir()
+        (previous / 'archive.tar').write_bytes(b'original failed snapshot')
+        (previous / 'operation.log').write_bytes(b'original failure\n')
+        (previous / 'extracted').mkdir()
+        (previous / 'extracted/partial').write_bytes(b'original partial extraction')
+        flags = {self.base / name: name.encode() for name in ('next.scr', 'good.scr', 'recover.scr')}
+        for path, data in flags.items():
+            path.write_bytes(data)
+        with patch.object(bundles.os, 'setxattr', side_effect=OSError(errno.EOPNOTSUPP,
+                          'Operation not supported')) as setting, \
+                patch.object(bundles.os, 'getxattr') as reading, \
+                patch.object(bundles, '_execute') as extraction, \
+                patch.object(bundles, '_publish') as publication, \
+                self.assertRaisesRegex(ValueError, 'security.capability.*capable maintenance.*offline'):
+            self.unpack()
+        self.assertEqual(setting.call_count, 1)
+        self.assertEqual(setting.call_args.args[1:], ('security.capability', capability))
+        reading.assert_not_called()
+        extraction.assert_not_called()
+        publication.assert_not_called()
+        self.assert_not_published()
+        operations = [path for path in self.systems.glob('.diagnostic-26-bundle-*') if path != previous]
+        self.assertEqual(len(operations), 1)
+        self.assertEqual((operations[0] / 'archive.tar').read_bytes(), self.archive.read_bytes())
+        self.assertIn('Operation not supported', (operations[0] / 'operation.log').read_text())
+        self.assertFalse((operations[0] / 'extracted').exists())
+        self.assertFalse(list(operations[0].glob('.capability-probe-*')))
+        self.assertEqual((previous / 'archive.tar').read_bytes(), b'original failed snapshot')
+        self.assertEqual((previous / 'operation.log').read_bytes(), b'original failure\n')
+        self.assertEqual((previous / 'extracted/partial').read_bytes(), b'original partial extraction')
+        self.assertEqual({path: path.read_bytes() for path in flags}, flags)
+
+    def test_capability_roundtrip_mismatch_rejects_before_extraction_and_cleans_probe(self):
+        capability = struct.pack('<5I', 0x02000001, 1 << 13, 0, 0, 0)
+        self.capability_archive([capability])
+        with patch.object(bundles.os, 'setxattr') as setting, \
+                patch.object(bundles.os, 'getxattr', return_value=b'changed capability') as reading, \
+                patch.object(bundles, '_execute') as extraction, \
+                patch.object(bundles, '_publish') as publication, \
+                self.assertRaisesRegex(ValueError, 'security.capability roundtrip differs.*offline'):
+            self.unpack()
+        self.assertEqual(setting.call_count, 1)
+        reading.assert_called_once_with(setting.call_args.args[0], 'security.capability')
+        extraction.assert_not_called()
+        publication.assert_not_called()
+        self.assert_not_published()
+        operation, = self.systems.glob('.diagnostic-26-bundle-*')
+        self.assertEqual((operation / 'archive.tar').read_bytes(), self.archive.read_bytes())
+        self.assertIn('roundtrip differs', (operation / 'operation.log').read_text())
+        self.assertFalse((operation / 'extracted').exists())
+        self.assertFalse(list(operation.glob('.capability-probe-*')))
+
+    def test_capability_probe_uses_exact_distinct_archive_values_on_a_private_regular_file(self):
+        values = [struct.pack('<5I', 0x02000001, mask, 0, 0, 0) for mask in (1 << 7, 1 << 13)]
+        self.capability_archive([*values, values[0]])
+        operation = self.systems / 'private-operation'
+        operation.mkdir(mode=0o700)
+        with self.archive.open('rb') as archive:
+            members = bundles._members(archive, self.version.name)
+        stored = {}
+        observed = []
+
+        def setting(descriptor, name, value):
+            details = os.fstat(descriptor)
+            self.assertTrue(stat.S_ISREG(details.st_mode))
+            self.assertEqual(stat.S_IMODE(details.st_mode), 0o600)
+            self.assertEqual(details.st_uid, os.getuid())
+            self.assertEqual(name, 'security.capability')
+            self.assertEqual(len(list(operation.glob('.capability-probe-*'))), 1)
+            observed.append(value)
+            stored[descriptor] = value
+
+        def reading(descriptor, name):
+            self.assertEqual(name, 'security.capability')
+            return stored[descriptor]
+
+        with patch.object(bundles.os, 'setxattr', side_effect=setting), \
+                patch.object(bundles.os, 'getxattr', side_effect=reading):
+            bundles._probe_capabilities(operation, members)
+        self.assertEqual(observed, sorted(values))
+        self.assertFalse(list(operation.iterdir()))
+
+    def test_bundle_without_capabilities_imports_without_probing_destination(self):
+        bundles.pack_release(self.version, self.archive)
+        with patch.object(bundles.os, 'setxattr') as setting, \
+                patch.object(bundles.os, 'getxattr') as reading, \
+                patch.object(bundles.tempfile, 'NamedTemporaryFile') as probe:
+            self.assertEqual(self.unpack(), self.manifest)
+        setting.assert_not_called()
+        reading.assert_not_called()
+        probe.assert_not_called()
+
+    def test_capability_probe_waits_for_hash_and_safe_member_validation(self):
+        capability = struct.pack('<5I', 0x02000001, 1 << 13, 0, 0, 0)
+        self.capability_archive([capability])
+        with patch.object(bundles, '_probe_capabilities') as probe, \
+                patch.object(bundles, '_execute') as extraction, \
+                patch.object(bundles, '_publish') as publication:
+            with self.assertRaisesRegex(ValueError, 'SHA-256'):
+                self.unpack(expected_hash='0' * 64)
+            member = tarfile.TarInfo('diagnostic-26/root/../../escape')
+            self.crafted([(member, b'')])
+            with self.assertRaisesRegex(ValueError, 'Traversing'):
+                self.unpack()
+        probe.assert_not_called()
+        extraction.assert_not_called()
+        publication.assert_not_called()
+
+    @unittest.skipUnless(os.geteuid() == 0, 'security.capability needs the saved root builder')
+    def test_native_security_capability_round_trip_preserves_original_metadata(self):
+        capability = struct.pack('<5I', 0x02000001, 1 << 13, 0, 0, 0)
+        os.setxattr(self.file, 'security.capability', capability)
+        bundles.pack_release(self.version, self.archive)
+        self.assertEqual(self.unpack(), self.manifest)
+        target = self.destination / 'root/usr/bin/tool'
+        self.assertEqual(os.getxattr(self.file, 'security.capability'), capability)
+        self.assertEqual(os.getxattr(target, 'security.capability'), capability)
+        self.assertEqual(target.stat().st_ino, target.with_name('hardlink').stat().st_ino)
+        self.assertFalse(list(self.systems.glob('.diagnostic-26-bundle-*/.capability-probe-*')))
 
     def test_tar_options_cannot_change_the_fixed_packing_command(self):
         with patch.dict(os.environ, {'TAR_OPTIONS': '--transform=s/diagnostic-26/other/'}):

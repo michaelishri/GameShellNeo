@@ -215,6 +215,33 @@ def _execute(arguments, log, *, stdin=None, stdout=None):
                    env=environment, check=True)
 
 
+def _probe_capabilities(operation, members):
+    """Check the destination kernel/filesystem before extracting capability xattrs."""
+    key = 'SCHILY.xattr.security.capability'
+    required = {member.pax_headers[key].encode('utf-8', 'surrogateescape')
+                for member in members.values() if key in member.pax_headers}
+    if not required:
+        return
+    guidance = ('boot a capable maintenance system or prepare the development card offline')
+    probe = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix='.capability-probe-', dir=operation,
+                                         delete=False) as stream:
+            probe = Path(stream.name)
+            for value in sorted(required):
+                try:
+                    os.setxattr(stream.fileno(), 'security.capability', value)
+                    actual = os.getxattr(stream.fileno(), 'security.capability')
+                except OSError as error:
+                    raise ValueError('Destination cannot preserve required security.capability '
+                                     'attributes; ' + guidance + ': ' + str(error)) from error
+                if actual != value:
+                    raise ValueError('Destination security.capability roundtrip differs; ' + guidance)
+    finally:
+        if probe is not None:
+            probe.unlink()
+
+
 def _verify_tree(stage, members):
     """Fail closed if extraction lost ownership, modes, timestamps, links or xattrs."""
     for parts, member in reversed(list(members.items())):
@@ -321,6 +348,7 @@ def unpack_release(archive, destination, *, expected_hash, store_partuuid) -> di
                 raise ValueError('Development bundle SHA-256 differs')
             with _open_regular(snapshot) as source:
                 members = _members(source, name)
+                _probe_capabilities(operation, members)
                 stage = operation / 'extracted'
                 stage.mkdir(mode=0o700)
                 source.seek(0)

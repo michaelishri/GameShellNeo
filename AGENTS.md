@@ -80,7 +80,7 @@ Current worktrees are under the canonical checkout's `.local/worktrees/`:
 | `remaining-final-integration` | final merge documentation and host checks; source/candidate receipts stay in the frozen validation worktrees above |
 | `multiboot-boot-selection` | NEO-208 development SD systems and NEO-210's completed remote store bootstrap; complete import, directory trials, recovery rollback and return to capable diag27 pass; retain its artifacts and live-operation evidence |
 | `ext4-security-attributes` | `cd4eb25`: completed NEO-209 diagnostic.27 / kernel26 image and managed-stage evidence; original hardware worktree remains frozen |
-| `development-store-expansion` | isolated NEO-211 source and disposable qualification; physical expansion requires the fresh checkpoint and review gates in report 295 |
+| `development-store-expansion` | NEO-211 source, independent reviews, disposable qualification, verified off-device checkpoint and successful remote expansion evidence; preserve its private artifacts after branch cleanup |
 
 Merged branch references are removed; their worktrees, ignored evidence and
 private configuration remain at their original revisions. Create a branch
@@ -202,13 +202,16 @@ recording is authorized by this workflow. The camera stops after each request.
 
 ## Hardware gates and evidence
 
-- **NEO-211 development-store expansion is in progress.** Report 295 records
-  the approved 4 GiB to 55.6171875 GiB target, opt-in plan/backup/apply/status
-  Tasks and independent review/native qualification gates. Physical expansion
-  has not yet occurred. Preserve every MBR byte except p3's length: `sfdisk`
-  recalculates legacy CHS, so validate its layout on a private sparse surrogate
-  and use the guarded exact four-byte length update. Keep prior bootstrap
-  receipts historical after expansion; never weaken their geometry guards.
+- **NEO-211 development-store expansion completed.** Report 295 records the
+  verified off-device checkpoint, clean independent reviews/native qualification
+  and successful single remote operation from fixed recovery. P3 retains start
+  sector 8388608 and now has 116637696 sectors / 59718500352 bytes
+  (55.6171875 GiB); both releases, settings and identities are preserved.
+  Offline checks and the bounded write/read/delete probe pass. Every MBR byte
+  except p3's length is unchanged: `sfdisk` recalculates legacy CHS, so the
+  reviewed method validates its layout on a private sparse surrogate and uses
+  the guarded exact four-byte length update. Prior 4 GiB bootstrap receipts are
+  historical; never weaken their geometry guards or reuse them for expansion.
 
 - NEO-208 is **development only**; the owner explicitly excludes this card
   selector from the final release. [Report 292](docs/292-development-sd-systems.md)
@@ -293,12 +296,22 @@ recording is authorized by this workflow. The camera stops after each request.
   used the exact directory root and consumed NEXT to recovery. Its next warned
   reboot, without another selection, reached fixed p2 recovery boot
   `840a8868-c8ef-48bd-b051-32dc979c14da`. Both routes and inspected Kiyo consoles
-  pass for each boot. The final return to capable diag27 is boot
+  pass for each boot. The pre-expansion return to capable diag27 was boot
   `926d517d-1a83-43d6-8702-1a83008025b5`, kernel `6.18.54-gameshellneo26`, with
   exact root/capability/FAT proof and both routes. Its initial early USB no-route
   observation is retained separately. It remains unconfirmed, with NEXT, GOOD
   and RECOVER at recovery. Physical input response, explicit default confirmation
   and clock/provenance acceptance remain open; input registration is insufficient.
+- After expansion, the separately warned reboot reached capable diag27 boot
+  `cea309a9-bea5-49d7-8d41-e462ddd57e89`, kernel `6.18.54-gameshellneo26`.
+  Its actual directory root, source/deployment identities, exact fping capability,
+  actual-store capability roundtrip and unmounted FAT check pass. The one-shot
+  trial consumed NEXT to recovery; GOOD and RECOVER remain recovery. Do not
+  confirm it or infer physical-input or clock/PM acceptance from these checks.
+  Both management routes and inspected Kiyo console frames pass. The final
+  read-only growth plan reports no remaining growth; the earlier early-USB
+  connection failures are retained separately. The card's bounded I/O probe
+  reported approximately 50.54 GiB available after overhead and existing data.
 - Use the saved PM/RTC/cable test Tasks and their exact matching runtime/image
   admission, original-result ledger, restoration and postflight checks. Keep
   debug stages distinct from actual sleep. The current RTC trial cap is sixty

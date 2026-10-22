@@ -119,19 +119,25 @@ card image remains the physical-flash fallback. Older kernels can then be import
 and tested from that capable system. Keep a capable maintenance version
 available for later full-metadata imports.
 
-The installed prototype uses a 4 GiB store on the 64 GB DEV spare; the remaining
-card capacity is unallocated. Ordinary imports do not resize partitions. The
-opt-in `dev:store:backup` / `dev:store:grow` workflow is being qualified to use
-that space from fixed recovery, with a fresh full off-device checkpoint; see
-[report 295](../../docs/295-development-store-expansion.md). Its default growth
-command is read-only; `--apply` is a separate owned offline operation and
-`--status` observes the original job without resubmitting it. The
-bootstrap leaves an empty catalog and recovery selected; register its verified
-inactive release with the normal `register` command, then select a trial
-separately. Its real diag27 trial preserves the exact capability value and
-returns NEXT to the confirmed recovery descriptor. A subsequent complete
-diag25 import, directory-root trial and next-boot return to fixed recovery also
-pass. Confirmation still requires
+The installed 64 GB DEV card now uses all trailing capacity: its store grew
+from 4 GiB to 55.6171875 GiB from fixed recovery, preserving diagnostic.25,
+diagnostic.27, their settings and filesystem identities. The verified checkpoint,
+offline resize, clean filesystem check and bounded write/read/delete probe
+pass; approximately 50.54 GiB was available at the probe. See
+[report 295](../../docs/295-development-store-expansion.md). No image rebuild
+or card removal was needed. Ordinary imports do not resize partitions. The
+opt-in `dev:store:backup` / `dev:store:grow` default growth command is read-only;
+`--apply` is a separate owned offline operation and `--status` observes the
+original job without resubmitting it. The old 4 GiB bootstrap receipts are
+historical and keep their strict geometry guards.
+
+The original bootstrap left an empty catalog and recovery selected. Normal
+registration and selection then established both installed versions. The real
+diag27 trial preserves the exact capability value and returns NEXT to the
+confirmed recovery descriptor. A subsequent complete diag25 import,
+directory-root trial and next-boot return to fixed recovery also pass. After
+expansion, the exact diag27 directory boot and capability roundtrip pass again;
+it remains unconfirmed with recovery as the default. Confirmation still requires
 the checks below; registered input-device names alone do not prove button
 response.
 

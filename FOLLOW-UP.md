@@ -2,15 +2,25 @@
 
 Record deferred questions and activities here as they arise.
 
-**NEO-211 development-store expansion:** the approved remote expansion from
-4 GiB to 55.6171875 GiB is being qualified in an isolated checkout. It requires
-a fresh full off-device checkpoint, original recovery p2, strict identity and
-writer guards, independent Standards/Spec reviews and disposable native
-qualification before hardware writes. The direct `sfdisk` proposal recalculates
-legacy CHS bytes; [report 295](docs/295-development-store-expansion.md) records
-the strict four-byte length update derived from a validated private surrogate.
-Leave diagnostic.27 unconfirmed with recovery as the default, and retain
-NEO-208's physical-input and clock/provenance gates.
+**NEO-211 development-store expansion:** the remote expansion from 4 GiB to
+55.6171875 GiB completed from fixed recovery after a fresh fully verified
+off-device checkpoint, independent Standards/Spec reviews and disposable native
+qualification. Both releases, all pinned settings and filesystem identities
+are preserved; the offline filesystem checks and bounded write/read/delete
+probe pass. [Report 295](docs/295-development-store-expansion.md) records the
+validated `sfdisk` surrogate and exact four-byte length update, preserving every
+other MBR byte. The expanded card boots the exact diagnostic.27 directory with
+its capability intact. Keep it unconfirmed with recovery as the default.
+NEO-208's physical-input/default-confirmation and clock/provenance gates remain
+open. Older 4 GiB bootstrap receipts are historical; retain their strict guards
+and every original checkpoint.
+
+**Development-card verification cost:** `Card.status()` verifies each release
+and then verifies it again while constructing descriptors; the store grower
+adds an explicit verification pass. This costs several minutes on the real
+card. A future change can reuse verified manifests within one owned operation
+while retaining exact file/flag readback and rejecting changes; do not cache
+health across operations or weaken source, metadata or recovery admission.
 
 **NEO-208 development-only SD systems:** opt-in tooling prepares complete
 directory systems, per-version boot bundles, a one-shot selection flag and

@@ -677,7 +677,7 @@ def health(pm, record, lock):
     if any(before[k] != after[k] for k in keys):
         raise ValueError('State restoration or journal continuity failed')
     delta = kernel_evidence.delta(before, after)
-    if any(x in delta for x in pm.FAULTS) or 'suspend debug: Waiting' in delta:
+    if pm.kernel_fault(delta) or 'suspend debug: Waiting' in delta:
         raise ValueError('Kernel fault or unexpected debug return')
     successes = int(after['stats']['success'])-int(before['stats']['success'])
     if successes != (1 if record['mode'] == 'rtc-wake' else 0) or any(

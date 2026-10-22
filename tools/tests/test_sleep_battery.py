@@ -175,7 +175,7 @@ class BatteryEntry(unittest.TestCase):
 class BatteryLineage(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.object(sleep, 'sources', return_value=chain.SOURCE))
-        self.pm = Mock(FAULTS=sleep.pm_module().FAULTS)
+        self.pm = Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
 
     def test_valid_battery_history_cannot_admit_usb_or_mixed_mode(self):
         debug, records, current = battery_chain()

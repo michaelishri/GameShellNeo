@@ -414,6 +414,18 @@ tasks:
     desc: Check sleep/disconnect and callback regressions plus six isolated ARM configurations
     cmds: [bash tools/run-logged.sh musb-sleep-configs python3 tools/check-musb-sleep.py --compile-matrix]
 
+  test:musb-wake-startup:
+    desc: Test isolated wake/startup with current sleep, callback and endpoint-restart contracts
+    cmds: [bash tools/run-logged.sh musb-wake-startup python3 tools/check-musb-sleep.py --wake-startup-candidate]
+
+  check:musb-wake-startup-configs:
+    desc: Qualify isolated wake/startup sources and six full ARM configurations; image queue unchanged
+    cmds: [bash tools/run-logged.sh musb-wake-startup-configs python3 tools/check-musb-sleep.py --wake-startup-candidate --compile-matrix]
+
+  audit:musb-teardown-baseline:
+    desc: Reproduce historical pre-session-retirement teardown defects; passing is not safe removal
+    cmds: [bash tools/run-logged.sh musb-teardown-baseline python3 tools/check-musb-teardown.py]
+
   test:musb-request-resume:
     desc: Test actual deferred endpoint-restart ownership on native and ARM32 with negative controls
     cmds: [bash tools/run-logged.sh musb-request-resume python3 tools/check-musb-request-resume.py]

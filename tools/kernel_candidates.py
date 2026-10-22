@@ -2,6 +2,10 @@
 from pathlib import Path
 
 PROFILES = {
+    'musb-wake-startup': (
+        'musb-wake-startup/0026-musb-wake-irq-policy.patch',
+        'musb-wake-startup/0029-musb-startup-runtime-pm.patch',
+    ),
     'power-supply-lifetime': (
         'power-supply-lifetime/0037-power-supply-unregister-producer.patch',
     ),

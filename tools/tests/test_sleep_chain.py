@@ -50,7 +50,7 @@ def chain(count=2):
             wifi_trace=dict(restored=True,trace_lost=False),
             usb_trace=dict(restored=True,trace_lost=False,before={'state':'configured','carrier':'1'},
                            after={'state':'configured','carrier':'1'}))
-        sleep.health(Mock(FAULTS=sleep.pm_module().FAULTS), record, {})
+        sleep.health(Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault), record, {})
         records.append(record)
     if records:
         current = deepcopy(records[-1]['after']); current['monotonic_seconds'] += 10
@@ -60,7 +60,7 @@ def chain(count=2):
 class Lineage(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.object(sleep, 'sources', return_value=SOURCE))
-        self.pm = Mock(FAULTS=sleep.pm_module().FAULTS)
+        self.pm = Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
 
     def test_valid_chain_rechecks_health_and_original_debug_anchor(self):
         for count in (0,1,4,sleep.MAX_SLEEP_CHAIN):
@@ -117,7 +117,7 @@ class DeviceLedger(unittest.TestCase):
         self.enterContext(patch.object(sleep,'RESULTS',self.root/'sleep'))
         self.enterContext(patch.object(sleep,'OWNED',self.root/'owned'))
         self.enterContext(patch.object(sleep.pm_platform,'admission',return_value={'run_id':REHEARSAL}))
-        self.pm = Mock(RESULTS=self.root/'debug',STATE=self.root/'state',FAULTS=sleep.pm_module().FAULTS)
+        self.pm = Mock(RESULTS=self.root/'debug',STATE=self.root/'state',FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
         self.pm.command.return_value=''
         self.debug,self.records,self.current=chain(2)
         for r in self.debug+self.records:
@@ -283,7 +283,7 @@ class RehearsalLineage(unittest.TestCase):
         self.root=Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.enterContext(patch.object(sleep,'RESULTS',self.root))
         self.enterContext(patch.object(sleep,'sources',return_value=SOURCE))
-        self.pm=Mock(FAULTS=sleep.pm_module().FAULTS)
+        self.pm=Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
         self.debug,self.records,self.current=chain(2)
         self.prior=deepcopy(self.records[0])
         self.prior.update(run_id=REHEARSAL,mode='rehearse')

@@ -80,15 +80,16 @@ def callback_checks(work, source, udc_source, wait_source, builder, function):
             print('callbacks-' + name + ': ' + (result.stdout.strip() or 'expected assertion failure'), flush=True)
     finally:
         header.write_text(functions)
+    relative = work.relative_to(ROOT).as_posix()
     arm = subprocess.check_output([
         'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
         '--platform', builder['platform'], '--entrypoint', 'bash',
         '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
         'set -euo pipefail\n'
         'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror -pthread -static '
-        '-I.local/build/musb-sleep-tests kernel/tests/musb_callback_test.c '
-        '-o .local/build/musb-sleep-tests/callbacks-arm\n'
-        'timeout 60 qemu-arm .local/build/musb-sleep-tests/callbacks-arm'], text=True)
+        f'-I{relative} kernel/tests/musb_callback_test.c '
+        f'-o {relative}/callbacks-arm\n'
+        f'timeout 60 qemu-arm {relative}/callbacks-arm'], text=True)
     print(arm, end='', flush=True)
     return dict(native=results, arm32=arm.strip(), harness_sha256=sha256(harness),
                 limits='Actual callbacks, UDC unbind and lock-wait macros with pthread primitives and controlled boundary APIs. '

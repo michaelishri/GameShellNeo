@@ -49,7 +49,7 @@ class CandidateQueues(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             work = Path(temporary)
             source = work / 'source'
-            for profile in ('power-supply-lifetime', 'musb-retirement', None):
+            for profile in (*PROFILES, None):
                 with self.subTest(profile=profile), \
                         patch.object(kernel_checks, 'ensure_source', return_value=(source, [], {})) as ensure, \
                         patch.object(kernel_checks, 'attach_source'), \

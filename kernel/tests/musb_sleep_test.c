@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Actual driver functions; shims expose register/PM/work ownership boundaries. */
 #include <assert.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -11,6 +12,31 @@ typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 #define __iomem
+#ifdef MUSB_WAKE_STARTUP
+#define CONFIG_PM 1
+#define CONFIG_PM_SLEEP 1
+#define IRQ_GET_DESC_CHECK_GLOBAL 0
+#define IRQCHIP_SKIP_SET_WAKE 1
+#define IRQCHIP_MASK_ON_SUSPEND 2
+#define IRQCHIP_ENABLE_WAKEUP_ON_SUSPEND 4
+#define IRQD_WAKEUP_STATE 1
+#define IRQD_WAKEUP_ARMED 2
+#define IRQD_IRQ_DISABLED 4
+#define IRQD_IRQ_ENABLED_ON_SUSPEND 8
+#define IRQD_IRQ_INPROGRESS 16
+#define IRQD_IRQ_MASKED 32
+#define IRQS_SUSPENDED 1
+#define IRQS_PENDING 2
+#define IRQS_POLL_INPROGRESS 4
+#define IRQS_REPLAY 8
+#define IRQS_WAITING 16
+#define IRQ_RESEND 1
+#define IRQ_START_FORCE 1
+#define CONFIG_GENERIC_IRQ_EFFECTIVE_AFF_MASK 0
+#define IS_ENABLED(option) (option)
+#define unlikely(x) (x)
+#define WARN_ONCE(value, ...) (assert(!(value)), false)
+#endif
 #define BIT(n) (1U << (n))
 #define MUSB_C_NUM_EPS 2
 #define MUSB_HOST 1
@@ -35,7 +61,11 @@ typedef uint32_t u32;
 #include "musb_sleep_defs.h"
 
 struct list_head { struct list_head *next, *prev; };
-struct device { bool wake; int refs, get_error; };
+struct device {
+	bool wake, capable;
+	int refs, get_error, init_error;
+	struct { void *wakeirq, *wakeup; } power;
+};
 struct work_struct { int unused; };
 struct delayed_work { struct work_struct work; bool queued; };
 struct usb_gadget { int speed, state; };
@@ -56,6 +86,7 @@ struct musb {
 	struct musb_context_registers context;
 	struct { void *regs; } endpoints[MUSB_C_NUM_EPS];
 	int port_mode, lock, list_lock, port1_status, state, nIrq;
+	bool irq_wake, wakeup_initialized;
 	bool gadget_async_callbacks;
 	unsigned gadget_callback_count;
 	int gadget_callback_wait;
@@ -76,6 +107,27 @@ static unsigned disconnects, completed_requests, pending_requests;
 static bool irq_drained, irq_disconnect, change_intent;
 static struct usb_gadget_driver driver;
 static u8 banks[8][128];
+#ifdef MUSB_WAKE_STARTUP
+struct irq_chip;
+struct irq_data { unsigned flags; struct irq_chip *chip; };
+struct irq_chip { unsigned flags; int (*irq_set_wake)(struct irq_data *, unsigned); };
+struct irq_desc {
+	struct irq_data irq_data;
+	unsigned wake_depth, depth, istate, no_suspend_depth, force_resume_depth;
+	void *action;
+	void (*handle_irq)(struct irq_desc *);
+	bool locked, chained;
+};
+static struct irq_desc irqdesc;
+static struct irq_chip irqchip;
+static int wake_on_error, wake_off_error, wake_on_calls, wake_off_calls;
+static bool wake_hardware, wake_backend_live;
+static unsigned wake_init_calls, freed_irqs, freed_hosts;
+static unsigned system_wakes, irq_masks;
+struct cpumask { int unused; };
+static int irq_poll_cpu = -1;
+
+#endif
 
 #define spin_lock_irqsave(lock, flags) do { (flags) = 0; assert(!*(lock)); *(lock) = 1; } while (0)
 #define spin_unlock_irqrestore(lock, flags) do { (void)(flags); assert(*(lock)); *(lock) = 0; } while (0)
@@ -84,6 +136,7 @@ static u8 banks[8][128];
 #define lockdep_assert_held(lock) assert(*(lock))
 static void wake_up_all(int *wait) { (void)wait; assert(active->lock); }
 #define WARN_ON(value) assert(!(value))
+#define WARN(value, ...) assert(!(value))
 #define dev_err(...) do { errors++; } while (0)
 #define musb_dbg(...) do {} while (0)
 #define is_host_active(m) ((m)->port_mode == MUSB_HOST)
@@ -101,6 +154,73 @@ static void devm_kfree(struct device *d, void *p) { (void)d; (void)p; }
 static struct musb *dev_to_musb(struct device *d) { assert(d == active->controller); return active; }
 static struct musb *gadget_to_musb(struct usb_gadget *g) { return container_of(g, struct musb, g); }
 static bool device_may_wakeup(struct device *d) { return d->wake; }
+#ifdef MUSB_WAKE_STARTUP
+static bool device_can_wakeup(struct device *d) { return d->capable; }
+static int device_init_wakeup(struct device *d, bool enable)
+{
+	wake_init_calls++;
+	d->capable = enable;
+	if (enable && d->init_error) return d->init_error;
+	d->wake = enable;
+	d->power.wakeup = enable ? d : NULL;
+	return 0;
+}
+static struct irq_desc *irq_to_desc(unsigned irq) { assert(irq == 164); return &irqdesc; }
+static struct irq_chip *irq_desc_get_chip(struct irq_desc *d) { return d->irq_data.chip; }
+static bool irq_is_nmi(struct irq_desc *d) { (void)d; return false; }
+static void irqd_set(struct irq_data *d, unsigned f) { d->flags |= f; }
+static void irqd_clear(struct irq_data *d, unsigned f) { d->flags &= ~f; }
+static struct irq_desc *get_desc(unsigned irq)
+{
+	struct irq_desc *d = irq_to_desc(irq);
+	assert(!d->locked && !active->lock); d->locked = true; return d;
+}
+static struct irq_desc *put_desc(struct irq_desc *d)
+{ if (d) { assert(d->locked); d->locked = false; } return NULL; }
+static void cleanup_desc(struct irq_desc **d) { put_desc(*d); }
+#define scoped_irqdesc_get_and_buslock(irq, check) \
+	for (struct irq_desc *scoped_irqdesc __attribute__((cleanup(cleanup_desc))) = get_desc(irq); \
+	     scoped_irqdesc; scoped_irqdesc = put_desc(scoped_irqdesc))
+int irq_set_irq_wake(unsigned irq, unsigned on);
+static int enable_irq_wake(unsigned irq) { return irq_set_irq_wake(irq, 1); }
+static int disable_irq_wake(unsigned irq) { return irq_set_irq_wake(irq, 0); }
+static int irqchip_wake(struct irq_data *d, unsigned on)
+{
+	assert(d == &irqdesc.irq_data && irqdesc.locked && wake_backend_live);
+	if (on) { wake_on_calls++; if (wake_on_error) return wake_on_error; }
+	else { wake_off_calls++; if (wake_off_error) return wake_off_error; }
+	wake_hardware = on;
+	return 0;
+}
+static void free_irq(int irq, struct musb *m)
+{ assert(irq == 164 && m == active); freed_irqs++; }
+static void musb_host_free(struct musb *m) { assert(m == active); freed_hosts++; }
+static bool irq_desc_is_chained(struct irq_desc *d) { return d->chained; }
+static bool irqd_has_set(struct irq_data *d, unsigned flags) { return d->flags & flags; }
+static bool irqd_is_wakeup_set(struct irq_data *d) { return irqd_has_set(d, IRQD_WAKEUP_STATE); }
+static bool irqd_irq_disabled(struct irq_data *d) { return irqd_has_set(d, IRQD_IRQ_DISABLED); }
+static bool irqd_is_enabled_on_suspend(struct irq_data *d) { return irqd_has_set(d, IRQD_IRQ_ENABLED_ON_SUSPEND); }
+static void irq_state_set_disabled(struct irq_desc *d) { irqd_set(&d->irq_data, IRQD_IRQ_DISABLED); }
+static void irq_state_set_masked(struct irq_desc *d) { irqd_set(&d->irq_data, IRQD_IRQ_MASKED); }
+static void irq_disable(struct irq_desc *d)
+{ assert(d->locked); irq_state_set_disabled(d); irq_state_set_masked(d); }
+static void mask_irq(struct irq_desc *d) { assert(d->locked); irq_masks++; irq_state_set_masked(d); }
+static unsigned irq_desc_get_irq(struct irq_desc *d) { assert(d == &irqdesc); return 164; }
+static void pm_system_irq_wakeup(unsigned irq) { assert(irq == 164); system_wakes++; }
+static void irq_settings_set_noprobe(struct irq_desc *d) { assert(d->locked); }
+static void irq_startup(struct irq_desc *d, int resend, int force)
+{
+	assert(d->locked && d->depth == 1 && resend == IRQ_RESEND && force == IRQ_START_FORCE);
+	d->depth = 0; irqd_clear(&d->irq_data, IRQD_IRQ_DISABLED | IRQD_IRQ_MASKED);
+}
+static int smp_processor_id(void) { return 0; }
+static bool irq_wait_on_inprogress(struct irq_desc *d) { (void)d; assert(false); return false; }
+static bool irqd_is_single_target(struct irq_data *d) { (void)d; return false; }
+static void handle_edge_irq(struct irq_desc *d) { (void)d; assert(false); }
+static const struct cpumask *irq_data_get_effective_affinity_mask(struct irq_data *d)
+{ (void)d; assert(false); return NULL; }
+static int cpumask_first(const struct cpumask *m) { (void)m; assert(false); return 0; }
+#endif
 static void musb_gadget_work(struct work_struct *work);
 static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on);
 static int musb_gadget_stop(struct usb_gadget *gadget);
@@ -218,6 +338,14 @@ static void init(struct musb *m, struct device *d, struct config *c, struct musb
 	pm_boundary_intent = callback_intent = -1;
 	disconnects = completed_requests = 0; pending_requests = 3;
 	irq_drained = irq_disconnect = change_intent = false;
+#ifdef MUSB_WAKE_STARTUP
+	irqchip = (struct irq_chip){.irq_set_wake = irqchip_wake};
+	irqdesc = (struct irq_desc){.irq_data = {.chip = &irqchip}, .action = &irqchip};
+	wake_on_error = wake_off_error = wake_on_calls = wake_off_calls = 0;
+	wake_hardware = false; wake_backend_live = true;
+	wake_init_calls = freed_irqs = freed_hosts = 0;
+	system_wakes = irq_masks = 0;
+#endif
 }
 static int callback(struct musb *m, void *data)
 {
@@ -234,6 +362,170 @@ static void add_work(struct musb *m, struct musb_pending_work *w, int *result)
 	m->pending_list.prev->next = &w->node; m->pending_list.prev = &w->node;
 }
 static bool connected(void) { return banks[0][MUSB_POWER] & MUSB_POWER_SOFTCONN; }
+
+#ifdef MUSB_WAKE_STARTUP
+static void irq_pm_cases(void)
+{
+	struct musb m; struct device d; struct config c; struct musb_platform_ops ops;
+	/* Drive actual noirq/flow/resume helpers around actual driver callbacks. */
+	for (int policy = 0; policy < 2; policy++)
+	for (int foreign = 0; foreign < 2; foreign++)
+	for (int event = 0; event < 2; event++) {
+		init(&m, &d, &c, &ops); d.wake = policy;
+		irqchip.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+		if (foreign) assert(!enable_irq_wake(m.nIrq));
+		assert(!musb_suspend(&d));
+		get_desc(164); assert(suspend_device_irq(&irqdesc)); put_desc(&irqdesc);
+		bool wake = policy || foreign;
+		assert(irqd_has_set(&irqdesc.irq_data, IRQD_WAKEUP_ARMED) == wake);
+		assert(irqdesc.depth == (unsigned)!wake && irq_masks == (unsigned)!wake);
+		if (event) {
+			get_desc(164); assert(!irq_can_handle(&irqdesc)); put_desc(&irqdesc);
+			assert(system_wakes == (unsigned)wake && (irqdesc.istate & IRQS_PENDING));
+			/* Once armed wake was consumed, no second notification or handler. */
+			get_desc(164); assert(!irq_can_handle(&irqdesc)); put_desc(&irqdesc);
+			assert(system_wakes == (unsigned)wake);
+		}
+		get_desc(164); resume_irq(&irqdesc); put_desc(&irqdesc);
+		assert(!irqdesc.depth && !(irqdesc.istate & IRQS_SUSPENDED));
+		assert(!irqd_has_set(&irqdesc.irq_data,
+			IRQD_WAKEUP_ARMED | IRQD_IRQ_DISABLED | IRQD_IRQ_MASKED));
+		assert(!musb_resume(&d) && !d.refs && !m.irq_wake);
+		assert(irqdesc.wake_depth == (unsigned)foreign);
+		get_desc(164); assert(irq_can_handle(&irqdesc)); put_desc(&irqdesc);
+		if (foreign) assert(!disable_irq_wake(m.nIrq));
+		scenarios++;
+	}
+}
+
+static void wake_cases(void)
+{
+	struct musb m; struct device d; struct config c; struct musb_platform_ops ops;
+	/* Fresh probe tests wake capability without leaving its reference held. */
+	for (int foreign = 0; foreign < 3; foreign++)
+	for (int skip = 0; skip < 2; skip++) {
+		init(&m, &d, &c, &ops);
+		irqchip.flags = skip ? IRQCHIP_SKIP_SET_WAKE : 0;
+		for (int i = 0; i < foreign; i++) assert(!enable_irq_wake(m.nIrq));
+		assert(!musb_init_wakeup(&m));
+		assert(d.capable && d.wake && m.wakeup_initialized && !m.irq_wake);
+		assert(irqdesc.wake_depth == (unsigned)foreign);
+		assert(wake_on_calls == (!skip && !foreign ? 1 : !skip));
+		assert(wake_off_calls == (!skip && !foreign ? 1 : 0));
+		musb_cleanup_wakeup(&m);
+		assert(!d.capable && !d.wake && !m.wakeup_initialized && !m.irq_wake);
+		assert(irqdesc.wake_depth == (unsigned)foreign);
+		for (int i = 0; i < foreign; i++) assert(!disable_irq_wake(m.nIrq));
+		wake_backend_live = false; musb_free(&m);
+		assert(freed_irqs == 1 && freed_hosts == 1 && !irqdesc.wake_depth); scenarios++;
+	}
+	/* Unsupported wake is optional, not a reason to lose normal USB. */
+	init(&m, &d, &c, &ops); irqchip.irq_set_wake = NULL;
+	assert(!musb_init_wakeup(&m) && !d.capable && !wake_init_calls && !irqdesc.wake_depth);
+	musb_cleanup_wakeup(&m); assert(!errors); scenarios++;
+	/* Reject a preexisting capability/source/wakeirq without taking ownership. */
+	for (int kind = 0; kind < 3; kind++) {
+		init(&m, &d, &c, &ops);
+		d.capable = kind == 0; d.power.wakeup = kind == 1 ? &d : NULL;
+		d.power.wakeirq = kind == 2 ? &d : NULL;
+		assert(musb_init_wakeup(&m) == -EEXIST);
+		musb_cleanup_wakeup(&m);
+		assert(!wake_init_calls && !wake_on_calls && !m.wakeup_initialized);
+		assert(d.capable == (kind == 0) && !!d.power.wakeup == (kind == 1));
+		assert(!!d.power.wakeirq == (kind == 2)); scenarios++;
+	}
+	/* Partial capability initialization is owned until probe unwind. */
+	init(&m, &d, &c, &ops); d.init_error = -ENOMEM;
+	assert(musb_init_wakeup(&m) == -ENOMEM && d.capable && m.wakeup_initialized);
+	assert(!irqdesc.wake_depth && !m.irq_wake);
+	musb_cleanup_wakeup(&m); assert(!d.capable && !d.wake && !m.wakeup_initialized); scenarios++;
+	/* A failed probe disarm is reported and retained, then recovered on unwind. */
+	init(&m, &d, &c, &ops); wake_off_error = -EIO;
+	assert(musb_init_wakeup(&m) == -EIO && m.irq_wake && irqdesc.wake_depth == 1);
+	assert(!d.capable && !wake_init_calls);
+	musb_cleanup_wakeup(&m); assert(errors == 1 && m.irq_wake && irqdesc.wake_depth == 1);
+	wake_off_error = 0; musb_cleanup_wakeup(&m);
+	assert(!m.irq_wake && !irqdesc.wake_depth && !wake_hardware); scenarios++;
+	/* Policy may change before resume: release our arm, not another owner's. */
+	for (int foreign = 0; foreign < 3; foreign++)
+	for (int policy = 0; policy < 2; policy++)
+	for (int changed = 0; changed < 2; changed++) {
+		init(&m, &d, &c, &ops); d.wake = policy;
+		for (int i = 0; i < foreign; i++) assert(!enable_irq_wake(m.nIrq));
+		assert(!musb_suspend(&d)); assert(m.irq_wake == !!policy);
+		assert(irqdesc.wake_depth == (unsigned)(foreign + policy));
+		d.wake = changed;
+		assert(!musb_resume(&d) && !d.refs && !m.irq_wake);
+		assert(irqdesc.wake_depth == (unsigned)foreign);
+		for (int i = 0; i < foreign; i++) assert(!disable_irq_wake(m.nIrq));
+		scenarios++;
+	}
+	/* Wake-arm failure occurs before any gadget/register/platform changes. */
+	init(&m, &d, &c, &ops); d.wake = true; wake_on_error = -EIO;
+	assert(musb_suspend(&d) == -EIO && !d.refs && !writes && !m.gadget_suspended);
+	assert(!m.irq_wake && !irqdesc.wake_depth && connected() && platform_ready && irq_ready); scenarios++;
+	/* Failed resume disarm restores the controller/PM reference but retains debt. */
+	init(&m, &d, &c, &ops); d.wake = true; assert(!musb_suspend(&d));
+	d.wake = false; wake_off_error = -EIO;
+	assert(musb_resume(&d) == -EIO && !d.refs && m.irq_wake && irqdesc.wake_depth == 1);
+	assert(platform_ready && irq_ready);
+	unsigned before = writes; int arms = wake_on_calls;
+	assert(musb_suspend(&d) == -EIO && !d.refs && writes == before && wake_on_calls == arms);
+	assert(m.irq_wake && irqdesc.wake_depth == 1);
+	wake_off_error = 0;
+	assert(!musb_suspend(&d) && !m.irq_wake && !irqdesc.wake_depth);
+	assert(!musb_resume(&d) && !d.refs); scenarios++;
+	/* No acquired runtime reference: do not touch even an old wake debt. */
+	init(&m, &d, &c, &ops); assert(!enable_irq_wake(m.nIrq)); m.irq_wake = true;
+	d.get_error = -EIO; before = wake_off_calls;
+	assert(musb_suspend(&d) == -EIO && !d.refs && m.irq_wake);
+	assert(wake_off_calls == (int)before && irqdesc.wake_depth == 1);
+	musb_cleanup_wakeup(&m); assert(!m.irq_wake && !irqdesc.wake_depth); scenarios++;
+	/* Another shared owner can arrive or leave while MUSB holds its reference. */
+	for (int arrives_first = 0; arrives_first < 2; arrives_first++)
+	for (int leaves_first = 0; leaves_first < 2; leaves_first++)
+	for (int last_disable_fails = 0; last_disable_fails < 2; last_disable_fails++) {
+		init(&m, &d, &c, &ops); d.wake = true;
+		if (arrives_first) assert(!enable_irq_wake(m.nIrq));
+		assert(!musb_suspend(&d));
+		if (!arrives_first) assert(!enable_irq_wake(m.nIrq));
+		assert(m.irq_wake && irqdesc.wake_depth == 2 && wake_on_calls == 1);
+		wake_off_error = last_disable_fails ? -EIO : 0;
+		if (leaves_first) {
+			assert(!disable_irq_wake(m.nIrq));
+			assert(musb_resume(&d) == wake_off_error);
+			assert(m.irq_wake == !!last_disable_fails);
+			assert(irqdesc.wake_depth == (unsigned)last_disable_fails);
+			wake_off_error = 0; assert(!musb_disarm_wake(&m));
+		} else {
+			assert(!musb_resume(&d) && !m.irq_wake && irqdesc.wake_depth == 1);
+			assert(disable_irq_wake(m.nIrq) == wake_off_error);
+			assert(irqdesc.wake_depth == (unsigned)last_disable_fails);
+			/* The remaining failed reference belongs to the other driver. */
+			before = wake_off_calls; musb_cleanup_wakeup(&m);
+			assert(wake_off_calls == (int)before && !m.irq_wake);
+			if (last_disable_fails) { wake_off_error = 0; assert(!disable_irq_wake(m.nIrq)); }
+		}
+		assert(!irqdesc.wake_depth && !wake_hardware && !d.refs); scenarios++;
+	}
+	/* An ungated resume-work error stays logged even when disarm also fails. */
+	init(&m, &d, &c, &ops); d.wake = true; assert(!musb_suspend(&d));
+	struct musb_pending_work pending; int pending_error = -ENODEV;
+	add_work(&m, &pending, &pending_error); wake_off_error = -EIO;
+	/* Callback error, work-summary error and wake-disarm error all remain visible. */
+	assert(musb_resume(&d) == -EIO && errors == 3 && !d.refs);
+	assert(m.irq_wake && irqdesc.wake_depth == 1 && list_empty(&m.pending_list));
+	wake_off_error = 0; assert(!musb_disarm_wake(&m)); scenarios++;
+	/* Terminal hardware-disarm failure is exposed; no fake balance or retry loop. */
+	init(&m, &d, &c, &ops); assert(!musb_init_wakeup(&m));
+	assert(!enable_irq_wake(m.nIrq)); m.irq_wake = true; wake_off_error = -EIO;
+	musb_cleanup_wakeup(&m);
+	assert(errors == 1 && m.irq_wake && irqdesc.wake_depth == 1 && !d.capable);
+	before = wake_off_calls; wake_backend_live = false; musb_free(&m);
+	assert(wake_off_calls == (int)before && freed_irqs == 1 && m.irq_wake); scenarios++;
+}
+
+#endif
 
 int main(void)
 {
@@ -348,6 +640,10 @@ int main(void)
 	assert(!musb_suspend(&d)); assert(!disconnects && !m.gadget_callback_count);
 	assert(m.g.state == USB_STATE_NOTATTACHED); m.gadget_driver = NULL;
 	assert(!musb_resume(&d)); assert(!connected()); scenarios++;
+#ifdef MUSB_WAKE_STARTUP
+	wake_cases();
+	irq_pm_cases();
+#endif
 	printf("MUSB sleep: %u source-function scenarios passed\n", scenarios);
 	return 0;
 }

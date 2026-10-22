@@ -21,6 +21,20 @@ files and bindings live in `overlay/` and become the third generated patch.
 The same queue is applied by `--apply SOURCE` for local compilation. Input
 changes require a fresh source extraction; do not silently reuse a patched tree.
 
+The explicit offline `musb-wake-startup` profile retains the original
+[0026 wake ownership](candidates/musb-wake-startup/0026-musb-wake-irq-policy.patch)
+and [0029 startup PM](candidates/musb-wake-startup/0029-musb-startup-runtime-pm.patch)
+candidates. `task test:musb-wake-startup` combines their actual-source tests
+with the current sleep/session-retirement and callback contracts;
+`task check:musb-wake-startup-configs` also builds six full ARM configurations.
+The default sleep checker and production 33-patch queue retain their current
+scope. Wake/startup and `musb-retirement` are separate source profiles: their
+wake cleanup / IRQ retirement need reconciliation before a combined image.
+The optional `audit:musb-teardown-baseline` Task retains the pre-session-retirement
+reproducer through patch 0030 and cannot qualify current removal safety.
+[Report 291](../docs/291-legacy-musb-source-integration.md) records branch
+supersession, evidence and the remaining software and physical gates.
+
 The isolated [0038 failed-queue DMA rollback candidate](candidates/0038-musb-queue-dma-rollback.patch)
 is kept under `candidates/`, outside that exporter and the image queue. Its
 `test:musb-queue-dma` and `check:musb-queue-dma-drivers` tasks exercise actual

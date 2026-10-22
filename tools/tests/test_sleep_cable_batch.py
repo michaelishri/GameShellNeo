@@ -36,7 +36,7 @@ def fixture(count=4):
     ids = [r['run_id'] for r in debug]
     sleeps, rehearsals, observations = [], [], []
     counts = dict(ACIN_PLUGIN=0,ACIN_REMOVAL=0,VBUS_PLUGIN=0,VBUS_REMOVAL=0)
-    pm = Mock(FAULTS=sleep.pm_module().FAULTS)
+    pm = Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
     for index in range(count):
         profile = BATCH['sequence'][index]
         q = dict(runs=ids,sleep_runs=[r['run_id'] for r in sleeps],connection=profile,
@@ -85,7 +85,7 @@ def fixture(count=4):
 class Lineage(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.object(sleep,'sources',return_value=chain.SOURCE))
-        self.pm=Mock(FAULTS=sleep.pm_module().FAULTS)
+        self.pm=Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
 
     def validate(self,d,r,a,o,c,batch=None):
         connection=BATCH['sequence'][len(r)] if len(r)<4 else 'usb-remove'
@@ -153,7 +153,7 @@ class Lineage(unittest.TestCase):
 class DeviceAdmission(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.object(sleep,'sources',return_value=chain.SOURCE))
-        self.pm=Mock(FAULTS=sleep.pm_module().FAULTS)
+        self.pm=Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
         self.root=Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.enterContext(patch.object(sleep,'RESULTS',self.root/'sleep'))
         self.enterContext(patch.object(sleep,'OWNED',self.root/'owned'))
@@ -218,7 +218,7 @@ class GuidedSession(unittest.TestCase):
         self.enterContext(patch.object(sleep,'sources',return_value=chain.SOURCE))
         self.enterContext(patch.object(guided,'sources',return_value={'test':'source'}))
         self.d,self.r,self.a,self.o,self.c=fixture(4)
-        self.enterContext(patch.object(sleep,'pm_module',return_value=Mock(FAULTS=())))
+        self.enterContext(patch.object(sleep,'pm_module',return_value=Mock(FAULTS=(), kernel_fault=lambda text: False)))
         self.calls=[]
         self.enterContext(patch.object(guided.host,'experiment',side_effect=self.attempt))
         self.enterContext(patch.object(guided.host,'inspect_live',side_effect=self.inspect))
@@ -339,7 +339,7 @@ class GuidedSession(unittest.TestCase):
 class HostReceipt(unittest.TestCase):
     def test_observer_hash_and_endpoint_specific_routes_bind_receipt(self):
         with tempfile.TemporaryDirectory() as temp,patch.object(sleep,'sources',return_value=chain.SOURCE), \
-                patch.object(sleep,'pm_module',return_value=Mock(FAULTS=())):
+                patch.object(sleep,'pm_module',return_value=Mock(FAULTS=(), kernel_fault=lambda text: False)):
             root=Path(temp);private=root/'diagnostics';private.mkdir()
             (root/'build').mkdir()
             (root/'build/sources.lock.json').write_text('{}')
@@ -354,7 +354,7 @@ class HostReceipt(unittest.TestCase):
                 sleeps=[dict(capture=str(result),rehearsal=str(paths[a[0]['run_id']]))],cable_batch=BATCH)
             path=root/'history.json';path.write_text(json.dumps(summary))
             with patch.object(host,'LOCAL',root),patch.object(host,'ROOT',root), \
-                    patch.object(sleep,'pm_module',return_value=Mock(FAULTS=())):
+                    patch.object(sleep,'pm_module',return_value=Mock(FAULTS=(), kernel_fault=lambda text: False)):
                 receipt=host.receipt(path,c,'usb-attach')
                 self.assertEqual(receipt['cable_observations'],o)
                 observer=result.with_name('result-cable-observation.json')

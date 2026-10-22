@@ -12,8 +12,10 @@ import tarfile
 
 from kernel_checks import ROOT, archive_for, compile_objects, run, sha256
 from musb_callback_checks import callback_checks
+from kernel_candidates import patch_path, candidate_paths
+from musb_wake_checks import probe_checks, startup_checks
 
-WORK = ROOT / '.local/build/musb-sleep-tests'
+PROFILE = 'musb-wake-startup'
 PREFIX = 'drivers/usb/musb/'
 FILES = ('musb_core.c', 'musb_core.h', 'musb_regs.h', 'musb_gadget.c', 'musb_gadget.h', 'musb_gadget_ep0.c', 'sunxi.c')
 
@@ -30,16 +32,20 @@ def main():
     parser.add_argument('--compile-drivers', action='store_true')
     parser.add_argument('--compile-matrix', action='store_true',
                         help='Compile host/dual-role/module and PM stub alternatives')
+    parser.add_argument('--wake-startup-candidate', action='store_true',
+                        help='Isolated 0026/0029 candidate; never changes production image inputs')
     args = parser.parse_args()
-    WORK.mkdir(parents=True, exist_ok=True)
-    with (WORK / '.lock').open('a') as guard:
+    profile = PROFILE if args.wake_startup_candidate else None
+    work = ROOT / '.local/build' / ('musb-wake-startup-tests' if profile else 'musb-sleep-tests')
+    work.mkdir(parents=True, exist_ok=True)
+    with (work / '.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        output = WORK / ('matrix-evidence.json' if args.compile_matrix else
+        output = work / ('matrix-evidence.json' if args.compile_matrix else
                          'compile-evidence.json' if args.compile_drivers else 'evidence.json')
         output.unlink(missing_ok=True)
         lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
         archive = archive_for(lock)
-        target = WORK / 'patched' / PREFIX
+        target = work / 'patched' / PREFIX
         target.mkdir(parents=True, exist_ok=True)
         prefix = 'linux-' + lock['linux']['tag'][1:] + '/' + PREFIX
         found = set()
@@ -55,6 +61,9 @@ def main():
             raise ValueError('Incomplete locked source')
         dependencies = {}
         needed = ('drivers/usb/gadget/udc/core.c', 'include/linux/wait.h')
+        if profile:
+            needed += ('include/linux/pm_runtime.h', 'kernel/irq/manage.c',
+                       'kernel/irq/pm.c', 'kernel/irq/chip.c')
         with tarfile.open(archive, mode='r|xz') as source:
             version_prefix = 'linux-' + lock['linux']['tag'][1:] + '/'
             for entry in source:
@@ -64,12 +73,14 @@ def main():
                         break
         if len(dependencies) != len(needed):
             raise ValueError('Missing locked UDC/wait source')
-        patches = [ROOT / 'kernel/patches' / name for name in (
+        patches = [patch_path(ROOT, name) for name in (
             '0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
             '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch',
             '0037-musb-resume-request-ownership.patch')]
+        if profile:
+            patches = sorted((*patches, *candidate_paths(ROOT, profile)), key=lambda p: p.name)
         for patch in patches:
-            run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=WORK / 'patched')
+            run(['patch', '--batch', '--fuzz=0', '-p1', '-i', str(patch)], cwd=work / 'patched')
         core = (target / 'musb_core.c').read_text()
         gadget = (target / 'musb_gadget.c').read_text()
         functions = ''.join(function(gadget, name) for name in (
@@ -80,6 +91,16 @@ def main():
         functions += ''.join(function(core, name) for name in (
             'musb_save_context', 'musb_restore_context', 'musb_run_resume_work',
             'musb_suspend', 'musb_resume'))
+        if profile:
+            extra = ''.join(function(dependencies['kernel/irq/manage.c'], name) for name in (
+                'set_irq_wake_real', 'irq_set_irq_wake', '__disable_irq', '__enable_irq'))
+            extra += ''.join(function(dependencies['kernel/irq/pm.c'], name) for name in (
+                'irq_pm_handle_wakeup', 'suspend_device_irq', 'resume_irq'))
+            extra += ''.join(function(dependencies['kernel/irq/chip.c'], name) for name in (
+                'irq_can_handle_pm', 'irq_can_handle_actions', 'irq_can_handle'))
+            extra += ''.join(function(core, name) for name in (
+                'musb_disarm_wake', 'musb_init_wakeup', 'musb_cleanup_wakeup', 'musb_free'))
+            functions = extra + functions
         definitions = (target / 'musb_core.h').read_text() + (target / 'musb_regs.h').read_text()
         constants = (set(re.findall(r'\bMUSB_[A-Z0-9_]+', functions)) |
                      {'MUSB_POWER_HSENAB'}) - {'MUSB_HOST', 'MUSB_PERIPHERAL', 'MUSB_HST_MODE'}
@@ -91,10 +112,11 @@ def main():
             defs += '#define ' + name + ' ' + match[1] + '\n'
         for name in ('musb_csr_regs', 'musb_context_registers'):
             defs += re.search(r'struct ' + name + r' \{.*?\n\};', definitions, re.S)[0] + '\n'
-        (WORK / 'musb_sleep_defs.h').write_text(defs)
-        header = WORK / 'musb_sleep_functions.h'
+        (work / 'musb_sleep_defs.h').write_text(defs)
+        header = work / 'musb_sleep_functions.h'
         harness = ROOT / 'kernel/tests/musb_sleep_test.c'
-        flags = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-I', str(WORK), str(harness)]
+        defines = ['-DMUSB_WAKE_STARTUP=1'] if profile else []
+        flags = [*defines, '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-I', str(work), str(harness)]
         variants = dict(
             candidate=functions,
             missing_session_retirement=functions.replace(
@@ -113,6 +135,27 @@ def main():
             stop_keeps_pullup=functions.rsplit('\tmusb_pullup(musb, 0);', 1)[0] +
                 functions.rsplit('\tmusb_pullup(musb, 0);', 1)[1],
         )
+        if profile:
+            variants.update(
+                keeps_probe_wake=functions.replace(
+                    '\tmusb->irq_wake = true;\n\tret = musb_disarm_wake(musb);',
+                    '\tmusb->irq_wake = true;\n\tret = 0;', 1),
+                loses_failed_disarm=functions.replace(
+                    '\tif (!ret)\n\t\tmusb->irq_wake = false;', '\tmusb->irq_wake = false;', 1),
+                disarm_rereads_policy=functions.replace(
+                    '\tif (!musb->irq_wake)', '\tif (!device_may_wakeup(musb->controller) || !musb->irq_wake)', 1),
+                ignores_arm_error=functions.replace(
+                    '\t\tif (ret)\n\t\t\tgoto err_pm_put;', '\t\t/* lost arm error */', 1),
+                loses_disarm_error=functions.replace(
+                    '\t\tif (!error)\n\t\t\terror = ret;', '\t\t/* lost disarm error */', 1),
+                clears_foreign_source=functions.replace(
+                    '\tif (musb->wakeup_initialized) {', '\tif (true) {', 1),
+                no_wake_arm=functions.replace(
+                    '\t\tirqd_set(irqd, IRQD_WAKEUP_ARMED);', '\t\t/* no wake arm */', 1),
+                wake_handler_runs_early=functions.replace(
+                    '\tif (!irq_can_handle_pm(desc))\n\t\treturn false;',
+                    '\tif (!irq_can_handle_pm(desc))\n\t\treturn true;', 1),
+            )
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         results = {}
         try:
@@ -120,10 +163,10 @@ def main():
                 if name != 'candidate' and value == functions:
                     raise ValueError('Negative control did not mutate: ' + name)
                 header.write_text(value)
-                binary = WORK / name
+                binary = work / name
                 run(['cc', *flags, '-o', str(binary)])
                 result = subprocess.run([str(binary)], capture_output=True, text=True)
-                (WORK / (name + '.txt')).write_text(result.stdout + result.stderr)
+                (work / (name + '.txt')).write_text(result.stdout + result.stderr)
                 if name == 'candidate':
                     result.check_returncode()
                 elif result.returncode == 0 or 'Assertion' not in result.stderr:
@@ -133,29 +176,40 @@ def main():
         finally:
             header.write_text(functions)
         builder = lock['builder']
+        relative = work.relative_to(ROOT).as_posix()
+        arm_defines = ' '.join(defines)
         arm = subprocess.check_output([
             'docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
             '--platform', builder['platform'], '--entrypoint', 'bash',
             '-v', f'{ROOT}:/project', '-w', '/project', builder['image'], '-c',
             'set -euo pipefail\n'
             'arm-linux-gnueabihf-gcc -std=gnu11 -O2 -Wall -Wextra -Werror -static '
-            '-I.local/build/musb-sleep-tests kernel/tests/musb_sleep_test.c '
-            '-o .local/build/musb-sleep-tests/arm\n'
-            'qemu-arm .local/build/musb-sleep-tests/arm'], text=True)
+            f'{arm_defines} -I{relative} kernel/tests/musb_sleep_test.c '
+            f'-o {relative}/arm\n'
+            f'qemu-arm {relative}/arm'], text=True)
         print(arm, end='', flush=True)
-        evidence = dict(linux=lock['linux']['tag'], archive_sha256=sha256(archive),
+        evidence = dict(candidate_profile=profile, linux=lock['linux']['tag'], archive_sha256=sha256(archive),
                         inputs={str(p.relative_to(ROOT)): sha256(p) for p in
                                 (*patches, harness, Path(__file__), ROOT / 'tools/kernel_checks.py',
-                                 ROOT / 'tools/musb_callback_checks.py')},
+                                 ROOT / 'tools/musb_callback_checks.py', ROOT / 'tools/kernel_candidates.py',
+                                 ROOT / 'tools/musb_wake_checks.py',
+                                 *((ROOT / 'kernel/tests' / name for name in (
+                                     'musb_wake_probe_test.c', 'musb_startup_test.c')) if profile else ()))},
                         native=results, arm32=arm.strip(), builder=builder,
                         limits='Actual source functions, deterministic boundary interleavings. '
                                'No electrical USB timing, host enumeration or scheduler concurrency qualification.')
+        if profile:
+            pm = dependencies['include/linux/pm_runtime.h']
+            evidence['probe_remove'] = probe_checks(
+                work, core, dependencies['kernel/irq/manage.c'], pm, builder, function)
+            evidence['startup'] = startup_checks(
+                work, gadget, pm, dependencies['drivers/usb/gadget/udc/core.c'], builder, function)
         evidence['callbacks'] = callback_checks(
-            WORK, target, dependencies['drivers/usb/gadget/udc/core.c'],
+            work, target, dependencies['drivers/usb/gadget/udc/core.c'],
             dependencies['include/linux/wait.h'], builder, function)
         if args.compile_drivers or args.compile_matrix:
-            evidence['arm_build'] = compile_objects(archive, lock, WORK, [
-                PREFIX + 'musb_core.o', PREFIX + 'musb_gadget.o', PREFIX + 'musb_gadget_ep0.o', PREFIX + 'sunxi.o'])
+            evidence['arm_build'] = compile_objects(archive, lock, work, [
+                PREFIX + 'musb_core.o', PREFIX + 'musb_gadget.o', PREFIX + 'musb_gadget_ep0.o', PREFIX + 'sunxi.o'], candidate_profile=profile)
         if args.compile_matrix:
             # These are compile-only alternatives, never board image configurations.
             matrices = {
@@ -177,8 +231,8 @@ def main():
             for name, (config, objects) in matrices.items():
                 print('Compile-only MUSB configuration:', name, flush=True)
                 evidence['arm_configurations'][name] = compile_objects(
-                    archive, lock, WORK, [PREFIX + obj for obj in objects],
-                    extra_config=config, project_config=False)
+                    archive, lock, work, [PREFIX + obj for obj in objects],
+                    extra_config=config, project_config=False, candidate_profile=profile)
                 if name == 'module':
                     record = evidence['arm_configurations'][name]
                     linked = record['scratch'] + '/output/' + PREFIX + 'musb_hdrc.o'
@@ -188,7 +242,7 @@ def main():
                         '--entrypoint', builder['cross_compile'] + 'readelf',
                         '-v', f'{ROOT}:/project', builder['image'],
                         '--wide', '--symbols', '/project/' + linked], text=True)
-                    symbol_file = WORK / 'module-symbols.txt'
+                    symbol_file = work / 'module-symbols.txt'
                     symbol_file.write_text(symbols)
                     required = ('musb_gadget_get_driver', 'musb_gadget_put_driver')
                     for symbol in required:
@@ -198,7 +252,7 @@ def main():
                             raise RuntimeError('Callback helper is unresolved in combined module: ' + symbol)
                     record['callback_helpers'] = dict(defined=list(required),
                                                       symbols_sha256=sha256(symbol_file))
-                (WORK / 'matrix-progress.json').write_text(json.dumps(evidence, indent=2) + '\n')
+                (work / 'matrix-progress.json').write_text(json.dumps(evidence, indent=2) + '\n')
         output.write_text(json.dumps(evidence, indent=2) + '\n')
         print('Evidence:', output.relative_to(ROOT), flush=True)
 

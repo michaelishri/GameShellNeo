@@ -55,7 +55,7 @@ def record(scenario='usb-remove', mode='rtc-wake'):
         value['wake_observation'] = cable.wake_observation(value)
     value.update(wifi_ssh_verified=True,
                  usb_ssh_verified=connection.endpoint(scenario, mode, 'after') == 'usb')
-    sleep.health(Mock(FAULTS=sleep.pm_module().FAULTS), value, {})
+    sleep.health(Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault), value, {})
     return value
 
 
@@ -99,7 +99,7 @@ class StateEvidence(unittest.TestCase):
 
     def test_positive_results_revalidate_and_cannot_seed_a_mixed_or_repeat_chain(self):
         with patch.object(sleep, 'sources', return_value=chain.SOURCE):
-            pm = Mock(FAULTS=sleep.pm_module().FAULTS)
+            pm = Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
             for scenario in ('usb-remove', 'usb-attach'):
                 value = record(scenario)
                 sleep.completed_result(pm, value, {}, 'rtc-wake')
@@ -178,7 +178,7 @@ class MaskedCable(unittest.TestCase):
         value = self.candidate()
         value['rtc']['interrupt'] = None
         with self.assertRaisesRegex(ValueError, 'RTC event'):
-            sleep.health(Mock(FAULTS=sleep.pm_module().FAULTS), value, {})
+            sleep.health(Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault), value, {})
         for scenario in ('usb-attach', 'usb-remove'):
             value = self.candidate(scenario, 'rehearse')
             connection.validate(value)
@@ -257,7 +257,7 @@ class MaskedRemoval(unittest.TestCase):
     def test_assessment_revalidated_and_failed_original_cannot_be_promoted(self):
         value = self.candidate()
         value['cable']['after']['irqs'] = deepcopy(value['cable']['entry']['irqs'])
-        pm = Mock(FAULTS=sleep.pm_module().FAULTS)
+        pm = Mock(FAULTS=sleep.pm_module().FAULTS, kernel_fault=sleep.pm_module().kernel_fault)
         sleep.health(pm, value, {})
         with patch.object(sleep, 'sources', return_value=chain.SOURCE), \
                 patch.object(sleep, 'pm_module', return_value=pm):
@@ -445,7 +445,7 @@ class Transport(unittest.TestCase):
 class ObserverReport(unittest.TestCase):
     def test_observer_does_not_override_automated_failure_or_claim_edge_timing(self):
         value=record()
-        with patch.object(sleep,'sources',return_value=chain.SOURCE),patch.object(sleep,'pm_module',return_value=Mock(FAULTS=())):
+        with patch.object(sleep,'sources',return_value=chain.SOURCE),patch.object(sleep,'pm_module',return_value=Mock(FAULTS=(), kernel_fault=lambda text: False)):
             good=report.assessment(value,'during-dark','normal',{})
             self.assertTrue(good['attended_case_passed']);self.assertFalse(good['electrical_edge_timing_qualified'])
             for action,display in (('uncertain','normal'),('after-return','normal'),('no-action','normal'),('during-dark','abnormal')):

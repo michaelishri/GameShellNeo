@@ -6,6 +6,15 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+NEO-207 reconciles the old MUSB wake/startup and removal histories in
+[report 291](docs/291-legacy-musb-source-integration.md). Use
+`task test:musb-wake-startup` or `task check:musb-wake-startup-configs` for the
+explicit offline `musb-wake-startup` profile. Patches 0026/0029 remain outside
+the production image queue. The independent retirement profile is not combined
+with it. `task audit:musb-teardown-baseline` deliberately reproduces historical
+ordering defects; a successful audit does not qualify safe removal. Existing
+parent software audits, new-image integration and hardware gates remain open.
+
 NEO-202's console and assertion output-bounds candidate is documented in
 [report 286](docs/286-brcmfmac-diagnostic-output-bounds.md). Run
 `task test:brcmfmac-output-bounds` for native/sanitizer/ARM output checks and

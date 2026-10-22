@@ -2,6 +2,20 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-207 legacy MUSB branch reconciliation:** exact wake/startup patches
+0026/0029 now have an independent offline profile, preserving current sleep
+session retirement, callback suppression and request ownership. This profile
+is intentionally separate from `musb-retirement`: patch 0039 and the wake
+cleanup in 0026 must be reconciled before a combined source/image queue can
+be qualified. Preserve both candidates and original evidence. Historical
+teardown audit success reproduces old defects and is not a current removal
+safety claim. [Report 291](docs/291-legacy-musb-source-integration.md) maps all
+five old branch histories. NEO-98 retains whole-kernel PM/IRQ traversal and
+allocation/sysfs concurrency limits; NEO-106 retains caller/global-accessor,
+other backend/DMA and inaccessible-hardware software work. These are separate
+from the new-image/card installation and matching-board wake/unbind/rebind
+qualification that need physical access and fresh clock admission.
+
 **Branch integration review, 22 October 2026 (NEO-204):** reviewed cumulative
 work through NEO-194 and six already integrated histories are merged into main;
 23 merged branch references can be removed while preserving their worktrees

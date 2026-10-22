@@ -23,6 +23,12 @@ PROFILES = {
     )),
 }
 
+# Mailbox lifetime is deliberately independent of the wake/IRQ bridge profile.
+PROFILES['musb-omap-mailbox'] = PROFILES['musb-retirement'] + (
+    'musb-wake-startup/0029-musb-startup-runtime-pm.patch',
+    'musb-omap-mailbox/0063-musb-omap-mailbox-lifetime.patch',
+)
+
 
 def patch_path(root, name):
     """Locate a named source input without falling back for missing candidates."""

@@ -550,6 +550,22 @@ tasks:
     desc: Test actual MPFS remove with Linux platform child, PHY and clock cleanup in UML
     cmds: [bash tools/run-logged.sh mpfs-ownership-kunit python3 tools/check-mpfs-ownership-kunit.py]
 
+  test:omap-musb-mailbox-reference:
+    desc: Reproduce four OMAP mailbox dispatch/work lifetime schedules without device access
+    cmds: [bash tools/run-logged.sh omap-musb-mailbox-reference python3 tools/check-omap-musb-mailbox.py --reference]
+
+  test:omap-musb-mailbox:
+    desc: Qualify bounded OMAP mailbox and parent-PM lifetime on native, sanitizers and ARM32
+    cmds: [bash tools/run-logged.sh omap-musb-mailbox python3 tools/check-omap-musb-mailbox.py]
+
+  check:omap-musb-mailbox-drivers:
+    desc: Qualify OMAP mailbox lifetime and compile six explicitly selected complete configurations
+    cmds: [bash tools/run-logged.sh omap-musb-mailbox-drivers python3 tools/check-omap-musb-mailbox.py --compile-drivers]
+
+  test:omap-musb-mailbox-kunit:
+    desc: Qualify real Linux SRCU, work, parent runtime PM and OMAP child lifetime under UML
+    cmds: [bash tools/run-logged.sh omap-musb-mailbox-kunit python3 tools/check-omap-musb-mailbox-kunit.py]
+
   test:extcon-kunit:
     desc: Build and run real Linux UML notifier lifetime tests with TREE and TINY SRCU; no device access
     env:

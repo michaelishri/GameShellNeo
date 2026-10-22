@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[306 — OMAP2430 MUSB mailbox ownership](306-omap-mailbox-ownership.md)
+records the original publisher/work schedules, opt-in ownership candidate,
+source-context boundaries and separate Linux and hardware qualification gates.
+
 [300 — MPFS parent resource and PHY ownership](300-mpfs-removal-ownership.md)
 records the two backend teardown defects, actual-source and selected-object
 qualification, real platform-device fixture and retained wider boundaries.

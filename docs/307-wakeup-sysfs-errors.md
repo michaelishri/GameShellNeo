@@ -113,10 +113,16 @@ incapable device, verifies its real attribute is absent, then invokes the actual
 unchanged static frontend through a test-only accessor. It does not simulate an
 incapable sysfs file or concurrent capability changes.
 
-The prepared checkpoint will adopt accepted published main `0886549` before
-its first managed ARM/object/kernel writer. That context adoption must preserve
-the candidate and all own fixture/source bytes; previous host evidence remains
-historical when maintained context inputs change.
+Prepared checkpoint `c88e4d3` adopted accepted published main `0886549` through
+merge `4918476` before its first managed ARM/object/kernel writer. The private
+`.local/audit/neo223-accepted-context.json` receipt (SHA-256
+`e562e82f47c52b0b7569c57d02d919185b2a1bdd2f4c9c125b36d38febb70090`)
+proves the thirteen own candidate/fixture/source/doc files are byte-identical
+across that adoption, both own Task entries are preserved exactly, and the
+source lock/configuration, source preparation, managed helper and maintained
+production patches are unchanged. The imported context consists of accepted
+clock tooling/documentation and the separately reviewed wake-control host fix.
+Previous host evidence remains historical when maintained context inputs change.
 
 MUSB IRQ timing/device-DPM traversal, terminal destruction/composition, image
 selection and physical hardware behavior remain separate. NEO-98 stays open.

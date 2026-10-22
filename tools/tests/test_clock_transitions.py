@@ -66,6 +66,8 @@ class ClockTransitions(unittest.TestCase):
         if raw is None:
             raw = ''.join(json.dumps(row, sort_keys=True)+'\n' for row in records).encode()
         original = copy.deepcopy(records)
+        origins = {name: str(Path(module.__file__).resolve()) for name, module in (
+            ('clock_transitions', transitions), ('clock_provenance', transitions.provenance))}
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary)/'kernel.ndjson'
             source.write_bytes(raw)
@@ -79,7 +81,9 @@ class ClockTransitions(unittest.TestCase):
                 raw_sha256=hashlib.sha256(raw).hexdigest(), raw_unchanged=source.read_bytes() == raw,
                 input_object_unchanged=records == original, actual_cli=True, current_module_same_result=(
                     direct == {k: v for k, v in result.items() if k not in ('input_bytes', 'input_sha256')}
-                    if result is not None else None), no_device_or_collector=True)
+                    if result is not None else None), actual_import_origins=origins,
+                original_replay_reused=transitions.provenance is sys.modules['clock_provenance'],
+                no_device_or_collector=True)
             saved = os.environ.get('NEO_CLOCK_TRANSITION_RESULTS_DIR')
             if saved:
                 directory = Path(saved)/name; directory.mkdir(parents=True, exist_ok=False)
@@ -90,6 +94,8 @@ class ClockTransitions(unittest.TestCase):
             self.assertEqual(child.returncode == 0, not refused, stderr.decode())
             self.assertTrue(observed['raw_unchanged'])
             self.assertTrue(observed['input_object_unchanged'])
+            self.assertEqual(origins, {name: str(ROOT/'tools'/(name+'.py')) for name in origins})
+            self.assertTrue(observed['original_replay_reused'])
             if result is not None:
                 self.assertTrue(observed['current_module_same_result'])
                 self.assertEqual(result['input_sha256'], observed['raw_sha256'])

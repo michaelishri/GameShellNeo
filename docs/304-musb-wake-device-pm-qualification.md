@@ -2,10 +2,11 @@
 
 23 October 2026, Pacific/Auckland. This bounded offline child of NEO-98 uses
 the isolated `work/musb-wake-device-pm-qualification` checkout, starting at
-published main `02c633a0349ad986fe384cc0f94e26663baa3df3`. Report 301's separate
-NEO-218 checkpoint remains frozen for review; this fixture does not change or
-reuse its runner, maintained helper or fixture. NEO-219 separately owns terminal
-wake/IRQ cleanup and combined retirement qualification.
+published main `02c633a0349ad986fe384cc0f94e26663baa3df3`. That original checkpoint
+remains frozen at `6d7177b`. A separate `work/musb-wake-device-pm-final` checkout
+adopts published NEO-218 at `7120990` for its accepted managed-result API; it
+does not change NEO-218's runner, helper or fixture. NEO-219 separately owns
+terminal wake/IRQ cleanup and combined retirement qualification.
 
 ## Source and ownership boundary
 
@@ -80,11 +81,38 @@ the original MUSB core and Linux PM/IRQ sources remain unchanged.
 
 ## Qualification status and remaining scope
 
-Implementation and host admission guards are prepared. Actual managed kernel
-execution and the compiling control are pending; no result is claimed yet.
-The saved Tasks use the pinned local builder, disabled networking, one build job,
-unique managed attempts and retained source/config/binary/KTAP/result receipts.
-Original failures remain historical and are never relabeled as later success.
+The original `6d7177b` chain completed with actual kernel execution: positive
+run `e1df48b844cf429790b2e4115424b1ba` passed all nine cases; compiling control
+`6368e4d386c3481e9ac62e1c38733c68` exited 1 with the single named failure,
+exactly fourteen predeclared assertions and eight passes. Both original managed
+jobs are terminal and released, with no stop or OOM. Their immutable private
+index is `.local/audit/neo220-original-evidence-index.json` in the original
+checkout (SHA-256
+`eea3c6930015583099b6179f3c2c46fe92d711404c8afe0ba74ab2551b80ee67`).
+
+Those executions used the earlier admission code. They remain genuine
+historical observations and are not relabeled as current evidence. The separate
+final checkout now accepts a nonzero control only through NEO-218's typed
+`ManagedCommandFailure`, with matching original identity/result, clean exit 1
+and released ownership. Generic errors, including unresolved cleanup, propagate.
+Both positive and control routes retain and verify any old log or JSON file,
+remove the active names before execution, and require both files from the new
+execution. New identical result bytes are valid; content inequality is not a
+freshness test.
+
+Focused host qualification passed eleven DPM guard tests and five accepted
+managed-result test groups. The actual runner routes reject stale or partial
+outputs, unresolved/active ownership, stopped/OOM/running/wrong-original results
+and nonzero positive execution; they accept newly produced identical outputs.
+The fixture, exact fourteen-assertion control, Kconfig and generated kernel
+profile remain unchanged. New owned cached kernel executions and current-input
+evidence are pending the coordinated final publication base. No final receipt
+is claimed from the historical runs.
+
+The saved Tasks use the pinned local builder, disabled networking, one build
+job, unique managed attempts and retained source/config/binary/KTAP/result
+receipts. Original failures remain historical and are never relabeled as later
+success.
 
 NEO-98 remains open for allocation/sysfs concurrency, terminal destruction and
 combined wake/retirement ownership, other controllers, deliberate image

@@ -13,7 +13,7 @@ import uuid
 from kernel_candidates import include_candidates
 from kernel_checks import ROOT, archive_for, check_overrides, sha256
 from kernel_sources import atomic_json, ensure_source, locked
-from managed_container import execute, result_for
+from managed_container import ManagedCommandFailure, execute, owns_active, result_for
 from musb_restart_kunit import manifest_for
 import musb_wake_dpm_kunit as support
 
@@ -57,12 +57,20 @@ def main():
         (scratch / 'kunit.config').write_text(text)
         relative = scratch.relative_to(ROOT).as_posix()
         output = scratch / 'output'
-        if (output / 'test.log').exists():
+        result_paths = (output / 'test.log', scratch / 'results.json')
+        previous_paths = [path for path in result_paths if path.exists()]
+        if previous_paths:
             previous = scratch / 'previous-runs' / uuid.uuid4().hex
             previous.mkdir(parents=True)
-            for path in (output / 'test.log', scratch / 'results.json'):
-                if path.exists():
-                    shutil.copyfile(path, previous / path.name)
+            for path in previous_paths:
+                retained = previous / path.name
+                shutil.copyfile(path, retained)
+                if sha256(retained) != sha256(path):
+                    raise RuntimeError('Previous DPM result changed during retention: ' + path.name)
+            # A failed rebuild can exit before KUnit writes either result.
+            # Keep history, then require both active names to be created anew.
+            for path in previous_paths:
+                path.unlink()
         arguments = ['--pull=never', '--user', f'{os.getuid()}:{os.getgid()}',
             '--platform', builder['platform'], '--network', 'none',
             '--tmpfs', '/uml-tmp:rw,exec,size=2g,mode=1777', '-e', 'TMPDIR=/uml-tmp',
@@ -78,12 +86,13 @@ def main():
         try:
             try:
                 result = execute(stem + '-kunit', arguments, attempt, timeout=7200)
-            except RuntimeError:
+            except ManagedCommandFailure as failure:
                 if not args.control:
                     raise
-                _, result, _ = result_for(attempt / 'managed-run.json')
+                identity, result, _ = result_for(attempt / 'managed-run.json')
                 state = (result or {}).get('state') or {}
-                if (not result or result.get('outcome') != 'exited' or result.get('exit_code') != 1 or
+                if (identity != failure.identity or result != failure.result or owns_active(identity) or
+                        not result or result.get('outcome') != 'exited' or result.get('exit_code') != 1 or
                         result.get('returncode') != 1 or result.get('stop_requested') or
                         state.get('Running') is not False or state.get('Status') != 'exited' or
                         state.get('ExitCode') != 1 or state.get('OOMKilled') or state.get('Error')):
@@ -93,6 +102,8 @@ def main():
                 candidate_profile='musb-wake-startup', control=args.control))
         if any(sha256(ROOT / name) != digest for name, digest in inputs.items()):
             raise RuntimeError('DPM qualification inputs changed during the owned run')
+        if any(not path.is_file() for path in result_paths):
+            raise RuntimeError('Missing current-execution DPM KUnit log or JSON; retain original result')
         check_overrides(output / '.config', [line for line in text.splitlines() if line.startswith('CONFIG_')])
         validate = support.checked_control if args.control else support.checked_cases
         cases = validate(json.loads((scratch / 'results.json').read_text()),

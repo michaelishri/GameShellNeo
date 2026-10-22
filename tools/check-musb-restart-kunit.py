@@ -14,7 +14,7 @@ from kernel_candidates import include_candidates
 from kernel_checks import ROOT, archive_for, check_overrides, run, sha256
 from kernel_sources import atomic_json, ensure_source, locked
 from musb_restart_kunit import manifest_for
-from managed_container import execute, result_for
+from managed_container import ManagedCommandFailure, execute, owns_active, result_for
 
 
 def main():
@@ -68,12 +68,20 @@ def main():
         (scratch / 'kunit.config').write_text(text)
         relative = scratch.relative_to(ROOT).as_posix()
         output = scratch / 'output'
-        if (output / 'test.log').exists():
+        result_paths = (output / 'test.log', scratch / 'results.json')
+        previous_paths = [path for path in result_paths if path.exists()]
+        if previous_paths:
             previous = scratch / 'previous-runs' / uuid.uuid4().hex
             previous.mkdir(parents=True)
-            for path in (output / 'test.log', scratch / 'results.json'):
-                if path.exists():
-                    shutil.copyfile(path, previous / path.name)
+            for path in previous_paths:
+                retained = previous / path.name
+                shutil.copyfile(path, retained)
+                if sha256(retained) != sha256(path):
+                    raise RuntimeError('Previous result changed during retention: ' + path.name)
+            # KUnit can exit 1 on a build failure before writing either result.
+            # Retain history, then remove both active names before this execution.
+            for path in previous_paths:
+                path.unlink()
         arguments = ['--user', f'{os.getuid()}:{os.getgid()}',
              '--platform', builder['platform'], '--network', 'none',
              '--tmpfs', '/uml-tmp:rw,exec,size=2g,mode=1777', '-e', 'TMPDIR=/uml-tmp',
@@ -92,12 +100,13 @@ def main():
             try:
                 try:
                     managed_result = execute(stem + '-kunit', ['--pull=never', *arguments], attempt, timeout=7200)
-                except RuntimeError:
+                except ManagedCommandFailure as failure:
                     if not args.wake_control:
                         raise
-                    _, managed_result, _ = result_for(attempt / 'managed-run.json')
+                    identity, managed_result, _ = result_for(attempt / 'managed-run.json')
                     state = (managed_result or {}).get('state') or {}
-                    if (not managed_result or managed_result.get('outcome') != 'exited' or
+                    if (identity != failure.identity or managed_result != failure.result or owns_active(identity) or
+                            not managed_result or managed_result.get('outcome') != 'exited' or
                             managed_result.get('exit_code') != 1 or managed_result.get('returncode') != 1 or
                             managed_result.get('stop_requested') or state.get('Running') is not False or
                             state.get('Status') != 'exited' or state.get('ExitCode') != 1 or
@@ -110,6 +119,8 @@ def main():
                 raise RuntimeError('Wake qualification inputs changed during the owned run')
         else:
             run(['docker', 'run', '--rm', *arguments])
+        if any(not path.is_file() for path in result_paths):
+            raise RuntimeError('Missing current-execution KUnit log or JSON; retain original result')
         check_overrides(output / '.config', [line for line in text.splitlines() if line.startswith('CONFIG_')])
         validate = support.checked_control if args.wake_control else support.checked_cases
         cases = validate(json.loads((scratch / 'results.json').read_text()),

@@ -38,12 +38,93 @@ def report(control=False):
 
 
 def control_log():
-    lines = ['musb-wake-dpm', *CASES]
-    for expression, values in CONTROL_ASSERTIONS.items():
-        lines.extend(('# ' + CONTROL_CASE + ': EXPECTATION FAILED',
-                      'Expected ' + expression + ', but', *values))
-    lines.append('not ok 2 ' + CONTROL_CASE)
-    return '\n'.join(lines)
+    # Verbatim compiled KTAP from genuine control 5279349d92a14438bccfbbeef6784a50.
+    # Keep formatter values independent from the admission map under test.
+    return """    # Subtest: musb-wake-dpm
+    # module: musb_hdrc
+    1..9
+    ok 1 dpm_policy_disabled_test
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:436
+    Expected f->calls.prepare == 1U, but
+        f->calls.prepare == 0 (0x0)
+        1U == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:437
+    Expected f->prepare_usage == walk->before.usage + 1, but
+        f->prepare_usage == 0 (0x0)
+        walk->before.usage + 1 == 2 (0x2)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:448
+    Expected f->calls.suspend == 1U, but
+        f->calls.suspend == 0 (0x0)
+        1U == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:450
+    Expected walk->after_start.usage == walk->before.usage + 2, but
+        walk->after_start.usage == 2 (0x2)
+        walk->before.usage + 2 == 3 (0x3)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:456
+    Expected f->calls.resume == 1U, but
+        f->calls.resume == 0 (0x0)
+        1U == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:457
+    Expected f->calls.complete == 1U, but
+        f->calls.complete == 0 (0x0)
+        1U == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:458
+    Expected f->complete_usage == walk->before.usage + 1, but
+        f->complete_usage == 0 (0x0)
+        walk->before.usage + 1 == 2 (0x2)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:467
+    Expected f->calls.late == 1U, but
+        f->calls.late == 0 (0x0)
+        1U == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:468
+    Expected f->calls.noirq == 1U, but
+        f->calls.noirq == 0 (0x0)
+        1U == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:469
+    Expected f->calls.resume_noirq == 1U, but
+        f->calls.resume_noirq == 0 (0x0)
+        1U == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:470
+    Expected f->calls.early == 1U, but
+        f->calls.early == 0 (0x0)
+        1U == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:474
+    Expected walk->after_end.armed == wake, but
+        walk->after_end.armed == 0 (0x0)
+        wake == 1 (0x1)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:475
+    Expected walk->after_end.disabled == !wake, but
+        walk->after_end.disabled == 1 (0x1)
+        !wake == 0 (0x0)
+    # dpm_policy_enabled_test: EXPECTATION FAILED at drivers/usb/musb/musb-wake-dpm-kunit.c:476
+    Expected walk->after_end.references == wake ? 1U : 0U, but
+        walk->after_end.references == 0 (0x0)
+        wake ? 1U : 0U == 1 (0x1)
+    not ok 2 dpm_policy_enabled_test
+    ok 3 dpm_shared_peer_test
+ musb-wake-dpm-kunit: PM: device_prepare(): wake_dpm_prepare returns -5
+ musb-wake-dpm-kunit: PM: not prepared for power transition: code -5
+    ok 4 dpm_prepare_error_test
+ musb-wake-dpm-kunit: wake IRQ 128 suspend failed: -5
+ musb-wake-dpm-kunit: PM: dpm_run_callback(): wake_dpm_suspend returns -5
+ musb-wake-dpm-kunit: PM: failed to suspend: error -5
+    ok 5 dpm_arm_error_test
+ musb-wake-dpm-kunit: PM: dpm_run_callback(): wake_dpm_suspend returns -5
+ musb-wake-dpm-kunit: PM: failed to suspend: error -5
+    ok 6 dpm_runtime_resume_error_test
+ musb-wake-dpm-kunit: PM: dpm_run_callback(): wake_dpm_late returns -5
+ musb-wake-dpm-kunit: PM: failed to suspend late: error -5
+    ok 7 dpm_late_error_test
+ musb-wake-dpm-kunit: PM: dpm_run_callback(): wake_dpm_noirq returns -5
+ musb-wake-dpm-kunit: PM: failed to suspend noirq: error -5
+    ok 8 dpm_noirq_error_test
+ musb-wake-dpm-kunit: wake IRQ 128 resume failed: -5
+ musb-wake-dpm-kunit: PM: dpm_run_callback(): wake_dpm_resume returns -5
+ musb-wake-dpm-kunit: PM: failed to resume: error -5
+    ok 9 dpm_resume_disarm_error_test
+# musb-wake-dpm: pass:8 fail:1 skip:0 total:9
+# Totals: pass:8 fail:1 skip:0 total:9
+not ok 1 musb-wake-dpm"""
 
 
 class ProfileBoundary(unittest.TestCase):
@@ -103,6 +184,22 @@ class EvidenceBoundary(unittest.TestCase):
         for log in wrong_logs:
             with self.subTest(tail=log[-100:]), self.assertRaises(ValueError):
                 checked_control(report(True), log)
+
+    def test_control_rejects_numeric_prefixes_and_inconsistent_hex_values(self):
+        valid = control_log()
+        observed = 'walk->after_start.usage == 2 (0x2)'
+        self.assertEqual(valid.count(observed), 1)
+        for wrong in ('walk->after_start.usage == 20 (0x14)',
+                      'walk->after_start.usage == 21 (0x15)',
+                      'walk->after_start.usage == 2 (0x14)',
+                      'walk->after_start.usage == 20 (0x2)',
+                      'walk->after_start.usage == 2 (0x2) extra',
+                      observed + '\n        ' + observed):
+            with self.subTest(observed=wrong), self.assertRaises(ValueError):
+                checked_control(report(True), valid.replace(observed, wrong, 1))
+        with self.assertRaises(ValueError):
+            checked_control(report(True), valid.replace('wake == 1 (0x1)',
+                                                       'wake == 10 (0xa)', 1))
 
     def test_kernel_diagnostics_reject_both_paths(self):
         for diagnostic in ('WARNING:', 'BUG:', 'Kernel panic', 'possible circular locking',
@@ -274,6 +371,18 @@ class RunnerAdmission(unittest.TestCase):
             self.assertEqual(harness.before_execution,
                              {'test.log': False, 'results.json': False})
             self.assertEqual(harness.result_observations, 0)
+            self.assertFalse(list(harness.work.glob('*evidence.json')))
+
+    def test_control_rejects_wrong_complete_number_from_fresh_raw1_execution(self):
+        with self.cached_runner(produced=('test.log', 'results.json')) as harness:
+            harness.payload['test.log'] = harness.payload['test.log'].replace(
+                b'walk->after_start.usage == 2 (0x2)',
+                b'walk->after_start.usage == 20 (0x14)', 1)
+            with self.assertRaises(ValueError):
+                runner.main()
+            self.assertEqual(harness.before_execution,
+                             {'test.log': False, 'results.json': False})
+            self.assertEqual(harness.result_observations, 1)
             self.assertFalse(list(harness.work.glob('*evidence.json')))
 
 

@@ -83,9 +83,16 @@ def checked_control(report, log):
             any(failure['case'] != CONTROL_CASE for failure in failures)):
         raise ValueError('Unexpected or missing control assertion')
     for failure in failures:
-        block = '\n'.join(failure['lines'])
-        if any(value not in block for value in CONTROL_ASSERTIONS[failure['expression']]):
-            raise ValueError('Missing observed callback/IRQ value')
+        for expected in CONTROL_ASSERTIONS[failure['expression']]:
+            operand, value = expected.rsplit(' == ', 1)
+            lines = [line.strip() for line in failure['lines']
+                     if line.strip().startswith(operand + ' ==')]
+            if len(lines) != 1:
+                raise ValueError('Missing or duplicate observed callback/IRQ value')
+            observed = re.fullmatch(re.escape(operand) + r' == ([0-9]+) \(0x([0-9a-f]+)\)', lines[0])
+            if (observed is None or int(observed[1]) != int(value) or
+                    int(observed[2], 16) != int(value)):
+                raise ValueError('Unexpected observed callback/IRQ value')
     return cases
 
 

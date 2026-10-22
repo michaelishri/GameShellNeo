@@ -8,15 +8,21 @@ adopts published NEO-218 at `7120990` for its accepted managed-result API; it
 does not change NEO-218's runner, helper or fixture. NEO-219 separately owns
 terminal wake/IRQ cleanup and combined retirement qualification.
 
-The final-admission checkout starts from fixed guard checkpoint `9de70c2` and
+The first final-admission checkout starts from fixed guard checkpoint `9de70c2` and
 adopts independently published `4d680d7` through merge `e78f96d`. The actual DPM
 fixture, configuration, support, runner and tests remain byte-identical to that
-fixed checkpoint. Both saved Task entries are retained alongside the accepted
+fixed checkpoint at `1f432d4`. Both saved Task entries are retained alongside the accepted
 clock, host-admission and terminal-composition context. This milestone still
 selects unchanged wake/startup 0026/0029; the published terminal profile is a
 separate opt-in qualification. New owned positive and control executions pass
 the final current-input guards at `1f432d4`; their source, configuration and
 binary identities match the corresponding genuine original executions.
+
+The separate numeric-admission checkout starts from frozen `7c922e0` on the
+same accepted base. It corrects only host parsing and focused tests after the
+first final Spec review found a numeric-prefix false acceptance. Actual kernel
+fixtures/configuration, the fourteen-assertion map, source generation and the
+managed runner remain unchanged.
 
 ## Source and ownership boundary
 
@@ -84,6 +90,11 @@ driver suspend reference, and missing armed/reference state at noirq. Every
 assertion and observed value is bound to that case. An additional or different
 assertion, another failed case, setup/compile failure, skip, incomplete output
 or kernel diagnostic rejects the control.
+
+Each required observed operand must occur once on a complete formatter line.
+Both its decimal and hexadecimal values must equal the declared number;
+numeric prefixes, inconsistent representations, trailing text and duplicate
+observations are rejected.
 
 The original raw failed result is retained separately from positive evidence.
 Source generation changes only that single fixture registration assignment;
@@ -165,8 +176,20 @@ compiled C regressions, Bash syntax and ShellCheck. Its retained log is
 The complete check includes the twelve DPM tests and five managed-result groups.
 The source, index and worktree stayed unchanged through qualification. Only this
 report receives the final evidence afterward; executable inputs are unchanged.
-An entirely new final Standards and Spec pair remains required before publication
-or closing NEO-220.
+Those first final executions remain genuine historical evidence after the
+numeric-parser correction; their receipts are not relabeled as current.
+
+The first final review at frozen `7c922e0` returned zero required Standards
+findings and one required Spec finding: the prior substring check accepted
+`walk->after_start.usage == 20 (0x14)` when the declared value was 2. The new
+checkout preserves the original actual-admission counterexample and the red
+regressions before correcting it. Its focused check passes fourteen DPM tests
+and five managed-result groups. The tests use a verbatim genuine compiled KTAP
+section rather than constructing observed values from the admission map, and
+exercise both direct control parsing and actual runner admission with fresh
+raw-1 output. New owned current-input cached positive/control executions and
+the complete host check are pending. A new final Standards and Spec pair is
+required before publication or closing NEO-220.
 
 The saved Tasks use the pinned local builder, disabled networking, one build
 job, unique managed attempts and retained source/config/binary/KTAP/result

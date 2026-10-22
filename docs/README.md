@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[298 — USB removal producer and backend lifetime](298-usb-removal-producer-lifetime.md)
+records the Sun4i detector generation guard, offline qualification and separate
+remaining provider/backend and physical gates.
+
 [295 — Development-store expansion](295-development-store-expansion.md)
 records the guarded offline grow operation, fresh checkpoint requirements,
 partition-byte preservation and qualification gates.

@@ -18,6 +18,7 @@ PROFILES = {
         '0043-extcon-notifier-drain.patch',
         '0044-sunxi-child-notifier-work.patch',
         '0045-extcon-provider-link.patch',
+        '0060-sun4i-phy-detector-generation.patch',
     )),
 }
 

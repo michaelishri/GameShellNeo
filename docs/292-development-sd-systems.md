@@ -140,8 +140,83 @@ rejects tampering before SSH. Validation is
 `1c3be827f08a3a862a1810e90731064b56bb46340e29f3e09b82f6f20772fd47`.
 No real configuration, network, Mac or device operation was used by these tests.
 
-Card assembly, whole-version transfer qualification, full host regression and
-independent final review results are recorded below once complete.
+The 8 GiB card assembly completed through managed run
+`9b500a28549a4e3ab426b792fd5ec89c`. Artifact
+`.local/multiboot/card/GameShellNeo-development-r2.img` has SHA
+`630be26098ae5736ff8718a2e2a4608564213a915f8222d87a5bed0200416463`;
+its `.json` receipt SHA is
+`0505f4c7b250b7c7aaf229522545d3862285978c606397a28c85a8732636cf0f`.
+All three filesystems pass, and the reserved bootloader prefix and full p2 are
+byte-identical. The store is `b9dab681-03`, recovery `b9dab681-02` with kernel
+`6.18.54-gameshellneo24`. The initial NEXT selects `diag26` with matched
+`6.18.54-gameshellneo25`; GOOD retains recovery. The source raw hashes are
+`c88d158d446b6ed14617b815ec17bfd2b3e90fee858ddd30e008ed74640aeb77`
+(recovery diagnostic.25) and
+`a4ba84485e9de96d9b92ce0eb6f5ce1958163188c02a315d7f46d1da161c9df8`
+(selected diagnostic.26). The generated image remains hardware-unqualified.
+
+The complete `task check` passed: 24 runtime and 1150 tooling tests, five
+explicit skips, both compiled selector/mount-guard checks and shell lint.
+Root-only and native-handoff skips have the separate evidence above; the two
+pre-existing environment-dependent skips remain explicit. Host log SHA is
+`d5c19f38822a474135d4faca9479a27df2bdc79ae571650e59c37ccbb00cf674`.
+There is no diff to `build/sources.lock.json`, `kernel/patches/` or `runtime/`.
+
+The host prepared `.local/multiboot/bundles/diag25.tar`, 678348800 bytes, SHA
+`d1b40e7c333e652904c60c9d7df7fb4412f7411b8ca5568a8bda34b8069adaa4`,
+for store `b9dab681-03`. `task check:dev-card` then completed the full import on
+a disposable copy, managed run `6190841ff16c4d268d51953ce8923102` (exit 0, no
+OOM/stop). The two roots retain their respective kernels. Import left
+NEXT=diag26/GOOD=recovery unchanged; selection changed NEXT to diag25; recovery
+selection restored NEXT=recovery. The actual copied administration CLI and its
+retained loader/source receipt passed. All three copied filesystems pass after
+the operations, and the original prepared image still hashes to `630be260...`.
+Result `.local/multiboot/card/import-qualification.json` and its managed log
+both hash to
+`648507319a128538a77ef5dc4e41e031aebe6f84e04846e72bcf67bb6ca4c9ed`.
+
+`task dev:pack` created the fresh private transfer directory
+`.local/multiboot/transfer-r2`. Its gzip image is 561002958 bytes, SHA
+`6196379abcf4126d4575c44511f1d5451e805dfabe71f81bae2924014f902e19`;
+`transfer.json` SHA is
+`45978796b8cc5fea684cf9f5cb2c538901ac8985f682fbed018bd0c9480cd116`.
+The actual flash helper's source-verification API checked the complete
+compressed and decompressed checksums and development receipt on Linux, and
+admitted the explicit 2168-second guard. This accesses no card and does not
+qualify macOS Disk Arbitration runtime behavior. Verification result SHA is
+`e28d3059e7c918743ec0616aac832e76290926db41c900a3d270598bd52c264f`.
+Production transfer directories and recovery checkpoints were not selected.
+
+The consolidated private evidence is `.local/multiboot/qualification.json`, SHA
+`3d397f58f3a4e984aa310a5170c16eadbe8d7428586c97146828e74d1cb4af39`.
+It pins code checkpoint `0d1fd621e48e674f455964daa80e90e119d9f148`, receipts,
+logs, both review axes and the remaining qualification limits. The stage
+ledger is clear; all owned build sessions completed. Canonical main remains
+`a41a0aa` with its original four owner-modified/untracked paths, and the
+protected legacy request-resume audit still hashes to
+`2e8ed588faa129e9f07edc68d9137e8af684774353ed34233bb9b3932c35310a`.
+This feature branch remains open for the physical acceptance below; its saved
+worktree, failed first image and original logs are retained.
+
+## Standards review
+
+Independent review of `a41a0aa...0d1fd62` found zero documented-standard
+violations and zero actionable smell findings. The code retains managed
+ownership, read-only sources, immutable version names, private artifacts,
+identity checks and separate registration/selection. The receipt-collision,
+SPL admission and recovery manifest/fstab correlation findings are resolved.
+The review distinguishes shell-model/native evidence from the vendor/board
+checks still outstanding.
+
+## Spec review
+
+Independent review of the same fixed diff found zero missing requirements,
+scope-creep findings or incorrect implementations. The development-only
+contract covers independent complete roots, matched boot assets/modules,
+preserved recovery, consume/readback, explicit confirmation, loop-free import
+and guarded flash selection. Production inputs stay separate, and development
+roots cannot reuse PM admission. Physical/vendor/board qualification remains
+open. Findings: Standards 0; Spec 0.
 
 ## Remaining acceptance
 

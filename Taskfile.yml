@@ -959,6 +959,14 @@ tasks:
       NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
     cmds: [python3 tools/check-clock-boundary.py]
 
+  test:clock-reference-feasibility:
+    desc: Test six fixed synthetic counter-reference families without hardware
+    cmds: [python3 -m unittest discover -s tools/tests -p test_clock_reference_feasibility.py -v]
+
+  check:clock-reference-feasibility:
+    desc: Audit pinned ordering and managed native/sanitizer/ARM fixtures; no device probe
+    cmds: ['bash tools/run-logged.sh clock-reference-feasibility python3 tools/check-clock-reference-feasibility.py {{.CLI_ARGS}}']
+
   test:development-clock:
     desc: Test development-directory clock provenance and strict original-image refusals offline
     cmds: [python3 -m unittest discover -s tools/tests -p test_development_clock.py -v]
@@ -970,6 +978,26 @@ tasks:
   dev:clock:
     desc: Read-only local provenance plan; --apply explicitly runs one bounded awake development capture
     cmds: ['python3 tools/check-development-clock.py {{.CLI_ARGS}}']
+
+  check:scheduled-clock-pause:
+    desc: Qualify the separate pause helper offline with native UBSan, ARM and actual signal evidence
+    cmds: ['bash tools/run-logged.sh scheduled-clock-pause python3 tools/build-scheduled-clock.py {{.CLI_ARGS}}']
+
+  test:scheduled-clock:
+    desc: Test finite scheduled clock/pause provenance, replay, admission and owned cleanup offline
+    cmds: [python3 -m unittest discover -s tools/tests -p 'test_*scheduled*.py' -v]
+
+  check:scheduled-clock-workload:
+    desc: Qualify native and original ARM Python/libc workload offline in an owned limited container
+    cmds: ['bash tools/run-logged.sh scheduled-clock-workload python3 tools/qualify-scheduled-clock.py {{.CLI_ARGS}}']
+
+  dev:clock:scheduled:
+    desc: Read-only finite scheduled plan; --apply explicitly runs one provenance-qualified capture
+    cmds: ['python3 tools/check-scheduled-clock.py {{.CLI_ARGS}}']
+
+  report:clock-scheduled:
+    desc: Independently replay saved finite clock/pause originals without device access
+    cmds: ['python3 tools/replay-scheduled-clock.py {{.CLI_ARGS}}']
 
   report:clock-boundary:
     desc: Correlate saved kernel clock ordinals with raw ABI and Python/native values; no device access

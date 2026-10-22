@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[302 — Finite scheduled clock brackets](302-scheduled-clock-boundaries.md)
+records the separate fixed guard/RAW experiment, pause ABI, offline evidence
+and unchanged clock/PM and exclusive-device gates.
+
 [297 — brcmfmac firmware startup ownership](297-brcmfmac-startup-ownership.md)
 records reproduced setup-error loss, the isolated fail-fast candidate,
 actual-source qualification and separate reset/reprobe boundaries.

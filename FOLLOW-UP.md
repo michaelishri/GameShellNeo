@@ -296,7 +296,7 @@ that cross-CPU atomic callback boundary. No GameShell access occurred.
 adapter now distinguishes the original diagnostic.27 image, unchanged ARM
 reader receipt and newly executed wrapper sources. Its local plan verifies
 the raw image/kernel and exact release/deployment transformation; live checks
-will require the actual p3 root inode/mount, card/filesystem identity and fresh
+require the actual p3 root inode/mount, card/filesystem identity and fresh
 runtime hashes. Original raw-image and PM guards remain strict. Offline
 provenance/refusal, exact bounded large-contract staging, managed native/ARM
 replay and full 24 runtime/1297 tooling source checks pass. Both independent
@@ -304,10 +304,27 @@ source reviews pass, and one coordinated 384-call capture/replay completes
 from the exact capable diag27 root with fresh runtime/build provenance and
 unchanged health/both routes. The actual window covers CPU0 only for about
 11.9 ms; it does not clear the intermittent fault. Recovery remains default,
-diag27 unconfirmed; final evidence/combined-tree review and publication remain
-pending. The original MONOTONIC fault, RAW discrepancy and NEO-191 PM gate
-remain open.
+diag27 unconfirmed. Additional fresh review found and corrected receipt-driven
+ABI header completeness: all ten expected headers are now required. The valid
+original receipt and real artifact plan pass offline; 18 focused and 24 runtime /
+1301 tooling tests pass. Entirely fresh Standards/Spec reviews accepted the
+corrected source; NEO-213 was published and closed at `5505fd9`, retaining the
+historical capture's original source hashes and all evidence. The original
+MONOTONIC fault, RAW discrepancy and NEO-191 PM gate remain open.
 [Report296](docs/296-development-clock-admission.md).
+
+**NEO-192/217 scheduled observation, 23 October 2026:** a distinct finite
+experiment requests 32 guard/RAW brackets separated by 31 fixed relative
+100 ms pauses: 256 clock calls, with no affinity/clocksource/PM policy change
+or retry. The new pause-only library has separate native/ARM ABI, signal and
+source receipts; original reader/core and 384-call guards stay unchanged.
+Offline admission, replay, partial/error preservation and owned-stage tests
+are being qualified with a separate actual ARM Python/libc workload fixture.
+That fixture uses a fake recorder and supplies no kernel or hardware evidence.
+Fresh reviews and a separate device lease remain required before one capture;
+no scheduled GameShell operation has occurred. A clean finite sample cannot
+clear NEO-192 or dependent PM gates.
+[Report 302](docs/302-scheduled-clock-boundaries.md).
 
 **Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies
 kernel build ID/configuration, image/source/runtime hashes, same-process vDSO

@@ -1400,6 +1400,15 @@ The original raw-image entry and PM directory rejection remain strict.
 native/ARM reader offline. [Report296](docs/296-development-clock-admission.md)
 records separate identities, retained failures and the review/device gates.
 
+`task dev:clock:scheduled -- <explicit-provenance-arguments>` is a separate
+finite experiment: 32 guard/RAW rounds, 256 clock calls and 31 fixed relative
+pauses, with a separately qualified pause library. Its default remains a local
+read-only plan. `task test:scheduled-clock`, `task check:scheduled-clock-pause`
+and `task check:scheduled-clock-workload` qualify its explicit inputs offline.
+It needs its own independent reviews and device lease before execution;
+[report 302](docs/302-scheduled-clock-boundaries.md) records the schedule,
+retained failures and distinction between offline ABI fixtures and hardware.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

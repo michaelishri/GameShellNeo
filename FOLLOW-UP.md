@@ -2,7 +2,8 @@
 
 Record deferred questions and activities here as they arise.
 
-**NEO-207 legacy MUSB branch reconciliation:** exact wake/startup patches
+**NEO-207 legacy MUSB branch reconciliation:** source review and offline
+qualification are complete; wider parent gates remain. Exact wake/startup patches
 0026/0029 now have an independent offline profile, preserving current sleep
 session retirement, callback suppression and request ownership. This profile
 is intentionally separate from `musb-retirement`: patch 0039 and the wake

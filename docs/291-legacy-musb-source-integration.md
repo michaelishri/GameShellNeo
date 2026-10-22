@@ -84,9 +84,79 @@ Original patch identities:
 
 ## Qualification and retained evidence
 
-Final evidence is recorded after the saved Tasks finish. Early rejected fixture
-compilation is retained separately and is not accepted evidence. No maintained
-patch was changed to accommodate a test result.
+Implementation `5c24d89` retains the mapped source. History acknowledgement
+`bc95b79` records the earlier removal tip (and the other four ancestor tips)
+without changing that tree. Final source is `58eeadd`: the independent
+Standards and Spec reviews have zero remaining findings. The initial
+low-priority duplicate-execution judgment was resolved by sharing fixture
+execution through the existing native-variant helper while keeping probe/startup
+source extraction and mutations separate. The shared executor requires exact
+native/ARM summaries and records binary/log hashes.
+
+The final `check:musb-wake-startup-configs` run passes **430 actual-source
+scenarios natively and under ARM32 emulation**, plus **45 native assertion
+controls**:
+
+| Fixture | Native and ARM32 scenarios |
+| --- | ---: |
+| Current sleep/session/disconnect plus wake ownership and per-IRQ PM | 113 |
+| Complete probe/remove with wake and startup errors | 141 |
+| UDC gadget start with runtime-PM errors and positive success | 42 |
+| Callback/UDC suppression, drain and request-completion boundaries | 134 |
+
+The same run passes six full ARM object configurations: the board gadget
+configuration, host, dual-role, module, PM without system sleep and no PM.
+All 25 recorded objects are ARM ELF files; the module defines both callback
+helpers. Every final input hash (16), configuration hash, object hash and full
+35-patch candidate manifest was rechecked. Configurations and object hashes
+match the retained first complete matrix. The verified shared source inventory
+is `86924e61a2a60f53b8ead482ee71f27114ac7e28d05a48eb0d28695d1b7e3bca`.
+The ordinary production queue still has exactly its original 33 entries.
+
+The main candidate worktree is `.local/worktrees/remaining-legacy-integration`;
+its final receipt is `.local/build/musb-wake-startup-tests/matrix-evidence.json`,
+SHA-256 `8717666db39c7016270b18656164fbf75bfba10bd8a517b7fb93373a50a585dc`.
+The preceding full matrix at `bc95b79`, including 176 retained input/artifact
+files, is under `musb-wake-startup-tests/retained-matrices/bc95b79/`;
+its receipt hash is
+`b55d0a970512c1573c7c2e1a5211b0742fe924cd56852b103f6d79cb2d2395e8`.
+The final probe/startup extracted functions match that preceding run exactly.
+
+Independent evidence checkout `.local/worktrees/remaining-legacy-validation`
+passes the unchanged production `test:musb-sleep` scope at `58eeadd`: **68 sleep
+and 134 callback scenarios** on native/ARM32, with **21 native controls**.
+Its `.local/build/musb-sleep-tests/evidence.json` hash is
+`1bd7e36da6f99f84f2e7ce8c9454877ab77e7799c0bf750b6586932690c69ce1`.
+All 12 recorded inputs and the callback harness match the accepted source;
+production/candidate extracted callback functions are byte-identical.
+
+That checkout also passes the historical `audit:musb-teardown-baseline`:
+four observed/control variants each execute 20 stop and 24 remove scenarios
+natively and on ARM32; two assertion controls reject. The observed baseline
+reproduces eight offline-stop accesses, twelve residual-work cases and twelve
+post-clock-handler cases. Its success is reproduction of those historical
+faults. The receipt `.local/build/musb-teardown-baseline-audit/evidence.json`
+has SHA-256 `b5beeb2be7c23ab8c6fe5e94be120ddfd4e890f6745418ae19a8305c760e8190`;
+all eleven input hashes, nine extracted-source hashes, the final extracted
+header and eight native/ARM binary hashes were rechecked.
+
+The final combined `task check` at `58eeadd` in
+`.local/worktrees/remaining-final-integration` passes **24 runtime and 1,053
+tooling tests** (two existing optional skips), both compiled helper checks,
+Bash syntax and ShellCheck. Its log `.local/build/final-host-check.log` hash is
+`a64e9bc966dab0ab675b04224c46e6c4d416b31b589a8e14eb3a25f909c3a135`;
+receipt `.local/build/final-host-check.json` hash is
+`61ce63af5fcae11934a34b97a94b0c8fde68c49c89c06e4f93b0f9a531748f18`.
+The receipt pins 785 tracked inputs. The initial sandbox run blocked five
+synthetic local socket fixtures and remains in `final-host-check-sandbox.*`;
+the accepted successor used local-fixture permission without changing code or
+contacting a live SSH endpoint.
+
+The initial missing-WARN fixture compilation failure remains retained and is
+not accepted evidence; fixing the shim changed no maintained patch. Both legacy
+qualification worktrees have no active owned build container after completion.
+Final private verification is `.local/final-legacy-verification.json` in the
+candidate worktree. No source cache or original evidence was edited or cleaned.
 
 ## Remaining software and physical gates
 

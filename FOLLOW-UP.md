@@ -2,6 +2,18 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-10/227 charging inventory host admission:** a retained eight-route local
+baseline accepts four invalid inventories. The host now checks raw registers,
+24 clock points with explicit boundary-derived PM context, profile/metadata and
+recomputed assessment through unchanged pure code. Exactly 51 current local
+routes pass; one combined host check passes 24 runtime/1,438 tooling tests
+(nine expected skips), C guards and shell lint. Collector/stdin/transport,
+published normalizer, original baseline and historical profile map are
+preserved. Fresh independent review and serialized publication remain pending;
+no current diagnostic27, electrical/calibration/safety, device or parent
+NEO-10/101/192 clock/PM gate is cleared.
+[Report 312](docs/312-charge-inventory-result-admission.md).
+
 **NEO-10/226 charging host result admission:** the retained actual-host local
 baseline accepts four invalid streams, including completion-only and forged
 raw-bound/summary data. Host admission derives bounds from raw integers before

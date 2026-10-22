@@ -2624,6 +2624,13 @@ decoded controls/status into `assessment.gauge_control` with its explicit source
 label; E0/E1 capacity stays under `cached_configuration`. The embedded inventory
 in `device:charge-baseline` uses the same schema; previous captures stay unchanged.
 
+The standalone inventory host also replays raw register/clock/profile evidence
+and recomputes its assessment before reporting success, retaining raw output and
+provenance on refusal. The collector and historical diagnostic.20–23 profile
+guards remain unchanged; diagnostic.27 remains unsupported by that map.
+[Report 312](docs/312-charge-inventory-result-admission.md) records the host-only
+checks and separate device/electrical/clock qualification gates.
+
 `device:charge-baseline SECONDS=120` records a connected, awake baseline with
 one sample every ten seconds. `SECONDS` must be a multiple of ten from 60 to
 600. Keep USB connected and the screen/controls unchanged. It uses the same

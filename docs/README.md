@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[312 — Charging inventory host admission](312-charge-inventory-result-admission.md)
+records the original invalid acceptances, raw register/clock/profile replay,
+unchanged collector/transport and separate electrical/clock qualification gates.
+
 [310 — Raw charging-result host admission](310-charge-result-admission.md)
 records the retained host baseline, independent raw-bound/summary replay,
 unchanged collector/transport and separate charging/clock qualification gates.

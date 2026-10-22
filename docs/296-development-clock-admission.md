@@ -163,9 +163,107 @@ Final `task check` passes **24 runtime and 1297 tooling tests**, nine expected
 skips, both compiled C checks and Bash/ShellCheck. Log
 `.local/build/development-clock-host-check-final.log` has SHA
 `7eae5c49d7a94d027b66089a3699d14727837ced2c65bc151a960a9218c4790d`.
-The earlier 1295-case source checkpoint remains historical. Independent
-Standards/Spec reviews and live execution remain pending at this checkpoint.
-No Mac or GameShell operation has occurred for NEO-213 yet.
+The earlier 1295-case source checkpoint remains historical. This source
+checkpoint preceded the independent reviews and single live operation below.
+
+## Independent review and actual awake operation
+
+Both peer reviews cover fixed source
+`98aff1fe86689c916cd930f2b5c5a8bb218088f0...23c4133fa4f86a963152eca86c9b7315a4219264`.
+Spec reports zero actionable findings. Standards reports zero documented
+violations and zero required fixes, with one optional maintainability note:
+three independent sites construct the same deployment-manifest shape. A
+future pure helper could centralize that shape while retaining the separate
+hash/source comparisons. The note is preserved without changing qualified
+inputs. Canonical private reviews are `neo213-23c4133-spec.txt` and
+`neo213-23c4133-standards.txt` under `.local/coordination/reviews/`.
+
+The coordinator granted exclusive awake-only lease `device-neo213-01` at
+11:19:04 UTC on 22 October. Both frozen-checkout status operations pass:
+USB capture `20261022T111952.343801Z`, Wi-Fi `20261022T112004.939587Z`.
+The five-second Kiyo baseline `20261022T112022.363230Z` contains ten frames
+and stopped successfully. Actual first/last JPEG inspection shows the same
+readable tty1 login console; it does not establish physical input or clock
+health. All raw images remain private.
+
+Exactly one `dev:clock --apply` ran using the reviewed source and qualified
+artifact arguments. Capture
+`.local/diagnostics/20261022T112138.366426Z` in the new checkout retains the
+originals. The actual staged compact contract hashes to the qualified
+`8f4a387bdd33776dbebc9d26ff68d9e51ebdfee7805d62ed52513083c4f1183f`.
+The owning unit was
+`gameshellneo-clock-boundary-e7611efe551f44e796899071b6734eda.service`,
+PID/TID 661. Its original normal exit is code 1/status 0; only after retaining
+that evidence did supervision retire it. The final state is inactive,
+not-found, MainPID/ControlPID 0. No launch or measurement was repeated.
+
+Current process snapshots before/after match exactly: boot
+`cea309a9-bea5-49d7-8d41-e462ddd57e89`, kernel26 and the expected build ID,
+source/release/deployment manifests, CID/UUID/PARTUUID and actual p3 directory
+inode **131075**. Current Python and mapped libc match the release and saved
+ELF ABI evidence, at their exact sizes/hashes. The clocksource remains
+`arch_sys_counter`; both same-process vDSO clock exports are absent. The
+owner is one task in the initial PID namespace with the expected time
+namespace and unchanged CPUs 0–3 allowed affinity. No affinity is changed.
+
+The original 384-call stream is complete, aligned and independently replayed:
+128 calls per clock and 96 per route, **zero boundary findings or decreasing
+kernel/userspace values in this window**. It contains two writer records,
+zero lost writers, and one accepted attempt for every call. Every actual read
+and end CPU is **CPU0**. The first-to-last consumed counter span is 285610
+ticks, approximately **11.9004 ms** at the recorded 24 MHz timer frequency.
+This qualifies the end-to-end evidence path; it supplies neither multi-CPU
+coverage nor recurrence/clearance of the intermittent clock fault.
+
+Before/after awake health preserves PM counters 0/0, all service restart
+counts 0, empty failed-unit output, taint 0, USB power/configuration, display,
+charger, Wi-Fi and governor policy. The complete 282-record protected kernel
+checkpoint and its 282-record anchor are unchanged; anchor SHA is
+`aef844482f730b1309d9a112a38c9dc0d1339850ef728ad6cfc15faa4384978a`.
+These are current-boot observations. They do not overwrite the original
+diagnostic.25 restart/clock incident. The independent Wi-Fi proof also passes.
+
+Successful downloaded originals were replayed before removing only the owned
+`/tmp/gameshellneo-clock-boundary.jNcWEE3A` stage. A final read-only postflight
+proves that stage absent, no active clock/PM diagnostic units, no remaining
+process/control PID and no open recorder descriptor in any process. It also
+reads NEXT, GOOD and RECOVER, all at the recovery digest
+`dce033ba9041858b244d2f15c1f1b3111057d93756f64b07f02c73ec0de1ef84`.
+**Flags were measured postflight only**; no fresh before-flag sample exists
+for this operation, so unchanged flags across the operation are not claimed.
+Diagnostic.27 remains unconfirmed. The coordinator released the device lease
+after checking this receipt; no further live operation is authorized by it.
+
+| Retained live artifact | SHA-256 |
+| --- | --- |
+| `kernel.ndjson` | `aa40f8c551edecfd433a4d7acb060e19657cf669767c13b3c796e6b92da3dc62` |
+| `users.json` | `00bafb80e0e9460f2e34ccc4f5c18df160b7d2858978bf5d080b8bf1badd0530` |
+| `analysis.json` | `58093d96c3e7624f95e56d1f48bf75c74fed2386fa34fef54f02074a41f2ae4c` |
+| `host-summary.json` | `2e566466da36c14d8cc52188aee63b772db272d286acff65998ff263c06f16e3` |
+| `unit.json` | `485dab1183ae796b6804b52f0dbcb35bec3550ef9164d129ac5ab04b49ef88fe` |
+| `read-only-postflight.json` | `9a15e170f0b0772b3a4d12b9455984b8a753b650c4f8b9d1a08c4ffc2c0cb37c` |
+| Separate offline replay | `5f52ee1bdcc60abd2ba90e43061870e3ed0f8fe4357c5d4b4719a4fad04cdd16` |
+
+No PM, reboot, blanking, confirmation, service/runtime replacement, counter
+reset, clocksource/affinity policy or charger change occurred. NEO-192 and
+all dependent PM gates remain open. NEO-213's source and actual-capture
+milestone is ready for independent final evidence and combined-tree review,
+then serialized publication/integration and closure.
+
+The isolated branch also incorporates independently accepted published main
+`5a2f362a39e49415b6a73e732219007ab8f4eb00`. The only merge conflict was the
+report index; its resolution retains the exact report297 and296 entries in
+that order. All six clock source/test files and clock Task sections remain
+byte-identical to reviewed source `23c4133`; all Wi-Fi source/tests and report297
+match accepted main. The production source lock, kernel queue and fragment
+are unchanged. Combined `task check` passes 24 runtime/1297 tooling tests,
+nine expected skips, C checks and shell lint; its log SHA is
+`8c629d89a941f66f8524a5f4b17dd68fa8d02a7cbadbc7664734e9ce2f2cbb13`.
+Private `.local/development-clock/final-evidence-index.json`, SHA
+`d9e73cd70b1574ed646ea3abff025556293f75de90bf27e2c62727a971ee8c70`,
+links source-unchanged proof, independent source reviews, both completed host
+checks, managed reader evidence, exact live originals, separately rerun replay,
+camera/status receipts and the terminal ownership/flag postflight.
 
 ## Interpretation and next causal work
 

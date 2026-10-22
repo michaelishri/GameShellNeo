@@ -165,10 +165,19 @@ See [report 286](docs/286-brcmfmac-diagnostic-output-bounds.md).
 No triggering firmware input or live fault is claimed; candidate 0054 stays
 outside the image queue, with integration/hardware ownership in NEO-58.
 
-**NEO-58 firmware-startup error audit, 12 October 2026:** the callback still
-discards clock/setup transfer results outside NEO-201's shared-reader path.
-Trace them with function-2/IRQ/interface ownership and reset/reprobe cleanup;
-the completed active-worker candidates do not qualify startup failures.
+**NEO-58/212 firmware startup, 23 October 2026:** actual-source baseline
+passes 959/2088 native and sanitizer cases, reproducing discarded clock,
+protocol/mask/watermark and save/restore setup errors. Candidate 0055 checks
+each boundary before later setup, preserves the first error through clock
+cleanup and releases its firmware inputs once. All 2088 startup cases pass
+native/sanitizer/ARM, with 41 meaningful mutations and the combined Wi-Fi
+regressions; complete board/debug objects, host checks, independent source
+reviews and final input/artifact/source verification pass. One optional
+positional-chip fixture maintainability note is retained in
+[report 297](docs/297-brcmfmac-startup-ownership.md). This completes NEO-212's
+offline candidate scope. It stays outside the image queue; NEO-58 retains
+deliberate integration, board checks, probe/buscore setup and reset/reprobe
+ownership. The active-worker candidates do not by themselves qualify startup.
 
 **NEO-58/198 polling status, 12 October 2026:** actual-source tests reproduce
 discarded queued-TX polling errors and I/O after a prior error arrives at host
@@ -290,9 +299,14 @@ the raw image/kernel and exact release/deployment transformation; live checks
 will require the actual p3 root inode/mount, card/filesystem identity and fresh
 runtime hashes. Original raw-image and PM guards remain strict. Offline
 provenance/refusal, exact bounded large-contract staging, managed native/ARM
-replay and full 24 runtime/1297 tooling source checks pass. Independent review
-and one coordinated device capture remain pending. The
-original MONOTONIC fault, RAW discrepancy and NEO-191 PM gate remain open.
+replay and full 24 runtime/1297 tooling source checks pass. Both independent
+source reviews pass, and one coordinated 384-call capture/replay completes
+from the exact capable diag27 root with fresh runtime/build provenance and
+unchanged health/both routes. The actual window covers CPU0 only for about
+11.9 ms; it does not clear the intermittent fault. Recovery remains default,
+diag27 unconfirmed; final evidence/combined-tree review and publication remain
+pending. The original MONOTONIC fault, RAW discrepancy and NEO-191 PM gate
+remain open.
 [Report296](docs/296-development-clock-admission.md).
 
 **Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies

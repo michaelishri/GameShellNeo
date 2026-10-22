@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[297 — brcmfmac firmware startup ownership](297-brcmfmac-startup-ownership.md)
+records reproduced setup-error loss, the isolated fail-fast candidate,
+actual-source qualification and separate reset/reprobe boundaries.
+
 [296 — Development-directory clock provenance](296-development-clock-admission.md)
 records the explicit awake-only adapter, separate image/reader/source identities,
 strict root/runtime admission and retained clock/PM gates.

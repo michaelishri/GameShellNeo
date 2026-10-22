@@ -2633,6 +2633,13 @@ detected sleep, missing/late samples, slow reads, lost external power, discharge
 invalid battery readings, low capacity, excess temperature, taint, and observed
 changes to brightness or charger/input-limit settings. No setting is changed.
 
+The host derives clock bounds from the raw integer brackets and recomputes the
+charge summary before accepting the result. Forged stored bounds/summaries,
+missing samples and disturbed observations retain their original raw output
+and provenance on refusal. This leaves the collector and its historical image
+profile guards unchanged. [Report 310](docs/310-charge-result-admission.md)
+records the host-only qualification and remaining review/charging/clock gates.
+
 Original JSON-lines observations (including a rejected sample), source hashes
 and requested duration remain private under `.local/diagnostics/`. A remote
 deadline bounds execution independently of SSH collection. Lost SSH or partial
@@ -2655,6 +2662,13 @@ It stops sampling if external power returns, brightness/governor changes,
 Wi-Fi disconnects, the guard becomes invalid/stale, capacity reaches 20%,
 temperature reaches 80 °C or the kernel is tainted. These stops do not request
 power-off; the existing battery guard continues independently.
+
+The standalone idle, power, governor and RSB host consumers recompute raw
+awake-clock proof before accepting a result or deleting owned helpers. They
+retain raw output and exact helper/unit context on refusal. This checks result
+consistency; current image/health admission and physical preparation remain
+required. [Report 308](docs/308-awake-result-admission.md) records the reproduced
+host gap, finite local qualification and remaining NEO-101/192 gates.
 
 The private `idle-sample.jsonl` records raw software readings, temperature,
 frequency, signal context and timing. Its final summary integrates current and

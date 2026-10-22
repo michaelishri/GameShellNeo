@@ -6,6 +6,7 @@ import json
 import os
 import shlex
 
+from charge_result import admit_capture
 from private_config import load_env
 from remote import ROOT, LOCAL, device, evidence_directory, run
 
@@ -44,13 +45,11 @@ def main():
             payload_sha256=hashlib.sha256(source).hexdigest(), route='usb',
             sources_lock_sha256=hashlib.sha256(lock_bytes).hexdigest()), indent=2)+'\n')
         with device(load_env(), 'usb') as client, (capture/'charge-baseline.jsonl').open('wb') as output:
-            data = run(client, shlex.join(arguments), input_data=source,
-                       output=output, display=False, timeout=40)
-        events = [json.loads(line) for line in data.splitlines()]
-        result = events[-1]
-        if result.get('event') != 'completed' or result.get('passed') is not True:
-            raise ValueError('Charging baseline did not finish; original output retained')
-        print(json.dumps(result['summary'], indent=2))
+            run(client, shlex.join(arguments), input_data=source,
+                output=output, display=False, timeout=40)
+        admitted = admit_capture(capture/'charge-baseline.jsonl', seconds=seconds,
+            kernel=lock['linux']['tag'][1:]+lock['linux']['localversion'], image=lock['image_version'])
+        print(json.dumps(admitted['summary'], indent=2))
 
 
 if __name__ == '__main__':

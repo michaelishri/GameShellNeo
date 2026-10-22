@@ -19,26 +19,29 @@ qualification that need physical access and fresh clock admission.
 
 **Branch integration review, 22 October 2026 (NEO-204):** reviewed cumulative
 work through NEO-194 and six already integrated histories are merged into main;
-23 merged branch references can be removed while preserving their worktrees
-and ignored evidence. Thirteen branches remain open. See
-[report 288](docs/288-branch-integration-review.md) for pins and review results.
+23 merged local references were removed while preserving their worktrees and
+ignored evidence. The thirteen histories retained at that stage are now
+reconciled in reports 289–291. [Report 288](docs/288-branch-integration-review.md)
+preserves the original pins and blockers; parent software/physical tickets
+remain open after source-reference cleanup.
 
-**NEO-205 candidate placement before retirement-branch merges:**
-`work/power-supply-unregister` and `work/sunxi-retirement` (including retirement
-ancestors) put candidates 0037–0045 in `kernel/patches/`, which
-`tools/kernel-inputs.py` automatically includes in production builds. Their
-reports 222/231 require a separately identified future image. Adapt candidate
-placement, native/KUnit/ARM queues and default build checks before merging;
-retain diagnostic.26's exact inputs and the separate hardware gates. Keep the
-older removal-lifetime/wake/startup branches and untracked removal audit until
-their unique changes have been reconciled; they are not wholly superseded.
+**NEO-205 isolated candidate placement:** power-supply 0037 and retirement
+0038–0045 remain outside `kernel/patches/` in named offline profiles. Native,
+KUnit and ARM builders replay their explicit queues; the production exporter,
+33 patch names/hashes, source lock, board configuration and overlay are
+unchanged. [Report 289](docs/289-isolated-retirement-branch-integration.md)
+records current validation and branch disposition. Report 291 separately maps
+the five older histories and preserves unique wake/startup source and audits.
+Future image promotion, the combined wake/IRQ cleanup design and each parent
+ticket's software/physical qualification remain separate work.
 
-**NEO-206 SMP callback runner/build ownership compatibility:**
-`work/musb-callback-kernel` uses named and interactive Docker containers plus
-post-run inspect/stop/remove operations. Its saved logged Tasks conflict with
-NEO-194's supported foreground contract and managed collection. Adapt and test
-the shared lifecycle before merging; bypassing the wrapper would restore
-unowned writers. NEO-103's matching hardware bind/unbind gate remains separate.
+**NEO-206 managed SMP/QMP runners:** private allocation receipts and pinned-run
+resume/stop preserve NEO-194 exclusion and original terminal evidence. All
+thirteen Docker fixture groups, bounded two-CPU QMP smoke and eighteen real
+ARM callback cases pass; [report 290](docs/290-managed-smp-runner-integration.md)
+records independently verified artifacts and original fixture failures.
+NEO-103's matching hardware bind/unbind gate remains separate; retained older
+worktrees must not bypass ownership to run obsolete named/interactive commands.
 
 **NEO-58/200 clock readiness, 12 October 2026:** asynchronous `CLK_PENDING`
 had no deadline. The baseline reproduces missing deadlines and notifications;
@@ -151,7 +154,7 @@ command ended with status 143 while its Docker kernel build remained running.
 The host log stopped advancing; Docker logs and process activity established
 continued compilation. Attached to that exact container, observed exit 0,
 then verified all 16 kernel artifacts before continuing image assembly. No
-duplicate build was started. The implementation on `work/build-stage-ownership`
+duplicate build was started. The implementation in main
 now reserves per-stage ownership before Docker creation, blocks later logged
 stages until verified retirement, and supplies `build:stage:status/resume/stop`
 with retained container logs and actual exit status. A durable start receipt
@@ -164,15 +167,16 @@ container; it does not replay host postprocessing or prove image validity.
 Other branches must adopt the change deliberately. This is separate from the
 abandoned SSH-stall work; no GameShell command was involved.
 
-- [ ] NEO-103 real-kernel concurrency preparation: the locked Linux 6.18.54
-  `arch/um/Kconfig` restricts `NR_CPUS` to 1. The later NEO-163 UML suite covers
-  endpoint restart/giveback ownership, not simultaneous IRQ-context gadget
-  callbacks and unbind on different CPUs. Do not count it as that missing
-  callback qualification. Prepare a separate SMP system-emulation runner (or
-  equivalent real-kernel environment) with non-sleeping callback handshakes,
-  original callback/UDC operations and bounded cleanup. The retained builder
-  inventory has QEMU user emulation but no QEMU system package; environment
-  preparation remains software work, not an owner/hardware blocker.
+- [x] NEO-103 real-kernel concurrency preparation: the locked Linux 6.18.54
+  UML configuration restricts `NR_CPUS` to 1, so endpoint restart/giveback
+  checks alone cannot establish simultaneous IRQ-context callbacks and unbind
+  on different CPUs. The separate pinned ARM SMP environment and actual
+  callback/UDC fixture now qualify those bounded kernel paths on four guest
+  CPUs, with non-sleeping handshakes and verified cleanup. Historical
+  [report 274](docs/274-musb-callback-smp-validation.md) and current managed
+  runner [report 290](docs/290-managed-smp-runner-integration.md) record the
+  eighteen passing cases and substituted hardware boundaries. Matching-board
+  function-driver bind/unbind remains open after clock admission clears.
 
 **Clock image integration, 12 October 2026:** diagnostic.26 explicitly selects
 the canonical recorder and has its own kernel release, `6.18.54-gameshellneo25`.
@@ -1636,7 +1640,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [x] NEO-105 audit: map MUSB stop/removal ownership through endpoint cleanup, UDC/host callbacks, PM, IRQ/work/timers, DMA and Sunxi PHY/extcon. The [report and repeatable task](docs/139-musb-teardown-power-audit.md) distinguish source defects, diagnostic control effects and unproven hardware reachability. Production fixes and qualification remain open above; no driver patch or image change is included.
 - [ ] Audit MUSB request DMA mapping on failed `musb_queue_resume_work()`. `musb_gadget_queue()` removes the queued list node on failure without the unmap used by its disabled-endpoint path. Check synchronous callback/error semantics, buffer ownership and retry across DMA backends before changing it. CPI's Sunxi backend uses PIO; this is a shared-driver finding, not an observed board DMA fault. [Discovery in report 139](docs/139-musb-teardown-power-audit.md).
 
-- [ ] NEO-106 backend boundaries: [report 141](docs/141-musb-removal-backend-contracts.md) extends the removal audit to all nine platform and four DMA backends. Resolve or explicitly bound MPFS clock-before-child removal, DSPS parent VBUS IRQ/timer retirement and synchronous-wait locking, MTK parent/child PM and rebind, OMAP mailbox/parent PM, role setters admitted before unregister, independent DMA callback retirement and partial-probe role cleanup. The proposed opt-in per-extcon SRCU dispatch envelope addresses selected-before-entry consumer callbacks only; provider lifetime and Allwinner detector MMIO retirement remain separate. Source dependencies do not establish live CPI faults. Implementation is in progress on [work/musb-removal-lifetime](https://github.com/michaelishri/GameShellNeo/tree/work/musb-removal-lifetime); diagnostic.18 is unchanged.
+- [ ] NEO-106 backend boundaries: [report 141](docs/141-musb-removal-backend-contracts.md) extends the removal audit to all nine platform and four DMA backends. Resolve or explicitly bound MPFS clock-before-child removal, DSPS parent VBUS IRQ/timer retirement and synchronous-wait locking, MTK parent/child PM and rebind, OMAP mailbox/parent PM, role setters admitted before unregister, independent DMA callback retirement and partial-probe role cleanup. The proposed opt-in per-extcon SRCU dispatch envelope addresses selected-before-entry consumer callbacks only; provider lifetime and Allwinner detector MMIO retirement remain separate. Source dependencies do not establish live CPI faults. The prepared source is reconciled in the isolated profiles mapped by [report 291](docs/291-legacy-musb-source-integration.md); the wider backend software and qualification work remains open. These original experiments did not change diagnostic.18.
 
 - [x] NEO-107: the [repeat RTC-wake runner](docs/143-repeat-rtc-wake-runner.md) now passes live initial admission, successor continuation and a four-cycle attended batch on unchanged diagnostic.18. Fresh seven-debug prerequisites and same-source awake rehearsal passed first; all four actual sleeps restored policies, traces, RTC, original keypad and both SSH routes, with PM15→19/fail0, RTC IRQ5→9 and stable SDIO2. The owner confirmed every dim-console return without intervention. Final read-only inspection independently recomputed all seven debug and four sleep records against the unchanged source/image/boot; Mac sleep history stayed unchanged. [Report 148](docs/148-diagnostic18-repeat-rtc-wake.md) preserves results, hashes and transient collection failures. Source/transport failure tests remain in report143. NEO-95 cable/host coverage, CPU retention and energy qualification remain open; no image or production sleep policy changed.
 - [x] NEO-109: [battery-only RTC-wake qualification](docs/150-battery-rtc-qualification.md) is complete for the saved one-shot workflow and first attended hardware pass. Explicit battery admission retains common health requirements, original-result collection, profile/source-bound history and durable successor ownership; USB absence never counts as USB recovery. Source checks pass (13 runtime, 513 tooling, two optional skips, C and shell checks). Fresh seven-debug prerequisites, awake battery rehearsal and one actual battery sleep pass on unchanged diagnostic.18: PM19→26→27/fail0, RTC9→10→11, stable SDIO2, cable absent throughout sleep, original input/memory/policies restored and independent Wi-Fi recovery. The owner confirmed normal dim-console return without intervention. Separate physical reattachment then passed USB/Wi-Fi SSH, configured UDC/carrier1, external power, PHY/IRQ state and Mac enumeration on the same boot; PM27/0 and settings stayed unchanged, with no new kernel entries. NEO-95 retains cable changes during sleep, Mac sleep and repeat-boot coverage. CPU retention, standby energy, wake-button/product policy and latency remain separate; no image or charging policy changed.
@@ -1668,10 +1672,12 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 - [ ] Preflight all dependencies when reusing a completed kernel in an isolated image-build workspace, including the locked kernel regulatory signing certificates. Diagnostic.20 assembled successfully but its first verification correctly rejected an empty certificate set because only compiled artifacts had been staged. Restoring the hash-checked, patched source allowed unchanged-image verification to pass. Consider exporting verified certificates with the completed stage and checking prerequisites before a long bootstrap; preserve the current signature/trust checks.
 
 
-- [ ] NEO-169 integrates the earlier Sunxi child notifier/work and extcon provider
-  candidates with the core retirement queue on `work/sunxi-retirement` (patches
-  0043–0045). [Report 231](docs/231-sunxi-retirement-integration.md) supersedes the
-  earlier separate-branch integration status, not its hardware limits. Finish
+- [ ] NEO-106 remaining backend qualification after NEO-169: the earlier Sunxi
+  child notifier/work and extcon provider candidates are integrated with the
+  core retirement queue as isolated 0043–0045 inputs. [Report 231](docs/231-sunxi-retirement-integration.md)
+  records that source integration; [report 289](docs/289-isolated-retirement-branch-integration.md)
+  records its current explicit offline profile. These supersede the earlier
+  separate-branch integration status, retaining its hardware limits. Finish
   the Allwinner PHY detector's independent IRQ/work/resource audit and other PHY
   consumer ordering, caller-frame/global-accessor lifetime and other backend/DMA
   prerequisites before complete removal qualification. Keep NEO-106 open.

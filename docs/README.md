@@ -16,6 +16,19 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[291 — Legacy MUSB source reconciliation](291-legacy-musb-source-integration.md)
+maps the five earlier histories, preserves unique wake/startup candidates and
+historical audits, and separates remaining software composition from physical
+qualification.
+
+[290 — Managed SMP runner integration](290-managed-smp-runner-integration.md)
+records exact-run receipts, durable cleanup, thirteen ownership fixture groups
+and eighteen real ARM SMP callback cases with independently verified artifacts.
+
+[289 — Isolated retirement branch integration](289-isolated-retirement-branch-integration.md)
+records explicit power/MUSB candidate queues, unchanged production kernel inputs,
+native/ARM/kernel qualification and preservation during final branch cleanup.
+
 [288 — Branch integration review and cleanup](288-branch-integration-review.md)
 records the ready cumulative merge, acknowledged earlier histories, retained
 integration blockers, unchanged production patch queue and repeated host checks.

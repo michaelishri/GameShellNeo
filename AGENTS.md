@@ -50,9 +50,10 @@ the snapshot below is a starting point, not admission for a hardware test.
   as well as the selected worktree's instructions. Sibling ClockworkPi/vendor
   repositories and `allwinner/` contain reference code and supplied documents.
 - Start with `git status --short`, `git branch --show-current`,
-  `git log -5 --oneline` and `git worktree list`. Main now includes the reviewed
-  cumulative development through NEO-194. Thirteen branches with unresolved
-  integration work remain; report 288 records their exact pins and blockers.
+  `git log -5 --oneline` and `git worktree list`. Main includes the reviewed
+  cumulative development through NEO-207. The thirteen source branch histories
+  retained in report 288 are reconciled in reports 289–291; merged refs are
+  cleaned only after publication while their source/evidence worktrees remain.
   A command, report or image present in one worktree may be absent or different
   in another. Select the intended source and image before rebuilding.
 - Consult the ticket's current description/comments, `FOLLOW-UP.md`, the
@@ -71,6 +72,12 @@ Current worktrees are under the canonical checkout's `.local/worktrees/`:
 | `brcmfmac-tx-recovery` | `57a6c22` (detached): NEO-202 completed; Wi-Fi candidates through 0054 are offline-qualified and outside the image queue |
 | `build-stage-ownership` | `0f53a71` (detached): completed NEO-194 implementation, independent reviews and original qualification evidence |
 | `merge-ready-branches` | detached reviewed main integration with the repeated host checks and Docker ownership evidence recorded in report 288 |
+| `remaining-branch-integration` | `057b50e`: frozen NEO-205 native/ARM and real-kernel retirement evidence; see report 289 |
+| `remaining-extra-validation` | `057b50e` (detached): full ARM power-supply candidate and final Sunxi ownership fixture evidence |
+| `remaining-smp-validation` | `057b50e` (detached): thirteen Docker ownership groups, two-CPU QMP smoke and eighteen-case four-CPU ARM SMP evidence; see report 290 |
+| `remaining-legacy-integration` | code through `58eeadd` plus final report commits: independent wake/startup profile, six ARM configurations and mapped older histories; see report 291 |
+| `remaining-legacy-validation` | `58eeadd` (detached): production sleep/callback regression and explicitly historical teardown reproduction |
+| `remaining-final-integration` | final merge documentation and host checks; source/candidate receipts stay in the frozen validation worktrees above |
 
 Merged branch references are removed; their worktrees, ignored evidence and
 private configuration remain at their original revisions. Create a branch
@@ -245,6 +252,14 @@ recording is authorized by this workflow. The camera stops after each request.
   the image queue. NEO-58 retains deliberate integration, matching hardware
   qualification and the separate firmware-startup/reset audit. Reports 284–286
   in `brcmfmac-tx-recovery` record the latest offline work.
+- NEO-205/207 preserve the 33 production kernel patch names/hashes. Power-supply
+  lifetime, MUSB retirement and wake/startup are explicit offline candidate
+  profiles. Invoke their saved Tasks deliberately; passing candidate checks
+  does not select an image queue. Wake/startup and retirement still need
+  software reconciliation at terminal IRQ/wake cleanup before a combined
+  queue can be qualified. NEO-98/102/103/106 remain open for their separately
+  documented software, image and physical gates; do not label every remaining
+  parent task human-only. Reports 289/291 record the boundaries.
 - Inspect the live process/container/session handle before calling a build
   stopped. The NEO-194 baseline proves that a host command can disappear while
   its Docker container keeps writing. Do not start a duplicate build, clear a
@@ -252,10 +267,11 @@ recording is authorized by this workflow. The camera stops after each request.
 - NEO-194 is complete and integrated in main: recorded stage containers and
   `build:stage:status/resume/stop` retain logs/results and exclude duplicate
   writers. Report 287 records qualification; report 288 repeats all twelve
-  Docker fixture groups on the merged source. Older preserved worktrees still
-  have their original wrapper and must not be assumed protected by this fix.
-  NEO-206 tracks the retained SMP callback runner's named/interactive-container
-  incompatibility; do not bypass ownership to make that runner work.
+  Docker fixture groups on the merged source. NEO-206's receipt/pinned-run
+  interface and managed SMP/QMP runners pass thirteen ownership groups plus
+  real ARM guest checks in report 290. Older preserved worktrees still have
+  their original wrapper and must not be assumed protected by these fixes.
+  Do not bypass ownership to make a retained named/interactive runner work.
 - Wait for authoritative completion before changing a test's hashed inputs.
   A session observation timeout does not terminate it; poll the same handle or
   inspect the specific container/job. Preserve logs and terminal results. A

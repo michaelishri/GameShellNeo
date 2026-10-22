@@ -31,7 +31,7 @@ def offset(call):
     return call['offset_sec'] * provenance.NS + call['offset_nsec']
 
 
-def regressions(calls, writers):
+def regressions(calls, writers, *, coverage_qualified):
     previous, result = {}, []
     for call in calls:
         if not all(call[name] for name in ('accepted', 'valid', 'complete')) or call['error']:
@@ -47,6 +47,8 @@ def regressions(calls, writers):
         name = 'raw' if call['clock'] == 4 else 'mono'
         old, new = before['tuple'], call['tuple']
         reasons = []
+        if not coverage_qualified:
+            reasons.append('publication-coverage-unqualified')
         if (old['source_changed'] != new['source_changed'] or
                 any(old[base]['source_id'] != new[base]['source_id'] for base in ('mono', 'raw'))):
             reasons.append('source-generation-or-identity-changed')
@@ -85,8 +87,11 @@ def analyze(records):
     publications = [row for row in writers if row['kind'] == 0]
     orders = [row['order'] for row in publications]
     findings, unknown, links, readers = [], [], [], []
+    coverage = replay['complete'] and replay['stop_reason'] != 4
     if not replay['complete']:
         unknown.append(dict(reason='original-record-stream-incomplete', details=replay['incomplete']))
+    if replay['stop_reason'] == 4:
+        unknown.append(dict(reason='closed-session-publication-coverage-unknown'))
     for first, second in zip(publications, publications[1:]):
         changed = differences(first['new'], second['old'])
         links.append(dict(previous_order=first['order'], order=second['order'], matched=not changed))
@@ -100,6 +105,10 @@ def analyze(records):
     for call in calls:
         if not all(call[name] for name in ('accepted', 'valid', 'complete')) or call['error']:
             unknown.append(dict(reason='call-incomplete-or-error', ordinal=call['ordinal']))
+            continue
+        if not coverage:
+            readers.append(dict(ordinal=call['ordinal'], anchor=None, matched=None,
+                                publication_coverage_qualified=False))
             continue
         index = bisect_left(orders, call['read_order']) - 1
         if not publications:
@@ -119,10 +128,10 @@ def analyze(records):
         if call['seq'] != expected:
             unknown.append(dict(reason='reader-sequence-gap', ordinal=call['ordinal'],
                                 expected_sequence=expected, observed_sequence=call['seq']))
-    deltas = regressions(calls, writers)
+    deltas = regressions(calls, writers, coverage_qualified=coverage and not findings)
     for row in deltas:
         if not row['comparable']:
-            unknown.append(dict(reason='regression-source-incomparable', ordinal=row['ordinal'],
+            unknown.append(dict(reason='regression-context-incomparable', ordinal=row['ordinal'],
                                 details=row['unknown']))
     complete = replay['complete'] and not findings and not unknown
     return dict(schema=1, operation='clock-publication-reconciliation',
@@ -140,6 +149,7 @@ def analyze(records):
                        'Diagnostic insertion order is not counter-instruction time.',
                        'Sequence gaps may be unhooked leap-state updates, not missing publications.',
                        'Nonpublication writer sites, incomplete setup seeds and action flags do not identify causes.',
+                       'CLOSED/drained or incomplete streams cannot establish complete publication coverage.',
                        'Delta components are old-tuple hypothetical arithmetic, not independent counter evidence.',
                        'No reconstruction of historical faults lacking event-time records; no MMIO STOP or PM clearance.'])
 

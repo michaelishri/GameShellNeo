@@ -25,7 +25,7 @@ FAMILIES = {
     'delta': ('unchanged-raw-minus750', 'changed-tuple-regression', 'namespace-only-delta',
               'source-generation-incomparable'),
     'refusal': ('duplicate-json', 'truncated-json', 'oversized-stream', 'writer-loss',
-                'unfinished-call', 'odd-accepted-sequence'),
+                'unfinished-call', 'odd-accepted-sequence', 'closed-complete-coverage'),
 }
 
 
@@ -200,7 +200,7 @@ class ClockTransitions(unittest.TestCase):
         # The established fixture's -750ns is 24 ticks at its declared 125/4
         # conversion. It is not a claim about the historical 24MHz hardware event.
 
-    def test_six_original_refusals_and_incomplete_streams(self):
+    def test_original_refusals_incomplete_and_closed_streams(self):
         good = ''.join(json.dumps(row, sort_keys=True)+'\n' for row in capture(call())).encode()
         bad = call(seq=9)
         unfinished = call(complete=0)
@@ -208,6 +208,8 @@ class ClockTransitions(unittest.TestCase):
                        delta=200, delta_valid=1, old=original_call()['tuple'], new={}) for i in range(2048)]
         lost = capture(call(), writers=losses)
         lost[0].update(reason=3, writer_lost=1)
+        closed = changed_pair()
+        closed[0]['reason'] = 4
         cases = {
             'duplicate-json': (None, good.replace(b'"schema": 1', b'"schema": 1, "schema": 1', 1), True),
             'truncated-json': (None, b'{"type":', True),
@@ -215,15 +217,24 @@ class ClockTransitions(unittest.TestCase):
             'writer-loss': (lost, None, False),
             'unfinished-call': (capture(unfinished), None, False),
             'odd-accepted-sequence': (capture(bad), None, True),
+            'closed-complete-coverage': (closed, None, False),
         }
         for name, (records, raw, refused) in cases.items():
             with self.subTest(case=name):
                 result = self.run_case(name, records, raw=raw, refused=refused)
                 if not refused:
-                    self.assertFalse(result['record_complete'])
                     self.assertFalse(result['reconciliation_complete'])
                     self.assertIs(result['consistent'], None)
-                    self.assertIn('original-record-stream-incomplete', [row['reason'] for row in result['unknown']])
+                    self.assertEqual(result['findings'], [])
+                    if name == 'closed-complete-coverage':
+                        self.assertTrue(result['record_complete'])
+                        self.assertIn('closed-session-publication-coverage-unknown',
+                                      [row['reason'] for row in result['unknown']])
+                        self.assertFalse(result['regressions'][0]['comparable'])
+                        self.assertIsNone(result['regressions'][0]['counter_component_ns'])
+                    else:
+                        self.assertFalse(result['record_complete'])
+                        self.assertIn('original-record-stream-incomplete', [row['reason'] for row in result['unknown']])
 
 
 if __name__ == '__main__':

@@ -996,7 +996,7 @@ tasks:
     cmds: [python3 tools/clock_provenance.py]
 
   test:clock-transitions:
-    desc: Test 24 saved-record publication and reader cases offline; no device access
+    desc: Test 24 declared saved-record cases and complete CLOSED coverage offline
     cmds: [bash tools/run-logged.sh clock-transitions python3 -m unittest discover -s tools/tests -p test_clock_transitions.py -v]
 
   report:clock-transitions:

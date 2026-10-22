@@ -1,8 +1,11 @@
 # MUSB terminal IRQ and wake ownership composition
 
 23 October 2026 NZDT. NEO-219 is a bounded offline child of NEO-102, related
-to NEO-98 and NEO-106. The isolated `work/musb-terminal-wake-ownership`
-checkout starts from accepted `02c633a0349ad986fe384cc0f94e26663baa3df3`.
+to NEO-98 and NEO-106. Original qualification in the isolated
+`work/musb-terminal-wake-ownership` checkout used accepted
+`02c633a0349ad986fe384cc0f94e26663baa3df3`, frozen at `6b380ac`.
+The final review context below adopts published `4925a67` with identical
+qualification inputs; the original receipts retain their original provenance.
 No Mac/GameShell, image, selector, PM, unbind or reset operation is included.
 Diagnostic.27 stays unconfirmed with recovery the default; clock/PM gates
 remain open.
@@ -141,17 +144,42 @@ status with `check=True`; no broad exception fallback or expected-failure
 path can substitute old KTAP/JSON after a failed cached rebuild or swallow
 unresolved managed cleanup. Prior logs/results remain preserved separately.
 
-Host `task check` passes **1,310 tests** (nine skipped), current-limit/mount
+The original host `task check` passes **1,310 tooling tests** (nine skipped), current-limit/mount
 guards, Bash syntax and ShellCheck; its log SHA-256 is
 `36f2105a0bdaf0a9cbd30bf59dc53036fe66b3914ffc551bce855e0a99bb8eb0`.
 Strict checkpatch has zero errors/warnings and one check for the existing
 `nIrq` field name. The separately retained run with only `CAMELCASE` ignored
 has zero errors, warnings or checks; the qualified shared field is preserved.
 
-Fresh independent pre-integration Standards/Spec review is pending on this
-accepted-base source and its original qualification. Adoption of later
-accepted context, current-input/equivalence checks and fresh final reviews
-still precede serialized publication. Linux controller construction and the chip wake
+Fresh independent pre-integration Standards and Spec reviews accepted `6b380ac`
+with zero required findings. Standards retained one optional fixture-setup
+duplication note; the qualified source stays unchanged.
+
+Final review uses `work/musb-terminal-wake-final-admission`, based on published
+`4925a67786269018f4884db753c3ec78892f14f0`. The only cherry-pick conflict was
+report navigation; all accepted entries are preserved. All 18 maintained
+qualification inputs, candidate 0062 and the complete 35/43/45-entry profiles
+match the original bundle exactly. The 33 production inputs remain unchanged.
+An independent current-context audit checks fresh strict source extraction,
+the native/control/reference bodies, five unchanged 0026 policy bodies,
+0029's UDC-start body and the generated Linux test patch against the actual
+original tested source. All 167 checks pass. Current published helper APIs and
+Task routes are preserved; the dedicated runners do not import the changed
+generic managed-container helper.
+
+The native/configuration and Linux receipts and relative private paths above
+remain in the original `musb-terminal-wake-ownership` checkout. They are not
+new executions on the final base. No unchanged heavy qualification was repeated
+solely for ancestry. The new checkout retains
+`.local/notes/neo219-current-context-equivalence.json` as the source and artifact
+equivalence record. Its one fresh combined host check passes **24 runtime and
+1,379 tooling tests** (nine existing opt-in skips), C guards, Bash syntax and
+ShellCheck. The new log is
+`.local/build/terminal-wake-final-host-check.log`, SHA-256
+`8bc133b0d8cfd2c8ef2f521b7387dcd1ebc58855551809cdb903069a2ca39011`.
+
+Fresh final independent Standards/Spec reviews and a separate serialized
+integration grant still precede publication. Linux controller construction and the chip wake
 callback are fixture seams; hardware MMIO/source masking, complete backend/DMA
 producer retirement, caller/global-accessor lifetime, SMP, actual system PM
 and physical removal remain parent work. Concurrent sysfs source admission

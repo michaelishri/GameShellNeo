@@ -1878,7 +1878,11 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   double/invalid-disarm risk; failed-final-disarm debt remains explicit.
   All 147 native/sanitizer/ARM scenarios, seven assertion controls, six complete
   ARM configurations and eight real Linux IRQ/wakeup-source context cases
-  pass; independent pre-integration review is pending in
+  pass; fresh independent pre-integration reviews accepted the source. Final
+  published-`4925a67` context preserves all 18 qualification inputs and full
+  queues, with exact source/test-patch equivalence and a fresh combined host
+  pass (24 runtime/1,379 tooling tests, nine skipped). Fresh final reviews and
+  serialized publication remain pending in
   [report 303](docs/303-musb-terminal-wake-composition.md).
   Existing profiles, production inputs, complete failed-power/backend/DMA
   removal and NEO-102/98/106 physical/clock gates remain separate.

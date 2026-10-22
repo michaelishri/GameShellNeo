@@ -136,7 +136,8 @@ builder stage, offline/no-pull, one CPU/3 GiB and serial builds, runs ARM32/QEMU
 and ARM ELF identity. Only successful original managed completion after
 released ownership is accepted; no fallback admits nonzero/old output.
 
-Original evidence under this worktree's `.local/tests/brcmfmac-eapol/`:
+Original execution evidence remains in the frozen `wifi-auth-next-boundary`
+worktree under its `.local/tests/brcmfmac-eapol/`:
 
 - `20261022T205845Z-9295023c703b41e98038a78e893145bb`: session 47502,
   terminal admission exit 0 for nine failing (raw 1) and five passing cases.
@@ -194,7 +195,7 @@ tested inputs, distinct from the subsequent host correction below.
 
 A read-only self-audit at frozen `269e511` found a host admission gap: raw exit 1
 with the exact declared control failure plus an additional unrelated `FAIL`
-line was accepted. The original counterexample is retained separately as
+line was accepted. The original counterexample remains in that original worktree as
 `.local/audit/neo230-extra-result-counterexample.json`, SHA256
 `c3e30e9b21d7996a93fd8ab028f8ab139d19bbc877230d5cf18d6fba354b17bd`.
 The entire original checkout/ref, 950-file manifest and 329-artifact index
@@ -223,9 +224,37 @@ receipt is relabeled or rewritten. Cross-checkout output validation uses the
 current shared validator with original hashes/provenance; it does not bypass or
 extend the complete helper's existing same-suite reuse contract.
 
-The combined current host check and explicit upstream publication boundary are
-recorded after local context reconciliation. No new native/sanitizer/ARM/object
-run is needed for this host-only validator change.
+No new native/sanitizer/ARM/object run is needed for this host-only validator
+change.
+
+## Reconciled local context and final review boundary
+
+The corrected candidate adopts exactly the independently reviewed local
+NEO-228 source `631a5451b14de1c3e19abe387aaff66c5631afc5`, through clean merge
+`8dda8c016c3d0443c84fde7a02e5e224b8971db9`. The only conflict was adjacent
+documentation navigation; both report rows are retained. At qualification
+time this upstream commit was **not published**. Complete fresh reviews may
+run provisionally against that fixed base; whole-ticket publication/closure
+requires independent proof that the identical dependency was published.
+
+Local-context proof `.local/audit/neo230-local-context/proof.json`, SHA256
+`29fd65441f17f5a67e958fb668c9f7cf3f750190a4f3b83681336a6f58991597`,
+checks the entire unchanged production33 manifest, candidate 0057 and the 14
+non-host/Task maintained dependencies. Own EAPOL Task bodies are byte-identical;
+the whole Taskfile delta is exactly the two upstream clock-report Tasks. The
+four imported clock source/test/report files match the reviewed dependency
+byte for byte. This accounts for the full context change while preserving
+the original native/sanitizer/source/type/compiler/ARM/object evidence. It
+does not claim old receipts carry new whole-file Task or host-input hashes.
+
+One new combined `task check` at clean `8dda8c0`, original session **76036**,
+completed with exit 0: **24 runtime tests, 1473 tooling tests (nine expected
+skips), both compiled C checks, Bash syntax and ShellCheck**. The current log is
+`.local/build/neo230-final-host.log`. It includes all 30 focused checks and the
+new clock imports. Later source edits are this report and the own follow-up
+paragraph only. Final evidence references historical artifacts in place;
+there are no source/archive/cache copies, binary replays or publication
+attempts by this author.
 
 NEO-55/58 remain open for original
 cause/recovery ownership, deliberate candidate composition/image integration

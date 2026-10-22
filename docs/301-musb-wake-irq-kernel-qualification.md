@@ -6,8 +6,9 @@ at `5a2f362a39e49415b6a73e732219007ab8f4eb00` in the isolated
 main `5505fd90e9cd98038fef785bfe6ba19e6548a739`. After all original writers
 completed, the branch adopted published main
 `49b1c237ea3cd822195362f9462285fc1ee9a75c`. The positive suite passes all eleven
-cases; corrected control-oracle execution and independent reviews are pending.
-The wider parent remains open.
+cases. The corrected compiling control produces exactly five required failing
+cases and six passing cases. Independent reviews precede publication/closure;
+the wider parent remains open.
 
 ## Acceptance boundary
 
@@ -99,11 +100,50 @@ six passed and the five source-justified cases above failed. Its original
 wrapper predicted only four and rejected the additional debt-recovery failure.
 That rejected wrapper result, complete logs/KTAP/JSON and kernel remain historical
 and unchanged. The exact five-case oracle now requires the specific IRQ/reference
-assertions in each named case; fresh cached-kernel execution is pending.
+assertions in each named case. Before replay, a retained rationale records why
+the fifth failure follows from the same condition, and an independent source
+comparison confirms that reversing this sole condition change reproduces the
+positive core file byte-for-byte. The fixture, Kconfig, gadget/header and IRQ-core
+files match between both compiled sources.
 
-Private logs and receipts are retained under
-`.local/build/musb-wake-kunit/`; the report will record exact managed run and
-artifact identities after authoritative completion.
+On the final accepted-main context, both complete 36-patch specifications and
+generated test patches match their original compiled inputs. Maintained image
+patches, candidate bytes, lock, configuration and overlay are unchanged. Host
+input drift consists only of the accepted task/retirement-registry context,
+the control oracle/coverage wording and its parser guards. Fresh owned executions
+retain the original binary hashes and record the current host input hashes:
+
+| Final execution | Managed run | Actual result |
+| --- | --- | --- |
+| Positive | `ef784b94037344babc8d4d2574de3577` | Raw kernel exit 0; all eleven cases PASS |
+| Policy-ignored control | `ee85189791a74f939a1062a542ead05b` | Raw kernel exit 1; exactly the five named cases FAIL and six PASS; strict control checker succeeds |
+
+Both results are authoritative exits with no requested stop, OOM or unresolved
+writer. The maintained input hashes match before and after execution. The
+original eleven-PASS record and rejected four-case-oracle wrapper remain
+historical; neither is relabeled as this fresh execution.
+
+| Artifact | Positive SHA-256 | Control SHA-256 |
+| --- | --- | --- |
+| Complete source tree | `ef10df122813ed1cdf223531980bf2ad02fe997790c0860cc8a70875ebc87a95` | `1b3b8d205b36e96fb18113ddd4bad635080d0d791bec2f8163012e233142a6ef` |
+| Generated test patch | `b814d51a4f0ef92ef2be2445ba34c00fcf9b0f79684d9f17479d9ea8ed6fcaae` | `26f5da96dae2da173c10cd2e7052fb2f803420fca9c9c73f23af8901eb4e9aca` |
+| UML kernel | `3a74177d67ba3078617070ee998bed7c90589bb8db4aec6c68fa82012fadee17` | `7d31dc381b740ae0f88d6151f71a003bfa15913820c2c0645a7d680e1b8565de` |
+| Complete KTAP log | `1a03b4703d732c50e906bda6f9de4416a9c71a5f09969b4f655f1b0ad1815cfa` | `6d26ecfc4d09d97f1b0ea7ddfac3b1309e3c6ea6d4a792759d7fe99eda8df21e` |
+| Evidence receipt | `8d06174c1b1abcb36dadcca68990f300c2337328a5827b27834a4f3593c2f09b` | `bbdb3a2fbccd2e0e505d8b85c2be4f8a2a0499ead2185da0584a4cf7086c1b37` |
+
+Both kernels resolve the same required config, SHA-256
+`21b603baddcb16204901a2c2c96d6b1b5c5a3832893bfc8b0bf3077cf0f620e3`,
+including suspend, PM_SLEEP, the selected fixture, KASAN and lockdep. Final
+`task check` passes 24 runtime and 1,310 tooling tests (nine existing skips),
+the compiled current-selector and mount-guard checks, Bash syntax and ShellCheck.
+Nine focused guards cover wrong/composed profiles, incomplete results, unexpected
+control outcomes and assertion values assigned to the wrong case.
+
+Original and final logs/receipts remain under the two
+`.local/build/musb-wake-kunit*/` directories; accepted artifacts have unique
+retained subdirectories. The private
+`.local/build/musb-wake-kunit/neo218-evidence-index.json` indexes their hashes,
+the pre-replay oracle rationale/source-equivalence proof and original failures.
 
 ## Remaining NEO-98 gates
 

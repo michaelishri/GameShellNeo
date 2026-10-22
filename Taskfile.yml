@@ -526,6 +526,18 @@ tasks:
     desc: Run Sunxi ownership regressions and compile ARM gadget, host and dual-role glue/extcon
     cmds: [bash tools/run-logged.sh sunxi-owner-drivers python3 tools/check-sunxi-owner.py --compile-drivers]
 
+  test:phy-detector:
+    desc: Test Sun4i detector exit/rebind tails on native, sanitizers and ARM32
+    cmds: [bash tools/run-logged.sh phy-detector python3 tools/check-phy-detector.py]
+
+  check:phy-detector-drivers:
+    desc: Test detector retirement and compile five complete ARM PHY configurations
+    cmds: [bash tools/run-logged.sh phy-detector-drivers python3 tools/check-phy-detector.py --compile-drivers]
+
+  test:phy-detector-kunit:
+    desc: Test actual detector and PHY init/exit with Linux work/mutex/extcon races in UML
+    cmds: [bash tools/run-logged.sh phy-detector-kunit python3 tools/check-phy-detector-kunit.py]
+
   test:extcon-kunit:
     desc: Build and run real Linux UML notifier lifetime tests with TREE and TINY SRCU; no device access
     env:

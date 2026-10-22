@@ -1,0 +1,89 @@
+From: GameShellNeo contributors
+Subject: [PATCH] phy: sun4i-usb: exclude retired detector hardware tails
+
+Extcon callbacks run outside the PHY mutex and can synchronously retire
+its resources. Recheck the initialized generation under that mutex before
+post-notification register access and polling. A new initialization gets a
+new generation so a stale scan cannot change a rebound consumer state.
+
+diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
+--- a/drivers/phy/allwinner/phy-sun4i-usb.c
++++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+@@ -129,6 +129,7 @@
+ 	/* phy0 / otg related variables */
+ 	struct extcon_dev *extcon;
+ 	bool phy0_init;
++	u64 phy0_generation; /* protected by phys[0].phy->mutex */
+ 	struct gpio_desc *id_det_gpio;
+ 	struct gpio_desc *vbus_det_gpio;
+ 	struct power_supply *vbus_power_supply;
+@@ -351,6 +352,7 @@
+ 	sun4i_usb_phy_passby(phy, 1);
+ 
+ 	if (phy->index == 0) {
++		data->phy0_generation++;
+ 		data->phy0_init = true;
+ 
+ 		/* Enable pull-ups */
+@@ -587,6 +589,7 @@
+ 	struct phy *phy0 = data->phys[0].phy;
+ 	struct sun4i_usb_phy *phy;
+ 	bool force_session_end, id_notify = false, vbus_notify = false;
++	u64 generation;
+ 	int id_det, vbus_det;
+ 
+ 	if (!phy0)
+@@ -599,6 +602,8 @@
+ 		mutex_unlock(&phy0->mutex);
+ 		return;
+ 	}
++
++	generation = data->phy0_generation;
+ 
+ 	/* PHY exit holds this mutex too; do not access its suppliers after exit. */
+ 	id_det = sun4i_usb_phy0_get_id_det(data);
+@@ -635,13 +640,20 @@
+ 	if (id_notify) {
+ 		extcon_set_state_sync(data->extcon, EXTCON_USB_HOST,
+ 					!id_det);
++		/* A notifier may exit and even reinitialize this PHY.  The
++		 * old scan must not touch powered-off or new-instance state.
++		 */
++		mutex_lock(&phy0->mutex);
++		if (!data->phy0_init || data->phy0_generation != generation) {
++			mutex_unlock(&phy0->mutex);
++			return;
++		}
++
+ 		/* When leaving host mode force end the session here */
+ 		if (force_session_end && id_det == 1) {
+-			mutex_lock(&phy0->mutex);
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
+ 			msleep(1000);
+ 			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
+-			mutex_unlock(&phy0->mutex);
+ 		}
+ 
+ 		/* Enable PHY0 passby for host mode only. */
+@@ -650,13 +662,20 @@
+ 		/* Re-route PHY0 if necessary */
+ 		if (data->cfg->phy0_dual_route)
+ 			sun4i_usb_phy0_reroute(data, id_det);
++		mutex_unlock(&phy0->mutex);
+ 	}
+ 
+ 	if (vbus_notify)
+ 		extcon_set_state_sync(data->extcon, EXTCON_USB, vbus_det);
+ 
+-	if (sun4i_usb_phy0_poll(data))
++	/* A VBUS notification can retire the PHY too.  Do not let this
++	 * generation poll after exit, or race regulator state changes.
++	 */
++	mutex_lock(&phy0->mutex);
++	if (data->phy0_init && data->phy0_generation == generation &&
++	    sun4i_usb_phy0_poll(data))
+ 		queue_delayed_work(system_wq, &data->detect, POLL_TIME);
++	mutex_unlock(&phy0->mutex);
+ }
+ 
+ static irqreturn_t sun4i_usb_phy0_id_vbus_det_irq(int irq, void *dev_id)

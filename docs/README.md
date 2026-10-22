@@ -20,6 +20,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 records the separate fixed guard/RAW experiment, pause ABI, offline evidence
 and unchanged clock/PM and exclusive-device gates.
 
+[298 — USB removal producer and backend lifetime](298-usb-removal-producer-lifetime.md)
+records the Sun4i detector generation guard, offline qualification and separate
+remaining provider/backend and physical gates.
+
 [297 — brcmfmac firmware startup ownership](297-brcmfmac-startup-ownership.md)
 records reproduced setup-error loss, the isolated fail-fast candidate,
 actual-source qualification and separate reset/reprobe boundaries.

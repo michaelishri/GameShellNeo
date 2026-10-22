@@ -1798,4 +1798,18 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   the Allwinner PHY detector's independent IRQ/work/resource audit and other PHY
   consumer ordering, caller-frame/global-accessor lifetime and other backend/DMA
   prerequisites before complete removal qualification. Keep NEO-106 open.
+- [ ] NEO-214 isolates the Sun4i detector's stale post-notification hardware
+  tail: a consumer may exit or exit/reinitialize the PHY while extcon dispatch
+  runs outside its mutex. Candidate 0060 adds initialized-generation admission
+  for the remaining MMIO and poll tail. Native/sanitizer/ARM and five full ARM
+  configurations and ten real-kernel cases pass; independent review remains
+  pending in [report 298](docs/298-usb-removal-producer-lifetime.md). This does
+  not retire every generic-PHY consumer or complete NEO-106.
+- [ ] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
+  `mpfs_remove()` disables the parent clock before child teardown and passes
+  the parent to `usb_phy_generic_unregister()` rather than the registered
+  `glue->phy`. That helper directly unregisters its argument. Actual platform
+  helpers ignore NULL/error pointers, so those early unwind calls are benign;
+  retain their error/ownership regressions. No physical
+  MPFS/CPI fault or complete backend DMA/timer retirement is claimed.
 - [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

@@ -7,8 +7,11 @@ main `5505fd90e9cd98038fef785bfe6ba19e6548a739`. After all original writers
 completed, the branch adopted published main
 `49b1c237ea3cd822195362f9462285fc1ee9a75c`. The positive suite passes all eleven
 cases. The corrected compiling control produces exactly five required failing
-cases and six passing cases. Independent reviews precede publication/closure;
-the wider parent remains open.
+cases and six passing cases. Final review preparation uses the separate
+`work/musb-wake-irq-final` checkout on accepted main
+`02c633a0349ad986fe384cc0f94e26663baa3df3`, with new owned executions described
+below. Independent reviews precede publication/closure; the wider parent remains
+open.
 
 ## Acceptance boundary
 
@@ -106,14 +109,14 @@ comparison confirms that reversing this sole condition change reproduces the
 positive core file byte-for-byte. The fixture, Kconfig, gadget/header and IRQ-core
 files match between both compiled sources.
 
-On the final accepted-main context, both complete 36-patch specifications and
+On the `49b1c23` accepted-main context, both complete 36-patch specifications and
 generated test patches match their original compiled inputs. Maintained image
 patches, candidate bytes, lock, configuration and overlay are unchanged. Host
 input drift consists only of the accepted task/retirement-registry context,
 the control oracle/coverage wording and its parser guards. Fresh owned executions
 retain the original binary hashes and record the current host input hashes:
 
-| Final execution | Managed run | Actual result |
+| Execution on `49b1c23` | Managed run | Actual result |
 | --- | --- | --- |
 | Positive | `ef784b94037344babc8d4d2574de3577` | Raw kernel exit 0; all eleven cases PASS |
 | Policy-ignored control | `ee85189791a74f939a1062a542ead05b` | Raw kernel exit 1; exactly the five named cases FAIL and six PASS; strict control checker succeeds |
@@ -144,6 +147,40 @@ Original and final logs/receipts remain under the two
 retained subdirectories. The private
 `.local/build/musb-wake-kunit/neo218-evidence-index.json` indexes their hashes,
 the pre-replay oracle rationale/source-equivalence proof and original failures.
+
+## Final accepted-base review context
+
+The final review checkout adopts exactly published main `02c633a` after its
+NEO-215 integration lease completed. The original `0a359f6` checkout, its six
+managed runs and the index above remain frozen. The only changed maintained
+receipt inputs are `Taskfile.yml`, which adds three MPFS Tasks, and
+`tools/kernel_candidates.py`, which appends candidate 0061 to the retirement
+profile. The wake commands and separate 0026/0029 profile are unchanged.
+
+Before execution, both complete generated specifications match the original
+36-patch specifications exactly. Independent copies of the verified immutable
+sources and cached outputs retain the source, generated-patch, kernel and
+resolved-config hashes above. The normal runner revalidates each complete source
+inventory and records new owned executions with the current maintained hashes;
+no receipt guard is weakened and no original run is relabeled.
+
+| Execution on `02c633a` | Managed run | Actual result |
+| --- | --- | --- |
+| Positive | `93c53bce398649899024b1102a77830d` | Raw kernel exit 0; eleven PASS |
+| Policy-ignored control | `3a4f50277ff043c0b169c044684a7694` | Raw kernel exit 1; exact five FAIL/six PASS; strict checker succeeds |
+
+Both original jobs are terminal with unchanged inputs, no stop request and no
+OOM. Their new evidence receipt hashes are
+`6176889a452cf31b4066b2239237594e700a311f908384fd83271fc334ffaded`
+and `4a198f7f24bb2e752c882f02e3f5b2721f55c650f503dc4cd823a3e2f4a8aaed`.
+The new complete KTAP hashes are
+`13152b2c6bf2f6c2f98204105dd0d05b95c4388394e7af9f69a8ca650b389f1c`
+and `fb4c291d08de0a8ace4d90eb2a0ec491bb0c743048e18aea0822399673883504`;
+the two binary, resolved-config and result-JSON hashes remain exactly equal to
+the prior executions. Repeated context checks pass 24 runtime and 1,310 tooling
+tests (nine existing skips), the compiled checks and ShellCheck. The final
+checkout's private `.local/audit/neo218-final-review-index.json` binds the new
+receipts, preflight equality proof and host log to the frozen original index.
 
 ## Remaining NEO-98 gates
 

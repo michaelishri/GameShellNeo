@@ -5,6 +5,11 @@ from published main `02c633a` in `work/wakeup-sysfs-errors`. Candidate 0071 chan
 only the frontend's observable errno/idempotency contract. It is not registered
 in `kernel_candidates.py` or selected for an image.
 
+This source checkpoint adopts accepted published `0886549`. It is prepared for
+pre-integration source/evidence review; qualification against the later accepted
+combined base and final whole-ticket review/publication remain queued after
+NEO-220. No current-main acceptance or hardware result is inferred here.
+
 ## Source contract
 
 Linux 6.18.54 `drivers/base/power/sysfs.c:wakeup_store()` discards the return
@@ -154,7 +159,7 @@ finish while that pin remains, then releases and joins both workers before
 assertions. Actual allocation, IDA, registration, kernfs and production SRCU
 bodies remain unchanged. This adds no case or frontend-control exception: the
 twelve names and exact four-error/eight-pass control remain fixed. Fresh kernel
-qualification of the repaired fixture is pending.
+qualification of the repaired fixture is recorded below.
 
 The repaired positive/control profiles were compared before their execution at
 `.local/audit/neo223-fixture-repair-final-plan/plan.json` (SHA-256
@@ -193,6 +198,29 @@ proves the captured text is exact and the source-generation function, fixture
 and semantic control map are unchanged. Changed maintained host inputs require
 new owned cached positive/control execution and fresh output files; the earlier
 positive and rejected control are preserved as historical observations.
+
+The one new normally guarded cached chain, outer session 23896, completed with
+exit 0. Its genuine executions produced fresh output under new managed
+identities and released ownership:
+
+| Qualification | Managed run | Actual outcome |
+| --- | --- | --- |
+| Positive UML/KASAN/lockdep | `9a1350e1e22c4a44babf40ecce9a252c` | Raw 0, twelve passes, no rejected diagnostics |
+| Compiling frontend-error control | `feb69966e4ff4bf49550148a9642de8d` | Raw 1, exactly four named errno failures and eight passes; no other assertion or diagnostic |
+
+Both executions retain exactly the earlier profiles, configuration and binary
+hashes; only the three maintained host inputs (own runner, oracle and host tests)
+changed. The positive binary is SHA-256
+`a1d5fa3832b8adb83557490b94bbfcb981e68a9c5a04073bf266aa9eb9b8c792`;
+the control is
+`9a5b844d3debb56cb4d2a7a77fae5a2f079de98cec32c1c47f322a3f5a3b2736`.
+The immutable accepted-run receipts and complete artifact/source/input hashes
+are indexed at `.local/audit/neo223-original-base-qualification.json` (SHA-256
+`9ecf2e831536b8b2484e1623d0b583a35033b1db6603826866402ccce8d32717`).
+Every admitted native/ARM/production-object input still matches its complete
+earlier run. Re-execution of those unaffected stages was unnecessary. Complete
+host context checks are the remaining preparation before the fixed source
+pre-integration review bundle.
 
 MUSB IRQ timing/device-DPM traversal, terminal destruction/composition, image
 selection and physical hardware behavior remain separate. NEO-98 stays open.

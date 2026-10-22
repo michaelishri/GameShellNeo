@@ -20,6 +20,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 records refusal of successful command exits with failing control output,
 actual-runner host regressions and preservation of historical kernel evidence.
 
+[307 — Wakeup sysfs errors and idempotency](307-wakeup-sysfs-errors.md)
+records the isolated frontend candidate, real allocation/kernfs/SRCU lifetime
+qualification, exact error control and retained pre-integration boundaries.
+
 [305 — MMIO reference feasibility](305-clock-reference-feasibility.md)
 records the bounded offline STOP outcome, primary ordering/configuration audit,
 conditional native/ARM fixtures and unchanged underlying clock/PM gates.

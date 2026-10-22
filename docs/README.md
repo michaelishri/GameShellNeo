@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[309 — MUSB wake negative-control command exit](309-musb-wake-control-exit.md)
+records refusal of successful command exits with failing control output,
+actual-runner host regressions and preservation of historical kernel evidence.
+
 [305 — MMIO reference feasibility](305-clock-reference-feasibility.md)
 records the bounded offline STOP outcome, primary ordering/configuration audit,
 conditional native/ARM fixtures and unchanged underlying clock/PM gates.

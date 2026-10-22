@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 import sys
@@ -82,7 +83,75 @@ def flags(boot):
     return {name: dev_store.read_file(dev_store.child(boot, name), 65536) for name in dev_store.FLAGS}
 
 
-def exercise(boot, store, manifest, log):
+def reject_nested_mounts(root, mountinfo=Path('/proc/self/mountinfo')):
+    for line in mountinfo.read_text().splitlines():
+        fields = line.split()
+        point = Path(re.sub(r'\\([0-7]{3})', lambda match: chr(int(match[1], 8)), fields[4]))
+        require(point == root or not point.is_relative_to(root), 'Nested mount in complete development root')
+
+
+def root_metadata(root):
+    """Record metadata only, without following links or exporting inode numbers."""
+    root = Path(root).absolute()
+    require(root.resolve(strict=True) == root and stat.S_ISDIR(root.lstat().st_mode),
+            'Expected a real complete development-root directory')
+    reject_nested_mounts(root)
+    device = root.lstat().st_dev
+    entries, links = {}, {}
+    stable = ('st_dev', 'st_ino', 'st_mode', 'st_uid', 'st_gid', 'st_rdev',
+              'st_mtime_ns', 'st_ctime_ns', 'st_nlink')
+
+    def visit(path, relative):
+        before = path.lstat()
+        require(before.st_dev == device, 'Nested filesystem in complete development root')
+        record = dict(uid=before.st_uid, gid=before.st_gid, mode=before.st_mode,
+                      rdev=before.st_rdev, mtime_ns=before.st_mtime_ns,
+                      xattrs={name: os.getxattr(path, name, follow_symlinks=False).hex()
+                              for name in sorted(os.listxattr(path, follow_symlinks=False))})
+        if stat.S_ISLNK(before.st_mode):
+            record['symlink'] = os.readlink(path)
+        if not stat.S_ISDIR(before.st_mode):
+            record['nlink'] = before.st_nlink
+            links.setdefault((before.st_dev, before.st_ino), []).append(relative)
+        entries[relative] = record
+        if stat.S_ISDIR(before.st_mode):
+            with os.scandir(path) as children:
+                names = sorted(child.name for child in children)
+            for name in names:
+                visit(path / name, name if relative == '.' else relative + '/' + name)
+        after = path.lstat()
+        require(all(getattr(after, key) == getattr(before, key) for key in stable),
+                'Root metadata changed during capture: ' + relative)
+
+    visit(root, '.')
+    reject_nested_mounts(root)
+    return dict(entries=entries, hardlink_groups=sorted(sorted(group) for group in links.values() if len(group) > 1))
+
+
+def metadata_summary(snapshot):
+    entries = snapshot['entries']
+    modes = [record['mode'] for record in entries.values()]
+    return dict(sha256=hashlib.sha256(dev_store.json_bytes(snapshot)).hexdigest(), entries=len(entries),
+                directories=sum(stat.S_ISDIR(mode) for mode in modes),
+                regular_files=sum(stat.S_ISREG(mode) for mode in modes),
+                symlinks=sum(stat.S_ISLNK(mode) for mode in modes),
+                special_files=sum(not (stat.S_ISDIR(mode) or stat.S_ISREG(mode) or stat.S_ISLNK(mode))
+                                  for mode in modes),
+                hardlink_groups=len(snapshot['hardlink_groups']),
+                xattrs=sum(len(record['xattrs']) for record in entries.values()),
+                acls=sum(name.startswith('system.posix_acl_') for record in entries.values()
+                         for name in record['xattrs']))
+
+
+def verify_root_metadata(before, after):
+    changed = sorted(path for path in before['entries'].keys() | after['entries'].keys()
+                     if before['entries'].get(path) != after['entries'].get(path))
+    require(not changed and before['hardlink_groups'] == after['hardlink_groups'],
+            'Complete root metadata changed during administration: ' +
+            (', '.join(changed[:5]) if changed else 'hardlink groups'))
+
+
+def exercise(boot, store, manifest, log, metadata_path):
     from dev_systems import Card
 
     dev_store.verify_boot(boot, manifest)
@@ -108,6 +177,9 @@ def exercise(boot, store, manifest, log):
         source_metadata_records_capability_value=False,
         raw_image_sha256=manifest['raw']['sha256'])
 
+    metadata_before = root_metadata(root)
+    metadata_record = dict(before=metadata_summary(metadata_before), after=None, unchanged=None)
+    save(metadata_path, metadata_record)
     registered = Card(boot, store).register(selected_slot)
     require(flags(boot) == original_flags, 'Registration changed a boot selection flag')
     card = Card(boot, store)
@@ -141,9 +213,13 @@ def exercise(boot, store, manifest, log):
     loader = json.loads(command([sys.executable, '-I', '-c', loader_code, tools,
                                 dev_store.child(store, 'admin/loader/uInitrd')], log))
     require(flags(boot) == original_flags, 'Copied administration or loader verification changed flags')
+    metadata_after = root_metadata(root)
+    metadata_record.update(after=metadata_summary(metadata_after), unchanged=metadata_before == metadata_after)
+    save(metadata_path, metadata_record)
+    verify_root_metadata(metadata_before, metadata_after)
     return dict(before=before, registered=registered, after_register=after_register,
                 trial=selected, restored=restored, copied_admin_status=copied,
-                copied_loader=loader, fping=capability_record,
+                copied_loader=loader, fping=capability_record, root_metadata=metadata_record,
                 original_flags_sha256={name: hashlib.sha256(value).hexdigest()
                                        for name, value in original_flags.items()})
 
@@ -189,7 +265,7 @@ def worker(work, boot_sha256):
                 with mounted(boot_device, work / 'boot', 'vfat', log) as boot, \
                         mounted(store_device, work / 'store', 'ext4', log) as store:
                     phase('mounted')
-                    observed = exercise(boot, store, manifest, log)
+                    observed = exercise(boot, store, manifest, log, work / 'root-metadata.json')
                     phase('administration-verified', observed=observed)
                     os.sync()
                 phase('unmounted')
@@ -206,6 +282,8 @@ def worker(work, boot_sha256):
         except BaseException as error:
             log.write(traceback.format_exc().encode())
             os.fsync(log.fileno())
+            if (work / 'root-metadata.json').is_file():
+                state['root_metadata'] = dev_store.load_json(work / 'root-metadata.json')
             phase('failed', error=type(error).__name__ + ': ' + str(error))
             raise
         finally:

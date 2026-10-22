@@ -64,8 +64,20 @@ confirmation remain NEO-208 gates. Clock and PM admission remain separate.
 
 ## Standards
 
-Final independent review pending.
+The initial independent review of `8ae9274` found one hard issue and no
+actionable smells: a fixed x86 block-size ioctl request did not match native
+32-bit ARM. A read-only board query reproduced its errno 22 rejection and
+verified the native request returns the exact 4 GiB store size. The correction
+derives the request from native `size_t` width and checks both encodings.
+Final correction review and repeated native qualification are pending.
 
 ## Spec
 
-Final independent review pending.
+The initial independent review found two partial requirements: original-failure
+file pins were optional, and the compatibility fixture lacked root metadata
+comparison around administration operations. The correction requires archive
+and log pins from one retained failure operation, cross-checked against live
+store-file pins. The fixture now compares the complete root's ownership,
+modes, links and extended attributes before and after administration. Final
+correction review and actual artifact qualification are pending. No scope creep
+or additional incorrect-behavior finding was reported.

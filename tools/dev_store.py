@@ -252,9 +252,27 @@ def validate_backup(data, manifest):
             any(pins['systems/' + name + '/release.json'] != value['manifest_sha256']
                 for name, value in data['catalog'].items())):
         raise ValueError('Backup original catalog pins differ')
-    _keys(data['evidence'], ('admission_sha256', 'checkpoint_result_sha256', 'failed_import_sha256'))
-    for value in data['evidence'].values():
-        _digest(value)
+    evidence = data['evidence']
+    _keys(evidence, ('admission_sha256', 'checkpoint_result_sha256', 'failed_import_sha256',
+                     'failed_import_files'))
+    for key in ('admission_sha256', 'checkpoint_result_sha256', 'failed_import_sha256'):
+        _digest(evidence[key])
+    failed = _filemap(evidence['failed_import_files'])
+    operations = set()
+    for path, digest in failed.items():
+        parts = path.split('/')
+        operation = re.fullmatch(r'\.(.+)-bundle-([a-z0-9_]{8})', parts[1]) if len(parts) >= 3 else None
+        if parts[0] != 'systems' or operation is None:
+            raise ValueError('Failure evidence must belong to a retained bundle operation')
+        _slot(operation[1])
+        operations.add('/'.join(parts[:2]))
+        if pins.get(path) != digest:
+            raise ValueError('Failure evidence is missing from original store pins or differs')
+    if len(operations) != 1:
+        raise ValueError('Failure evidence spans different retained bundle operations')
+    prefix = operations.pop() + '/'
+    if not {prefix + 'archive.tar', prefix + 'operation.log'} <= failed.keys():
+        raise ValueError('Failure evidence lacks the original archive or operation log')
     return data
 
 

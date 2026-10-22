@@ -86,13 +86,17 @@ class StorePackage(unittest.TestCase):
                      'RELEASES.JSON':digest(store.json_bytes(catalog)),
                      'systems/diag26/release.json':'4'*64,'systems/diag26/source-image.json':'5'*64,
                      'systems/diag26/source-fstab':'6'*64})
+        failed={'systems/.diag25-bundle-fixture1/archive.tar':digest(b'original archive'),
+                'systems/.diag25-bundle-fixture1/operation.log':digest(b'original operation log')}
+        pins.update(failed)
         return dict(schema=1,operation='development-store-backup',development_only=True,verified=True,
             root=dict(boot_id='11111111-2222-3333-4444-555555555555',root_partuuid='1234abcd-02',
                       directory_deployment=False,image_sha256='7'*64,kernel='6.18.54-gameshellneo24'),
             parent=dict(cid='8'*32,bytes=64013467648,sector_bytes=512,partuuid_prefix='1234abcd'),
             partitions=parts,regions=regions,card=self.card,catalog=catalog,
             flags={name:self.manifest['boot_files'][name] for name in store.FLAGS},store_files=pins,
-            evidence=dict(admission_sha256='9'*64,checkpoint_result_sha256='a'*64,failed_import_sha256='b'*64))
+            evidence=dict(admission_sha256='9'*64,checkpoint_result_sha256='a'*64,
+                          failed_import_sha256='b'*64,failed_import_files=failed))
 
     def test_complete_inactive_store_and_recovery_boot_verify_without_xattr_access(self):
         self.assertIs(store.validate_manifest(self.manifest),self.manifest)
@@ -129,6 +133,48 @@ class StorePackage(unittest.TestCase):
         for change in changes:
             value=self.backup();change(value)
             with self.subTest(change=change),self.assertRaises(ValueError):store.validate_backup(value,self.manifest)
+
+    def test_failure_evidence_requires_one_retained_archive_and_log_with_matching_store_pins(self):
+        prefix='systems/.diag25-bundle-fixture1/'
+        for case in ('missing map','empty map','missing archive','missing log',
+                     'unretained directory','outside systems','invalid slot','invalid nonce','two operations',
+                     'traversal','missing store pin','mismatched store pin'):
+            backup=self.backup();evidence=backup['evidence'];failed=evidence['failed_import_files']
+            if case=='missing map':evidence.pop('failed_import_files')
+            elif case=='empty map':evidence['failed_import_files']={}
+            elif case=='missing archive':failed.pop(prefix+'archive.tar')
+            elif case=='missing log':failed.pop(prefix+'operation.log')
+            elif case in ('unretained directory','outside systems','invalid slot','invalid nonce','two operations','traversal'):
+                folders={'unretained directory':'systems/diag25-bundle-fixture1/',
+                         'outside systems':'other/.diag25-bundle-fixture1/',
+                         'invalid slot':'systems/.recovery-bundle-fixture1/',
+                         'invalid nonce':'systems/.diag25-bundle-fixture!/',
+                         'two operations':'systems/.diag25-bundle-fixture2/',
+                         'traversal':'systems/.diag25-bundle-fixture1/../'}
+                old=prefix+'operation.log';new=folders[case]+'operation.log'
+                failed[new]=failed.pop(old)
+                backup['store_files'][new]=backup['store_files'].pop(old)
+            elif case=='missing store pin':backup['store_files'].pop(prefix+'archive.tar')
+            elif case=='mismatched store pin':backup['store_files'][prefix+'archive.tar']='f'*64
+            with self.subTest(case=case),self.assertRaises(ValueError):
+                store.validate_backup(backup,self.manifest)
+
+    def test_extra_failed_operation_files_are_pinned_and_cannot_traverse_symlinks(self):
+        backup=self.backup();failed=backup['evidence']['failed_import_files']
+        extra='systems/.diag25-bundle-fixture1/extracted/diag25/release.json'
+        failed[extra]=digest(b'extracted source manifest')
+        with self.assertRaisesRegex(ValueError,'original store pins'):
+            store.validate_backup(backup,self.manifest)
+        backup['store_files'][extra]=failed[extra]
+        self.assertIs(store.validate_backup(backup,self.manifest),backup)
+        for relative in failed:
+            self.write(self.store,relative,b'evidence fixture')
+        archive='systems/.diag25-bundle-fixture1/archive.tar'
+        (self.store/archive).unlink()
+        outside=self.directory/'outside-failed-archive';outside.write_bytes(b'original archive')
+        (self.store/archive).symlink_to(outside)
+        with self.assertRaisesRegex(ValueError,'symlink'):
+            store._verify_files(self.store,failed)
 
     def test_content_tampering_and_symlink_traversal_reject(self):
         immutable=self.store/self.prefix/'root/usr/bin/tool'

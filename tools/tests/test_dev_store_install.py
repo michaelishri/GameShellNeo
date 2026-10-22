@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import struct
 import sys
 import tempfile
 import types
@@ -25,6 +26,18 @@ SPEC.loader.exec_module(installer)
 
 def sha(data):
     return hashlib.sha256(data).hexdigest()
+
+
+class BlockSizeRequest(unittest.TestCase):
+    def test_arm32_and_64_bit_requests_match_the_literal_linux_abi(self):
+        self.assertEqual(installer.blkgetsize64_request(4), 0x80041272)
+        self.assertEqual(installer.blkgetsize64_request(8), 0x80081272)
+        native = {4: 0x80041272, 8: 0x80081272}[struct.calcsize('N')]
+        self.assertEqual(installer.blkgetsize64_request(), native)
+        self.assertEqual(installer.BLKGETSIZE64, native)
+        for invalid in (0, 2, 16, True, '4'):
+            with self.subTest(width=invalid), self.assertRaises(ValueError):
+                installer.blkgetsize64_request(invalid)
 
 
 class ArchiveAndBlockIO(unittest.TestCase):

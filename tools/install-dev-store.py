@@ -25,7 +25,17 @@ CHUNK = 4 * 1024 * 1024
 METADATA_LIMIT = 16 * 1024 * 1024
 SPACE_MARGIN = 64 * 1024 * 1024
 REGISTRY = Path('/var/lib/gameshellneo-development-store-installer')
-BLKGETSIZE64 = 0x80081272
+
+
+def blkgetsize64_request(size_t_bytes=None):
+    """Linux encodes sizeof(size_t), although BLKGETSIZE64 returns eight bytes."""
+    width = struct.calcsize('N') if size_t_bytes is None else size_t_bytes
+    if type(width) is not int or width not in (4, 8):
+        raise ValueError('Expected a 32-bit or 64-bit native size_t')
+    return 0x80001272 | (width << 16)
+
+
+BLKGETSIZE64 = blkgetsize64_request()
 
 
 def require(condition, message):

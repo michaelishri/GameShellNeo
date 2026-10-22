@@ -1,0 +1,274 @@
+From: GameShellNeo project
+Subject: [PATCH] brcmfmac: stop firmware startup after setup failures
+
+Preserve the first clock and SDIO setup error before DATA publication or
+common attach. Return save/restore initialization errors and release both
+firmware inputs on failed download admission. Keep this candidate outside
+the image queue until deliberate integration and board qualification.
+
+diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -3694,39 +3694,41 @@
+ 					const struct firmware *fw,
+ 					void *nvram, u32 nvlen)
+ {
+-	int bcmerror;
++	int bcmerror, ret;
+ 	u32 rstvec;
+ 
+ 	sdio_claim_host(bus->sdiodev->func1);
+-	brcmf_sdio_clkctl(bus, CLK_AVAIL, false);
++	bcmerror = brcmf_sdio_clkctl(bus, CLK_AVAIL, false);
++	if (bcmerror)
++		goto out;
+ 
+ 	rstvec = get_unaligned_le32(fw->data);
+ 	brcmf_dbg(SDIO, "firmware rstvec: %x\n", rstvec);
+ 
+ 	bcmerror = brcmf_sdio_download_code_file(bus, fw);
+-	release_firmware(fw);
+ 	if (bcmerror) {
+ 		brcmf_err("dongle image file download failed\n");
+-		brcmf_fw_nvram_free(nvram);
+-		goto err;
++		goto out;
+ 	}
+ 
+ 	bcmerror = brcmf_sdio_download_nvram(bus, nvram, nvlen);
+-	brcmf_fw_nvram_free(nvram);
+ 	if (bcmerror) {
+ 		brcmf_err("dongle nvram file download failed\n");
+-		goto err;
++		goto out;
+ 	}
+ 
+ 	/* Take arm out of reset */
+ 	if (!brcmf_chip_set_active(bus->ci, rstvec)) {
+ 		brcmf_err("error getting out of ARM core reset\n");
+ 		bcmerror = -EIO;
+-		goto err;
+-	}
+-
+-err:
+-	brcmf_sdio_clkctl(bus, CLK_SDONLY, false);
++	}
++
++out:
++	release_firmware(fw);
++	brcmf_fw_nvram_free(nvram);
++	ret = brcmf_sdio_clkctl(bus, CLK_SDONLY, false);
++	if (!bcmerror)
++		bcmerror = ret;
+ 	sdio_release_host(bus->sdiodev->func1);
+ 	return bcmerror;
+ }
+@@ -3741,7 +3743,7 @@
+ 		return false;
+ }
+ 
+-static void brcmf_sdio_sr_init(struct brcmf_sdio *bus)
++static int brcmf_sdio_sr_init(struct brcmf_sdio *bus)
+ {
+ 	int err = 0;
+ 	u8 val;
+@@ -3769,13 +3771,13 @@
+ 	val = brcmf_sdiod_readb(bus->sdiodev, SBSDIO_FUNC1_WAKEUPCTRL, &err);
+ 	if (err) {
+ 		brcmf_err("error reading SBSDIO_FUNC1_WAKEUPCTRL\n");
+-		return;
++		return err;
+ 	}
+ 	val |= 1 << wakeupctrl;
+ 	brcmf_sdiod_writeb(bus->sdiodev, SBSDIO_FUNC1_WAKEUPCTRL, val, &err);
+ 	if (err) {
+ 		brcmf_err("error writing SBSDIO_FUNC1_WAKEUPCTRL\n");
+-		return;
++		return err;
+ 	}
+ 
+ 	/* Add CMD14 Support */
+@@ -3784,19 +3786,20 @@
+ 			     &err);
+ 	if (err) {
+ 		brcmf_err("error writing SDIO_CCCR_BRCM_CARDCAP\n");
+-		return;
++		return err;
+ 	}
+ 
+ 	brcmf_sdiod_writeb(bus->sdiodev, SBSDIO_FUNC1_CHIPCLKCSR,
+ 			   chipclkcsr, &err);
+ 	if (err) {
+ 		brcmf_err("error writing SBSDIO_FUNC1_CHIPCLKCSR\n");
+-		return;
++		return err;
+ 	}
+ 
+ 	/* set flag */
+ 	bus->sr_enabled = true;
+ 	brcmf_dbg(INFO, "SR enabled\n");
++	return 0;
+ }
+ 
+ /* enable KSO bit */
+@@ -4623,9 +4626,13 @@
+ 	sdio_claim_host(sdiod->func1);
+ 
+ 	/* Make sure backplane clock is on, needed to generate F2 interrupt */
+-	brcmf_sdio_clkctl(bus, CLK_AVAIL, false);
+-	if (bus->clkstate != CLK_AVAIL)
++	err = brcmf_sdio_clkctl(bus, CLK_AVAIL, false);
++	if (err)
+ 		goto release;
++	if (bus->clkstate != CLK_AVAIL) {
++		err = -EIO;
++		goto release;
++	}
+ 
+ 	/* Force clocks on backplane to be sure F2 interrupt propagates */
+ 	saveclk = brcmf_sdiod_readb(sdiod, SBSDIO_FUNC1_CHIPCLKCSR, &err);
+@@ -4643,7 +4650,9 @@
+ 
+ 	/* Enable function 2 (frame transfers) */
+ 	brcmf_sdiod_writel(sdiod, core->base + SD_REG(tosbmailboxdata),
+-			   SDPCM_PROT_VERSION << SMB_DATA_VERSION_SHIFT, NULL);
++			   SDPCM_PROT_VERSION << SMB_DATA_VERSION_SHIFT, &err);
++	if (err)
++		goto checkdied;
+ 
+ 	err = sdio_enable_func(sdiod->func2);
+ 
+@@ -4654,7 +4663,9 @@
+ 		/* Set up the interrupt mask and enable interrupts */
+ 		bus->hostintmask = HOSTINTMASK;
+ 		brcmf_sdiod_writel(sdiod, core->base + SD_REG(hostintmask),
+-				   bus->hostintmask, NULL);
++				   bus->hostintmask, &err);
++		if (err)
++			goto checkdied;
+ 
+ 		switch (sdiod->func1->device) {
+ 		case SDIO_DEVICE_ID_BROADCOM_43751:
+@@ -4664,26 +4675,42 @@
+ 				  CY_4373_F2_WATERMARK);
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_WATERMARK,
+ 					   CY_4373_F2_WATERMARK, &err);
++			if (err)
++				goto checkdied;
+ 			devctl = brcmf_sdiod_readb(sdiod, SBSDIO_DEVICE_CTL,
+ 						   &err);
++			if (err)
++				goto checkdied;
+ 			devctl |= SBSDIO_DEVCTL_F2WM_ENAB;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_DEVICE_CTL, devctl,
+ 					   &err);
++			if (err)
++				goto checkdied;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_FUNC1_MESBUSYCTRL,
+ 					   CY_4373_F1_MESBUSYCTRL, &err);
++			if (err)
++				goto checkdied;
+ 			break;
+ 		case SDIO_DEVICE_ID_BROADCOM_CYPRESS_43012:
+ 			brcmf_dbg(INFO, "set F2 watermark to 0x%x*4 bytes\n",
+ 				  CY_43012_F2_WATERMARK);
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_WATERMARK,
+ 					   CY_43012_F2_WATERMARK, &err);
++			if (err)
++				goto checkdied;
+ 			devctl = brcmf_sdiod_readb(sdiod, SBSDIO_DEVICE_CTL,
+ 						   &err);
++			if (err)
++				goto checkdied;
+ 			devctl |= SBSDIO_DEVCTL_F2WM_ENAB;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_DEVICE_CTL, devctl,
+ 					   &err);
++			if (err)
++				goto checkdied;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_FUNC1_MESBUSYCTRL,
+ 					   CY_43012_MESBUSYCTRL, &err);
++			if (err)
++				goto checkdied;
+ 			break;
+ 		case SDIO_DEVICE_ID_BROADCOM_4329:
+ 		case SDIO_DEVICE_ID_BROADCOM_4339:
+@@ -4691,26 +4718,42 @@
+ 				  CY_4339_F2_WATERMARK);
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_WATERMARK,
+ 					   CY_4339_F2_WATERMARK, &err);
++			if (err)
++				goto checkdied;
+ 			devctl = brcmf_sdiod_readb(sdiod, SBSDIO_DEVICE_CTL,
+ 						   &err);
++			if (err)
++				goto checkdied;
+ 			devctl |= SBSDIO_DEVCTL_F2WM_ENAB;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_DEVICE_CTL, devctl,
+ 					   &err);
++			if (err)
++				goto checkdied;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_FUNC1_MESBUSYCTRL,
+ 					   CY_4339_MESBUSYCTRL, &err);
++			if (err)
++				goto checkdied;
+ 			break;
+ 		case SDIO_DEVICE_ID_BROADCOM_43455:
+ 			brcmf_dbg(INFO, "set F2 watermark to 0x%x*4 bytes\n",
+ 				  CY_43455_F2_WATERMARK);
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_WATERMARK,
+ 					   CY_43455_F2_WATERMARK, &err);
++			if (err)
++				goto checkdied;
+ 			devctl = brcmf_sdiod_readb(sdiod, SBSDIO_DEVICE_CTL,
+ 						   &err);
++			if (err)
++				goto checkdied;
+ 			devctl |= SBSDIO_DEVCTL_F2WM_ENAB;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_DEVICE_CTL, devctl,
+ 					   &err);
++			if (err)
++				goto checkdied;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_FUNC1_MESBUSYCTRL,
+ 					   CY_43455_MESBUSYCTRL, &err);
++			if (err)
++				goto checkdied;
+ 			break;
+ 		case SDIO_DEVICE_ID_BROADCOM_4359:
+ 		case SDIO_DEVICE_ID_BROADCOM_4354:
+@@ -4719,17 +4762,27 @@
+ 				  CY_435X_F2_WATERMARK);
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_WATERMARK,
+ 					   CY_435X_F2_WATERMARK, &err);
++			if (err)
++				goto checkdied;
+ 			devctl = brcmf_sdiod_readb(sdiod, SBSDIO_DEVICE_CTL,
+ 						   &err);
++			if (err)
++				goto checkdied;
+ 			devctl |= SBSDIO_DEVCTL_F2WM_ENAB;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_DEVICE_CTL, devctl,
+ 					   &err);
++			if (err)
++				goto checkdied;
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_FUNC1_MESBUSYCTRL,
+ 					   CY_435X_F1_MESBUSYCTRL, &err);
++			if (err)
++				goto checkdied;
+ 			break;
+ 		default:
+ 			brcmf_sdiod_writeb(sdiod, SBSDIO_WATERMARK,
+ 					   DEFAULT_F2_WATERMARK, &err);
++			if (err)
++				goto checkdied;
+ 			break;
+ 		}
+ 	} else {
+@@ -4739,7 +4792,7 @@
+ 	}
+ 
+ 	if (brcmf_chip_sr_capable(bus->ci)) {
+-		brcmf_sdio_sr_init(bus);
++		err = brcmf_sdio_sr_init(bus);
+ 	} else {
+ 		/* Restore previous clock setting */
+ 		brcmf_sdiod_writeb(sdiod, SBSDIO_FUNC1_CHIPCLKCSR,

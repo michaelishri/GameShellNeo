@@ -169,6 +169,18 @@ tasks:
     desc: Exercise interrupted-build admission and reattachment in bounded offline Docker fixtures
     cmds: [bash tools/run-logged.sh docker-ownership python3 tools/check-docker-stage.py]
 
+  test:brcmfmac-startup-baseline:
+    desc: Reproduce discarded firmware startup errors (expected failures; no hardware)
+    cmds: [bash tools/run-logged.sh brcmfmac-startup-baseline python3 tools/check-brcmfmac-tx-recovery.py --startup-baseline --native-only]
+
+  test:brcmfmac-startup:
+    desc: Qualify actual firmware startup failure ownership and combined Wi-Fi regressions
+    cmds: [bash tools/run-logged.sh brcmfmac-startup python3 tools/check-brcmfmac-tx-recovery.py --startup-errors]
+
+  check:brcmfmac-startup-drivers:
+    desc: Qualify firmware startup and build complete board/debug ARM driver objects
+    cmds: [bash tools/run-logged.sh brcmfmac-startup-drivers python3 tools/check-brcmfmac-tx-recovery.py --startup-errors --compile-drivers]
+
   test:brcmfmac-output-baseline:
     desc: Reproduce unchecked diagnostic output in offline native/sanitizer cases (expected failures)
     cmds: [bash tools/run-logged.sh brcmfmac-output-baseline python3 tools/check-brcmfmac-tx-recovery.py --bounds-baseline --native-only]

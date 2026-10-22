@@ -165,10 +165,15 @@ See [report 286](docs/286-brcmfmac-diagnostic-output-bounds.md).
 No triggering firmware input or live fault is claimed; candidate 0054 stays
 outside the image queue, with integration/hardware ownership in NEO-58.
 
-**NEO-58 firmware-startup error audit, 12 October 2026:** the callback still
-discards clock/setup transfer results outside NEO-201's shared-reader path.
-Trace them with function-2/IRQ/interface ownership and reset/reprobe cleanup;
-the completed active-worker candidates do not qualify startup failures.
+**NEO-58/212 firmware startup, 23 October 2026:** actual-source baseline
+passes 959/2088 native and sanitizer cases, reproducing discarded clock,
+protocol/mask/watermark and save/restore setup errors. Candidate 0055 checks
+each boundary before later setup, preserves the first error through clock
+cleanup and releases its firmware inputs once. Full qualification and
+independent review are in progress in
+[report 297](docs/297-brcmfmac-startup-ownership.md). It stays outside the image
+queue; the active-worker candidates do not by themselves qualify startup.
+Separate probe/buscore setup and reset/reprobe ownership still need audit.
 
 **NEO-58/198 polling status, 12 October 2026:** actual-source tests reproduce
 discarded queued-TX polling errors and I/O after a prior error arrives at host

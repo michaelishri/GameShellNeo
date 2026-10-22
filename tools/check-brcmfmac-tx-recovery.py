@@ -220,6 +220,8 @@ def main():
     global POLL_STATUS, CLOCK_DEADLINE, SHARED_DIAGNOSTICS, CASES, WORK
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--startup-errors', action='store_true', help='Qualify firmware startup failure ownership')
+    mode.add_argument('--startup-baseline', action='store_true', help='Reproduce discarded firmware startup errors')
     mode.add_argument('--baseline', action='store_true', help='Reproduce uncorrected TX error ownership')
     mode.add_argument('--poll-status', action='store_true', help='Qualify queued-TX polling status errors')
     mode.add_argument('--poll-baseline', action='store_true', help='Reproduce discarded polling status errors')
@@ -235,7 +237,9 @@ def main():
     parser.add_argument('--compile-drivers', action='store_true')
     parser.add_argument('--arm-attempt', help=argparse.SUPPRESS)
     args = parser.parse_args()
-    bounds_mode = args.diagnostic_bounds or args.bounds_baseline
+    startup_mode = args.startup_errors or args.startup_baseline
+    startup = module('startup_checks', 'brcmfmac_startup_checks.py') if startup_mode else None
+    bounds_mode = args.diagnostic_bounds or args.bounds_baseline or startup_mode
     bounds = module('diagnostic_output_checks', 'brcmfmac_output_checks.py') if bounds_mode else None
     shared_mode = args.shared_diagnostics or args.shared_baseline or bounds_mode
     SHARED_DIAGNOSTICS = args.shared_diagnostics or bounds_mode
@@ -253,8 +257,12 @@ def main():
         WORK = ROOT / '.local/build/brcmfmac-clock-deadline'
     if shared_mode:
         WORK = ROOT / '.local/build/brcmfmac-shared-diagnostics'
+    if startup_mode:
+        WORK = ROOT / '.local/build/brcmfmac-startup'
     if args.arm_attempt:
         attempt = ROOT / args.arm_attempt
+        if startup:
+            startup.run_cases(attempt / 'startup', rx, arm=True)
         if watchdog:
             watchdog.run_cases(attempt / 'watchdog', rx, arm=True, clock=CLOCK_DEADLINE)
             if CLOCK_DEADLINE:
@@ -289,8 +297,10 @@ def main():
             paths.append(ROOT / 'kernel/candidates/0052-brcmfmac-clock-deadline.patch')
         if SHARED_DIAGNOSTICS:
             paths.append(ROOT / 'kernel/candidates/0053-brcmfmac-shared-diagnostics.patch')
-        if args.diagnostic_bounds:
+        if args.diagnostic_bounds or startup_mode:
             paths.append(ROOT / 'kernel/candidates/0054-brcmfmac-diagnostic-bounds.patch')
+        if args.startup_errors:
+            paths.append(ROOT / 'kernel/candidates/0055-brcmfmac-startup-errors.patch')
         for path in paths:
             if path.name in {name for name, _ in queue}:
                 raise ValueError('TX test candidate unexpectedly entered image queue')
@@ -310,11 +320,24 @@ def main():
             paths += [diagnostics.HARNESS, ROOT / 'tools/brcmfmac_shared_checks.py']
         if bounds:
             paths += [bounds.HARNESS, bounds.FIXTURE, ROOT / 'tools/brcmfmac_output_checks.py']
+        if startup:
+            paths += [startup.HARNESS, ROOT / 'tools/brcmfmac_startup_checks.py',
+                      ROOT / 'tools/managed_container.py', ROOT / 'tools/docker-stage.py']
         hashes = {str(path.relative_to(ROOT)): sha256(path) for path in paths}
         atomic_json(attempt / 'inputs.json', hashes)
         with locked(WORK / '.source-lock'):
             source, _, metadata = ensure_source(ROOT, WORK, archive, lock, manifest, recorded_patches=queue)
         atomic_json(attempt / 'source.json', metadata)
+        if startup:
+            start = attempt / 'startup'; start.mkdir()
+            startup.extract_sources(source, start, rx)
+            failures = startup.run_cases(start, rx, baseline=args.startup_baseline)
+            sanitizer_failures = startup.run_cases(start, rx, sanitizer=True, baseline=args.startup_baseline)
+            if args.startup_baseline:
+                if not failures and not sanitizer_failures:
+                    raise RuntimeError('Startup baseline unexpectedly passed')
+                raise RuntimeError('Startup baseline reproduced failures; original logs retained')
+            startup.negatives(start, rx)
         if watchdog:
             watch = attempt / 'watchdog'; watch.mkdir()
             watchdog.extract_sources(source, watch, rx, clock=CLOCK_DEADLINE)
@@ -362,12 +385,17 @@ def main():
         run_worker(worker, negative=True)
         run_worker(worker, sanitizer=True)
         if not args.native_only:
-            subprocess.run(['docker', 'run', '--rm', '--network=none', '--pull=never',
+            arguments = ['--network=none', '--pull=never',
                 '--user', f'{os.getuid()}:{os.getgid()}', '--platform', lock['builder']['platform'],
                 '--entrypoint=python3', '-v', f'{ROOT}:/project', '-w', '/project',
                 lock['builder']['image'], 'tools/check-brcmfmac-tx-recovery.py',
-                *(['--diagnostic-bounds'] if bounds_mode else ['--shared-diagnostics'] if shared_mode else ['--clock-deadline'] if CLOCK_DEADLINE else ['--watchdog-errors'] if watchdog_mode else ['--poll-status'] if POLL_STATUS else []),
-                '--arm-attempt', str(attempt.relative_to(ROOT))], check=True, timeout=180)
+                *(['--startup-errors'] if startup_mode else ['--diagnostic-bounds'] if bounds_mode else ['--shared-diagnostics'] if shared_mode else ['--clock-deadline'] if CLOCK_DEADLINE else ['--watchdog-errors'] if watchdog_mode else ['--poll-status'] if POLL_STATUS else []),
+                '--arm-attempt', str(attempt.relative_to(ROOT))]
+            if startup_mode:
+                from managed_container import execute
+                execute('brcmfmac-startup-arm', arguments, attempt / 'managed-arm', timeout=900)
+            else:
+                subprocess.run(['docker', 'run', '--rm', *arguments], check=True, timeout=180)
         builds = {}
         if args.compile_drivers:
             for name, extra in dict(board=(), debug=('CONFIG_BRCMDBG=y',)).items():
@@ -383,11 +411,14 @@ def main():
             watchdog=watchdog_mode,
             clock_deadline=CLOCK_DEADLINE,
             shared_diagnostics=shared_mode,
-            diagnostic_bounds=bounds_mode,
+            diagnostic_bounds=bounds_mode, firmware_startup=startup_mode,
             native_complete=True, native_sanitizers=True, arm_complete=not args.native_only,
             inputs=hashes, source=metadata, cases=CASES, arm_build=builds,
             artifacts={str(path.relative_to(attempt)): sha256(path) for path in attempt.rglob('*') if path.is_file()},
-            limits=('Console sizes/indices and assertion bytes use controlled firmware-memory responses; '
+            limits=('Actual firmware callback/download/SR initialization with controlled synchronous '
+                    'SDIO, clock, IRQ, allocation and driver-release seams; no full driver-core or '
+                    'firmware scheduling simulation. ' if startup_mode else '') +
+                   ('Console sizes/indices and assertion bytes use controlled firmware-memory responses; '
                     'bounded seq writes and real vsnprintf model output, not the kernel seq-file core. '
                     'No malformed input is sent to a device. ' if bounds_mode else '') +
                    ('Actual shared/console/assert/trap diagnostic functions and RAM helper; '

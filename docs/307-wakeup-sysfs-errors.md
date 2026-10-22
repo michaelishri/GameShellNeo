@@ -218,9 +218,23 @@ The immutable accepted-run receipts and complete artifact/source/input hashes
 are indexed at `.local/audit/neo223-original-base-qualification.json` (SHA-256
 `9ecf2e831536b8b2484e1623d0b583a35033b1db6603826866402ccce8d32717`).
 Every admitted native/ARM/production-object input still matches its complete
-earlier run. Re-execution of those unaffected stages was unnecessary. Complete
-host context checks are the remaining preparation before the fixed source
-pre-integration review bundle.
+earlier run. Re-execution of those unaffected stages was unnecessary. The
+read-only reference-artifact audit also rehashes every saved native/sanitizer/ARM
+binary and all three ARM objects, reparses their exact original outcomes and
+checks released original ownership. Its receipt is
+`.local/audit/neo223-reference-artifact-verification.json` (SHA-256
+`0c556565a049d9bfcb4f48f95cc764702e97558cf9445108fe69b5a691975ed6`).
+
+Complete original-base `task check` at clean `e897f91`, original normal-host
+session 24547, passed with exit 0: 24 runtime and 1,367 tooling tests, nine
+expected skips, both compiled C checks, Bash syntax and ShellCheck. The full log
+is `.local/build/neo223-preintegration-host-check.log` (SHA-256
+`15312b2e07ef87e80db37496e8d79a06eff349f9b00acc731caca8a30ec537f4`);
+its saved receipt records the same clean head before and after. Subsequent
+review preparation changes only this report; qualified code and all admitted
+kernel/native/object inputs remain unchanged. This prepares source
+pre-integration review only. Final adopted-base qualification and an entirely
+fresh whole-ticket pair remain queued after NEO-220.
 
 MUSB IRQ timing/device-DPM traversal, terminal destruction/composition, image
 selection and physical hardware behavior remain separate. NEO-98 stays open.

@@ -2633,6 +2633,13 @@ detected sleep, missing/late samples, slow reads, lost external power, discharge
 invalid battery readings, low capacity, excess temperature, taint, and observed
 changes to brightness or charger/input-limit settings. No setting is changed.
 
+The host derives clock bounds from the raw integer brackets and recomputes the
+charge summary before accepting the result. Forged stored bounds/summaries,
+missing samples and disturbed observations retain their original raw output
+and provenance on refusal. This leaves the collector and its historical image
+profile guards unchanged. [Report 310](docs/310-charge-result-admission.md)
+records the host-only qualification and remaining review/charging/clock gates.
+
 Original JSON-lines observations (including a rejected sample), source hashes
 and requested duration remain private under `.local/diagnostics/`. A remote
 deadline bounds execution independently of SSH collection. Lost SSH or partial

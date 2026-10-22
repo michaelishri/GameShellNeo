@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-10/226 charging host result admission:** the retained actual-host local
+baseline accepts four invalid streams, including completion-only and forged
+raw-bound/summary data. Host admission now derives clock bounds from raw
+integers before unchanged pure validators/charge-summary reuse. Fourteen
+methods / 39 local host cases pass; raw/provenance, original stdin payload,
+deadlines, PM lock and collector/profile bytes remain unchanged. Final context,
+combined checks, fresh review and publication wait behind NEO-219/220. No
+device or calibration/safety qualification occurs; original NEO-121 evidence
+and NEO-10/101/192 gates remain unchanged.
+[Report 310](docs/310-charge-result-admission.md).
+
 **NEO-211 development-store expansion:** the remote expansion from 4 GiB to
 55.6171875 GiB completed from fixed recovery after a fresh fully verified
 off-device checkpoint, independent Standards/Spec reviews and disposable native

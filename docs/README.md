@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[310 — Raw charging-result host admission](310-charge-result-admission.md)
+records the retained host baseline, independent raw-bound/summary replay,
+unchanged collector/transport and separate charging/clock qualification gates.
+
 [309 — MUSB wake negative-control command exit](309-musb-wake-control-exit.md)
 records refusal of successful command exits with failing control output,
 actual-runner host regressions and preservation of historical kernel evidence.

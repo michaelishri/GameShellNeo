@@ -16,9 +16,37 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[309 — MUSB wake negative-control command exit](309-musb-wake-control-exit.md)
+records refusal of successful command exits with failing control output,
+actual-runner host regressions and preservation of historical kernel evidence.
+
+[308 — Standalone host awake-result admission](308-awake-result-admission.md)
+records reproduced host proof acceptance, raw/context retention, finite local
+consumer qualification and separate physical/clock/PM gates.
+
 [306 — OMAP2430 MUSB mailbox ownership](306-omap-mailbox-ownership.md)
 records the original publisher/work schedules, opt-in ownership candidate,
 source-context boundaries and separate Linux and hardware qualification gates.
+
+[305 — MMIO reference feasibility](305-clock-reference-feasibility.md)
+records the bounded offline STOP outcome, primary ordering/configuration audit,
+conditional native/ARM fixtures and unchanged underlying clock/PM gates.
+
+[304 — MUSB wake policy through device-PM traversal](304-musb-wake-device-pm-qualification.md)
+records actual Linux DPM dispatch and error unwind, the exact missing-callback
+control, guarded evidence admission and separate physical/composition limits.
+
+[303 — MUSB terminal IRQ/wake composition](303-musb-terminal-wake-composition.md)
+records the explicit combined candidate, action/wake ownership handoff,
+actual-source controls and separate software/hardware boundaries.
+
+[302 — Finite scheduled clock brackets](302-scheduled-clock-boundaries.md)
+records the separate fixed guard/RAW experiment, pause ABI, offline evidence,
+one finite GameShell capture and unchanged clock/PM and exclusive-device gates.
+
+[301 — MUSB wake ownership through kernel IRQ traversal](301-musb-wake-irq-kernel-qualification.md)
+records the isolated wake/startup KUnit suite, real Linux global IRQ traversal,
+source control, retained original failures and separate DPM/physical gates.
 
 [300 — MPFS parent resource and PHY ownership](300-mpfs-removal-ownership.md)
 records the two backend teardown defects, actual-source and selected-object

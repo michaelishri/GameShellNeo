@@ -2,6 +2,19 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-101/224 standalone host result admission:** ten retained local baseline
+cases reproduce acceptance of missing or disturbed raw awake proof in five
+actual host consumers, including six helper-stage deletions. The shared host
+admission now recomputes unchanged raw proof before success/deletion and saves
+exact owned helper/unit context. Fifteen methods / 130 local scripted-channel
+cases pass, including duration rounding boundaries, raw retention and original
+error/restoration behavior. No SSH, collector or device operation occurs.
+The combined check on accepted NEO-225 context passes 24 runtime / 1370 tooling
+tests (nine expected skips), C and shell checks. Fresh independent review and
+publication remain pending. Parent NEO-101 physical/observer-cost and
+NEO-192/PM gates stay open.
+[Report 308](docs/308-awake-result-admission.md).
+
 **NEO-211 development-store expansion:** the remote expansion from 4 GiB to
 55.6171875 GiB completed from fixed recovery after a fresh fully verified
 off-device checkpoint, independent Standards/Spec reviews and disposable native
@@ -85,8 +98,10 @@ cleanup in 0026 must be reconciled before a combined source/image queue can
 be qualified. Preserve both candidates and original evidence. Historical
 teardown audit success reproduces old defects and is not a current removal
 safety claim. [Report 291](docs/291-legacy-musb-source-integration.md) maps all
-five old branch histories. NEO-98 retains whole-kernel PM/IRQ traversal and
-allocation/sysfs concurrency limits; NEO-106 retains caller/global-accessor,
+five old branch histories. [NEO-218](docs/301-musb-wake-irq-kernel-qualification.md)
+adds the separate profile's real global IRQ traversal qualification; NEO-98
+retains full device-DPM traversal, allocation/sysfs concurrency and terminal
+wake-debt/composition limits. NEO-106 retains caller/global-accessor,
 other backend/DMA and inaccessible-hardware software work. These are separate
 from the new-image/card installation and matching-board wake/unbind/rebind
 qualification that need physical access and fresh clock admission.
@@ -292,11 +307,27 @@ callback/UDC suite is now qualified above. Existing single-CPU UML endpoint test
 that cross-CPU atomic callback boundary. No GameShell access occurred.
 [Report 273](docs/273-smp-kernel-test-environment.md).
 
+**NEO-192/221 reference feasibility, 23 October 2026:** bounded offline audit
+returns STOP. Seven locked Linux sources, actual configuration/vmlinux and
+primary ARM documentation distinguish relaxed MMIO, ordered readl and the
+original ISB/MRRC path. No two-sided reference-bracket proof is established;
+adding DSB can perturb the fault. Nineteen fixed cases in six families pass
+native, ASan/UBSan and ARM arithmetic checks; nine Python cases pass. An exact
+18-tick uncertainty control retains the corrected full comparison width and
+both raw reversal examples. Compile-only ARM fragments are never executed or
+linked; no kernel interface, profile, image, MMIO/device or additional capture
+is introduced. Provider lifetime and actual resolution remain unqualified.
+Original and corrected attempts, parser failure and old NEO-217 evidence are
+preserved. Refreshed current-input qualification and the combined 24 runtime /
+1354 tooling checks pass on accepted published NEO-218 context; fresh final
+review/publication remain pending. NEO-192
+and dependent PM gates stay open. [Report 305](docs/305-clock-reference-feasibility.md).
+
 **NEO-192/213 development admission, 23 October 2026:** an explicit awake-only
 adapter now distinguishes the original diagnostic.27 image, unchanged ARM
 reader receipt and newly executed wrapper sources. Its local plan verifies
 the raw image/kernel and exact release/deployment transformation; live checks
-will require the actual p3 root inode/mount, card/filesystem identity and fresh
+require the actual p3 root inode/mount, card/filesystem identity and fresh
 runtime hashes. Original raw-image and PM guards remain strict. Offline
 provenance/refusal, exact bounded large-contract staging, managed native/ARM
 replay and full 24 runtime/1297 tooling source checks pass. Both independent
@@ -304,10 +335,46 @@ source reviews pass, and one coordinated 384-call capture/replay completes
 from the exact capable diag27 root with fresh runtime/build provenance and
 unchanged health/both routes. The actual window covers CPU0 only for about
 11.9 ms; it does not clear the intermittent fault. Recovery remains default,
-diag27 unconfirmed; final evidence/combined-tree review and publication remain
-pending. The original MONOTONIC fault, RAW discrepancy and NEO-191 PM gate
-remain open.
+diag27 unconfirmed. Additional fresh review found and corrected receipt-driven
+ABI header completeness: all ten expected headers are now required. The valid
+original receipt and real artifact plan pass offline; 18 focused and 24 runtime /
+1301 tooling tests pass. Entirely fresh Standards/Spec reviews accepted the
+corrected source; NEO-213 was published and closed at `5505fd9`, retaining the
+historical capture's original source hashes and all evidence. The original
+MONOTONIC fault, RAW discrepancy and NEO-191 PM gate remain open.
 [Report296](docs/296-development-clock-admission.md).
+
+**NEO-192/217 scheduled observation, 23 October 2026:** a distinct finite
+experiment requests 32 guard/RAW brackets separated by 31 fixed relative
+100 ms pauses: 256 clock calls, with no affinity/clocksource/PM policy change
+or retry. The new pause-only library has separate native/ARM ABI, signal and
+source receipts; original reader/core and 384-call guards stay unchanged.
+Offline admission, replay, partial/error preservation and owned-stage tests
+pass: 30 focused host tests, 15 pure native/ARM tests on each architecture,
+actual ARM Python/libc 256-call/31-pause execution, and 24 runtime / 1331 tooling
+combined checks (nine expected skips). The ARM fixture uses a fake recorder
+and supplies no kernel or hardware evidence. Accepted main `49b1c23` is
+incorporated; actual clock/pause ABI pins and all 33 production patches remain
+unchanged. Original failures and all actual qualification receipts are retained.
+Entirely fresh Standards/Spec reviews accepted frozen `6524aea` with zero
+findings. The separately leased single GameShell capture completed all 256
+calls / 31 pauses with 458 writer records and no loss; independent replay
+matches. Read CPUs 0/1/2/3 supplied 120/24/8/104 calls across a 3.157333209 s
+RAW interval, with no discrepancy in this finite sample. Fresh source/runtime,
+both routes, protected kernel continuity and mounted-p1 recovery-flag pre/post
+checks pass. The exact Kiyo capture stopped after ten frames; actual first
+and last frames were inspected. Original unit/PIDs/stage and recorder
+ownership are closed. The coordinator verified
+the 45-file postflight receipt and released the lease. A new combined checkout
+adopts accepted published `7120990`; the physical capture's source and
+98-artifact checkpoint remain unchanged. The accepted managed-build helper
+change caused a preserved strict receipt refusal; fresh pause and actual ARM
+workload receipts then pass normal current-input admission. Library bytes are
+unchanged. Combined checks pass 24 runtime/1354 tooling tests with nine expected
+skips, C and shell checks. Fresh final review/publication is pending.
+NEO-192's historical MONOTONIC/RAW faults and dependent PM gates
+remain open, and diag27 stays unconfirmed with recovery default.
+[Report 302](docs/302-scheduled-clock-boundaries.md).
 
 **Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies
 kernel build ID/configuration, image/source/runtime hashes, same-process vDSO
@@ -1729,7 +1796,8 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
 
 - [x] NEO-80 image: retained diagnostic.13 recovery, clean-built diagnostic.14 with patch 0019 and the journal correction, passed full source/kernel/DT/offline checks and 13 runtime + 346 tooling tests (one optional skip), and staged the 270 MB archive on the Mac with compressed/decompressed verification. Config/package inventory and prior patches match diagnostic.13. [Report 103](docs/103-diagnostic14-preparation.md). No card write or late/noirq/real-sleep test; attended installation and qualification remain above.
 
-- [ ] NEO-98: the [MUSB IRQ-wake audit](docs/131-musb-wake-irq-ownership.md) confirms the probe-time reference survives disabled device policy. A separate [candidate branch](https://github.com/michaelishri/GameShellNeo/tree/work/musb-wake-irq-policy) balances the probe, checks system-sleep arm/disarm, preserves failed-disarm ownership and cleans up before backend teardown. It passes 205 native/ARM32 source scenarios and 22 negative controls, including actual probe/remove functions, per-IRQ PM/dispatch, changing shared-owner order and combined errors. Six ARM compile configurations pass for the unchanged patch. Whole-kernel PM/IRQ traversal, allocation/sysfs concurrency, other-backend runtime wake and hardware qualification remain open; terminal disarm failure cannot be called balanced cleanup. Diagnostic.18 remains unchanged and staged without this candidate. No electrical wake exclusion or power saving is established.
+- [ ] NEO-98: retain exact wake-policy/startup candidates 0026/0029 in the separate offline profile mapped by [report 291](docs/291-legacy-musb-source-integration.md). [NEO-218 / report 301](docs/301-musb-wake-irq-kernel-qualification.md) adds eleven passing full-kernel UML cases for actual MUSB wake/system-PM callbacks, Linux shared IRQ references and global IRQ suspend/resume traversal, plus a compiled policy-ignored control requiring five specific failures. The hardware boundary uses counting shared handlers and a synthetic level irqchip/register bank; the physical MUSB ISR is not executed. Full device-DPM traversal, allocation/sysfs concurrency, terminal failed-disarm/destruction ownership, deliberate retirement composition, other controllers, image and board qualification remain open. Terminal disarm failure is not balanced cleanup; no electrical wake exclusion, latency or power saving is established.
+- [ ] NEO-225: require the wake negative-control command to exit 1 through its typed original-result handler. [Report 309](docs/309-musb-wake-control-exit.md) preserves the actual-runner raw-0 false acceptance and new refusal regression; final host context qualification passes; fresh independent reviews and publication remain pending. Historical NEO-218 raw-1 kernel evidence remains valid and retained; this host guard does not advance NEO-98's hardware gates.
 - [ ] NEO-102: integrate and qualify the [MUSB startup power-failure candidate](docs/136-musb-startup-runtime-pm.md), isolated on [work/musb-startup-pm](https://github.com/michaelishri/GameShellNeo/tree/work/musb-startup-pm). Patch 0029 checks probe and gadget-start runtime resume before core PHY/MMIO or gadget ownership publication, balances failed gets and unwinds backend initialization. Source tests cover the actual PM helpers and UDC start wrapper, positive success returns, backend-held references and retry. 289 native/ARM32 scenarios, 32 negative controls, six complete ARM compile configurations and 13 runtime/466 tooling tests pass (two existing skips). A new image identity and hardware qualification remain required; diagnostic.18 is unchanged.
 - [ ] NEO-106: implement MUSB removal producer retirement from the [NEO-105 teardown audit](docs/139-musb-teardown-power-audit.md). Endpoint cleanup can access registers before stop; endpoint disable requeues work after initial cancellation; the core IRQ remains registered across Sunxi clock/reset teardown. The saved native/ARM32 ordering reproduction establishes these software boundaries, not a live CPI fault or safe fix. Retire producers, requests, IRQs, timer/resume work and PM callbacks while required resources remain available; resolve PHY/extcon in-flight notification and re-init ownership. A failed PM get alone does not establish lost Sunxi register access, and an early stop return leaves stale ownership while UDC reports stopped. Preserve request completion, shared IRQ users, partial-probe cleanup and rebind behavior; qualify any implementation separately from NEO-102 startup and NEO-103 notification gating. Truly inaccessible-hardware/DMA recovery still requires the broader backend contract described in the audit. Framework prerequisite patch 0031 now has 29 native/ARM32 scenarios, seven negative controls and board/module/TINY SRCU ARM builds; [report 144](docs/144-extcon-notifier-drain-candidate.md). The framework is absent from diagnostic.18. Report 145 qualifies the drain on real Linux SRCU. Patch 0033 now adds child-owned Sunxi notifier registration, terminal work shutdown and fresh rebind state; [report 146](docs/146-sunxi-child-notifier-work.md) records 240 native/ARM32 scenarios, seven negative controls and three ARM object configurations. Patch 0034 now secures extcon lookup/binding admission and integrates it in the Sunxi parent; [report 147](docs/147-extcon-provider-lifetime.md) records ten real-kernel provider tests passing under both TREE and TINY SRCU with inferred links disabled, repeated 240 native/ARM32 scenarios and three ARM object configurations. Consumers must drain before returning probe errors, and providers must retain registration for their bound lifetime. Full core IRQ/work/timer/PM retirement, other PHY-consumer lifetime, complete kernel/image integration and hardware qualification remain open. This candidate must not be described as complete safe removal.
 - [ ] NEO-103: integrate and qualify the [MUSB callback-lifetime candidate](docs/137-musb-gadget-callback-lifetime.md) on [work/musb-callback-lifetime](https://github.com/michaelishri/GameShellNeo/tree/work/musb-callback-lifetime). Patch 0030 supplies UDC callback admission, stable driver snapshots and a controller-lock-based drain for setup/reset/suspend/resume/disconnect; endpoint completion remains ungated. Source tests execute real UDC bind/unbind and Linux wait macros with concurrent/nested callbacks, suppressed events, spurious wakes, pointer-clear windows and error cleanup. 132 callback scenarios and the existing 289 source scenarios pass natively/ARM32; 42 negative controls, six ARM configurations with a combined-module symbol check, and 13 runtime/466 tooling tests pass (two existing skips). Full-kernel scheduler/IRQ/timer, image and hardware qualification remain open; this does not fix failed-power removal or retire the entire controller. Diagnostic.18 remains unchanged.
@@ -1799,7 +1867,7 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   and Spec reviews accepted the source, published at `49b1c23`; see
   [report 298](docs/298-usb-removal-producer-lifetime.md). This does
   not retire every generic-PHY consumer or complete NEO-106.
-- [ ] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
+- [x] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
   `mpfs_remove()` disables the parent clock before child teardown and passes
   the parent to `usb_phy_generic_unregister()` rather than the registered
   `glue->phy`. That helper directly unregisters its argument. Actual platform
@@ -1811,6 +1879,21 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   complete MPFS-selected PIO/DMA/module objects and three real Linux platform-device
   cases pass. The final accepted-`49b1c23` combination preserves all maintained
   qualification inputs and passes 1,301 host regressions (nine skipped);
-  independent review and serialized publication remain pending in
-  [report 300](docs/300-mpfs-removal-ownership.md).
+  fresh independent Standards and Spec accepted the bounded change, published
+  at `02c633a`; see [report 300](docs/300-mpfs-removal-ownership.md).
+- [ ] NEO-219 composes wake/startup and retirement explicitly: unchanged 0029
+  and retirement inputs plus bridge 0062 preserve 0026 policy semantics while
+  handing owned wake/source cleanup to the valid IRQ action before free and
+  `nIrq` invalidation. Native reference controls reproduce the naive
+  double/invalid-disarm risk; failed-final-disarm debt remains explicit.
+  All 147 native/sanitizer/ARM scenarios, seven assertion controls, six complete
+  ARM configurations and eight real Linux IRQ/wakeup-source context cases
+  pass; fresh independent pre-integration reviews accepted the source. Final
+  published-`4925a67` context preserves all 18 qualification inputs and full
+  queues, with exact source/test-patch equivalence and a fresh combined host
+  pass (24 runtime/1,379 tooling tests, nine skipped). Fresh final reviews and
+  serialized publication remain pending in
+  [report 303](docs/303-musb-terminal-wake-composition.md).
+  Existing profiles, production inputs, complete failed-power/backend/DMA
+  removal and NEO-102/98/106 physical/clock gates remain separate.
 - [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

@@ -11,6 +11,24 @@ from kernel_sources import atomic_json
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class ManagedCommandFailure(RuntimeError):
+    """A verified nonzero command outcome after original ownership is released."""
+    def __init__(self, identity, result):
+        super().__init__('Managed command exited ' + str(result['exit_code']) + ': ' + identity['run'])
+        self.identity = identity
+        self.result = result
+
+
+def _completed_command(result, returncode):
+    state = (result or {}).get('state') or {}
+    return (result is not None and result.get('outcome') == 'exited' and
+            type(returncode) is int and returncode >= 0 and
+            result.get('exit_code') == returncode and result.get('returncode') == returncode and
+            not result.get('stop_requested') and state.get('Running') is False and
+            state.get('Status') == 'exited' and state.get('ExitCode') == returncode and
+            not state.get('OOMKilled') and not state.get('Error'))
+
+
 def owns_active(identity):
     path = ROOT / '.local/build/container-active.json'
     try:
@@ -55,14 +73,9 @@ def execute(stage, arguments, destination, *, timeout):
         with (destination / 'runner.log').open('wb') as output:
             process = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT, timeout=timeout)
         _, result, _ = result_for(receipt)
-        state = (result or {}).get('state') or {}
-        if (process.returncode or not result or result.get('outcome') != 'exited' or
-                result.get('exit_code') != 0 or result.get('returncode') != 0 or result.get('stop_requested') or
-                state.get('Running') is not False or state.get('Status') != 'exited' or
-                state.get('ExitCode') != 0 or
-                state.get('OOMKilled') or state.get('Error')):
+        if not _completed_command(result, process.returncode):
             raise RuntimeError('Managed container did not complete successfully; inspect ' + str(destination))
-        return result
+        command_result = result
     finally:
         # An interrupted observer leaves ownership intact. Stop only the exact
         # run allocated to this attempt; a successor must never be stopped.
@@ -92,3 +105,13 @@ def execute(stage, arguments, destination, *, timeout):
             else:
                 atomic_json(destination / 'cleanup-pending.json', identity)
                 raise RuntimeError('Managed run remains unresolved; retain ownership and inspect ' + str(receipt))
+    # The nonzero outcome is distinguishable only after the finally block has
+    # retained the original result/log and proven cleanup. Never turn a cleanup,
+    # timeout, stopped or changed-result failure into an expected command exit.
+    identity, final_result, _ = result_for(receipt)
+    if (owns_active(identity) or final_result != command_result or
+            not _completed_command(final_result, process.returncode)):
+        raise RuntimeError('Managed command ownership or original result is unresolved; inspect ' + str(receipt))
+    if final_result['exit_code']:
+        raise ManagedCommandFailure(identity, final_result)
+    return final_result

@@ -157,7 +157,8 @@ class RunnerAdmission(unittest.TestCase):
                 targets[name].write_bytes(payload[name])
             identity = dict(schema=1, workspace='fixture-workspace',
                             stage='musb-wake-dpm-kunit', run='a' * 32)
-            exit_code = 1 if control or failure == 'unexpected-positive' else 0
+            exit_code = (0 if failure == 'zero-exit' else
+                         1 if control or failure == 'unexpected-positive' else 0)
             terminal = dict(outcome='exited', exit_code=exit_code, returncode=exit_code,
                             stop_requested=False, job=identity,
                             state=dict(Running=False, Status='exited', ExitCode=exit_code,
@@ -262,6 +263,16 @@ class RunnerAdmission(unittest.TestCase):
                                 failure='unexpected-positive') as harness:
             with self.assertRaises(runner.ManagedCommandFailure):
                 runner.main()
+            self.assertEqual(harness.result_observations, 0)
+            self.assertFalse(list(harness.work.glob('*evidence.json')))
+
+    def test_control_rejects_successful_command_with_valid_fresh_failed_output(self):
+        with self.cached_runner(produced=('test.log', 'results.json'),
+                                failure='zero-exit') as harness:
+            with self.assertRaisesRegex(RuntimeError, 'expected original command exit 1'):
+                runner.main()
+            self.assertEqual(harness.before_execution,
+                             {'test.log': False, 'results.json': False})
             self.assertEqual(harness.result_observations, 0)
             self.assertFalse(list(harness.work.glob('*evidence.json')))
 

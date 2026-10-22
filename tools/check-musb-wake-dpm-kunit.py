@@ -86,6 +86,8 @@ def main():
         try:
             try:
                 result = execute(stem + '-kunit', arguments, attempt, timeout=7200)
+                if args.control:
+                    raise RuntimeError('DPM control exited successfully; expected original command exit 1')
             except ManagedCommandFailure as failure:
                 if not args.control:
                     raise

@@ -109,6 +109,18 @@ profile remain unchanged. New owned cached kernel executions and current-input
 evidence are pending the coordinated final publication base. No final receipt
 is claimed from the historical runs.
 
+Fresh source/pre-integration Spec review at `51d0705` required rejecting a
+normal successful executor return on the negative-control route. Fresh valid
+failed-case output must still be rejected when the original command exit is 0.
+The separate `work/musb-wake-device-pm-control-exit` correction preserves that
+frozen review checkpoint, reproduces its original false acceptance through
+actual `main()` with a disposable executor fixture, and adds the missing guard
+and exact regression. Final review and qualification remain pending; historical
+raw-1 kernel evidence is unchanged. A read-only audit reproduced the equivalent
+gap in the published NEO-218 route and reported it for a separately scoped fix.
+The corrected focused host run passed twelve DPM tests plus five accepted
+managed-result groups, including the new raw-0/current-failed-output regression.
+
 The saved Tasks use the pinned local builder, disabled networking, one build
 job, unique managed attempts and retained source/config/binary/KTAP/result
 receipts. Original failures remain historical and are never relabeled as later

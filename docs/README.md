@@ -28,6 +28,10 @@ consumer qualification and separate physical/clock/PM gates.
 records the bounded offline STOP outcome, primary ordering/configuration audit,
 conditional native/ARM fixtures and unchanged underlying clock/PM gates.
 
+[304 — MUSB wake policy through device-PM traversal](304-musb-wake-device-pm-qualification.md)
+records actual Linux DPM dispatch and error unwind, the exact missing-callback
+control, guarded evidence admission and separate physical/composition limits.
+
 [303 — MUSB terminal IRQ/wake composition](303-musb-terminal-wake-composition.md)
 records the explicit combined candidate, action/wake ownership handoff,
 actual-source controls and separate software/hardware boundaries.

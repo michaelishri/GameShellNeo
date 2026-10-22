@@ -8,6 +8,15 @@ adopts published NEO-218 at `7120990` for its accepted managed-result API; it
 does not change NEO-218's runner, helper or fixture. NEO-219 separately owns
 terminal wake/IRQ cleanup and combined retirement qualification.
 
+The final-admission checkout starts from fixed guard checkpoint `9de70c2` and
+adopts independently published `4d680d7` through merge `e78f96d`. The actual DPM
+fixture, configuration, support, runner and tests remain byte-identical to that
+fixed checkpoint. Both saved Task entries are retained alongside the accepted
+clock, host-admission and terminal-composition context. This milestone still
+selects unchanged wake/startup 0026/0029; the published terminal profile is a
+separate opt-in qualification. Final current-input executions are pending and
+will use new owned receipts rather than relabeling any historical run.
+
 ## Source and ownership boundary
 
 The saved Tasks deliberately select only the existing `musb-wake-startup`

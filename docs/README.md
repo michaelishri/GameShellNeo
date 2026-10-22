@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[296 — Development-directory clock provenance](296-development-clock-admission.md)
+records the explicit awake-only adapter, separate image/reader/source identities,
+strict root/runtime admission and retained clock/PM gates.
+
 [295 — Development-store expansion](295-development-store-expansion.md)
 records the guarded offline grow operation, fresh checkpoint requirements,
 partition-byte preservation and qualification gates.

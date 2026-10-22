@@ -947,6 +947,14 @@ tasks:
       NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
     cmds: [python3 tools/check-clock-boundary.py]
 
+  test:clock-reference-feasibility:
+    desc: Test six fixed synthetic counter-reference families without hardware
+    cmds: [python3 -m unittest discover -s tools/tests -p test_clock_reference_feasibility.py -v]
+
+  check:clock-reference-feasibility:
+    desc: Audit pinned ordering and managed native/sanitizer/ARM fixtures; no device probe
+    cmds: ['bash tools/run-logged.sh clock-reference-feasibility python3 tools/check-clock-reference-feasibility.py {{.CLI_ARGS}}']
+
   test:development-clock:
     desc: Test development-directory clock provenance and strict original-image refusals offline
     cmds: [python3 -m unittest discover -s tools/tests -p test_development_clock.py -v]

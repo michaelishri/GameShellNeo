@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[305 — MMIO reference feasibility](305-clock-reference-feasibility.md)
+records the bounded offline STOP outcome, primary ordering/configuration audit,
+conditional native/ARM fixtures and unchanged underlying clock/PM gates.
+
 [300 — MPFS parent resource and PHY ownership](300-mpfs-removal-ownership.md)
 records the two backend teardown defects, actual-source and selected-object
 qualification, real platform-device fixture and retained wider boundaries.

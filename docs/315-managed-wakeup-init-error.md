@@ -178,17 +178,59 @@ it rejects wrong modes, trees, aliases and metadata rather than repairing them.
 New outputs, inventory and evidence belong to the new checkout. The saved route
 is `task check:managed-wakeup-init-drivers -- --verified-source PATH`.
 Fifteen focused methods pass, including these read-only reuse guards. Only the
-two still-unqualified selected-object stages will execute; unchanged native
-and Linux tests are not repeated. Their original execution base and changed
-current whole-file runner/Task provenance remain distinct.
+two previously unqualified selected-object stages executed after correction;
+unchanged native and Linux tests were not repeated. Their original execution
+base and changed current whole-file runner/Task provenance remain distinct.
+
+Corrected Task session **8010** completed with exit 0 at clean `702fa7a`.
+PM_SLEEP=y run `e4d007772c8e4af68f3204df6bb04876` and PM_SLEEP=n run
+`7edd37423e224d569185594319fe99a3` both exited 0 and released ownership,
+without OOM/error/stop requests. The requested driver selectors are verified
+in each resolved configuration, before compilation. Both select
+`MFD_MAX77541=y` and `RTC_DRV_STM32=y` through the documented COMPILE_TEST
+dependencies; these are selected consumers, not forced unselected targets.
+
+| Configuration | Complete selected objects | Configuration SHA-256 |
+| --- | --- | --- |
+| PM=y, PM_SLEEP=y | `devres.o`, `wakeup.o`, `max77541.o`, `rtc-stm32.o` | `587d1fa8ed10ee847cad3058701cae275b05d49b92d12d069ccb3ecc116c3dba` |
+| PM=y, PM_SLEEP=n | `devres.o`, `max77541.o`, `rtc-stm32.o`; `wakeup.o` is not selected | `603ba33299e271c3cd79f26801b6534d59fb1ca4368f7badda520787090f6aa5` |
+
+All seven objects independently verify ELF32/EM_ARM. Both builds disable the
+test suite and original-return control; allocation hooks compile to their
+unchanged non-test paths. They are complete object/configuration checks, not
+runtime qualification of those PMIC/RTC devices or a linked CPI image.
+Driver evidence at the new checkout's
+`.local/build/managed-wakeup-init-tests/driver-evidence.json` has SHA-256
+`a273d77c516e708f0a2990782c22adffef85c79820ff3d9c863e9dfe17c29407`.
+The detailed terminal/ELF receipt is
+`.local/notes/managed-wakeup-init-error/selected-objects-terminal-01.json`,
+SHA-256 `78b0682cff04a9ba22c655d82e29d026b2f4859ece236943698ffd17635340a6`.
 
 The first idle heavy-resource lease was explicitly returned unused so another
 worker could build; no operation was stopped. Active qualification uses serial
 j1, a four-GiB incremental disk ceiling and a three-GiB free-space floor before
 a new stage. The reuse path counts retained original plus new qualification
-storage. Existing caches and original proof remain immutable. Selected-object
-results and the later coordinator-allocated current host/context check remain
-pending.
+storage. After qualification the combined original/new kernel footprint is
+2,014,769,152 bytes and free disk is 5,938,335,744 bytes. The new checkout has
+zero copied source caches. All owned heavy operations are terminal and their
+ownership is resolved. Existing caches and original proof remain immutable.
+The coordinator-allocated current host/context check remains pending; no
+unpublished upstream candidate is described as accepted or published here.
+
+The read-only original-to-corrected comparison records the exact unchanged
+candidate/native/Linux fixture/configuration and shared source helpers,
+unchanged production files, equal generated inline variants and equal complete
+97,302-entry kernel inventories. It also lists the changed whole-file Task,
+runner and host-test pins explicitly. The receipt is
+`.local/notes/managed-wakeup-init-error/original-to-corrected-equivalence-01.json`,
+SHA-256 `e50042be2becf08d84ee3b8d00ac2d1fa48bdd4c5ea1dd148cb6e1996eb9eef1`.
+The first factual index names 110 original/current artifact files without
+copying their contents:
+`.local/notes/managed-wakeup-init-error/qualification-artifact-index-01.json`,
+SHA-256 `2306c7b40b4a0e5e10df0bb92876394d8c26762a3245fb96acf7369fcce508be`.
+Those index and comparison records identify `702fa7a` as the corrected code
+capture; later documentation-only descendants do not change that execution
+provenance. They remain historical when final context is allocated.
 
 Fresh independent Standards and Spec review, a fixed complete evidence handoff
 and a separate integration/publication grant remain required. This ticket

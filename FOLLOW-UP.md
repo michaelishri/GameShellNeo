@@ -8,8 +8,9 @@ native/ASan/UBSan/ARM reference passes, with the original wrapper failing exactl
 two cases/eight assertions. Actual Linux PM/devres/IDA also passes all five,
 with the exact same original-wrapper control. A retained selected-object
 runner setup failure precedes driver compilation; the corrected separate
-checkout reuses the immutable qualified source read-only. Selected ARM objects,
-current context, fresh independent reviews and serialized publication remain
+checkout reuses the immutable qualified source read-only. Both genuinely
+selected ARM PM-sleep/no-sleep object builds now pass. Current context,
+fresh independent reviews and serialized publication remain
 pending. The underlying capability and action-reset contracts are preserved;
 no installed CPI fault, image or parent98/102/106 completion is inferred.
 [Report 315](docs/315-managed-wakeup-init-error.md).

@@ -1,10 +1,12 @@
 # OMAP2430 MUSB mailbox ownership
 
 23 October 2026 NZDT. NEO-222 is a bounded software child of NEO-102, related to
-NEO-106. Development and qualification use accepted base `02c633a`. Candidate
+NEO-106. Original development and qualification use accepted base `02c633a`,
+frozen at `db1078b`. Candidate
 0063 remains outside production images. Native, sanitizer, ARM32, six selected
 OMAP configurations and all 12 actual Linux lifetime cases pass. Independent
-acceptance remains pending. No physical controller fault or hardware result
+pre-integration Standards and Spec reviews accepted that source with zero
+required findings. Current-context final review remains pending. No physical controller fault or hardware result
 is claimed.
 
 ## Original schedules and source boundary
@@ -143,11 +145,59 @@ with nine existing opt-in skips, plus compiled C regressions, Bash syntax and
 ShellCheck. The candidate passes checkpatch with zero errors and warnings.
 These checks do not replace the separate kernel and original-container evidence.
 
+## Provisional current-context preparation
+
+The separate `omap-mailbox-final-admission` checkout retains original
+`db1078b` history and merges frozen NEO-220 candidate
+`a2688acce1a4b7b9379966dab7a83528af9da744`. This dependency is **provisional**:
+at this preparation gate it is not accepted or published. A changed NEO-220 tip
+invalidates this context until remapped; fresh final review and publication
+wait for the coordinator to verify the identical dependency is accepted and
+published. Canonical main and the original qualification checkout are untouched.
+
+Fifteen of the 16 maintained qualification inputs match exactly. The whole
+`kernel_candidates.py` file has an explicit new hash,
+`e0393155f4d0fcf3c74607cc99cc21dafd406c83d36a21232ec0904e43e134b0`:
+accepted NEO-219's separate terminal profile coexists with the unchanged OMAP
+assignment. The called registry functions and original profile dictionary
+remain identical. Terminal bridge 0062 does not enter the OMAP queue. Shared
+Task/navigation/FOLLOW-UP and helper whole-file differences are recorded
+separately; they are not relabeled as identical original input hashes.
+
+The current-context audit passes **627 checks**. It rehashes all four complete
+original source inventories and 142 retained matrix files, verifies original
+outcomes/configurations/managed release, replays the original KTAP through the
+current validator and independently reconstructs the bounded complete source,
+native/reference/control bodies and test patch. Actual tested source and the
+full reference44/candidate45/Linux46 manifests match. The current test patch
+retains SHA-256
+`932436773971ee7f7b183211524ed19eb3277683d954d4bf9f4243a5fc50766b`.
+The audit record is `.local/notes/neo222-current-context-equivalence.json`,
+SHA-256 `b1e14c074ffcc28c8f8d200de0c36e12032e3543158fbfdb7d427217c9bf1b29`.
+
+The first private observer stopped at a trailing separator difference between
+Task blocks, before source reconstruction or any build. Its terminal log and
+observer remain under `.local/notes/attempt-1-observer/`. Commands and indentation
+were identical; the corrected observer excludes only trailing block separators.
+Original session 94020 then completed the full audit with exit zero. This is
+not a claim that the initial audit attempt passed.
+
+One fresh combined managed host check on merge `e075549` passes **24 runtime
+and 1,402 tooling tests**, nine existing opt-in skips, both C guards, Bash syntax
+and ShellCheck. Original session 82988 / task PID 1267282 exited zero; all 924
+tracked inputs stayed unchanged during the run. Its log is
+`.local/build/omap-mailbox-final-host-check.log`, SHA-256
+`cb3eae722810433314db54b863343af2afa628e3869de4133f3a0c191b74b352`.
+Only documentation records these completed results afterward. Original native,
+ARM/configuration and Linux receipts remain original `02c633a/db1078b`
+executions. No compiler/kernel suite was repeated solely for the new ancestry,
+and no current execution receipt was manufactured from old evidence.
+
 ## Remaining gates
 
-Obtain independent Standards and Spec acceptance of the fixed source and
-qualification bundle. A later integration base needs current-input equivalence
-and fresh final reviews before publication. The bounded PM/glue construction
+Verify acceptance and publication of the identical provisional dependency, then
+obtain fresh final Standards and Spec reviews and a separate serialized
+integration grant. The bounded PM/glue construction
 passes; it does not establish every possible PM policy or controller state.
 A broader PM policy prerequisite must be reported before extending this
 admission change.

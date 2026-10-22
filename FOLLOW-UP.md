@@ -4,13 +4,15 @@ Record deferred questions and activities here as they arise.
 
 **NEO-10/226 charging host result admission:** the retained actual-host local
 baseline accepts four invalid streams, including completion-only and forged
-raw-bound/summary data. Host admission now derives clock bounds from raw
-integers before unchanged pure validators/charge-summary reuse. Fourteen
-methods / 39 local host cases pass; raw/provenance, original stdin payload,
-deadlines, PM lock and collector/profile bytes remain unchanged. Final context,
-combined checks, fresh review and publication wait behind NEO-219/220. No
-device or calibration/safety qualification occurs; original NEO-121 evidence
-and NEO-10/101/192 gates remain unchanged.
+raw-bound/summary data. Host admission derives bounds from raw integers before
+unchanged pure validators/summary reuse. Both original and current focused runs
+pass 14 methods/39 local routes. One combined host check on explicitly
+provisional, unaccepted/unpublished NEO-220/222 context passes 24 runtime/1,416
+tooling tests (nine skipped), C guards and shell lint; exact original execution
+and changed current remote/import provenance remain distinct. Identical upstream
+acceptance/publication, entirely fresh final review and serialized integration
+remain pending. No collector/profile, device, calibration/safety or parent
+NEO-10/101/192 gate is changed.
 [Report 310](docs/310-charge-result-admission.md).
 
 **NEO-101/224 standalone host result admission:** ten retained local baseline

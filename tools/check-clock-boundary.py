@@ -119,7 +119,18 @@ def terminal(state):
             state['ControlPID'] == '0')
 
 
-def supervise(client, unit, target, capture, now=time.monotonic, pause=time.sleep):
+def contract_bytes(contract):
+    # A real development release contains the complete immutable-file map.
+    # Compact encoding keeps that evidence within the runner's existing bound;
+    # never raise the bound or silently truncate/reduce the manifest.
+    raw = (json.dumps(contract, separators=(',', ':')) + '\n').encode()
+    if len(raw) > 2 * 1024 * 1024:
+        raise ValueError('Clock contract exceeds the existing 2 MiB limit')
+    return raw
+
+
+def supervise(client, unit, target, capture, now=time.monotonic, pause=time.sleep,
+              runner='capture-clock-boundary.py'):
     """One launch; host deadline is independent of the GameShell's clocks."""
     states, error, execution_state = [], None, None
     started = now()
@@ -127,7 +138,7 @@ def supervise(client, unit, target, capture, now=time.monotonic, pause=time.slee
         run(client, shlex.join(['sudo', '-n', 'systemd-run', '--unit=' + unit, '--property=Type=exec',
             '--property=RuntimeMaxSec=45s', '--property=TimeoutStopSec=5s', '--property=Restart=no',
             '--property=KillMode=control-group', '--property=RemainAfterExit=yes', '--property=UMask=0077', '--',
-            '/usr/bin/python3.13', '-I', '-S', '-B', target + '/capture-clock-boundary.py']),
+            '/usr/bin/python3.13', '-I', '-S', '-B', target + '/' + runner]),
             display=False, timeout=15)
         while True:
             state = unit_state(client, unit)
@@ -164,7 +175,26 @@ def supervise(client, unit, target, capture, now=time.monotonic, pause=time.slee
     return result
 
 
-def execute(client, directory, contract, capture):
+def execute(client, directory, contract, capture, *, extra_files=None,
+            runner='capture-clock-boundary.py'):
+    extra_files = extra_files or {}
+    if runner not in ('capture-clock-boundary.py', 'capture-development-clock.py'):
+        raise ValueError('Unknown clock capture runner')
+    if bool(extra_files) != (runner == 'capture-development-clock.py'):
+        raise ValueError('Development runner requires its explicit adapter inputs')
+    if ('development' in contract) != bool(extra_files):
+        raise ValueError('Development contracts require the explicit development runner')
+    hashes = dict(contract['files'])
+    if extra_files:
+        from development_clock import ADAPTERS, validate_development_contract
+        validate_development_contract(contract)
+        if set(extra_files) != set(ADAPTERS):
+            raise ValueError('Incomplete development adapter files')
+        hashes.update(contract['development']['adapter_files'])
+        for name, path in extra_files.items():
+            if Path(path).is_symlink() or sha256(path) != hashes[name]:
+                raise ValueError('Development adapter source changed: ' + name)
+    payload = contract_bytes(contract)  # Refuse oversized input before any SSH/staging.
     target = run(client, 'umask 077; mktemp -d /tmp/gameshellneo-clock-boundary.XXXXXXXX',
                  display=False, timeout=15).decode().strip()
     if not re.fullmatch(r'/tmp/gameshellneo-clock-boundary\.[A-Za-z0-9]{8}', target):
@@ -172,22 +202,24 @@ def execute(client, directory, contract, capture):
     unit = 'gameshellneo-clock-boundary-' + uuid.uuid4().hex + '.service'
     (capture / 'remote-stage.json').write_text(json.dumps(dict(directory=target, unit=unit)) + '\n')
     contract_path = capture / 'contract.json'
-    contract_path.write_text(json.dumps(contract, indent=2) + '\n')
+    contract_path.write_bytes(payload)
     with client.open_sftp() as sftp:
         sftp.get_channel().settimeout(15)
         for name in FILES:
             source = directory / name if name.endswith('.so') else directory / 'tools' / name
             upload(sftp, source, target + '/' + name)
+        for name, source in extra_files.items():
+            upload(sftp, source, target + '/' + name)
         upload(sftp, contract_path, target + '/contract.json')
         # Independent host download/hash comparison before a privileged launch.
-        for name, expected in contract['files'].items():
+        for name, expected in hashes.items():
             with sftp.open(target + '/' + name, 'rb') as stream:
                 if hashlib.sha256(stream.read(32 * 1024 * 1024 + 1)).hexdigest() != expected:
                     raise ValueError('Staged input differs: ' + name)
         with sftp.open(target + '/contract.json', 'rb') as stream:
             if stream.read(2 * 1024 * 1024 + 1) != contract_path.read_bytes():
                 raise ValueError('Staged contract differs')
-    result = supervise(client, unit, target, capture)
+    result = supervise(client, unit, target, capture, runner=runner)
     # Never collect/clean a process still writing or assume a timeout means exit.
     if not result['terminal']:
         raise RuntimeError('Diagnostic termination is unconfirmed; private stage retained')

@@ -6,7 +6,7 @@ main `98aff1fe86689c916cd930f2b5c5a8bb218088f0` in the isolated
 source caches and frozen hardware checkout are unchanged. No Mac or GameShell
 operation has been performed.
 
-The review checkout also combines published main
+The first combined review checkout also includes published main
 `5a2f362a39e49415b6a73e732219007ab8f4eb00`. The original qualified feature
 commit `57f885ea34412fe35ff99a58a4c20268bc9865eb` and its evidence checkout
 remain intact. The only overlapping edits were Task/FOLLOW-UP/report-index
@@ -15,6 +15,14 @@ input hash matches the combined source byte for byte. A fresh combined
 `task check` passes all 1,283 regressions (nine skipped) and shell/workflow
 checks; its log SHA-256 is
 `07a5b6bd9ad7691112994c477ea9b37aaf783aa8a4e281feb9751eb990731dee`.
+
+The final isolated review checkout adopts accepted published main
+`5505fd90e9cd98038fef785bfe6ba19e6548a739` after clock NEO-213 publication.
+That merge is automatic; every maintained native/kernel receipt input still
+matches byte for byte. The preserved original and first-combined worktrees
+remain intact. Fresh final `task check` passes all **1,301 regressions** (nine
+skipped) plus shell/workflow guards; log SHA-256 is
+`f6df84523aa03e3f941a278b186bd2601a91e6edcfcacd32b07c2a6d66f63864`.
 
 ## Sun4i post-notification resource ownership (NEO-214)
 
@@ -95,7 +103,7 @@ JSON result are retained beneath
 the receipt pins each hash and all maintained source/test inputs. Independent
 Standards/Spec review and serialized integration remain pending.
 
-The authorized offline `task check` passes all 1,283 Python regressions
+The authorized offline `task check` on the original feature passes 1,283 Python regressions
 (nine skipped), current-limit selection, Mac mount-guard fixtures, Bash syntax
 and ShellCheck. Its retained log has SHA-256
 `bbffb9ab6777a869693d1e096e333141feee962699a5ec3d93a7c773ab28e2bd`.

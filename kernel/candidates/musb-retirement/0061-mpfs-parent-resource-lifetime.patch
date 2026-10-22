@@ -1,0 +1,23 @@
+From: GameShellNeo contributors
+Subject: [PATCH] usb: musb: mpfs: retain parent resources through child removal
+
+MUSB child teardown can still access its registers and DMA engine. Keep
+the parent clock enabled until the child has been unregistered. Release
+the distinct generic PHY that probe registered rather than unregistering
+the parent device from its own remove callback.
+
+diff --git a/drivers/usb/musb/mpfs.c b/drivers/usb/musb/mpfs.c
+--- a/drivers/usb/musb/mpfs.c
++++ b/drivers/usb/musb/mpfs.c
+@@ -358,9 +358,9 @@ static void mpfs_remove(struct platform_device *pdev)
+ {
+ 	struct mpfs_glue *glue = platform_get_drvdata(pdev);
+ 
+-	clk_disable_unprepare(glue->clk);
+ 	platform_device_unregister(glue->musb);
+-	usb_phy_generic_unregister(pdev);
++	usb_phy_generic_unregister(glue->phy);
++	clk_disable_unprepare(glue->clk);
+ }
+ 
+ #ifdef CONFIG_OF

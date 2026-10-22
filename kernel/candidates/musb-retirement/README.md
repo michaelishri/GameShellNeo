@@ -1,6 +1,6 @@
 # Offline MUSB and Sunxi retirement candidate
 
-Patches 0038–0045 and 0060 extend the production source queue only for explicitly named
+Patches 0038–0045 and 0060–0061 extend the production source queue only for explicitly named
 offline checks. They are excluded from image builds. `tools/kernel_candidates.py`
 defines the `musb-retirement` profile; native, KUnit and full ARM object checks
 replay that profile and record its actual patch hashes.
@@ -20,6 +20,12 @@ complete actual PHY driver with real Linux work/mutex/extcon APIs under UML.
 Candidate 0060 keeps post-notification MMIO and polling within the original
 initialized generation. It does not retire every generic-PHY consumer or prove
 complete provider removal.
+
+Candidate 0061 retains the MPFS parent clock through child removal and releases
+the actual owned PHY. `test:mpfs-ownership` and `check:mpfs-ownership-drivers`
+exercise the real probe/remove and generic/platform helper bodies, then compile
+explicitly selected MPFS PIO/DMA/module configurations. The separate
+`test:mpfs-ownership-kunit` uses real Linux platform-device/PHY/clock cleanup.
 
 Reports 226–231 preserve the original source evidence. NEO-106 retains the
 separate image identity, physical USB/removal/rebind and hardware power gates.

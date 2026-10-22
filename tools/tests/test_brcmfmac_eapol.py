@@ -1,6 +1,7 @@
 """Admission/source-boundary regressions; driver semantics run in the C suite."""
 import contextlib
 import io
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -120,6 +121,145 @@ class EapolBoundaryTests(unittest.TestCase):
             self.run_oracle('FAIL timeout_single timeout_errno expected=-110 actual=1\n',
                             raw=1, stderr='runtime error: broken\n', failure=True,
                             assertion=('timeout_errno', -110, 1))
+
+
+class NativeProvenanceTests(unittest.TestCase):
+    """Disposable metadata fixtures exercise the maintained read-only route.
+
+    Projection/mutation are seams here; actual Linux bodies and compiling
+    mutations are qualified by the separate native/ARM fixture executions.
+    """
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.previous = self.root / 'attempts/original'
+        self.destination = self.root / 'attempts/current'
+        self.previous.mkdir(parents=True)
+        self.destination.mkdir()
+        self.source = self.root / 'current-source'
+        for name in checks.MAINTAINED:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('maintained:' + name)
+        for source in (self.source, self.previous / 'candidate-source'):
+            for name in checks.SOURCE_FILES:
+                path = source / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('selected source:' + name)
+        self.types, self.functions = 'actual types\n', 'actual functions\n'
+        self.addCleanup(mock.patch.stopall)
+        mock.patch.object(checks, 'projection', return_value=(self.types, self.functions)).start()
+        mock.patch.object(checks, 'mutate', side_effect=lambda text, name: text + name + '\n').start()
+        self.record = {'status': 'passed', 'inputs': checks.inputs(self.root), 'results': {}}
+        self.record['inputs']['tools/brcmfmac_eapol_checks.py'] = 'historical helper input'
+        for label in ('candidate', 'sanitizer', *checks.CONTROLS):
+            directory = self.previous / label
+            directory.mkdir()
+            functions = self.functions + label + '\n' if label in checks.CONTROLS else self.functions
+            for name, value in {'eapol_types.h': self.types, 'eapol_functions.h': functions,
+                                'fixture': 'original binary:' + label,
+                                'compile.stdout': '', 'compile.stderr': ''}.items():
+                (directory / name).write_text(value)
+            compile_record = dict(command=['cc', *checks.compiler_flags(label == 'sanitizer'), '-I', str(directory),
+                str(self.root / 'kernel/tests/brcmfmac_eapol_test.c'), '-o', str(directory / 'fixture')],
+                returncode=0, stdout_sha256=checks.digest(b''), stderr_sha256=checks.digest(b''))
+            self.write(directory / 'compile.json', compile_record)
+            original = dict(types_sha256=checks.digest(self.types.encode()),
+                            functions_sha256=checks.digest(functions.encode()),
+                            binary_sha256=checks.file_hash(directory / 'fixture'), cases={})
+            names = (checks.CONTROLS[label][2],) if label in checks.CONTROLS else checks.CASES
+            for name in names:
+                if label in checks.CONTROLS:
+                    assertion, expected, actual = checks.CONTROLS[label][3]
+                    output = f'FAIL {name} {assertion} expected={expected} actual={actual}\n'
+                else:
+                    output = 'PASS ' + name + '\n'
+                (directory / (name + '.stdout')).write_text(output)
+                (directory / (name + '.stderr')).write_text('')
+                case = dict(command=[str(directory / 'fixture'), name],
+                            returncode=1 if label in checks.CONTROLS else 0,
+                            stdout_sha256=checks.digest(output.encode()), stderr_sha256=checks.digest(b''))
+                self.write(directory / (name + '.json'), case)
+                original['cases'][name] = case
+            self.record['results'][label] = original
+        self.write(self.previous / 'result.json', self.record)
+        self.write(self.previous / 'sources.json',
+                   {'candidate': {name: checks.file_hash(self.source / name) for name in checks.SOURCE_FILES}})
+
+    @staticmethod
+    def write(path, value):
+        path.write_text(json.dumps(value) + '\n')
+
+    def admit(self):
+        return checks.admit_native(self.root, self.source, self.destination, self.previous)
+
+    def test_identical_executables_admitted_without_execution_or_original_writes(self):
+        before = {str(path.relative_to(self.previous)): checks.file_hash(path)
+                  for path in self.previous.rglob('*') if path.is_file()}
+        with mock.patch.object(checks.subprocess, 'run', side_effect=AssertionError('must not execute')):
+            proof = self.admit()
+        after = {str(path.relative_to(self.previous)): checks.file_hash(path)
+                 for path in self.previous.rglob('*') if path.is_file()}
+        self.assertEqual(before, after)
+        self.assertEqual(proof['changed_host_inputs'], ['tools/brcmfmac_eapol_checks.py'])
+        self.assertEqual(len(proof['verified']), 9)
+
+    def test_changed_fixture_dependency_refused(self):
+        (self.root / 'kernel/tests/brcmfmac_eapol_test.c').write_text('changed fixture')
+        with self.assertRaisesRegex(ValueError, 'dependency changed'):
+            self.admit()
+
+    def test_changed_shared_applicator_refused(self):
+        (self.root / 'tools/kernel-inputs.py').write_text('changed applicator')
+        with self.assertRaisesRegex(ValueError, 'dependency changed'):
+            self.admit()
+
+    def test_changed_current_selected_source_refused(self):
+        (self.source / checks.SOURCE_FILES[0]).write_text('different current source')
+        with self.assertRaisesRegex(ValueError, 'source files differ'):
+            self.admit()
+
+    def test_changed_original_binary_refused(self):
+        (self.previous / 'candidate/fixture').write_text('different binary')
+        with self.assertRaisesRegex(ValueError, 'input/binary differs'):
+            self.admit()
+
+    def test_different_compiler_flags_refused(self):
+        path = self.previous / 'candidate/compile.json'
+        value = json.loads(path.read_text())
+        value['command'].insert(1, '-DNDEBUG')
+        self.write(path, value)
+        with self.assertRaisesRegex(ValueError, 'compile provenance differs'):
+            self.admit()
+
+    def test_changed_output_hash_refused(self):
+        (self.previous / 'candidate/empty_wait.stdout').write_text('new output at old path\n')
+        with self.assertRaisesRegex(ValueError, 'case provenance differs'):
+            self.admit()
+
+    def change_control(self, *, raw=None, text=None):
+        label = 'positive_timeout'
+        name = checks.CONTROLS[label][2]
+        directory = self.previous / label
+        case = self.record['results'][label]['cases'][name]
+        if raw is not None:
+            case['returncode'] = raw
+        if text is not None:
+            (directory / (name + '.stdout')).write_text(text)
+            case['stdout_sha256'] = checks.digest(text.encode())
+        self.write(directory / (name + '.json'), case)
+        self.write(self.previous / 'result.json', self.record)
+
+    def test_consistent_control_metadata_with_wrong_raw_exit_refused(self):
+        self.change_control(raw=0)
+        with self.assertRaisesRegex(RuntimeError, 'Unexpected actual fixture'):
+            self.admit()
+
+    def test_consistent_control_metadata_with_numeric_prefix_refused(self):
+        self.change_control(text='FAIL timeout_single timeout_errno expected=-110 actual=10\n')
+        with self.assertRaisesRegex(RuntimeError, 'different assertion/value'):
+            self.admit()
 
 
 if __name__ == '__main__':

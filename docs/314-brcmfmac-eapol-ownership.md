@@ -149,8 +149,41 @@ Original evidence under this worktree's `.local/tests/brcmfmac-eapol/`:
   failed attempts and rotated workflow logs. They executed no fixture and are
   not source or sanitizer qualification.
 
-At this checkpoint ARM/objects and combined host checks are pending. Final
-results will be recorded before review. NEO-55/58 remain open for original
+The managed-only operation is terminal:
+
+- `20261022T210837Z-56dd96486ed143ef8f3d5d50dad1e874`, original session
+  34129, source/test checkpoint `72f95fbfef6cdfa7f169fa9e39cd7e0c3d6ac216`:
+  ARM32/QEMU 14/14 matches original native output byte for byte; complete board
+  and debug objects pass. Original managed run
+  `4c90590ae9224c5fb91300d5d5659eb3` exited 0 without OOM/stop/error and released
+  ownership. Result SHA256
+  `aa1d8593714d9909002ae830de945cdfe23106e2d7f0d1405b2affc23129254c`.
+- Read-only current native provenance proof SHA256
+  `5fac54c5f287598bd05e1fa7f6356dfd068a911cd608e38652e26dd51477fc2a`
+  verifies the original binaries, compiler flags, exact generated types/bodies,
+  five selected source files and all 35 native/sanitizer/control outcomes.
+  The three changed host files are this checker, its support and host tests;
+  seven newly pinned managed/configuration helpers are listed in the proof.
+  The original native receipt remains at its historical hashes.
+- Full production33+0057 source tree SHA256
+  `0cceb01121f80d4280114743c735e2fb3f8e6b37a88cb2f49f70a6032a617fa4`;
+  no other candidate is composed and no image patch is selected.
+
+| Complete object | BRCMDBG | Object SHA256 | Resolved config SHA256 |
+| --- | --- | --- | --- |
+| `brcmfmac.o` board | n | `b30c77bb271e95b4667b7cb8b1792bf7cf14daafc390b50a118ae2f966fd7a24` | `7e12dbb20507c838ea3c674e3db21ff25f012742d36cd3286fe0844355b7df02` |
+| `brcmfmac.o` debug | y | `8e08273fa505e7c56135fa16f1ee1fb6607553135b24a19d70844762a998a88f` | `bbe048986ab9a98b8ececb20b4627ccf21768947085a0c3aba55753c211a63c2` |
+
+After terminal release, nine additional host regressions exercise read-only
+provenance admission with disposable metadata fixtures: altered source,
+fixture/applicator dependency, binary, output hash, compile flags, raw exit and
+numeric-prefix outcomes reject; identical valid evidence passes without
+execution or original-file writes. Together with the 16 initial admission
+checks, all 25 focused checks pass. This adds tests only to the qualified
+checkpoint; candidate, driver fixture, checker, shared helpers and all kernel
+inputs remain unchanged. The combined host check is still pending here.
+
+NEO-55/58 remain open for original
 cause/recovery ownership, deliberate candidate composition/image integration
 and matching hardware qualification. Clock/provenance blocks live PM admission;
 no image or device change is part of this child.

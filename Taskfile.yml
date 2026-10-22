@@ -538,6 +538,18 @@ tasks:
     desc: Test actual detector and PHY init/exit with Linux work/mutex/extcon races in UML
     cmds: [bash tools/run-logged.sh phy-detector-kunit python3 tools/check-phy-detector-kunit.py]
 
+  test:mpfs-ownership:
+    desc: Test actual MPFS acquisition and owned-resource removal on native, sanitizers and ARM32
+    cmds: [bash tools/run-logged.sh mpfs-ownership python3 tools/check-mpfs-ownership.py]
+
+  check:mpfs-ownership-drivers:
+    desc: Test MPFS ownership and compile explicitly selected PIO, DMA and module driver configurations
+    cmds: [bash tools/run-logged.sh mpfs-ownership-drivers python3 tools/check-mpfs-ownership.py --compile-drivers]
+
+  test:mpfs-ownership-kunit:
+    desc: Test actual MPFS remove with Linux platform child, PHY and clock cleanup in UML
+    cmds: [bash tools/run-logged.sh mpfs-ownership-kunit python3 tools/check-mpfs-ownership-kunit.py]
+
   test:extcon-kunit:
     desc: Build and run real Linux UML notifier lifetime tests with TREE and TINY SRCU; no device access
     env:

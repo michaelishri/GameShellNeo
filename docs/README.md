@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[300 — MPFS parent resource and PHY ownership](300-mpfs-removal-ownership.md)
+records the two backend teardown defects, actual-source and selected-object
+qualification, real platform-device fixture and retained wider boundaries.
+
 [298 — USB removal producer and backend lifetime](298-usb-removal-producer-lifetime.md)
 records the Sun4i detector generation guard, offline qualification and separate
 remaining provider/backend and physical gates.

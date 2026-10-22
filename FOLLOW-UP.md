@@ -1778,4 +1778,9 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   helpers ignore NULL/error pointers, so those early unwind calls are benign;
   retain their error/ownership regressions. No physical
   MPFS/CPI fault or complete backend DMA/timer retirement is claimed.
+  Candidate 0061 preserves the parent clock through child cleanup and releases
+  the owned PHY. All 42 native/sanitizer/ARM cases, four negative controls and
+  complete MPFS-selected PIO/DMA/module objects and three real Linux platform-device
+  cases pass; final accepted-base combination and independent review remain
+  pending in [report 300](docs/300-mpfs-removal-ownership.md).
 - [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

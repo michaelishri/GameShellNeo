@@ -19,6 +19,7 @@ PROFILES = {
         '0044-sunxi-child-notifier-work.patch',
         '0045-extcon-provider-link.patch',
         '0060-sun4i-phy-detector-generation.patch',
+        '0061-mpfs-parent-resource-lifetime.patch',
     )),
 }
 

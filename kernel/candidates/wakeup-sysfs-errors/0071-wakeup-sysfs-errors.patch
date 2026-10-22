@@ -1,0 +1,56 @@
+From: GameShellNeo development <gameshellneo@localhost>
+Subject: [PATCH] PM: sleep: report wakeup policy enable failures through sysfs
+
+A failed wakeup-source registration leaves power/wakeup disabled, but the
+attribute currently reports the entire request as successful. Return the
+existing device_set_wakeup_enable() error to the caller.
+
+Preserve idempotent enabled writes without requiring a new allocation.
+Observe the existing source while holding power.lock, release the lock before
+allocation, and accept -EEXIST when another sysfs writer attached a source in
+between. Internal allocator, attach, detach and source-lifetime APIs are
+unchanged. Concurrent writes retain their normal observation/attachment
+ordering; this does not serialize every policy request.
+
+This candidate is opt-in and is not in the image patch queue.
+
+---
+--- a/drivers/base/power/sysfs.c
++++ b/drivers/base/power/sysfs.c
+@@ -331,16 +331,30 @@
+ static ssize_t wakeup_store(struct device *dev, struct device_attribute *attr,
+ 			    const char *buf, size_t n)
+ {
++	bool enabled;
++	int ret;
++
+ 	if (!device_can_wakeup(dev))
+ 		return -EINVAL;
+ 
+-	if (sysfs_streq(buf, _enabled))
+-		device_set_wakeup_enable(dev, 1);
+-	else if (sysfs_streq(buf, _disabled))
+-		device_set_wakeup_enable(dev, 0);
+-	else
++	if (sysfs_streq(buf, _enabled)) {
++		/* Repeated requests must not depend on another allocation. */
++		spin_lock_irq(&dev->power.lock);
++		enabled = !!dev->power.wakeup;
++		spin_unlock_irq(&dev->power.lock);
++		if (enabled)
++			return n;
++
++		ret = device_set_wakeup_enable(dev, 1);
++		/* Another writer may have attached its source meanwhile. */
++		if (ret == -EEXIST)
++			ret = 0;
++	} else if (sysfs_streq(buf, _disabled)) {
++		ret = device_set_wakeup_enable(dev, 0);
++	} else {
+ 		return -EINVAL;
+-	return n;
++	}
++	return ret < 0 ? ret : n;
+ }
+ 
+ static DEVICE_ATTR_RW(wakeup);

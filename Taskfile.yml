@@ -599,6 +599,10 @@ tasks:
     desc: Test MUSB probe roles and compile gadget, host, dual-role and module ARM configurations
     cmds: [bash tools/run-logged.sh musb-probe-drivers python3 tools/check-musb-probe-roles.py --compile-drivers]
 
+  test:wakeup-sysfs:
+    desc: Qualify wakeup sysfs errors/idempotency with actual frontend references and ARM PM objects
+    cmds: ['bash tools/run-logged.sh wakeup-sysfs python3 tools/check-wakeup-sysfs.py {{.CLI_ARGS}}']
+
   test:cpuidle-s2idle:
     desc: Test actual CPU-idle entry, scheduler, registration and tick-freeze functions on native and ARM32
     cmds: [bash tools/run-logged.sh cpuidle-s2idle python3 tools/check-cpuidle-s2idle.py]

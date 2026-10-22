@@ -150,10 +150,12 @@ These checks do not replace the separate kernel and original-container evidence.
 The separate `omap-mailbox-final-admission` checkout retains original
 `db1078b` history and merges frozen NEO-220 candidate
 `a2688acce1a4b7b9379966dab7a83528af9da744`. This dependency is **provisional**:
-at this preparation gate it is not accepted or published. A changed NEO-220 tip
-invalidates this context until remapped; fresh final review and publication
-wait for the coordinator to verify the identical dependency is accepted and
-published. Canonical main and the original qualification checkout are untouched.
+at this preparation gate it is not accepted or published. Fresh final review may
+inspect this exact frozen dependency; whole-ticket acceptance, integration,
+publication and closure require the identical dependency to be accepted and
+published. A changed NEO-220 tip invalidates the fixed review until remapped and
+freshly reviewed as required. Canonical main and the original qualification
+checkout are untouched.
 
 Fifteen of the 16 maintained qualification inputs match exactly. The whole
 `kernel_candidates.py` file has an explicit new hash,
@@ -195,9 +197,11 @@ and no current execution receipt was manufactured from old evidence.
 
 ## Remaining gates
 
-Verify acceptance and publication of the identical provisional dependency, then
-obtain fresh final Standards and Spec reviews and a separate serialized
-integration grant. The bounded PM/glue construction
+Obtain fresh final Standards and Spec reviews on the exact frozen provisional
+dependency. Whole-ticket acceptance, integration, publication and closure require
+verification that the identical dependency is accepted and published, plus a
+separate serialized integration grant. A changed dependency requires remapping
+and fresh required review. The bounded PM/glue construction
 passes; it does not establish every possible PM policy or controller state.
 A broader PM policy prerequisite must be reported before extending this
 admission change.

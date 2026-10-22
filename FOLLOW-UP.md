@@ -169,6 +169,27 @@ Arrange transfer on confirmed regular Wi-Fi, a DEV-card swap and one matching aw
 capture with fresh runtime identity. No clock correction, new PM admission or
 hardware qualification is claimed. [Report 272](docs/272-clock-provenance-image.md).
 
+**NEO-103 SMP guest qualification passed, 12 October 2026:** the saved
+`task check:musb-callback-kunit` runs the actual callback/UDC fixture
+on four ARM guest CPUs. Eighteen passing cases cover five entry points in hard-IRQ,
+timer-softirq and process contexts, two outstanding callbacks, request
+completion, rebind and unstarted-actor cleanup. Five host evidence/cleanup
+regression groups pass. Two guest attempts exposed fixture ordering/cleanup
+bugs, with original evidence retained. The corrected suite and the rerun after
+failed-artifact retention changes pass with KASAN/lockdep and clean exit/cleanup;
+none of the old failures is relabelled. The production patch is unchanged.
+Matching-board bind/unbind remains after clock admission clears; wider producer
+teardown stays in NEO-106. No GameShell operation occurred.
+[Report 274](docs/274-musb-callback-smp-validation.md).
+
+**NEO-103 SMP environment prepared, 12 October 2026:** saved
+`task setup:kernel-qemu` builds a separate pinned-snapshot ARM system emulator.
+Two virtual CPU threads, normal QMP exit and owned-container cleanup pass;
+offline refusal/timeout checks also pass. The actual SMP guest kernel
+callback/UDC suite is now qualified above. Existing single-CPU UML endpoint tests do not cover
+that cross-CPU atomic callback boundary. No GameShell access occurred.
+[Report 273](docs/273-smp-kernel-test-environment.md).
+
 **Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies
 kernel build ID/configuration, image/source/runtime hashes, same-process vDSO
 routes and task/namespace ownership before arming. Original results survive
@@ -558,7 +579,7 @@ dequeue/DMA follow-ups and NEO-106 controller removal remain separate.
 - [x] NEO-166 source candidate: permanently shut down the MUSB core OTG timer and disable/drain its three core delayed works after role/IRQ cleanup, before resource release. Retain the worker-owned session PM reference through outer teardown puts and release it only after runtime PM is disabled. All 42 native/ARM32 scenarios, 20 native negative controls, three source controls, eight real Linux work/timer/PM cases, five ARM configurations and host checks passed. Standards review found no issues; specification review caught an early session-release ordering defect, now fixed and covered by positive/negative PM-tail cases. [Report 228](docs/228-musb-core-work-retirement.md) records receipts and limits. No image or board operation occurred.
 - [x] NEO-165 source candidate: the MUSB core IRQ action now drains after client cleanup and masking, before backend/DMA resource teardown in removal and failed probe. All 34 native/ARM32 scenarios, nine native negative controls, four real-IRQ UML cases, five ARM configurations and host checks passed. Standards review found no issues; specification review's fixture cleanup finding was fixed and confirmed. [Report 227](docs/227-musb-core-irq-retirement.md) records receipts and limits. No image or board operation occurred.
 - [x] NEO-164 source candidate: successful MUSB host/gadget registrations now unwind after a later probe mode-selection failure, before common resource cleanup. Native/ARM32 checks pass 25 cases with 17 retry calls each; eight native negative controls, four ARM build configurations and host checks pass. Standards/specification reviews found no issues. [Report 226](docs/226-musb-probe-role-unwind.md) records exact scope and receipts. No image or board operation occurred.
-- [ ] Continue NEO-106 remaining producer and resource retirement. NEO-164 resolves completed role-registration ownership at probe failure; NEO-165 adds core IRQ action retirement ([report 227](docs/227-musb-core-irq-retirement.md)); NEO-166 adds core work/timer closure and session-reference accounting ([report 228](docs/228-musb-core-work-retirement.md)); NEO-167 adds the core runtime-PM callback barrier, including the no-session ordering fix, on `work/musb-runtime-retirement` ([report 229](docs/229-musb-runtime-pm-retirement.md)). These do not qualify complete failed-probe cleanup, physical rebind or terminal controller removal. NEO-168 addresses core pending-resume admission/drain and borrowed data on `work/musb-resume-retirement` ([report 230](docs/230-musb-resume-work-retirement.md)); independent producer frames, backend callbacks and parent PM, gadget-work ownership, DMA/resource ordering and failed-power handling remain open. A successful get on a disabled-but-active PM device does not establish backend admission or hardware availability. The separate notifier/backend candidates are not automatically integrated. NEO-108 image installation remains parked until the owner is home and available for the card swap.
+- [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.
 
 **Awake SSH investigation complete, 9 October 2026:** NEO-160 reviews both
 diagnostic.24 late/noirq inner-SSH failures: 24 greeting bytes accepted by the
@@ -1639,4 +1660,4 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   the Allwinner PHY detector's independent IRQ/work/resource audit and other PHY
   consumer ordering, caller-frame/global-accessor lifetime and other backend/DMA
   prerequisites before complete removal qualification. Keep NEO-106 open and
-  NEO-108's physical card swap parked; do not resume the abandoned SSH investigation.
+- [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

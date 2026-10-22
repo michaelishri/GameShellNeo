@@ -86,6 +86,18 @@ image/kernel identity and retains diagnostic.25 for recovery. It does not fix
 the clock fault or clear PM admission. [Report 272](docs/272-clock-provenance-image.md)
 records the artifact hashes, matching reader checks and pending installation work.
 
+For MUSB callback concurrency tests, `task setup:kernel-qemu`
+prepares a separate ARM system-emulation container from the pinned signed
+snapshots and checks two virtual CPU threads with bounded cleanup. This is
+environment preparation, not a driver or hardware qualification. See
+[report 273](docs/273-smp-kernel-test-environment.md). The new
+`task check:musb-callback-kunit` builds and runs the actual MUSB/UDC fixture on
+four ARM guest CPUs with KASAN and lockdep. All eighteen cases pass, including
+IRQ/timer/process races, two outstanding callbacks, request completion and
+unbind/rebind. Two earlier fixture failures remain preserved.
+[Report 274](docs/274-musb-callback-smp-validation.md) records scope and remaining
+coverage. Neither task accesses the GameShell.
+
 Diagnostic.25 is built and offline-verified with the reviewed NEO-108/163 USB
 deferred restart fix. [Report 232](docs/232-musb-restart-image-integration.md)
 records its separate build and qualification plan. Transfer, both archive/image
@@ -1644,8 +1656,7 @@ task check:musb-probe-drivers    # The same tests plus gadget, host, dual-role a
 Receipts are under `.local/build/musb-probe-roles/`. The helper tests replace
 registration and hardware calls with controlled boundaries; they do not perform
 physical USB registration or controller removal. See
-[report 226](docs/226-musb-probe-role-unwind.md). The native/ARM32 check is also
-part of `task build`.
+[report 226](docs/226-musb-probe-role-unwind.md). This explicitly invoked check uses the isolated candidate queue.
 
 The core IRQ/work retirement candidate has saved checks (run sequentially):
 
@@ -1657,7 +1668,7 @@ task test:musb-pm-kunit        # Real runtime-PM callback drain and teardown acc
 task check:musb-irq-drivers    # Source regressions and five ARM configurations
 ```
 
-The source check is part of `task build`. Its receipts are under
+The source check uses the isolated candidate queue. Its receipts are under
 `.local/build/musb-irq-tests/`; the kernel suite retains its accepted binary,
 configuration and results under `.local/build/musb-irq-kunit/`. The existing
 `test:musb-restart-kunit` task now tests callback retirement as well as its

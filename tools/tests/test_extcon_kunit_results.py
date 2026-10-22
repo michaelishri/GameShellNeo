@@ -118,10 +118,10 @@ class ArtifactTests(unittest.TestCase):
             for source in names:
                 (scratch / source).write_bytes(b'first ' + source.encode())
             with patch.object(runner, 'ROOT', root):
-                first = runner.retain_run(scratch)
+                first = runner.retain_run(runner.ROOT, scratch)
                 for source in names:
                     (scratch / source).write_bytes(b'second ' + source.encode())
-                second = runner.retain_run(scratch)
+                second = runner.retain_run(runner.ROOT, scratch)
             self.assertNotEqual(first['artifact_dir'], second['artifact_dir'])
             for source, name in names.items():
                 self.assertEqual((root / first['artifact_dir'] / name).read_bytes(),
@@ -136,7 +136,7 @@ class ArtifactTests(unittest.TestCase):
             (scratch / 'output').mkdir(parents=True)
             (scratch / 'output/linux').write_bytes(b'kernel')
             with patch.object(runner, 'ROOT', root), self.assertRaises(FileNotFoundError):
-                runner.retain_run(scratch)
+                runner.retain_run(runner.ROOT, scratch)
             self.assertFalse(list(scratch.rglob('evidence.json')))
 
 

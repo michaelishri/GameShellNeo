@@ -69,6 +69,14 @@ env:
   NEO_DOCKER_OWNERSHIP_CASE: '{{.CASE | default ""}}'
 
 tasks:
+  check:musb-callback-kunit:
+    desc: Exercise real MUSB callback/UDC races on four emulated ARM CPUs
+    cmds: [bash tools/run-logged.sh musb-callback-kunit python3 tools/check-musb-callback-kunit.py]
+
+  setup:kernel-qemu:
+    desc: Build pinned ARM system emulator and verify two virtual CPUs without device access
+    cmds: [bash tools/run-logged.sh kernel-qemu python3 tools/setup-kernel-qemu.py]
+
   test:build-workflow:
     desc: Check build preflight, setup and logger behavior without Docker or device access
     cmds: [bash tools/run-logged.sh build-workflow python3 -m unittest tools.tests.test_workflow tools.tests.test_build_preflight tools.tests.test_setup -v]
@@ -530,6 +538,10 @@ tasks:
   test:power-supply-lifetime:
     desc: Reproduce deferred notification teardown with original and candidate core functions; native and ARM32
     cmds: [bash tools/run-logged.sh power-supply-lifetime python3 tools/check-power-supply-lifetime.py]
+
+  check:power-supply-lifetime-driver:
+    desc: Check isolated producer retirement and compile the complete ARM candidate core
+    cmds: [bash tools/run-logged.sh power-supply-lifetime-driver python3 tools/check-power-supply-lifetime.py --compile-driver]
 
   test:power-supply-kunit:
     desc: Compare original and corrected teardown in KASAN Linux UML kernels (no board access)

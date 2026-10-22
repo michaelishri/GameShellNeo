@@ -330,7 +330,7 @@ def start(job):
     record_start(job, 'acknowledged')
 
 
-def run(stage, arguments):
+def run(stage, arguments, receipt=None):
     if not re.fullmatch(r'[a-z][a-z0-9-]{0,62}', stage):
         raise ValueError('Invalid build stage name')
     if arguments and arguments[0] == '--':
@@ -345,7 +345,13 @@ def run(stage, arguments):
                             any(arg == flag or arg.startswith(flag + '=') for flag in reserved)
                             for arg in arguments):
         raise ValueError('Unsupported managed Docker run flags')
+    if receipt is not None:
+        receipt = Path(receipt)
+        if not receipt.is_absolute() or not receipt.resolve().is_relative_to((ROOT / '.local').resolve()):
+            raise ValueError('Run receipts must be inside this checkout\'s private .local directory')
     with ownership():
+        if receipt is not None and (receipt.exists() or receipt.is_symlink()):
+            raise ValueError('Refusing to replace an existing run receipt')
         if job := active():
             blocked(job)
         # A deterministic workspace name is a second daemon-side exclusion.
@@ -357,6 +363,8 @@ def run(stage, arguments):
         save(directory(job) / 'job.json', job)
         record_start(job, 'unrequested')
         save(ACTIVE, job)  # Publish reservation before sending a create request.
+        if receipt is not None:
+            save(receipt, dict(schema=1, workspace=WORKSPACE, stage=stage, run=job['run']))
         labels = [item for key in ('workspace', 'stage', 'run')
                   for item in ('--label', PREFIX + key + '=' + job[key])]
         created = docker('create', '--name', NAME, *labels, '--log-driver', 'json-file',
@@ -372,14 +380,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
     start = sub.add_parser('run')
+    start.add_argument('--receipt', type=Path)
     start.add_argument('stage')
     start.add_argument('arguments', nargs=argparse.REMAINDER)
     for name in ('admit', 'status', 'resume', 'stop'):
-        sub.add_parser(name)
+        command = sub.add_parser(name)
+        if name in ('resume', 'stop'):
+            command.add_argument('--run', dest='expected_run')
     args = parser.parse_args()
     os.umask(0o077)
     if args.action == 'run':
-        return run(args.stage, args.arguments)
+        return run(args.stage, args.arguments, args.receipt)
     with ownership():
         job = active()
         if args.action == 'admit':
@@ -396,6 +407,8 @@ def main():
             job = recover_named()
         if not job:
             raise RuntimeError('No recorded container to resume or stop')
+        if args.expected_run is not None and job['run'] != args.expected_run:
+            raise RuntimeError('Recorded run differs from the requested run; refusing to act')
         value = inspect(job)
         if not value:
             if args.action == 'stop':

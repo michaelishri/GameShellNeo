@@ -125,7 +125,8 @@ def fixture_call(workspace, *arguments, timeout=45, env=None):
 def workspace_for(attempt, name):
     workspace = attempt / name / 'workspace with spaces'
     (workspace / 'tools/build-bin').mkdir(parents=True)
-    for relative in ('run-logged.sh', 'docker-stage.py', 'build-bin/docker'):
+    for relative in ('run-logged.sh', 'docker-stage.py', 'build-bin/docker',
+                     'managed_container.py', 'kernel_sources.py'):
         shutil.copy2(ROOT / 'tools' / relative, workspace / 'tools' / relative)
     return workspace
 
@@ -610,6 +611,79 @@ def delayed_start_case(attempt):
             fixture_call(workspace, 'stop')
 
 
+def managed_runner_case(attempt):
+    workspace = workspace_for(attempt, 'managed-runners')
+    image = json.loads((ROOT / 'build/sources.lock.json').read_text())['builder']['image']
+    script = workspace / 'fixture.py'
+    script.write_text('''import json, pathlib, subprocess, sys
+sys.path.insert(0, str(pathlib.Path(__file__).parent / 'tools'))
+from managed_container import execute
+root = pathlib.Path(__file__).parent
+mode, image = sys.argv[1:]
+destination = root / '.local' / mode
+arguments = ['--network=none', '--pull=never', '--entrypoint=/bin/sh', image,
+             '-c', ("trap 'exit 42' TERM; echo original-output; while :; do sleep 1; done"
+                    if mode == 'timeout' else 'echo original-output; exit ' + mode)]
+try:
+    result = execute('fixture', arguments, destination, timeout=8 if mode == 'timeout' else 20)
+    assert mode == '0' and result['exit_code'] == 0
+except subprocess.TimeoutExpired:
+    assert mode == 'timeout'
+except RuntimeError:
+    assert mode == '7'
+saved = json.loads((destination / 'managed-result.json').read_text())
+assert saved['exit_code'] == (42 if mode == 'timeout' else int(mode))
+assert saved['stop_requested'] == (mode == 'timeout')
+assert 'original-output' in (destination / 'container.log').read_text()
+assert not (root / '.local/build/container-active.json').exists()
+''')
+    command = ['bash', str(workspace / 'tools/run-logged.sh'), 'managed-fixture',
+               sys.executable, str(script)]
+    for mode in ('0', '7'):
+        result = subprocess.run([*command, mode, image], cwd=workspace,
+                                capture_output=True, text=True, timeout=45)
+        (workspace.parent / ('host-' + mode + '.log')).write_text(result.stdout + result.stderr)
+        if result.returncode:
+            raise RuntimeError('Managed runner fixture failed: ' + result.stderr)
+    worker = None
+    record = workspace / '.local/build/container-active.json'
+    job = None
+    try:
+        with (workspace.parent / 'host-timeout.log').open('w') as output:
+            worker = subprocess.Popen([*command, 'timeout', image], cwd=workspace,
+                                      stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
+            deadline = time.monotonic() + 7
+            while time.monotonic() < deadline:
+                status = fixture_call(workspace, 'status')
+                value = json.loads(status.stdout)
+                if value['active'] and (value['container_state'] or {}).get('Running'):
+                    job = value['active']
+                    break
+                if worker.poll() is not None:
+                    raise RuntimeError('Managed timeout fixture exited before its container started')
+                time.sleep(0.1)
+            if job is None:
+                raise RuntimeError('Managed timeout fixture did not start')
+            rejected = fixture_call(workspace, 'stop', '--run', 'f' * 32)
+            assert rejected.returncode != 0 and 'differs' in rejected.stderr
+            assert json.loads(record.read_text())['run'] == job['run']
+            assert json.loads(fixture_call(workspace, 'status').stdout)['container_state']['Running']
+            assert worker.wait(timeout=40) == 0
+        assert not record.exists()
+        observed = json.loads((workspace / '.local/timeout/interrupted-state.json').read_text())
+        assert json.loads(observed['stdout'])['active']['run'] == job['run']
+        return dict(case='managed-runners', success_and_failure_results_retained=True,
+                    timeout_observation_and_original_logs_retained=True,
+                    mismatched_run_rejected_without_stopping_live_container=True,
+                    timed_out_run_confirmed_retired=True)
+    finally:
+        if worker is not None and worker.poll() is None:
+            os.killpg(worker.pid, signal.SIGKILL)
+            worker.wait(timeout=5)
+        if record.exists() and job is not None:
+            fixture_call(workspace, 'stop', '--run', job['run'])
+
+
 CASES = {
     'interrupted-success': lambda attempt: candidate_case(attempt, 'interrupted-success', 0),
     'interrupted-failure': lambda attempt: candidate_case(attempt, 'interrupted-failure', 7),
@@ -623,6 +697,7 @@ CASES = {
     'created-cancellation': cancellation_case,
     'attachment-race': attachment_case,
     'delayed-start': delayed_start_case,
+    'managed-runners': managed_runner_case,
 }
 
 
@@ -633,7 +708,8 @@ def candidate(selected=None):
     print('Docker ownership evidence:', attempt, flush=True)
     inputs = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in (
         'tools/run-logged.sh', 'tools/docker-stage.py', 'tools/build-bin/docker',
-        'tools/check-docker-stage.py', 'build/sources.lock.json')}
+        'tools/check-docker-stage.py', 'tools/managed_container.py',
+        'tools/kernel_sources.py', 'build/sources.lock.json')}
     (attempt / 'inputs.json').write_text(json.dumps(inputs, indent=2) + '\n')
     results = []
     cases = {selected: CASES[selected]} if selected else CASES

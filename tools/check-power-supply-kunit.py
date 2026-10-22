@@ -11,31 +11,12 @@ import shutil
 import tempfile
 import uuid
 
+from kernel_run_evidence import retain_run
 from kernel_checks import ROOT, archive_for, check_overrides, run, sha256
 from kernel_candidates import include_candidates
 from kernel_sources import atomic_json, ensure_source, locked
 from power_supply_kunit_results import checked_cases
 from power_supply_kunit_source import FIX, manifest_for, test_patch
-
-
-def retain_run(scratch):
-    """Detach accepted artifacts from paths that subsequent Kbuild/KUnit runs reuse."""
-    accepted = scratch / 'accepted-runs' / uuid.uuid4().hex
-    accepted.mkdir(parents=True, mode=0o700)
-    record = dict(scratch=str(scratch.relative_to(ROOT)),
-                  artifact_dir=str(accepted.relative_to(ROOT)))
-    for field, path, name in (
-        ('kernel_sha256', scratch / 'output/linux', 'linux'),
-        ('config_sha256', scratch / 'output/.config', 'config'),
-        ('log_sha256', scratch / 'output/test.log', 'test.log'),
-        ('report_sha256', scratch / 'results.json', 'results.json'),
-    ):
-        digest = sha256(path)
-        shutil.copyfile(path, accepted / name)
-        if sha256(accepted / name) != digest:
-            raise RuntimeError('Accepted artifact changed during retention: ' + name)
-        record[field] = digest
-    return record
 
 
 
@@ -59,7 +40,7 @@ def main():
         candidate_queue = include_candidates(ROOT, 'power-supply-lifetime', module.patches())
         config = ROOT / 'kernel/tests/power-supply-kunit.config'
         builder = lock['builder']
-        paths = [Path(__file__), config, ROOT / 'tools/kernel_sources.py',
+        paths = [Path(__file__), config, ROOT / 'tools/kernel_run_evidence.py', ROOT / 'tools/kernel_sources.py',
                  ROOT / 'tools/kernel-inputs.py', ROOT / 'tools/kernel_checks.py',
                  ROOT / 'tools/kernel_candidates.py',
                  ROOT / 'tools/power_supply_kunit_source.py',
@@ -120,7 +101,7 @@ def main():
             report = json.loads((scratch / 'results.json').read_text())
             log = (output / 'test.log').read_text(errors='replace')
             cases = checked_cases(report, log)
-            record = retain_run(scratch)
+            record = retain_run(ROOT, scratch)
             record.update(cases=cases, source=metadata)
             atomic_json(ROOT / record['artifact_dir'] / 'evidence.json', dict(
                 schema_version=1, suite='power-supply-lifetime', variant=name,

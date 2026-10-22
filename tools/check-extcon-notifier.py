@@ -63,7 +63,7 @@ def main():
         # Apply every current queue hunk touching the extracted framework files,
         # including provider lifetime; do not silently test an older subset.
         for patch in sorted([*(ROOT / 'kernel/patches').glob('*.patch'),
-                             *candidate_paths(ROOT, 'musb-retirement')]):
+                             *candidate_paths(ROOT, 'musb-retirement')], key=lambda path: path.name):
             chunks = re.split(r'(?=^diff --git )', patch.read_text(), flags=re.M)
             selected = [chunk for chunk in chunks if any(
                 chunk.startswith('diff --git a/' + name + ' ') for name in FILES)]

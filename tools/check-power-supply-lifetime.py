@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Compare original and candidate deferred-notification teardown core functions."""
+import argparse
 import fcntl
 import json
 import os
@@ -9,7 +10,7 @@ import resource
 import subprocess
 import tarfile
 
-from kernel_checks import archive_for, run, sha256
+from kernel_checks import archive_for, compile_objects, run, sha256
 
 ROOT = Path(__file__).resolve().parents[1]
 WORK = ROOT / '.local/build/power-supply-lifetime-tests'
@@ -30,6 +31,9 @@ def functions(source):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--compile-driver', action='store_true')
+    args = parser.parse_args()
     WORK.mkdir(parents=True, exist_ok=True)
     with (WORK / '.lock').open('a') as guard:
         fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -91,16 +95,23 @@ def main():
             'kernel/tests/power_supply_lifetime_test.c -o "$directory/arm"\n'
             '  qemu-arm "$directory/arm"\n'
             'done'], text=True)
-        output.write_text(json.dumps(dict(
+        evidence = dict(
             linux=lock['linux']['tag'], archive_sha256=sha256(archive),
             core_sha256=sha256(driver),
             inputs={str(p.relative_to(ROOT)): sha256(p) for p in
-                    (patch, fix, harness, Path(__file__), ROOT / 'tools/kernel_checks.py')},
+                    (patch, fix, harness, Path(__file__), ROOT / 'tools/kernel_candidates.py',
+                     ROOT / 'tools/kernel_checks.py', ROOT / 'tools/kernel_sources.py',
+                     ROOT / 'build/sources.lock.json')},
             native=results, arm32=arm.strip(), builder=builder,
             limits='Actual producer, deferred callback and unregister functions; deterministic '
                    'queue/lock/refcount/device API shims. Candidate patch 0037 compared with original. '
                    'No real scheduler, kref release, AXP detach, PM or hardware result.'
-        ), indent=2) + '\n')
+        )
+        if args.compile_driver:
+            evidence['arm_build'] = compile_objects(archive, lock, WORK,
+                ['drivers/power/supply/power_supply_core.o'],
+                candidate_profile='power-supply-lifetime')
+        output.write_text(json.dumps(evidence, indent=2) + '\n')
         print(arm, end='')
         print('Evidence:', output.relative_to(ROOT))
 

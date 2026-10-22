@@ -68,6 +68,14 @@ controls and pending caller/packet qualification.
 records the built, offline-verified diagnostic.26 recorder image, matching
 reader admission, recovery checkpoint and pending physical installation.
 
+[274 — MUSB callback and UDC concurrency validation](274-musb-callback-smp-validation.md)
+records eighteen passing real callback/UDC ARM SMP cases with KASAN/lockdep,
+retained fixture failures and remaining matching-board qualification.
+
+[273 — SMP kernel test environment](273-smp-kernel-test-environment.md)
+prepares the missing ARM system emulator and verifies two virtual CPU threads
+and cleanup; report 274 adds the completed MUSB concurrency suite.
+
 [271 — Clock capture deployment and admission](271-clock-capture-deployment.md)
 adds kernel build-ID/runtime checks, same-process route inventory, bounded
 process ownership and original-result persistence; the old image is refused

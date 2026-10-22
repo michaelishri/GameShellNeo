@@ -55,7 +55,7 @@ def main():
                 raise ValueError('Missing pinned Sunxi source')
         patches = []
         for patch in sorted([*(ROOT / 'kernel/patches').glob('*.patch'),
-                             *candidate_paths(ROOT, 'musb-retirement')]):
+                             *candidate_paths(ROOT, 'musb-retirement')], key=lambda path: path.name):
             content = patch.read_text()
             chunks = re.split(r'(?=^diff --git )', content, flags=re.M)
             selected = [chunk for chunk in chunks if chunk.startswith('diff --git a/' + FILE + ' ')]

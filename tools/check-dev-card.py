@@ -31,7 +31,7 @@ def qualify(args):
             with mounted(device + 'p1', work / 'boot') as boot, \
                     mounted(device + 'p3', work / 'store', filesystem='ext4') as store:
                 before = Card(boot, store).status()
-                previous = {name: (boot / name).read_bytes() for name in ('NEXT.SCR', 'GOOD.SCR')}
+                previous = {name: (boot / name).read_bytes() for name in ('next.scr', 'good.scr')}
                 with Card(boot, store).lock():
                     imported = unpack_release(args.bundle, store / 'systems' / args.system,
                         expected_hash=args.sha256, store_partuuid=before['store_partuuid'])

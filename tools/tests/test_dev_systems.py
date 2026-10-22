@@ -1,5 +1,6 @@
 """Development selection never overwrites another system or reboots the host."""
 import json
+import os
 from pathlib import Path
 import struct
 import sys
@@ -66,28 +67,69 @@ class DevelopmentSystems(unittest.TestCase):
         return directory
 
     def test_initial_recovery_and_trial_leave_confirmed_descriptor_untouched(self):
-        before = (self.boot / 'GOOD.SCR').read_bytes()
+        before = (self.boot / 'good.scr').read_bytes()
         self.assertEqual(self.card.status()['confirmed_system'], 'recovery')
         self.card.select('diag26')
         status = self.card.status()
         self.assertEqual(status['next_system'], 'diag26')
         self.assertTrue(status['trial_pending'])
-        self.assertEqual((self.boot / 'GOOD.SCR').read_bytes(), before)
+        self.assertEqual((self.boot / 'good.scr').read_bytes(), before)
         self.assertFalse(status['reboot_performed'])
 
+    def test_case_insensitive_reads_cannot_admit_uppercase_flag_entries(self):
+        # Model FAT's ability to read lower paths while enumeration preserves
+        # uppercase on-disk names. The legacy writer cannot replace those names.
+        entries = list(self.boot.iterdir())
+        before = {p.name: p.read_bytes() for p in entries if p.name in systems.FLAGS}
+        iterdir = Path.iterdir
+
+        def presented(path):
+            if path == self.boot:
+                return iter(p.with_name(p.name.upper()) if p.name in systems.FLAGS else p
+                            for p in entries)
+            return iterdir(path)
+
+        with patch.object(Path, 'iterdir', presented), self.assertRaisesRegex(ValueError, 'lowercase'):
+            systems.Card(self.boot, self.store)
+        self.assertEqual({name: (self.boot / name).read_bytes() for name in before}, before)
+
+    def test_mount_options_cannot_disguise_incompatible_short_names(self):
+        before = (self.boot / 'next.scr').read_bytes()
+        for options in ('rw,shortname=lower', 'rw,shortname=win95', 'rw'):
+            device = self.boot.stat().st_dev
+            record = {'filesystems': [{'fstype': 'vfat', 'options': options,
+                       'maj:min': f'{os.major(device)}:{os.minor(device)}'}]}
+            with patch.object(systems.subprocess, 'check_output', return_value=json.dumps(record)), \
+                    self.assertRaisesRegex(ValueError, 'shortname=mixed'):
+                systems.Card(self.boot, self.store)
+        self.assertEqual((self.boot / 'next.scr').read_bytes(), before)
+
+    def test_alias_or_case_change_after_construction_cannot_change_selection(self):
+        before = (self.boot / 'next.scr').read_bytes()
+        alias = self.boot / 'NEXT.SCR'
+        alias.write_bytes(before)
+        with self.assertRaisesRegex(ValueError, 'unique lowercase'):
+            self.card.select('diag26')
+        self.assertEqual((self.boot / 'next.scr').read_bytes(), before)
+        alias.unlink()
+        (self.boot / 'next.scr').rename(alias)
+        with self.assertRaisesRegex(ValueError, 'unique lowercase'):
+            self.card.select('diag26')
+        self.assertEqual(alias.read_bytes(), before)
+
     def test_changed_root_rejects_selection_before_state_write(self):
-        before = (self.boot / 'NEXT.SCR').read_bytes()
+        before = (self.boot / 'next.scr').read_bytes()
         (self.store / 'systems/diag26/root/usr/bin/fixture').write_bytes(b'changed')
         with self.assertRaisesRegex(ValueError, 'system input changed'):
             self.card.select('diag26')
-        self.assertEqual((self.boot / 'NEXT.SCR').read_bytes(), before)
+        self.assertEqual((self.boot / 'next.scr').read_bytes(), before)
 
     def test_changed_kernel_rejects_selection_before_state_write(self):
-        before = (self.boot / 'NEXT.SCR').read_bytes()
+        before = (self.boot / 'next.scr').read_bytes()
         (self.boot / 'systems/diag26/uImage').write_bytes(b'damaged')
         with self.assertRaises(ValueError):
             self.card.select('diag26')
-        self.assertEqual((self.boot / 'NEXT.SCR').read_bytes(), before)
+        self.assertEqual((self.boot / 'next.scr').read_bytes(), before)
 
     def test_source_root_symlink_cannot_redirect_hashing_to_host(self):
         target = self.store / 'systems/diag26/root/usr'
@@ -112,18 +154,18 @@ class DevelopmentSystems(unittest.TestCase):
         root = self.store / 'systems/diag26/root'
         runtime = self.base / 'runtime-marker'
         runtime.write_bytes((root / 'etc/gameshellneo/development-slot').read_bytes())
-        before = (self.boot / 'GOOD.SCR').read_bytes()
+        before = (self.boot / 'good.scr').read_bytes()
         with self.assertRaisesRegex(ValueError, 'kernel/early-userspace'):
             self.card.confirm('diag26', running_root=root, runtime_record=runtime)
-        self.assertEqual((self.boot / 'GOOD.SCR').read_bytes(), before)
+        self.assertEqual((self.boot / 'good.scr').read_bytes(), before)
 
     def test_register_additional_release_does_not_change_selection(self):
-        before = (self.boot / 'NEXT.SCR').read_bytes()
+        before = (self.boot / 'next.scr').read_bytes()
         self.prepare('diag28')
         self.card.register('diag28')
         new_card = systems.Card(self.boot, self.store)
         self.assertIn('diag28', new_card.status()['systems'])
-        self.assertEqual((self.boot / 'NEXT.SCR').read_bytes(), before)
+        self.assertEqual((self.boot / 'next.scr').read_bytes(), before)
         with self.assertRaisesRegex(ValueError, 'immutable'):
             new_card.register('diag28')
 
@@ -146,10 +188,10 @@ class DevelopmentSystems(unittest.TestCase):
     def test_fixed_recovery_cannot_be_replaced_by_a_registered_version(self):
         with self.assertRaisesRegex(ValueError, 'reserved'):
             self.card.register('recovery')
-        old = (self.boot / 'RECOVER.SCR').read_bytes()
+        old = (self.boot / 'recover.scr').read_bytes()
         self.card.select('diag26')
         self.card.select_recovery()
-        self.assertEqual((self.boot / 'NEXT.SCR').read_bytes(), old)
+        self.assertEqual((self.boot / 'next.scr').read_bytes(), old)
 
     def test_invalid_identifier_and_unprepared_card_are_rejected(self):
         for value in ('../outside', 'diag;reset', 'a' * 49, 'UPPER', ''):

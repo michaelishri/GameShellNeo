@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import struct
+import subprocess
 import tempfile
 import zlib
 
@@ -23,6 +24,7 @@ BOOT_LIMITS = {'uImage': 0x1000000,
                'sun8i-r16-clockworkpi-cpi3-power-off.dtb': 0x100000}
 BOOT_FILES = ('uImage', 'sun8i-r16-clockworkpi-cpi3.dtb', 'uInitrd')
 OPTIONAL_DTB = 'sun8i-r16-clockworkpi-cpi3-power-off.dtb'
+FLAGS = ('next.scr', 'good.scr', 'recover.scr')
 
 
 def slot_id(value):
@@ -86,9 +88,34 @@ def atomic_write(path, data):
             os.close(fd)
         if regular(path).read_bytes() != data:
             raise ValueError('Development boot-state readback differs')
+        if path.name in FLAGS:
+            require_flag_names(path.parent, (path.name,))
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def require_flag_names(boot, flags=FLAGS):
+    # shortname=lower can disguise NTRes=0 uppercase entries as lowercase.
+    # Mixed spelling preserves the distinction that the old writer observes.
+    try:
+        found = json.loads(subprocess.check_output(['findmnt', '-J', '-T', str(boot),
+            '-o', 'FSTYPE,OPTIONS,MAJ:MIN'], stderr=subprocess.PIPE, timeout=10))['filesystems']
+        device = boot.stat().st_dev
+        number = f'{os.major(device)}:{os.minor(device)}'
+        mount = [m for m in found if m['maj:min'] == number]
+    except (OSError, subprocess.SubprocessError, KeyError, TypeError, ValueError) as error:
+        raise ValueError('Cannot identify development boot filesystem') from error
+    if not mount:
+        raise ValueError('Cannot identify development boot filesystem')
+    for record in mount:
+        if record['fstype'] == 'msdos' or (record['fstype'] == 'vfat' and
+                'shortname=mixed' not in record['options'].split(',')):
+            raise ValueError('Development FAT must use vfat mounted with shortname=mixed')
+    names = [p.name for p in boot.iterdir()]
+    for name in flags:
+        if [entry for entry in names if entry.casefold() == name] != [name]:
+            raise ValueError('Boot flags need unique lowercase directory entries; migrate the legacy card first')
 
 
 def json_bytes(value):
@@ -132,6 +159,10 @@ class Card:
         self.boot, self.store = Path(boot), Path(store)
         if self.boot.is_symlink() or self.store.is_symlink():
             raise ValueError('Development mount paths must not be symlinks')
+        # This vendor-era writer downcases its lookup then compares directory
+        # names case-sensitively. Case-insensitive Path.exists() on FAT would
+        # accept an uppercase entry that it cannot replace, creating duplicates.
+        require_flag_names(self.boot)
         self.record = json.loads(regular(self.boot / CARD_FILE).read_text())
         if (self.record.get('schema') != 1 or self.record.get('board') != BOARD or
                 self.record.get('development_only') is not True):
@@ -149,7 +180,7 @@ class Card:
             suspend_diagnostics=self.record['recovery_suspend_diagnostics']))
         if ((not _initializing and
              regular(self.boot / 'boot.scr').read_bytes() != script_image(dispatcher())) or
-                regular(self.boot / 'RECOVER.SCR').read_bytes() != expected_recovery or
+                regular(self.boot / 'recover.scr').read_bytes() != expected_recovery or
                 boot_bundle(child(self.boot, 'systems/recovery'), False) != self.record['recovery_boot_files']):
             raise ValueError('Fixed development/recovery boot files changed')
 
@@ -160,6 +191,7 @@ class Card:
         stream = path.open('a')
         try:
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            require_flag_names(self.boot)
             # Another selector may have published a version after this object
             # was constructed. Read the catalog while owning the writer lock.
             self.releases = json.loads(regular(self.store / RELEASES_FILE).read_text())
@@ -240,15 +272,15 @@ class Card:
     def select(self, name):
         with self.lock():
             data = self.descriptor(name)
-            atomic_write(self.boot / 'NEXT.SCR', data)
+            atomic_write(self.boot / 'next.scr', data)
         return {'next': name, 'trial': True, 'reboot_performed': False,
                 'fallback': 'last confirmed descriptor, then fixed recovery'}
 
     def select_recovery(self):
         with self.lock():
-            data = regular(self.boot / 'RECOVER.SCR').read_bytes()
+            data = regular(self.boot / 'recover.scr').read_bytes()
             script_source(data)
-            atomic_write(self.boot / 'NEXT.SCR', data)
+            atomic_write(self.boot / 'next.scr', data)
         return {'next': 'recovery', 'reboot_performed': False}
 
     def confirm(self, name, *, running_root=Path('/'), runtime_record=Path('/run/gameshellneo-development-slot')):
@@ -264,8 +296,8 @@ class Card:
                 raise ValueError('The requested system is not the running root')
             data = self.descriptor(name)
             # A failed second write still leaves two valid complete descriptors.
-            atomic_write(self.boot / 'GOOD.SCR', data)
-            atomic_write(self.boot / 'NEXT.SCR', data)
+            atomic_write(self.boot / 'good.scr', data)
+            atomic_write(self.boot / 'next.scr', data)
         return {'confirmed': name, 'reboot_performed': False,
                 'health_qualification': 'explicit operator confirmation; no PM/energy claim'}
 
@@ -277,12 +309,12 @@ class Card:
             release = self.verify(name)
             result['systems'][name] = {'kernel': release['kernel'],
                 'source_image_sha256': release['source_image_sha256']}
-        next_boot = regular(self.boot / 'NEXT.SCR').read_bytes()
-        good = regular(self.boot / 'GOOD.SCR').read_bytes()
+        next_boot = regular(self.boot / 'next.scr').read_bytes()
+        good = regular(self.boot / 'good.scr').read_bytes()
         script_source(next_boot)
         script_source(good)
         result['trial_pending'] = next_boot != good
-        descriptors = {'recovery': regular(self.boot / 'RECOVER.SCR').read_bytes()}
+        descriptors = {'recovery': regular(self.boot / 'recover.scr').read_bytes()}
         descriptors.update({name: self.descriptor(name) for name in self.releases})
         result['next_system'] = next((name for name, data in descriptors.items() if data == next_boot), None)
         result['confirmed_system'] = next((name for name, data in descriptors.items() if data == good), None)
@@ -329,7 +361,7 @@ def initialize(boot, store, *, recovery_partuuid, recovery_boot, releases,
     atomic_write(store / RELEASES_FILE, json_bytes(catalog))
     recovery = script_image(release_script('recovery', recovery_partuuid, directory=False,
         suspend_diagnostics=recovery_suspend_diagnostics))
-    for name in ('RECOVER.SCR', 'GOOD.SCR', 'NEXT.SCR'):
+    for name in ('recover.scr', 'good.scr', 'next.scr'):
         atomic_write(boot / name, recovery)
     card = Card(boot, store, _initializing=True)
     for name in releases:

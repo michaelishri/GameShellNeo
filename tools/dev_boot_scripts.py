@@ -84,19 +84,19 @@ def dispatcher() -> bytes:
     text = ('# Development only; no saveenv or raw-sector writes.\n'
             'setenv verify yes\n' + _image_helpers() +
             _definition('neo_script', validate) + _definition('neo_load', load))
-    text += '''setenv neo_file NEXT.SCR
+    text += '''setenv neo_file next.scr
 setenv neo_addr 0x43000000
 if run neo_load; then
   setenv neo_next_len ${neo_len}
-  setenv neo_file GOOD.SCR
+  setenv neo_file good.scr
   setenv neo_addr 0x43300000
   if run neo_load; then
     setenv neo_good_len ${neo_len}
     if itest.l ${neo_next_len} -eq ${neo_good_len} && cmp.b 0x43000000 0x43300000 ${neo_next_len}; then
       source 0x43000000
     else
-      if fatwrite mmc 0:1 0x43300000 NEXT.SCR ${neo_good_len}; then
-        setenv neo_file NEXT.SCR
+      if fatwrite mmc 0:1 0x43300000 next.scr ${neo_good_len}; then
+        setenv neo_file next.scr
         setenv neo_addr 0x43200000
         if run neo_load && itest.l ${neo_len} -eq ${neo_good_len} && cmp.b 0x43300000 0x43200000 ${neo_good_len}; then
           source 0x43000000
@@ -107,7 +107,7 @@ if run neo_load; then
 fi
 # A kernel handoff never returns, including when the final command returned 0.
 setenv verify yes
-setenv neo_file RECOVER.SCR
+setenv neo_file recover.scr
 setenv neo_addr 0x43400000
 if run neo_load; then
   source 0x43400000

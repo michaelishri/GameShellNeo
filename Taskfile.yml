@@ -105,6 +105,10 @@ tasks:
     desc: Run development archive and mixed-owner/device metadata fixtures as real root in the offline builder
     cmds: [bash tools/run-logged.sh dev-root-tests python3 tools/check-dev-root.py]
 
+  test:dev-fat-writer:
+    desc: Reproduce legacy U-Boot FAT filename replacement on disposable FAT16 files; no hardware
+    cmds: [bash tools/run-logged.sh dev-fat-writer python3 tools/check-dev-fat-writer.py]
+
   check:musb-callback-kunit:
     desc: Exercise real MUSB callback/UDC races on four emulated ARM CPUs
     cmds: [bash tools/run-logged.sh musb-callback-kunit python3 tools/check-musb-callback-kunit.py]

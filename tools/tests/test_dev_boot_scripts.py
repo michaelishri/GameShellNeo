@@ -175,9 +175,9 @@ def modeled(source, files, *, fault='', size_overrides=None, returns=()):
         setup.append(f'sizes[{shlex.quote(name)}]={size}')
     for kind in returns:
         setup.append(f'returning[{kind}]=1')
-    setup.extend(('good=' + shlex.quote(files.get('GOOD.SCR', b'').hex()),
-                  'trial=' + shlex.quote(files.get('NEXT.SCR', b'').hex()),
-                  'recovery=' + shlex.quote(files.get('RECOVER.SCR', b'').hex())))
+    setup.extend(('good=' + shlex.quote(files.get('good.scr', b'').hex()),
+                  'trial=' + shlex.quote(files.get('next.scr', b'').hex()),
+                  'recovery=' + shlex.quote(files.get('recover.scr', b'').hex())))
     setup.append(source.decode())
     setup.append('echo OUTER_SCAN')
     with tempfile.TemporaryDirectory() as directory:
@@ -215,8 +215,8 @@ class DispatcherTests(unittest.TestCase):
     def setUp(self):
         self.good = descriptor(b'echo good\n')
         self.trial = descriptor(b'echo trial with a different length\n')
-        self.files = {'NEXT.SCR': self.trial, 'GOOD.SCR': self.good,
-                      'RECOVER.SCR': descriptor(b'echo recovery\n')}
+        self.files = {'next.scr': self.trial, 'good.scr': self.good,
+                      'recover.scr': descriptor(b'echo recovery\n')}
 
     def model(self, **kwargs):
         return modeled(scripts.dispatcher(), self.files, **kwargs)
@@ -227,7 +227,7 @@ class DispatcherTests(unittest.TestCase):
         self.assertNotIn('OUTER_SCAN', lines)
 
     def test_normal_identical_descriptor_has_no_writes(self):
-        self.files['NEXT.SCR'] = self.good
+        self.files['next.scr'] = self.good
         lines = self.model()
         self.assertIn('SOURCE:good:verify=yes', lines)
         self.assertFalse(any(line.startswith('WRITE:') for line in lines))
@@ -235,36 +235,36 @@ class DispatcherTests(unittest.TestCase):
 
     def test_trial_consumes_and_compares_before_preserved_handoff(self):
         lines = self.model()
-        self.assertEqual([line for line in lines if line.startswith('WRITE:')], ['WRITE:NEXT.SCR'])
-        self.assertLess(lines.index('WRITE:NEXT.SCR'), lines.index('LOAD:NEXT.SCR:2'))
+        self.assertEqual([line for line in lines if line.startswith('WRITE:')], ['WRITE:next.scr'])
+        self.assertLess(lines.index('WRITE:next.scr'), lines.index('LOAD:next.scr:2'))
         self.assertLess(lines.index('CMP:0x43300000:0x43200000'),
                         lines.index('SOURCE:trial:verify=yes'))
         self.assertNotIn('SOURCE:recovery:verify=yes', lines)
         self.assertNotIn('OUTER_SCAN', lines)
-        written = next(line.split(':', 2)[2] for line in lines if line.startswith('WROTE:NEXT.SCR:'))
+        written = next(line.split(':', 2)[2] for line in lines if line.startswith('WROTE:next.scr:'))
         self.assertEqual(bytes.fromhex(written), self.good)
-        self.files['NEXT.SCR'] = bytes.fromhex(written)
+        self.files['next.scr'] = bytes.fromhex(written)
         successor = self.model()
         self.assertIn('SOURCE:good:verify=yes', successor)
         self.assertFalse(any(line.startswith('WRITE:') for line in successor))
 
     def test_same_length_trial_is_distinct_and_crc_valid_wrong_readback_rejects(self):
-        self.files['NEXT.SCR'] = descriptor(b'echo new!\n')
-        self.assertEqual(len(self.files['NEXT.SCR']), len(self.good))
+        self.files['next.scr'] = descriptor(b'echo new!\n')
+        self.assertEqual(len(self.files['next.scr']), len(self.good))
         lines = self.model()
         self.assertIn('CMP:0x43000000:0x43300000', lines)
         self.assertIn('SOURCE:trial:verify=yes', lines)
-        lines = self.model(fault='wrongwrite:NEXT.SCR')
+        lines = self.model(fault='wrongwrite:next.scr')
         self.assertIn('CMP:0x43300000:0x43200000', lines)
         self.assert_recovery(lines)
 
     def test_load_crc_write_and_readback_faults_never_enter_trial(self):
-        faults = ('fatsize:NEXT.SCR', 'fatsize:GOOD.SCR',
-                  'fatload:NEXT.SCR:1', 'fatload:GOOD.SCR:1',
-                  'shortload:NEXT.SCR:1', 'shortload:GOOD.SCR:1',
+        faults = ('fatsize:next.scr', 'fatsize:good.scr',
+                  'fatload:next.scr:1', 'fatload:good.scr:1',
+                  'shortload:next.scr:1', 'shortload:good.scr:1',
                   'iminfo:0x43000000', 'iminfo:0x43300000',
-                  'fatwrite:NEXT.SCR', 'fatload:NEXT.SCR:2',
-                  'shortload:NEXT.SCR:2', 'corruptload:NEXT.SCR:2',
+                  'fatwrite:next.scr', 'fatload:next.scr:2',
+                  'shortload:next.scr:2', 'corruptload:next.scr:2',
                   'iminfo:0x43200000', 'cmp:0x43300000:0x43200000')
         for fault in faults:
             with self.subTest(fault=fault):
@@ -272,7 +272,7 @@ class DispatcherTests(unittest.TestCase):
                 self.assert_recovery(lines)
 
     def test_missing_bad_crc_and_oversized_descriptors_never_write(self):
-        for name in ('NEXT.SCR', 'GOOD.SCR'):
+        for name in ('next.scr', 'good.scr'):
             original = self.files[name]
             for bad in (None, original[:-1], original[:-1] + b'X'):
                 with self.subTest(name=name, bad=bad):
@@ -298,7 +298,7 @@ class DispatcherTests(unittest.TestCase):
                    descriptor(b'echo hi\n') + b'trailing')
         for image in invalid:
             with self.subTest(image=image.hex()[:40]):
-                self.files['NEXT.SCR'] = image
+                self.files['next.scr'] = image
                 lines = self.model()
                 self.assert_recovery(lines)
                 self.assertFalse(any(line.startswith('WRITE:') for line in lines))
@@ -308,7 +308,7 @@ class DispatcherTests(unittest.TestCase):
         struct.pack_into('>I', image, 12, 0xffffff00)
         image[4:8] = b'\0' * 4
         struct.pack_into('>I', image, 4, zlib.crc32(image[:64]))
-        self.files['NEXT.SCR'] = bytes(image)
+        self.files['next.scr'] = bytes(image)
         lines = self.model()
         self.assert_recovery(lines)
         self.assertNotIn('CRC:0x43000000', lines)
@@ -318,7 +318,7 @@ class DispatcherTests(unittest.TestCase):
         struct.pack_into('>I', image, 0, 0xd00dfeed)
         image[4:8] = b'\0' * 4
         struct.pack_into('>I', image, 4, zlib.crc32(image[:64]))
-        self.files['NEXT.SCR'] = bytes(image)
+        self.files['next.scr'] = bytes(image)
         lines = self.model()
         self.assert_recovery(lines)
         self.assertNotIn('CRC:0x43000000', lines)
@@ -331,22 +331,22 @@ class DispatcherTests(unittest.TestCase):
 
     def test_load_buffers_preserve_dispatcher_and_returning_descriptor(self):
         lines = self.model(returns=('trial',))
-        for event in ('PLACE:NEXT.SCR:0x43000000', 'PLACE:GOOD.SCR:0x43300000',
-                      'PLACE:NEXT.SCR:0x43200000', 'PLACE:RECOVER.SCR:0x43400000'):
+        for event in ('PLACE:next.scr:0x43000000', 'PLACE:good.scr:0x43300000',
+                      'PLACE:next.scr:0x43200000', 'PLACE:recover.scr:0x43400000'):
             self.assertIn(event, lines)
         self.assertFalse(any(line.startswith('PLACE:') and line.endswith(':0x43100000')
                              for line in lines))
-        self.assertNotIn('PLACE:RECOVER.SCR:0x43000000', lines)
+        self.assertNotIn('PLACE:recover.scr:0x43000000', lines)
 
     def test_returning_good_enters_recovery_without_writing(self):
-        self.files['NEXT.SCR'] = self.good
+        self.files['next.scr'] = self.good
         lines = self.model(returns=('good',))
         self.assertIn('SOURCE:recovery:verify=yes', lines)
         self.assertFalse(any(line.startswith('WRITE:') for line in lines))
 
     def test_failed_or_returning_recovery_halts_instead_of_outer_scan(self):
-        del self.files['NEXT.SCR']
-        for kwargs in ({'returns': ('recovery',)}, {'fault': 'fatload:RECOVER.SCR:1'}):
+        del self.files['next.scr']
+        for kwargs in ({'returns': ('recovery',)}, {'fault': 'fatload:recover.scr:1'}):
             with self.subTest(kwargs=kwargs):
                 lines = self.model(**kwargs)
                 self.assertIn('HALT', lines)

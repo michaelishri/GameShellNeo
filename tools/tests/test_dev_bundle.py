@@ -88,7 +88,7 @@ class DevelopmentBundle(unittest.TestCase):
         self.assertTrue(any(path.stat().st_size for path in logs))
 
     def test_real_gnu_round_trip_preserves_data_metadata_links_and_selection(self):
-        selection = self.base / 'NEXT.SCR'
+        selection = self.base / 'next.scr'
         selection.write_bytes(b'original selection')
         os.setxattr(self.file, 'user.bundle-test', b'opaque\0\xff metadata')
         before = self.file.stat()

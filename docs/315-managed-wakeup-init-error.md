@@ -316,8 +316,26 @@ New host evidence belongs only to the diagnostic-admission checkout under
 their original inputs and modeled boundaries. The corresponding complete logs
 are `.local/build/neo229-diagnostic-counterexample.log`,
 `neo229-diagnostic-focused.log` and `neo229-retained-readmission.log`.
-One clean current combined host check of this corrected source remains to run;
-its result will be recorded separately from original session 39950.
+The first current full-host attempt, session **8571**, ended with exit 201:
+sandbox restrictions denied local AF_UNIX bind/send operations, causing six
+existing socket/Paramiko fixture errors. The run completed 24 runtime tests
+and attempted 1,491 tooling tests with eleven skips. Its original log and
+terminal receipt are retained unchanged; it is not a passing host result.
+
+After that operation was conclusively terminal, the separately authorized
+normal-host check ran the same Task at unchanged clean
+`dfe69455c5f6ec3fec327bc18382d7f774a9107f`, session **11508**, exit 0.
+It passes 24 runtime and 1,491 tooling tests (nine expected skips), compiled
+host guards and Bash/ShellCheck. All 967 tracked inputs remained unchanged.
+No tests or infrastructure were relaxed. The distinct complete log is
+`.local/build/neo229-diagnostic-current-host-normal.log`, SHA-256
+`fe907573678f5d3c747a2651b7c26949477b3810d4d284a64b2fd769f5068f68`.
+The terminal receipt is
+`.local/notes/managed-wakeup-init-diagnostic-admission/current-host-normal-terminal.json`,
+SHA-256 `bd6d1059ca625c9dbab043d8bb6e90f121edbda9c8106406b2f2c9dcfff0b91e`.
+Only factual report/FOLLOW-UP updates follow this run. Neither host attempt
+changes the original kernel/ARM execution identities or unpublished-base
+conditions.
 
 Fresh independent Standards and Spec review, a fixed complete evidence handoff
 and a separate integration/publication grant remain required. This ticket

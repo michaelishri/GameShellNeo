@@ -15,8 +15,10 @@ on explicitly provisional/unpublished NEO-230/228 context passes 24 runtime /
 host correction binds the entire permitted positive/control diagnostic stream:
 the retained maintained-route counterexample accepts extra KUnit diagnostics
 without parser errors, while the corrected route rejects them and readmits
-the unchanged genuine Linux logs. Eighteen focused host methods pass; the one
-current combined host check of this correction remains pending. Original
+the unchanged genuine Linux logs. Eighteen focused host methods pass. The
+authorized normal-host check passes 24 runtime / 1491 tooling tests (nine
+skips), host guards and shell lint; the earlier sandbox socket-fixture failure
+is retained separately, with no test relaxation. Original
 kernel/ARM executions and all earlier evidence stay unchanged. Identical
 upstream publication, fresh independent reviews and serialized publication
 remain pending. The capability and action-reset contracts are preserved;

@@ -292,6 +292,23 @@ callback/UDC suite is now qualified above. Existing single-CPU UML endpoint test
 that cross-CPU atomic callback boundary. No GameShell access occurred.
 [Report 273](docs/273-smp-kernel-test-environment.md).
 
+**NEO-192/213 development admission, 23 October 2026:** an explicit awake-only
+adapter now distinguishes the original diagnostic.27 image, unchanged ARM
+reader receipt and newly executed wrapper sources. Its local plan verifies
+the raw image/kernel and exact release/deployment transformation; live checks
+will require the actual p3 root inode/mount, card/filesystem identity and fresh
+runtime hashes. Original raw-image and PM guards remain strict. Offline
+provenance/refusal, exact bounded large-contract staging, managed native/ARM
+replay and full 24 runtime/1297 tooling source checks pass. Both independent
+source reviews pass, and one coordinated 384-call capture/replay completes
+from the exact capable diag27 root with fresh runtime/build provenance and
+unchanged health/both routes. The actual window covers CPU0 only for about
+11.9 ms; it does not clear the intermittent fault. Recovery remains default,
+diag27 unconfirmed; final evidence/combined-tree review and publication remain
+pending. The original MONOTONIC fault, RAW discrepancy and NEO-191 PM gate
+remain open.
+[Report296](docs/296-development-clock-admission.md).
+
 **Clock deployment wrapper checked, 12 October 2026:** NEO-192 now verifies
 kernel build ID/configuration, image/source/runtime hashes, same-process vDSO
 routes and task/namespace ownership before arming. Original results survive

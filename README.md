@@ -1390,6 +1390,16 @@ before device access; the instrumented image remains to be built. Neither a
 complete capture nor a clean window clears the original fault or admits PM.
 [Report 271](docs/271-clock-capture-deployment.md) details admission and cleanup.
 
+Development-directory deployments have a separate opt-in `task dev:clock --
+<explicit-provenance-arguments>` adapter. Its default is a local read-only
+plan; `--apply --hardware-checkout <frozen-checkout>` performs one bounded
+awake capture after exact source/release/deployment/root/build/runtime checks.
+The original raw-image entry and PM directory rejection remain strict.
+`task test:development-clock` and `task check:development-clock-reader --
+--reader-build <original-reader-directory>` qualify the adapter and unchanged
+native/ARM reader offline. [Report296](docs/296-development-clock-admission.md)
+records separate identities, retained failures and the review/device gates.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

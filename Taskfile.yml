@@ -935,6 +935,18 @@ tasks:
       NEO_RUNTIME_CAPTURE: '{{.RUNTIME_CAPTURE | default ""}}'
     cmds: [python3 tools/check-clock-boundary.py]
 
+  test:development-clock:
+    desc: Test development-directory clock provenance and strict original-image refusals offline
+    cmds: [python3 -m unittest discover -s tools/tests -p test_development_clock.py -v]
+
+  check:development-clock-reader:
+    desc: Replay the original clock reader natively and on ARM in an owned offline container
+    cmds: ['bash tools/run-logged.sh development-clock-reader python3 tools/qualify-development-clock.py {{.CLI_ARGS}}']
+
+  dev:clock:
+    desc: Read-only local provenance plan; --apply explicitly runs one bounded awake development capture
+    cmds: ['python3 tools/check-development-clock.py {{.CLI_ARGS}}']
+
   report:clock-boundary:
     desc: Correlate saved kernel clock ordinals with raw ABI and Python/native values; no device access
     env:

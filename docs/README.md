@@ -24,6 +24,10 @@ remaining provider/backend and physical gates.
 records reproduced setup-error loss, the isolated fail-fast candidate,
 actual-source qualification and separate reset/reprobe boundaries.
 
+[296 — Development-directory clock provenance](296-development-clock-admission.md)
+records the explicit awake-only adapter, separate image/reader/source identities,
+strict root/runtime admission and retained clock/PM gates.
+
 [295 — Development-store expansion](295-development-store-expansion.md)
 records the guarded offline grow operation, fresh checkpoint requirements,
 partition-byte preservation and qualification gates.

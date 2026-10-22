@@ -434,6 +434,10 @@ tasks:
     desc: Simulate sleep during awake measurements and verify rejection/restoration; no device access
     cmds: [bash tools/run-logged.sh awake-clock python3 -m unittest discover -s tools/tests -p test_awake_clock.py -v]
 
+  test:awake-result-admission:
+    desc: Test standalone host awake-result admission through local scripted transports
+    cmds: [bash tools/run-logged.sh awake-result-admission python3 -m unittest discover -s tools/tests -p test_awake_result_admission.py -v]
+
   test:sleep-protocol:
     desc: Offline RTC duration, admission, evidence, restoration and transport regressions; no device access
     cmds: [bash tools/run-logged.sh sleep-protocol python3 -m unittest discover -s tools/tests -p 'test_sleep_*.py' -v]

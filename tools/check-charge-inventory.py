@@ -6,6 +6,7 @@ import json
 import os
 
 from private_config import load_env
+from inventory_result import admit_capture
 from remote import ROOT, LOCAL, device, evidence_directory, run, python_command
 
 
@@ -27,13 +28,12 @@ def main():
             sources_lock_sha256=hashlib.sha256(lock_path.read_bytes()).hexdigest(),
             route='usb', linux=lock['linux']['tag']), indent=2) + '\n')
         with device(load_env(), 'usb') as client, (capture / 'inventory.json').open('wb') as output:
-            data = run(client, **python_command(source.decode(), '--kernel',
+            run(client, **python_command(source.decode(), '--kernel',
                 lock['linux']['tag'][1:] + lock['linux']['localversion'],
                 '--image', lock['image_version']), output=output, display=False, timeout=40)
-        result = json.loads(data)
-        if result.get('completed') is not True or result.get('kind') != 'axp223-charge-inventory':
-            raise ValueError('Incomplete charge inventory; original output retained')
-        print(json.dumps(dict(boot_id=result['before']['boot_id'],
+        result = admit_capture(capture / 'inventory.json',
+            kernel=lock['linux']['tag'][1:] + lock['linux']['localversion'], image=lock['image_version'])
+        print(json.dumps(dict(boot_id=result['boot_id'],
                               assessment=result['assessment'], limits=result['limits']), indent=2))
 
 

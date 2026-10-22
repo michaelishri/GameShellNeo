@@ -442,6 +442,10 @@ tasks:
     desc: Test charging host result admission through local scripted channels; no device access
     cmds: [bash tools/run-logged.sh charge-result-admission python3 -m unittest discover -s tools/tests -p test_charge_result_admission.py -v]
 
+  test:charge-inventory-result-admission:
+    desc: Test raw charging inventory host admission through local scripted channels; no device access
+    cmds: [bash tools/run-logged.sh charge-inventory-result-admission python3 -m unittest discover -s tools/tests -p test_inventory_result_admission.py -v]
+
   test:sleep-protocol:
     desc: Offline RTC duration, admission, evidence, restoration and transport regressions; no device access
     cmds: [bash tools/run-logged.sh sleep-protocol python3 -m unittest discover -s tools/tests -p 'test_sleep_*.py' -v]

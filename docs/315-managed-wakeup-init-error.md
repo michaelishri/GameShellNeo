@@ -7,6 +7,13 @@ by its dedicated saved Tasks. The production queue, source lock, all existing
 profiles and image selection are unchanged. This is shared driver-API source
 correctness, not a reproduced fault in the installed CPI system.
 
+Original native and real-Linux qualification ran at `70285ec`, retained with
+its checkout and all artifacts unchanged. A separate
+`work/managed-wakeup-init-final-admission` checkout descends from that commit
+for the selected-object runner correction described below. It reuses the
+original verified source read-only; it does not relabel old whole-file input
+pins as executions of the corrected runner.
+
 ## Primary-source findings
 
 The locked Linux 6.18.54 archive is SHA-256
@@ -134,11 +141,54 @@ tests pass. The Linux validator/actual-runner tests now bring focused coverage
 to twelve passing methods, including stale/partial data, raw-0, unrelated
 assertion, crash/diagnostic and unresolved-owner refusal.
 
-Real Linux and selected driver qualification are prepared but still pending.
+Original real-Linux Task session **61035** completed with exit 0 at `70285ec`.
+The original wrapper's managed run `d8a851e5b8e44b21b6fd12689f5dd2fd` exited
+raw 1 with exactly the required two failed cases/eight compiled assertions and
+all exact ownership observations. Candidate run
+`66d864ffb4304c3d8d7c2112ee92dacd` exited 0 with all five cases passing.
+Both have authoritative released ownership, no OOM/error/stop request, verified
+KASAN/lockdep configuration and no diagnostic. All 62 original input pins match
+the original checkout. Control and candidate evidence SHA-256 values are
+`1654b6cf6fb205c9292e2a195384ac713d9ee314a476cb9f15dd39871b3815b3`
+and `289bf9150c9fb8c2cf5db7a0ef4b41f1b0fa5823b038a8bf518ee8ecdc94fb71`.
+
+One common source has exactly 35 entries: unchanged production 33, explicit
+0072 and the test-only patch. Its identity is
+`fa61630b7e019ad9c30c6a5b1a9436815a6e8c44c16eb4b39ae671c8fb154844`.
+Both effective inline variants independently match their native/ARM body hashes
+exactly. Original source, inventory, binaries, configurations, KTAP, JSON and
+managed logs remain under the original checkout's
+`.local/build/managed-wakeup-init-kernel/`; its accepted control and positive
+artifact directories are separately immutable.
+
+The first selected-object Task, session **53980**, stopped with exit 201.
+Managed run `abab14d5b5544bc6bf17590a39a894ca` exited 1 before driver
+compilation: `merge_config.sh` tried to create its temporary file in the
+correctly read-only source working directory. This is a runner setup failure,
+not a candidate behavior or successful configuration result. The original
+result/log is retained (container log SHA-256
+`1da2d5a8899b7da4dd507f14b494c7a3cc1e68e5b11f543538ea830fa0f07e67`).
+
+After all writers resolved, the separate checkout corrects only that generated
+driver command to change into its owned output directory before merging the
+configuration. The source bind remains read-only. Driver-only
+`--verified-source /absolute/path/to/source` admits only the exact original
+35-entry identity and full inventory matching its unchanged cache metadata;
+it rejects wrong modes, trees, aliases and metadata rather than repairing them.
+New outputs, inventory and evidence belong to the new checkout. The saved route
+is `task check:managed-wakeup-init-drivers -- --verified-source PATH`.
+Fifteen focused methods pass, including these read-only reuse guards. Only the
+two still-unqualified selected-object stages will execute; unchanged native
+and Linux tests are not repeated. Their original execution base and changed
+current whole-file runner/Task provenance remain distinct.
+
 The first idle heavy-resource lease was explicitly returned unused so another
-worker could build; no operation was stopped. New source preparation/UML/object
-stages require a fresh host-resource lease, serial j1, bounded disk footprint
-and current-run evidence. Existing caches and original proof remain immutable.
+worker could build; no operation was stopped. Active qualification uses serial
+j1, a four-GiB incremental disk ceiling and a three-GiB free-space floor before
+a new stage. The reuse path counts retained original plus new qualification
+storage. Existing caches and original proof remain immutable. Selected-object
+results and the later coordinator-allocated current host/context check remain
+pending.
 
 Fresh independent Standards and Spec review, a fixed complete evidence handoff
 and a separate integration/publication grant remain required. This ticket

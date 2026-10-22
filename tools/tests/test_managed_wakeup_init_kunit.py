@@ -16,10 +16,16 @@ TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 from managed_wakeup_init_kunit import CASES, CONTROL_FAILURES, STEM, checked_cases, checked_control, test_patch
 from managed_wakeup_init_source import PATCH
+import managed_wakeup_init_kunit as support_module
+from kernel_sources import digest, inventory
 
 spec = importlib.util.spec_from_file_location('managed_wakeup_runner', TOOLS / 'check-managed-wakeup-init-kunit.py')
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
+
+spec = importlib.util.spec_from_file_location('managed_wakeup_object_runner', TOOLS / 'check-managed-wakeup-init.py')
+object_runner = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(object_runner)
 
 
 def report(control=False):
@@ -112,6 +118,65 @@ class KernelOutcomeAdmission(unittest.TestCase):
                       [(Path(PATCH).name, b''), ('other.patch', b'')]):
             with self.subTest(queue=queue), self.assertRaisesRegex(ValueError, 'Exactly one'):
                 test_patch(None, None, None, queue, None, None)
+
+
+class VerifiedSourceAdmission(unittest.TestCase):
+    @contextmanager
+    def source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            spec = dict(schema=1, linux=dict(tag='fixture'), patches=[
+                dict(name=f'{index}.patch', sha256='a' * 64) for index in range(35)])
+            entry = Path(temporary) / ('source-' + digest(spec))
+            source = entry / 'source'
+            source.mkdir(parents=True)
+            (source / 'body.c').write_text('actual fixture payload\n')
+            metadata = entry / 'metadata.json'
+            metadata.write_text(json.dumps(dict(spec=spec, tree_sha256=digest(inventory(source)))))
+            with mock.patch.object(support_module, 'QUALIFIED_SOURCE_ID', digest(spec)):
+                yield source, spec, metadata
+
+    def test_matching_full_inventory_is_read_without_cache_mutation(self):
+        with self.source() as (source, spec, metadata):
+            before = metadata.read_bytes(), inventory(source), {p.name for p in source.parent.iterdir()}
+            path, entries, observed = support_module.verified_source(source, spec)
+            self.assertEqual(path, source)
+            self.assertEqual(entries, before[1])
+            self.assertEqual(observed, json.loads(before[0]))
+            self.assertEqual((metadata.read_bytes(), inventory(source),
+                              {p.name for p in source.parent.iterdir()}), before)
+
+    def test_changed_body_spec_metadata_alias_and_extra_entries_fail_closed(self):
+        for mode in ('body', 'spec', 'metadata', 'alias', 'extra', 'wrong-count'):
+            with self.subTest(mode=mode), self.source() as (source, spec, metadata):
+                path = source
+                if mode == 'body':
+                    (source / 'body.c').write_text('changed payload\n')
+                elif mode == 'spec':
+                    spec['linux']['tag'] = 'different'
+                elif mode == 'metadata':
+                    metadata.write_text('{}')
+                elif mode == 'alias':
+                    path = source.parent / 'alias'
+                    path.symlink_to(source)
+                elif mode == 'extra':
+                    (source.parent / 'unexpected').write_text('not accepted')
+                else:
+                    spec['patches'].pop()
+                before = metadata.read_bytes(), inventory(source)
+                with self.assertRaises(ValueError):
+                    support_module.verified_source(path, spec)
+                self.assertEqual((metadata.read_bytes(), inventory(source)), before)
+
+    def test_explicit_source_rejected_before_native_or_host_preparation(self):
+        for flags in ([], ['--host-only']):
+            with self.subTest(flags=flags), mock.patch.object(sys, 'argv',
+                    ['runner', *flags, '--verified-source', '/unqualified/source']), \
+                    mock.patch.object(object_runner, 'archive_for') as archive, \
+                    redirect_stdout(io.StringIO()), mock.patch('sys.stderr', io.StringIO()):
+                with self.assertRaises(SystemExit) as failure:
+                    object_runner.main()
+                self.assertEqual(failure.exception.code, 2)
+                archive.assert_not_called()
 
 
 class RunnerAdmission(unittest.TestCase):

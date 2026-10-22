@@ -665,7 +665,7 @@ tasks:
 
   check:managed-wakeup-init-drivers:
     desc: Compile selected PM and no-sleep ARM callers using the opt-in managed-wakeup candidate
-    cmds: [bash tools/run-logged.sh managed-wakeup-init-drivers python3 tools/check-managed-wakeup-init.py --compile-drivers]
+    cmds: ['bash tools/run-logged.sh managed-wakeup-init-drivers python3 tools/check-managed-wakeup-init.py --compile-drivers {{.CLI_ARGS}}']
 
   test:managed-wakeup-init-kunit:
     desc: Require the exact two-failure managed-wakeup control, then five positive real Linux PM/devres cases

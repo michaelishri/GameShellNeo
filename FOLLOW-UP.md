@@ -5,8 +5,11 @@ Record deferred questions and activities here as they arise.
 **NEO-98/229 managed wakeup initialization:** candidate 0072 returns the exact
 initialization error before registering managed disable cleanup. The five-case
 native/ASan/UBSan/ARM reference passes, with the original wrapper failing exactly
-two cases/eight assertions. Real Linux PM/devres/IDA and selected driver
-qualification, fresh independent reviews and serialized publication remain
+two cases/eight assertions. Actual Linux PM/devres/IDA also passes all five,
+with the exact same original-wrapper control. A retained selected-object
+runner setup failure precedes driver compilation; the corrected separate
+checkout reuses the immutable qualified source read-only. Selected ARM objects,
+current context, fresh independent reviews and serialized publication remain
 pending. The underlying capability and action-reset contracts are preserved;
 no installed CPI fault, image or parent98/102/106 completion is inferred.
 [Report 315](docs/315-managed-wakeup-init-error.md).

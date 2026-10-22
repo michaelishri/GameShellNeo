@@ -13,12 +13,14 @@ import tempfile
 import uuid
 
 from kernel_checks import check_overrides, sha256
-from kernel_sources import atomic_json, ensure_source, locked
+from kernel_sources import (atomic_json, digest, ensure_source, inventory, locked,
+                            real_directory, real_file, source_spec)
 from managed_container import execute
 from managed_wakeup_init_source import CASES, CONTROL_FAILURES, HEADER, PATCH, function
 from musb_restart_kunit import checked_cases as validate_cases
 
 STEM = 'managed-wakeup-init'
+QUALIFIED_SOURCE_ID = 'fa61630b7e019ad9c30c6a5b1a9436815a6e8c44c16eb4b39ae671c8fb154844'
 TARGETS = (HEADER, 'drivers/base/power/wakeup.c', 'drivers/base/devres.c', 'kernel/power/Kconfig')
 LIMITS = ('Five synchronous calls on valid registered, unbound devices in single-CPU UML '
           'with real wakeup registration/attachment, IDA, devres/reset and device release, '
@@ -181,9 +183,11 @@ def checked_control(report, log):
     return cases
 
 
-def resources(root, work):
+def resources(root, work, *, retained=None):
     """Admission/receipt only: never terminate a writer to recover disk space."""
     used = sum(path.lstat().st_blocks * 512 for path in work.rglob('*') if not path.is_symlink())
+    if retained is not None and retained.resolve() != work.resolve():
+        used += sum(path.lstat().st_blocks * 512 for path in retained.rglob('*') if not path.is_symlink())
     free = shutil.disk_usage(root).free
     if free < 3 * 1024**3 or used > 4 * 1024**3:
         raise RuntimeError('Managed-wakeup stage exceeds admitted disk budget; retain all artifacts')
@@ -198,7 +202,32 @@ def production_pins(root):
     return {str(path.relative_to(root)): sha256(path) for path in paths}
 
 
-def kernel_source(root, lock, archive):
+def verified_source(path, spec):
+    """Read-only admission of the original qualified source, never a stamp repair."""
+    if not path.is_absolute() or path.resolve(strict=True) != path:
+        raise ValueError('Verified source requires an absolute path without symlink components')
+    identity = digest(spec)
+    if identity != QUALIFIED_SOURCE_ID or len(spec['patches']) != 35:
+        raise ValueError('Explicit source differs from the original qualified 35-entry identity')
+    entry = path.parent
+    if path.name != 'source' or entry.name != 'source-' + identity:
+        raise ValueError('Verified source cache identity/path differs')
+    real_directory(entry)
+    real_directory(path)
+    if {item.name for item in entry.iterdir()} != {'source', 'metadata.json'}:
+        raise ValueError('Unexpected verified source cache contents')
+    metadata_path = entry / 'metadata.json'
+    real_file(metadata_path)
+    original = metadata_path.read_bytes()
+    metadata = json.loads(original)
+    entries = inventory(path)
+    if (metadata != dict(spec=spec, tree_sha256=digest(entries)) or
+            metadata_path.read_bytes() != original):
+        raise ValueError('Verified source full inventory/metadata differs')
+    return path, entries, metadata
+
+
+def kernel_source(root, lock, archive, *, reuse=None):
     base = root / '.local/build/managed-wakeup-init-kernel'
     base.mkdir(parents=True, exist_ok=True)
     resources(root, base)
@@ -212,7 +241,10 @@ def kernel_source(root, lock, archive):
         queue.append(test_patch(root, archive, lock, queue, module.apply_queue, Path(temporary)))
     manifest = [dict(name=name, sha256=hashlib.sha256(data).hexdigest()) for name, data in queue]
     with locked(base / '.source-lock'):
-        source, entries, metadata = ensure_source(root, base, archive, lock, manifest, recorded_patches=queue)
+        if reuse is None:
+            source, entries, metadata = ensure_source(root, base, archive, lock, manifest, recorded_patches=queue)
+        else:
+            source, entries, metadata = verified_source(reuse, source_spec(lock, manifest))
         inventory_file = base / ('inventory-' + metadata['tree_sha256'] + '.json')
         if inventory_file.exists():
             if json.loads(inventory_file.read_text()) != entries:
@@ -225,16 +257,17 @@ def kernel_source(root, lock, archive):
                 raise ValueError('Retained kernel patch changed')
             if not path.exists():
                 path.write_bytes(data)
-    return base, source, dict(path=str(source.relative_to(root)), **metadata,
+    return base, source, dict(path=str(source.relative_to(root)) if source.is_relative_to(root) else str(source), **metadata,
         inventory_file=str(inventory_file.relative_to(root)), inventory_sha256=sha256(inventory_file))
 
 
-def driver_objects(root, lock, archive, work, candidate_text):
+def driver_objects(root, lock, archive, work, candidate_text, *, reuse=None):
     """Two actual selected ARM configurations; no image or controller claim."""
     base = root / '.local/build/managed-wakeup-init-kernel'
     base.mkdir(parents=True, exist_ok=True)
     with locked(base / '.qualification-lock'):
-        base, source, metadata = kernel_source(root, lock, archive)
+        base, source, metadata = kernel_source(root, lock, archive, reuse=reuse)
+        retained = source.parents[2] if reuse is not None else None
         # The effective non-test header must be the exact native-qualified body.
         from managed_wakeup_init_source import DEVRES_HEADER, inline_functions
         header = (source / HEADER).read_text()
@@ -246,7 +279,7 @@ def driver_objects(root, lock, archive, work, candidate_text):
         builder = lock['builder']
         records = {}
         for sleep in (True, False):
-            resources(root, base)
+            resources(root, base, retained=retained)
             name = 'pm-sleep' if sleep else 'pm-no-sleep'
             scratch = base / 'driver-runs' / (name + '-' + uuid.uuid4().hex)
             scratch.mkdir(parents=True)
@@ -271,14 +304,15 @@ def driver_objects(root, lock, archive, work, candidate_text):
                 '-w', '/kernel-source', builder['image'], '-c',
                 'set -euo pipefail\n'
                 'make O="$NEO_WAKEUP_OUTPUT" sunxi_defconfig\n'
+                'cd "$NEO_WAKEUP_OUTPUT"\n'
                 '/kernel-source/scripts/kconfig/merge_config.sh -m -O "$NEO_WAKEUP_OUTPUT" '
                 f'"$NEO_WAKEUP_OUTPUT/.config" /project/{relative}/extra.config\n'
-                'make O="$NEO_WAKEUP_OUTPUT" olddefconfig\n'
+                'make -C /kernel-source O="$NEO_WAKEUP_OUTPUT" olddefconfig\n'
                 'python3 -c \'import pathlib,sys;sys.path.insert(0,"/project/tools");'
                 'from kernel_checks import check_overrides;check_overrides(pathlib.Path(sys.argv[1]),'
                 'pathlib.Path(sys.argv[2]).read_text().splitlines())\' '
                 f'"$NEO_WAKEUP_OUTPUT/.config" /project/{relative}/extra.config\n'
-                'make O="$NEO_WAKEUP_OUTPUT" -j1 ' + ' '.join(objects) + '\n'
+                'make -C /kernel-source O="$NEO_WAKEUP_OUTPUT" -j1 ' + ' '.join(objects) + '\n'
                 f'"${{CROSS_COMPILE}}gcc" --version > /project/{relative}/compiler.txt\n'
                 f'"${{CROSS_COMPILE}}readelf" -h ' + ' '.join('"$NEO_WAKEUP_OUTPUT/' + obj + '"' for obj in objects) +
                 f' > /project/{relative}/elf-info.txt\n'], scratch / 'attempt', timeout=None)
@@ -288,7 +322,7 @@ def driver_objects(root, lock, archive, work, candidate_text):
                 config_sha256=sha256(scratch / 'output/.config'),
                 compiler_sha256=sha256(scratch / 'compiler.txt'),
                 elf_info_sha256=sha256(scratch / 'elf-info.txt'), source=metadata,
-                resources=resources(root, base), configuration_scope='selected ARM driver objects only')
+                resources=resources(root, base, retained=retained), configuration_scope='selected ARM driver objects only')
             atomic_json(scratch / 'evidence.json', record)
             records[name] = record
         return records

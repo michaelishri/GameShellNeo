@@ -94,9 +94,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host-only', action='store_true', help='Native/sanitizer references only')
     parser.add_argument('--compile-drivers', action='store_true', help='Only complete selected ARM objects')
+    parser.add_argument('--verified-source', type=Path,
+                        help='Reuse the original immutable qualified source for driver objects only')
     args = parser.parse_args()
     if args.host_only and args.compile_drivers:
         parser.error('--host-only and --compile-drivers are separate qualifications')
+    if args.verified_source is not None and not args.compile_drivers:
+        parser.error('--verified-source is only valid with --compile-drivers')
     base = ROOT / '.local/build/managed-wakeup-init-tests'
     base.mkdir(parents=True, exist_ok=True)
     with locked(base / '.lock'):
@@ -130,7 +134,8 @@ def main():
                       archive_sha256=sha256(archive), limits=LIMITS)
         if args.compile_drivers:
             from managed_wakeup_init_kunit import driver_objects
-            record['driver_objects'] = driver_objects(ROOT, lock, archive, work, texts['candidate'])
+            record['driver_objects'] = driver_objects(ROOT, lock, archive, work, texts['candidate'],
+                                                       reuse=args.verified_source)
         else:
             record['native'] = native(work, texts, harness)
             if not args.host_only:

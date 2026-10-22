@@ -1412,6 +1412,13 @@ One separately reviewed and leased capture completed the fixed plan across
 four CPUs without a discrepancy in that finite sample. The original clock
 faults and dependent PM gates remain open; this is not reliability admission.
 
+`task test:clock-reference-feasibility` and
+`task check:clock-reference-feasibility -- <explicit-source-arguments>` qualify
+an offline timer-reference feasibility study. Its outcome is STOP: the study
+does not justify a two-sided MMIO/counter bracket or authorize instrumentation.
+[Report 305](docs/305-clock-reference-feasibility.md) records pinned ordering,
+conditional synthetic evidence and the unchanged NEO-192/PM gates.
+
 The candidate ADC width correction has its own saved checks:
 
 ```sh

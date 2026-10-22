@@ -294,6 +294,20 @@ callback/UDC suite is now qualified above. Existing single-CPU UML endpoint test
 that cross-CPU atomic callback boundary. No GameShell access occurred.
 [Report 273](docs/273-smp-kernel-test-environment.md).
 
+**NEO-192/221 reference feasibility, 23 October 2026:** bounded offline audit
+returns STOP. Seven locked Linux sources, actual configuration/vmlinux and
+primary ARM documentation distinguish relaxed MMIO, ordered readl and the
+original ISB/MRRC path. No two-sided reference-bracket proof is established;
+adding DSB can perturb the fault. Nineteen fixed cases in six families pass
+native, ASan/UBSan and ARM arithmetic checks; nine Python cases pass. An exact
+18-tick uncertainty control retains the corrected full comparison width and
+both raw reversal examples. Compile-only ARM fragments are never executed or
+linked; no kernel interface, profile, image, MMIO/device or additional capture
+is introduced. Provider lifetime and actual resolution remain unqualified.
+Original and corrected attempts, parser failure and old NEO-217 evidence are
+preserved. Final combined checks/review/publication remain pending; NEO-192
+and dependent PM gates stay open. [Report 305](docs/305-clock-reference-feasibility.md).
+
 **NEO-192/213 development admission, 23 October 2026:** an explicit awake-only
 adapter now distinguishes the original diagnostic.27 image, unchanged ARM
 reader receipt and newly executed wrapper sources. Its local plan verifies

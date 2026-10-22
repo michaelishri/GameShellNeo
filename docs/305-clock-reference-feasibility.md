@@ -177,6 +177,31 @@ all original logs/results remain unchanged. An earlier Task YAML parse failure
 occurred before any fixture/managed launch; its exact draft and failure are
 retained separately. No failed or superseded result is relabeled as current.
 
+## Combined accepted context
+
+The original `8ae3abd` source, 77-artifact index and both old attempts remain
+unchanged. The separate combined NEO-217/221 checkout adopts accepted published
+main `7120990023cb17ecc152eadefa57f37c19309ed9`; its five reference code/test
+files are byte-identical to that original study. Shared Taskfile context and
+the accepted managed-container helper differ, so the complete ten-input
+qualifier was run again rather than treating the old receipt as current.
+
+Attempt `db712391b6ea4072a2c1a6b9fbb5649b`, receipt SHA
+`9bcb86617f76f4170a486e3107883e3cdbd287f88f12348ac537c800ea508415`,
+passes nine Python and 19 native/19 ASan-UBSan/19 actual ARM arithmetic cases.
+Original session 40191 and owned run `04d3344f4acb4fa5ab3bdf98c7bdd23a`
+exit 0 without OOM/stop; all current source/snapshot/output hashes match.
+The three ordering fragments remain compile-only and unexecuted. STOP remains
+the result; no reference measurement or hardware experiment follows.
+
+The combined host check passes 24 runtime/1354 tooling tests with nine expected
+skips, both C checks and shell lint. The exact original reader/counter/ABI,
+33 production patch names/hashes, image and actual runtime remain unchanged.
+Report 302 records the separate current-input refresh, original one physical
+capture and precise historical-source versus final-context distinction.
+The final evidence index links all original failures, corrected attempts,
+source equivalence and current receipts without upgrading old evidence.
+
 ## Outcome and remaining gates
 
 **STOP:** a valid two-sided ordering contract, accepted observation perturbation,
@@ -185,9 +210,10 @@ Compilation and synthetic agreement do not fill those gaps. This bounded
 feasibility work can be reviewed and published with a STOP outcome while
 NEO-192 remains open.
 
-The combined accepted-source/current-input checks, exact preservation proof
-and entirely fresh independent Standards/Spec reviews remain pending before
-publication. A future measurement needs separate authorization, qualification,
+Combined accepted-source/current-input checks and the preservation proof pass.
+At this checkpoint, entirely fresh independent Standards/Spec reviews and
+publication remain pending. A future measurement needs separate authorization,
+qualification,
 source/image identities and exclusive device grants; none follows from this
 report. No barrier change, clocksource switch, retry or PM admission is proposed
 as a fix.

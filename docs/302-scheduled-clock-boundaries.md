@@ -300,20 +300,55 @@ original helper, proposal and first collation draft remain retained.
 
 ## Final accepted context and remaining gates
 
-Final documentation is prepared in a separate checkout. It adopts accepted
-published main `02c633a0349ad986fe384cc0f94e26663baa3df3`, retaining NEO-215's
-isolated MPFS work, through merge `45ed6cd`. The sole merge conflict was the
-report index; exact report entries 302, 300 and 298 remain in that order.
-The physical capture executed frozen `6524aea`, before this context adoption;
-it is not relabeled as execution of the final merge.
+Stable documentation at `afd47a3` first adopted accepted MPFS context through
+`45ed6cd`; that checkout and its collation remain unchanged. A new combined
+NEO-217/221 review checkout then adopted accepted published main
+`7120990023cb17ecc152eadefa57f37c19309ed9`, including NEO-218's managed-evidence
+guards. Merges `f14993e` and `8dc1d28` preserve both original feature trees.
+Conflicts were confined to README/report-index concatenation; exact existing
+entries remain alongside reports 305 and 302. The physical capture executed
+frozen `6524aea`, before either adoption. It is never relabeled as execution
+of the final context or its refreshed offline contract.
 
-The clock, pause, ABI and reader sources remain byte-identical to the executed
-source. The shared Taskfile additionally contains accepted MPFS Tasks; its
-clock sections remain identical. Generic qualification snapshots therefore
-have explicit context differences rather than whole-tree equality. The final
-private proof records every actual admission input separately and preserves
-the unchanged 33 production patches and immutable image/runtime identities.
+All 13 scheduled code/test files, the original reader/counter/ABI and ten
+existing clock Task definitions remain unchanged. The accepted context changes
+`tools/managed_container.py`, an actual pause-build input. The first strict
+read-only plan correctly refused the historical receipt, exit 201; its exact
+log and original terminal result remain retained. The guard was preserved and
+the affected artifacts were qualified normally on the new helper.
 
-Final independent review and publication remain required. NEO-217's finite
+Fresh pause receipt SHA
+`914d1dd6af62868003a3f4336f379a495797ea98d50ec17af7599afefe8869fd`,
+owned run `df81eb6464674b3797f7c1f2c44ca9d0`, passes all four native and
+four ARM fixtures plus actual ARM success/EINTR calls. The library bytes remain
+the same `e59c4dda…`. Fresh actual ARM workload receipt SHA
+`bd1cdc868e0ba1b04a5c69b9b5f81805aeca1fd39296ed3d7369d2f4e0d9f30c`,
+owned run `d0295430cc934c26a21842e28adf5cbf`, passes 15 native/15 ARM pure
+tests and exact 256-call/31-pause execution. Both operations exit 0 without
+OOM/stop. This is ABI/workload evidence with a fake recorder, not another
+kernel or GameShell capture. All 389 current snapshot inputs and extracted
+runtime files match their receipts; all ten pause inputs match current source.
+
+Normal strict offline admission then passes. The actual host serializer produces
+1,950,028 bytes within the original 2 MiB bound, SHA
+`c6fd228d342f0242268bbc7835f4afa87efad9b55216aa5f6d83431d86b49a02`.
+Only `scheduled/pause_receipt_sha256` differs from the historical live contract.
+That new payload has never executed on the device. Saved-data replay from the
+combined source exactly matches the original capture analysis.
+
+The one final combined host check passes 24 runtime/1354 tooling tests, nine
+expected skips, both C checks and shell lint; log SHA
+`79bde012abfd1b456e2cba973a140c9af22b8c510d07f4e7540786b6aa7c7683`.
+Current-source proof SHA
+`db1f8bc687928a0416660985bfdae924a3c4e74b2ddcc33e061a64c086f48ebd`
+records the exact immutable pins, all current receipt/snapshot checks and
+terminal operations. It distinguishes four changed old snapshot paths and
+15 added context sources; the entire old snapshot is not called identical.
+The 33 production patch names/hashes and original image/runtime identities
+remain unchanged. NEO-221's separately qualified reference-feasibility result
+is STOP, as recorded in report 305.
+
+At this checkpoint, fresh final independent review and publication remain
+required. No current device lease is held. NEO-217's finite
 experiment does not close NEO-192 or admit dependent PM. Any later experiment
 needs its own explicit scope, fresh evidence and exclusive device grant.

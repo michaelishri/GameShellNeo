@@ -305,7 +305,9 @@ both raw reversal examples. Compile-only ARM fragments are never executed or
 linked; no kernel interface, profile, image, MMIO/device or additional capture
 is introduced. Provider lifetime and actual resolution remain unqualified.
 Original and corrected attempts, parser failure and old NEO-217 evidence are
-preserved. Final combined checks/review/publication remain pending; NEO-192
+preserved. Refreshed current-input qualification and the combined 24 runtime /
+1354 tooling checks pass on accepted published NEO-218 context; fresh final
+review/publication remain pending. NEO-192
 and dependent PM gates stay open. [Report 305](docs/305-clock-reference-feasibility.md).
 
 **NEO-192/213 development admission, 23 October 2026:** an explicit awake-only
@@ -350,10 +352,14 @@ both routes, protected kernel continuity and mounted-p1 recovery-flag pre/post
 checks pass. The exact Kiyo capture stopped after ten frames; actual first
 and last frames were inspected. Original unit/PIDs/stage and recorder
 ownership are closed. The coordinator verified
-the 45-file postflight receipt and released the lease. Final documentation
-adopts accepted MPFS context in a separate checkout; the physical capture's
-source and 98-artifact checkpoint remain unchanged. Final review/publication
-is pending. NEO-192's historical MONOTONIC/RAW faults and dependent PM gates
+the 45-file postflight receipt and released the lease. A new combined checkout
+adopts accepted published `7120990`; the physical capture's source and
+98-artifact checkpoint remain unchanged. The accepted managed-build helper
+change caused a preserved strict receipt refusal; fresh pause and actual ARM
+workload receipts then pass normal current-input admission. Library bytes are
+unchanged. Combined checks pass 24 runtime/1354 tooling tests with nine expected
+skips, C and shell checks. Fresh final review/publication is pending.
+NEO-192's historical MONOTONIC/RAW faults and dependent PM gates
 remain open, and diag27 stays unconfirmed with recovery default.
 [Report 302](docs/302-scheduled-clock-boundaries.md).
 

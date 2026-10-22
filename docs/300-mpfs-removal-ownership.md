@@ -1,7 +1,10 @@
 # MPFS parent resource and PHY ownership
 
-23 October 2026 NZDT. NEO-215 is a bounded software subtask of NEO-106 in
-the isolated `work/mpfs-removal-ownership` checkout. NEO-214 and its original
+23 October 2026 NZDT. NEO-215 is a bounded software subtask of NEO-106. The
+original `work/mpfs-removal-ownership` checkout and qualification evidence are
+preserved at `5f5fd77c4e3b2cfa18d8ee92f7db2cf909f7a830`. Final review uses
+`work/mpfs-removal-final` against accepted main
+`49b1c237ea3cd822195362f9462285fc1ee9a75c`. NEO-214 and its original
 test/evidence worktrees remain frozen. No Mac/GameShell, live unbind, PM,
 reset, selector or production-image operation has occurred.
 
@@ -56,6 +59,10 @@ compiler/ELF record, complete applied queue and builder. The compile receipt
 `e475f21cd0d58738cf2135494a28d55e3f060bc62c31a549dc39973dd1d3796e`.
 The earlier PHY object's qualification is not substituted for this backend.
 
+Both receipts and their accepted artifacts remain in
+`.local/worktrees/mpfs-removal-ownership` under the canonical checkout; paths
+below are relative to that preserved original worktree.
+
 The complete test-instrumented MPFS object and UML kernel compile, and all
 three real-kernel cases pass under KASAN/lockdep without diagnostics. They
 execute actual MPFS removal against
@@ -76,8 +83,17 @@ all maintained input and accepted-artifact hashes match.
 The original isolated checkout's `task check` passes all 1,283 regressions
 (nine skipped), current-limit/mount guards, Bash syntax and ShellCheck. Strict
 checkpatch (`--no-tree --strict --no-signoff`) reports zero errors, warnings
-or checks. Final accepted-base combination and independent
-review remain pending.
+or checks. Adopting accepted main changes context and documentation without
+changing any of the native or kernel receipts' maintained inputs. Their full
+input inventories and accepted artifacts were rechecked against the final
+worktree. The production patch queue and locked source inputs are unchanged.
+
+The final combined checkout's `task check` passes all **1,301 regressions**
+(nine skipped), current-limit/mount guards, Bash syntax and ShellCheck. Its
+`.local/build/mpfs-final-host-check.log` has SHA-256
+`820abe3e3891938548fb04111df30dfdf95d4d5189bd2c04a969e757c0bbd851`.
+Fresh independent Standards/Spec review and serialized publication remain
+pending.
 
 Controller MMIO and the complete MUSB client IRQ/DMA/timer graph remain outside
 this bounded resource test. In particular the MPFS timer/IRQ rearm contracts,

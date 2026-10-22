@@ -1781,12 +1781,13 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   the Allwinner PHY detector's independent IRQ/work/resource audit and other PHY
   consumer ordering, caller-frame/global-accessor lifetime and other backend/DMA
   prerequisites before complete removal qualification. Keep NEO-106 open.
-- [ ] NEO-214 isolates the Sun4i detector's stale post-notification hardware
+- [x] NEO-214 isolates the Sun4i detector's stale post-notification hardware
   tail: a consumer may exit or exit/reinitialize the PHY while extcon dispatch
   runs outside its mutex. Candidate 0060 adds initialized-generation admission
   for the remaining MMIO and poll tail. Native/sanitizer/ARM and five full ARM
-  configurations and ten real-kernel cases pass; independent review remains
-  pending in [report 298](docs/298-usb-removal-producer-lifetime.md). This does
+  configurations and ten real-kernel cases pass. Fresh independent Standards
+  and Spec reviews accepted the source, published at `49b1c23`; see
+  [report 298](docs/298-usb-removal-producer-lifetime.md). This does
   not retire every generic-PHY consumer or complete NEO-106.
 - [ ] NEO-215 owns the confirmed MPFS backend resource/unregistration defects:
   `mpfs_remove()` disables the parent clock before child teardown and passes
@@ -1798,6 +1799,8 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   Candidate 0061 preserves the parent clock through child cleanup and releases
   the owned PHY. All 42 native/sanitizer/ARM cases, four negative controls and
   complete MPFS-selected PIO/DMA/module objects and three real Linux platform-device
-  cases pass; final accepted-base combination and independent review remain
-  pending in [report 300](docs/300-mpfs-removal-ownership.md).
+  cases pass. The final accepted-`49b1c23` combination preserves all maintained
+  qualification inputs and passes 1,301 host regressions (nine skipped);
+  independent review and serialized publication remain pending in
+  [report 300](docs/300-mpfs-removal-ownership.md).
 - [x] NEO-108 restart source and image qualification are recorded in [report 239](docs/239-musb-restart-integration-review.md). The additional NEO-106 retirement candidates stay outside production builds and retain their own image and hardware gates.

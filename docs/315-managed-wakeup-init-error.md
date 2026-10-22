@@ -25,6 +25,12 @@ publication and closure require the identical dependencies actually published
 and a separate grant. A changed dependency must be remapped and receive fresh
 required review. The one current combined host check passes as recorded below.
 
+A third isolated checkout, `work/managed-wakeup-init-diagnostic-admission`,
+descends from frozen `06c9bd7` for the host diagnostic-admission correction
+below. Both earlier checkouts, all original executions, historical indexes
+and the unexecuted `06c9bd7` publication preparation remain unchanged. The
+provisional dependency and publication conditions above still apply.
+
 ## Primary-source findings
 
 The locked Linux 6.18.54 archive is SHA-256
@@ -265,6 +271,53 @@ Index 02's tracked report pin describes historical `e6d01dd` bytes, retained at
 `.local/notes/managed-wakeup-init-error/context-premerge-e6d01dd/315-managed-wakeup-init-error.md`
 and bound to that commit's Git blob. It does not describe the current report
 path after this factual update; the final handoff distinguishes those versions.
+
+## Complete diagnostic admission
+
+A retained host counterexample inserts either `test case cleanup timed out`
+or `Test should be marked slow` after the source-error ownership observation
+in a copy of the genuine original-control log. The pinned Linux KUnit parser
+retains each diagnostic without adding a JSON parsing error. The prior
+maintained runner then accepts both altered results despite the originating
+contract requiring any different diagnostic to remain inconclusive. The
+actual warning sites are `lib/kunit/test.c:387-389` and `:522`; these strings
+need not contain any of the existing kernel-warning blacklist tokens.
+
+The corrected host validator requires the complete ordered permitted KTAP
+stream for both candidate and original-control results. It checks the exact
+suite headers and plans, all eight expected control assertion blocks, each
+case's ownership/result pair, both summaries and the final suite/halt lines.
+Only indentation and blank lines are normalized. Unknown lines before or
+after ownership, within assertions or at case/suite boundaries reject rather
+than disappear when assertion collection stops. This enforces the permitted
+stream instead of adding warning names to a blacklist.
+
+Eighteen focused host methods pass, including both KUnit warning examples and
+arbitrary unexpected text at the relevant boundaries. Actual maintained-runner
+tests reject both positive and control diagnostics, publish no acceptance
+evidence and retain the current log/input receipt. The bounded counterexample
+and readmission routes use the real parser, validators and maintained runner;
+source preparation, the executor and released ownership results are explicit
+host models, not new Linux executions.
+
+The corrected validators readmit the unchanged genuine logs/JSON from original
+control run `d8a851e5b8e44b21b6fd12689f5dd2fd` and candidate run
+`66d864ffb4304c3d8d7c2112ee92dacd`. The exact original counterexample copies
+now reject. All 144 earlier artifact pins and original input pins match before
+and after this read-only check. Pinned-parser Python sources and bytecode-cache
+contents are unchanged; imports explicitly disable bytecode writes. Source
+generation, the test-only kernel patch, fixtures, configurations and selected
+object runner are unchanged. No native, sanitizer, ARM, guest or object build
+is repeated; their execution identities above remain historical.
+
+New host evidence belongs only to the diagnostic-admission checkout under
+`.local/notes/managed-wakeup-init-diagnostic-admission/`:
+`counterexample/result.json` and `retained-readmission/result.json` identify
+their original inputs and modeled boundaries. The corresponding complete logs
+are `.local/build/neo229-diagnostic-counterexample.log`,
+`neo229-diagnostic-focused.log` and `neo229-retained-readmission.log`.
+One clean current combined host check of this corrected source remains to run;
+its result will be recorded separately from original session 39950.
 
 Fresh independent Standards and Spec review, a fixed complete evidence handoff
 and a separate integration/publication grant remain required. This ticket

@@ -40,7 +40,8 @@ def report(control=False):
 def log(control=False):
     # Predeclared exact rendering from pinned KUnit unary/binary formatters.
     # This is a validator fixture, not an executed-kernel receipt.
-    lines = ['KTAP version 1', '# Subtest: ' + STEM]
+    lines = ['KTAP version 1', '1..1', '    KTAP version 1',
+             '    # Subtest: ' + STEM, '    # module: wakeup', '    1..5']
     observations = (
         'result=0 source_hits=0 action_hits=0 created=1 freed=1',
         ('result=0 action=1 capable=0' if control else 'result=-12 action=0 capable=1') +
@@ -51,14 +52,17 @@ def log(control=False):
         'result=0 source_hits=0 action_hits=0 created=1 freed=1')
     for index, case in enumerate(CASES, 1):
         for name, actual, wanted in CONTROL_FAILURES.get(case, ()) if control else ():
-            lines.append(f'# {case}: EXPECTATION FAILED at drivers/base/power/managed-wakeup-init-kunit.c:100')
+            lines.append(f'    # {case}: EXPECTATION FAILED at drivers/base/power/managed-wakeup-init-kunit.c:100')
             if name == 'result':
-                lines.extend((f'Expected result == {wanted}, but', 'result == 0 (0x0)'))
+                lines.extend((f'    Expected result == {wanted}, but', '        result == 0 (0x0)'))
             else:
-                lines.append(f'Expected {name} to be {"true" if wanted else "false"}, '
+                lines.append(f'    Expected {name} to be {"true" if wanted else "false"}, '
                              f'but is {"true" if actual else "false"}')
-        lines.extend((f'# {case}: ownership {observations[index - 1]}',
-                      f'{"not ok" if control and case in CONTROL_FAILURES else "ok"} {index} {case}'))
+        lines.extend((f'    # {case}: ownership {observations[index - 1]}',
+                      f'    {"not ok" if control and case in CONTROL_FAILURES else "ok"} {index} {case}'))
+    counts = 'pass:3 fail:2 skip:0 total:5' if control else 'pass:5 fail:0 skip:0 total:5'
+    lines.extend((f'# {STEM}: {counts}', '# Totals: ' + counts,
+                  f'{"not ok" if control else "ok"} 1 {STEM}', 'reboot: System halted'))
     return '\n'.join(lines) + '\n'
 
 
@@ -112,6 +116,43 @@ class KernelOutcomeAdmission(unittest.TestCase):
                            'INFO: task worker blocked for more than 120 seconds'):
             with self.subTest(diagnostic=diagnostic), self.assertRaises(ValueError):
                 checked_control(report(True), log(True) + diagnostic)
+
+    def test_unexpected_diagnostics_at_every_case_boundary_are_inconclusive(self):
+        for control in (False, True):
+            validate = checked_control if control else checked_cases
+            lines = log(control).splitlines()
+            ownership = next(index for index, line in enumerate(lines)
+                             if f'# {CASES[1]}: ownership ' in line)
+            first_case = next(index for index, line in enumerate(lines) if '# ' + CASES[0] + ':' in line)
+            first_target = next(index for index, line in enumerate(lines) if '# ' + CASES[1] + ':' in line)
+            footer = next(index for index, line in enumerate(lines) if line.startswith('# ' + STEM + ': pass:'))
+            positions = (first_case, first_target, ownership, ownership + 1,
+                         ownership + 2, footer, len(lines) - 1)
+            if control:
+                positions += (first_target + 1,)
+            for diagnostic in ('test case cleanup timed out',
+                               'Test should be marked slow (runtime: 1.000000000s)',
+                               'unrecognized fixture diagnostic'):
+                for position in positions:
+                    bad = lines[:position] + [f'    # {CASES[1]}: {diagnostic}'] + lines[position:]
+                    with self.subTest(control=control, position=position, diagnostic=diagnostic):
+                        with self.assertRaisesRegex(ValueError, 'diagnostic stream'):
+                            validate(report(control), '\n'.join(bad) + '\n')
+
+    def test_case_and_suite_stream_cannot_hide_changed_or_duplicate_entries(self):
+        for control in (False, True):
+            validate = checked_control if control else checked_cases
+            good = log(control)
+            ownership = next(line for line in good.splitlines(True) if '# ' + CASES[0] + ': ownership ' in line)
+            for bad in (good.replace('1..5', '1..6', 1),
+                        good.replace('# module: wakeup', '# module: unrelated', 1),
+                        good.replace('ok 1 ' + CASES[0], 'ok 2 ' + CASES[0], 1),
+                        good.replace(ownership, ownership + ownership, 1),
+                        good.replace(ownership, '', 1),
+                        good.replace('# Totals: pass:', '# unexpected Totals: pass:', 1),
+                        good.replace('reboot: System halted', 'reboot: System halted\nextra output', 1)):
+                with self.subTest(control=control, log=bad[-120:]), self.assertRaises(ValueError):
+                    validate(report(control), bad)
 
     def test_candidate_must_be_explicit_and_last_once(self):
         for queue in ([], [('other.patch', b'')], [(Path(PATCH).name, b'')] * 2,
@@ -181,7 +222,7 @@ class VerifiedSourceAdmission(unittest.TestCase):
 
 class RunnerAdmission(unittest.TestCase):
     @contextmanager
-    def executor(self, *, prior=('test.log', 'results.json'), produced=(), outcome='expected'):
+    def executor(self, *, prior=('test.log', 'results.json'), produced=(), outcome='expected', control=True):
         """Drive real maintained main; model only source/executor boundaries."""
         with tempfile.TemporaryDirectory() as temporary, ExitStack() as stack:
             root = Path(temporary)
@@ -206,9 +247,10 @@ class RunnerAdmission(unittest.TestCase):
             scratch = base / ('uml-' + key)
             output = scratch / 'output'
             output.mkdir(parents=True)
-            (output / '.config').write_text(config_text + 'CONFIG_NEO_MANAGED_WAKEUP_RETURN_IGNORED=y\n')
+            (output / '.config').write_text(config_text +
+                'CONFIG_NEO_MANAGED_WAKEUP_RETURN_IGNORED=' + ('y' if control else 'n') + '\n')
             (output / 'linux').write_bytes(b'fixture kernel')
-            payload = {'test.log': log(True).encode(), 'results.json': json.dumps(report(True)).encode()}
+            payload = {'test.log': log(control).encode(), 'results.json': json.dumps(report(control)).encode()}
             targets = {'test.log': output / 'test.log', 'results.json': scratch / 'results.json'}
             for name in prior:
                 targets[name].write_bytes(payload[name])
@@ -234,7 +276,7 @@ class RunnerAdmission(unittest.TestCase):
                     targets[name].write_bytes(payload[name])
                 if outcome == 'unresolved':
                     raise RuntimeError('Managed run remains unresolved')
-                if outcome == 'zero':
+                if outcome == 'zero' or not control:
                     value = copy.deepcopy(terminal)
                     value.update(exit_code=0, returncode=0)
                     value['state']['ExitCode'] = 0
@@ -244,13 +286,14 @@ class RunnerAdmission(unittest.TestCase):
             support = SimpleNamespace(__file__=str(root / 'tools/managed_wakeup_init_kunit.py'), STEM=STEM,
                 kernel_source=lambda *args: (base, root / 'source', metadata), resources=lambda *args: {},
                 production_pins=lambda *args: {},
-                checked_control=checked_control, LIMITS='host runner fixture')
+                checked_control=checked_control, checked_cases=checked_cases, LIMITS='host runner fixture')
             for name, value in (('ROOT', root), ('__file__', str(root / 'tools/check-managed-wakeup-init-kunit.py')),
                 ('archive_for', lambda lock: root / 'archive'), ('support', support), ('execute', execute),
                 ('result_for', lambda receipt: (identity, observed, root)),
                 ('owns_active', lambda identity: outcome == 'active-owner')):
                 stack.enter_context(mock.patch.object(runner, name, value))
-            stack.enter_context(mock.patch.object(sys, 'argv', ['runner', '--control', 'return-ignored']))
+            stack.enter_context(mock.patch.object(sys, 'argv',
+                ['runner', '--control', 'return-ignored'] if control else ['runner']))
             stack.enter_context(redirect_stdout(io.StringIO()))
             yield f
 
@@ -285,6 +328,25 @@ class RunnerAdmission(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     runner.main()
                 self.assertFalse((f.base / 'control-evidence.json').exists())
+
+    def test_unexpected_diagnostics_never_publish_either_runner_evidence(self):
+        for control in (False, True):
+            for diagnostic in ('test case cleanup timed out', 'Test should be marked slow',
+                               'arbitrary diagnostic after ownership'):
+                for after in (False, True):
+                    with self.subTest(control=control, diagnostic=diagnostic, after=after), self.executor(
+                            produced=('test.log', 'results.json'), control=control) as f:
+                        text = f.payload['test.log'].decode()
+                        ownership = next(line for line in text.splitlines(True)
+                                         if '# ' + CASES[1] + ': ownership ' in line)
+                        extra = f'    # {CASES[1]}: {diagnostic}\n'
+                        altered = text.replace(ownership, ownership + extra if after else extra + ownership, 1)
+                        f.payload['test.log'] = altered.encode()
+                        with self.assertRaisesRegex(ValueError, 'diagnostic stream'):
+                            runner.main()
+                        self.assertFalse((f.base / ('control-evidence.json' if control else 'evidence.json')).exists())
+                        self.assertEqual((f.scratch / 'output/test.log').read_text(), altered)
+                        self.assertTrue(list((f.base / 'attempts').glob('*/inputs.json')))
 
 
 if __name__ == '__main__':

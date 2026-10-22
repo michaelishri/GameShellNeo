@@ -128,11 +128,44 @@ def ownership_observations(log, *, control):
     actual = re.findall(r'#\s*(\w+_test): ownership ([^\n]+)', log)
     if Counter(actual) != Counter(expected.items()):
         raise ValueError('Different or missing actual managed-wakeup ownership observation')
+    return expected
+
+
+def checked_diagnostics(log, *, control):
+    """Require the complete pinned KTAP stream, including every case diagnostic."""
+    ownership = ownership_observations(log, control=control)
+    expected = [re.escape(line) for line in (
+        'KTAP version 1', '1..1', 'KTAP version 1', '# Subtest: ' + STEM,
+        '# module: wakeup', '1..5')]
+    for index, case in enumerate(CASES, 1):
+        for name, actual, wanted in CONTROL_FAILURES.get(case, ()) if control else ():
+            expected.append(r'# ' + re.escape(case) + r': EXPECTATION FAILED at '
+                            r'drivers/base/power/managed-wakeup-init-kunit\.c:[1-9][0-9]*')
+            lines = ([f'Expected result == {wanted}, but', 'result == 0 (0x0)'] if name == 'result'
+                     else [f'Expected {name} to be {"true" if wanted else "false"}, '
+                           f'but is {"true" if actual else "false"}'])
+            expected.extend(re.escape(line) for line in lines)
+        status = 'not ok' if control and case in CONTROL_FAILURES else 'ok'
+        expected.extend(re.escape(line) for line in (
+            f'# {case}: ownership {ownership[case]}', f'{status} {index} {case}'))
+    passed, failed = (3, 2) if control else (5, 0)
+    counts = f'pass:{passed} fail:{failed} skip:0 total:5'
+    expected.extend(re.escape(line) for line in (
+        f'# {STEM}: {counts}', f'# Totals: {counts}',
+        f'{"not ok" if control else "ok"} 1 {STEM}', 'reboot: System halted'))
+    lines = [line.strip() for line in log.splitlines() if line.strip()]
+    try:
+        actual = lines[lines.index('KTAP version 1'):]
+    except ValueError as error:
+        raise ValueError('Missing managed-wakeup KTAP stream') from error
+    if len(actual) != len(expected) or any(
+            re.fullmatch(pattern, line) is None for pattern, line in zip(expected, actual)):
+        raise ValueError('Unexpected managed-wakeup per-case diagnostic stream')
 
 
 def checked_cases(report, log):
     cases = validate_cases(report, log, suite_name=STEM, expected_cases=CASES)
-    ownership_observations(log, control=False)
+    checked_diagnostics(log, control=False)
     return cases
 
 
@@ -153,33 +186,7 @@ def checked_control(report, log):
             any(case.get('status') != ('FAIL' if case.get('name') in CONTROL_FAILURES else 'PASS')
                 for case in cases)):
         raise ValueError('Different or incomplete managed-wakeup control outcomes')
-    failures, active = [], None
-    for line in log.splitlines():
-        marker = re.match(r'\s*#\s*(\w+_test): (?:ASSERTION|EXPECTATION) FAILED', line)
-        if marker:
-            active = [marker[1], []]
-            failures.append(active)
-        elif re.match(r'\s*(?:not )?ok\s+\d+', line) or re.match(r'\s*#.*: ownership ', line):
-            active = None
-        if active is not None:
-            active[1].append(line.strip())
-    expected = []
-    for case, assertions in CONTROL_FAILURES.items():
-        for name, actual, wanted in assertions:
-            lines = ([f'Expected result == {wanted}, but', 'result == 0 (0x0)'] if name == 'result'
-                     else [f'Expected {name} to be {"true" if wanted else "false"}, '
-                           f'but is {"true" if actual else "false"}'])
-            expected.append((case, tuple(lines)))
-    parsed = []
-    for case, block in failures:
-        marker = (r'# ' + re.escape(case) + r': EXPECTATION FAILED at '
-                  r'drivers/base/power/managed-wakeup-init-kunit\.c:[1-9][0-9]*')
-        if not block or not re.fullmatch(marker, block[0]):
-            raise ValueError('Unexpected managed-wakeup compiled assertion boundary')
-        parsed.append((case, tuple(line for line in block[1:] if line)))
-    if Counter(parsed) != Counter(expected):
-        raise ValueError('Different or incomplete eight-assertion managed-wakeup control')
-    ownership_observations(log, control=True)
+    checked_diagnostics(log, control=True)
     return cases
 
 

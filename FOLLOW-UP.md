@@ -4,13 +4,15 @@ Record deferred questions and activities here as they arise.
 
 **NEO-10/226 charging host result admission:** the retained actual-host local
 baseline accepts four invalid streams, including completion-only and forged
-raw-bound/summary data. Host admission now derives clock bounds from raw
-integers before unchanged pure validators/charge-summary reuse. Fourteen
-methods / 39 local host cases pass; raw/provenance, original stdin payload,
-deadlines, PM lock and collector/profile bytes remain unchanged. Final context,
-combined checks, fresh review and publication wait behind NEO-219/220. No
-device or calibration/safety qualification occurs; original NEO-121 evidence
-and NEO-10/101/192 gates remain unchanged.
+raw-bound/summary data. Host admission derives bounds from raw integers before
+unchanged pure validators/summary reuse. Both original and current focused runs
+pass 14 methods/39 local routes. One combined host check on explicitly
+provisional, unaccepted/unpublished NEO-220/222 context passes 24 runtime/1,416
+tooling tests (nine skipped), C guards and shell lint; exact original execution
+and changed current remote/import provenance remain distinct. Identical upstream
+acceptance/publication, entirely fresh final review and serialized integration
+remain pending. No collector/profile, device, calibration/safety or parent
+NEO-10/101/192 gate is changed.
 [Report 310](docs/310-charge-result-admission.md).
 
 **NEO-101/224 standalone host result admission:** ten retained local baseline
@@ -1828,7 +1830,13 @@ The feasibility investigation, supplied Allwinner-document review and focused fi
   Four unchanged reference schedules reproduce the lifetime gaps; 32 native,
   sanitizer and ARM cases, nine assertion controls and six selected OMAP
   configurations pass. Twelve actual Linux cases, including real parent
-  PM/glue/PHY consistency, also pass; independent acceptance remains pending.
+  PM/glue/PHY consistency, also pass. Fresh pre-integration reviews accepted
+  original `db1078b`; provisional final context merges frozen, unaccepted and
+  unpublished NEO-220 `a2688ac`. An exact current-source/evidence audit passes
+  627 checks with one explicit registry-file delta; one combined host check
+  passes 24 runtime/1,402 tooling tests (nine skipped), C guards and shell lint.
+  Original execution provenance is retained. Identical dependency publication,
+  fresh final reviews and serialized integration remain required.
   The existing production and candidate queues are preserved. Cached status across rebind
   is retained information, not a fresh physical-state guarantee. See
   [report 306](docs/306-omap-mailbox-ownership.md); wider NEO-102/106 and physical

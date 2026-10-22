@@ -3,9 +3,10 @@
 23 October 2026 NZDT. The charging-baseline host previously accepted a final
 `completed`/`passed` claim without replaying the raw samples or checking the
 claimed charge summary. NEO-226 adds host-only admission after the original
-command returns. Focused local qualification passes; final accepted-context
-adoption, combined checks, fresh independent review and publication are held
-behind NEO-219/220. This does not qualify charging, calibrate telemetry or
+command returns. Focused and combined local qualification pass on an explicitly provisional
+NEO-220/222 context. Entirely fresh final review may inspect the exact frozen
+provisional dependencies. Whole-ticket acceptance, integration, publication and
+closure require those identical dependencies to be accepted and published. This does not qualify charging, calibrate telemetry or
 change any collector, image, runtime, clock or power setting.
 
 ## Original actual-host baseline
@@ -160,7 +161,71 @@ command/lock/provenance AST. All 39 current wire observations match the
 original baseline payload hash. These are host-only source and scripted
 transport results, not native/ARM kernel, image or hardware qualification.
 
-Final accepted-base adoption and required combined checks are deliberately
-held until NEO-219/220 finish their settled-context refreshes. Entirely fresh
-independent Standards/Spec review and publication are still required before
-closing this focused child. No main/device lease is held.
+## Provisional final context and actual current execution
+
+A separate final-admission checkout preserves original `7230738` and its
+305-artifact/eight-source-pin evidence bundle. Its explicit merge of provisional
+NEO-222 `e075549` retains both histories, including NEO-220 `a2688ac`.
+Only the charging Task and own document context are reconciled. All upstream
+code/queues are preserved. At these checks both driver dependencies are still
+**unaccepted and unpublished**; accepted published main is `4d680d7` and the
+accepted final-base field is deliberately null. Preparation is not dependency
+acceptance, source publication or child completion. A later report-only
+scheduling revision adopts exact NEO-222 `b5a89cef12c446b65daad8325ae86aa54b2f67d6`.
+Its diff from `ad3ce13` is only two procedural passages in report 306. All
+current executable/Task/import inputs and retained wire evidence remain exact;
+the original focused/full executions keep their original source attribution.
+No host check is repeated for this verified documentation-only change.
+
+The new actual focused execution is source `8f56a29`, original Task PID
+`1264976` / wrapper `1264951`, saved attempt
+`.local/charge-result-final-admission/focused/6233ac72a99240a49ca84a6d2055d0b6/`.
+It passes the same 14 methods / 39 cases (two accepted controls, 37 refusals).
+All eighteen current input pins match before/after; its receipt SHA-256 is
+`148d48d5a11375aff09f8625990a9d390f04bb2b9b6884738446acc7ad23dbde`,
+log `b6a3440275dd7ff909f9a7236e26fc104faeffb7b8909695443da0e8ac307b43`.
+
+Unlike the original `088`/`723` context, the full current `remote.py` has changed
+through published NEO-224 and imports `awake_result.py`. Do not label those
+whole modules or old execution receipts identical. The audit instead proves
+exact old `run`, `python_command`, `device` and `evidence_directory` function
+bytes, unchanged original charging payload/arguments/run/PM-lock/provenance
+paths, and unchanged collector/validator/fixture/source-lock files. Normal
+current import origins are pinned; the actual saved Task import trace also
+records the new `awake_result` import. The same 17,736-byte payload hash applies
+to all 39 new wire receipts as well as the 82 retained original observations.
+The initial inventory shapes remain result-consistency fixtures, not eligible
+current producer/profile admission.
+
+The exact next NEO-222 report checkpoint `ad3ce1370a81b35a2fad7bb3f2aa16762f5d3e0c`
+changes only report 306 and its FOLLOW-UP result entry from `e075549`. After an
+independent two-path diff and all eighteen focused-input comparisons, it is
+merged at clean `12322ac`. The original focused execution stays attributed to
+`8f56a29`; no redundant focused run is made for those documentation changes.
+
+One current saved `task check` executes at clean `12322ac`, original session
+`79911`, Task PID `1269314` / wrapper `1269301`,
+`2026-10-22T18:11:52.064391+00:00` to
+`2026-10-22T18:12:33.634209+00:00`, exit zero. The original log reports
+**24 runtime tests and 1,416 tooling tests, nine expected skips**, both compiled
+C guards, Bash syntax and ShellCheck passing. All 927 tracked files are
+stream-hashed before/after with no change; both original processes are absent.
+Saved attempt:
+`.local/charge-result-final-admission/full/a5153b16f50149e48d1af512b42fdef7/`.
+Qualification receipt SHA-256 `8f13a40078f9b1910b170742ec0b4c9f4d10ea4cb135f344f2978311c2828311`;
+original log `8f68b5de904b074221e3a699950317513d9e1bbbf7f7171011b2d9dfda65bdce`.
+These are host regressions, not kernel, ARM, image or device qualification.
+Only this report and the own FOLLOW-UP result entry are updated afterward;
+actual tested executable/Task inputs remain exact.
+
+The original five-case baseline, first 38-case qualification and original
+39-case qualification remain immutable at their actual old sources. The new
+current receipts supplement rather than relabel them. Separate inventory-host
+baseline/planning evidence is outside this child and is not an implemented fix
+or a dependency. Entirely new final Standards/Spec review may inspect the full
+fixed source/spec/evidence against the exact frozen provisional dependencies.
+Whole-ticket acceptance, integration, publication and closure still require
+those identical dependencies to be accepted and published, plus a separate
+serialized integration grant. A changed dependency invalidates the fixed
+context until remapped and freshly reviewed as required. No main/device lease
+is held; NEO-10/101/192 and electrical/physical/clock/PM gates remain open.

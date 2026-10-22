@@ -218,10 +218,66 @@ and guarded flash selection. Production inputs stay separate, and development
 roots cannot reuse PM admission. Physical/vendor/board qualification remains
 open. Findings: Standards 0; Spec 0.
 
+## Installation preparation, 22 October
+
+The owner freshly confirmed readiness for shutdown/card movement and an ordinary
+unmetered connection. Host commit `1c45a30` adds `device:poweroff` using the
+existing three-cue, mixer-restoration, same-boot and single-submission gates.
+All 33 focused audio/timing regressions pass; independent review found no
+actionable defect. The established hardware checkout supplied its existing
+private identity and unchanged speaker helper in place; its frozen files were
+not edited.
+
+Audio run `21e6e6e50c7f41588f11e1f16b268cf0` completed three level-5, 1000 ms cues
+and restored the mixer on boot `2ed25c8e-2e83-4c31-bc31-0b87f38bbbde`. One unique
+poweroff timer was accepted. Its original evidence is retained under the
+hardware checkout's `.local/diagnostics/20261022T032658.168453Z/`; transport
+acceptance alone does not establish physical power-off or human audibility.
+
+The 561,002,958-byte development-r2 archive is staged in the Mac's separate,
+receipt-addressed development directory. Compressed and complete 8 GiB
+decompressed checksum verification passed. This source-only operation wrote
+no card. Private `.local/multiboot/installation/preparation.json`, SHA
+`be3ee93819befc5ebeb2f606471cf68b582d07c68b4ac52595d003a16fe3540b`, pins these
+observations and the original warning-result hashes. Physical spare identity,
+installation and board qualification are separate from this source check.
+
+## DEV-card write and readback
+
+After shutdown the owner confirmed the Samsung DEV spare was in the Mac's
+reader. Fresh `mac:status` and `mac:inspect` found one external physical USB
+card, temporarily `disk16`, with 64,013,467,648 bytes, 512-byte sectors and
+boot-volume UUID `F3C30F83-85C0-3268-ACEE-68029A2BA536`. The original card is
+the separately retained 15,931,539,456-byte card. Fresh complete SHA-256 checks
+passed for its 6,515,307,882-byte backup archive and the diagnostic.25 recovery
+raw image. The original backup, both diagnostic source images and recovery
+checkpoints remain preserved.
+
+`mac:preflight` passed full source hashes and the freshly recorded target.
+An initial flash setup timed out before destructive submission: no feature
+flash capture had been created, no mount-guard source had been uploaded, no
+writer/guard was running on the Mac, and the original two-partition layout
+remained visible. This failed setup is retained in private
+`.local/multiboot/installation/flash-setup-timeout.json`. A fresh non-writing
+preflight passed before a separately recorded write was submitted.
+
+The completed `mac:flash` verified the real Mac mount veto, wrote the full
+8,589,934,592-byte image, read every written byte back and ejected the card.
+Readback SHA-256 is
+`630be26098ae5736ff8718a2e2a4608564213a915f8222d87a5bed0200416463`, exactly
+matching the prepared image; the bounded guard was 2168 seconds. Evidence is
+`.local/diagnostics/20261022T033251.466149Z/`; `flash-result.json` hashes to
+`3073c323755103f25a871eaaa34f94c6f5cb98ff5fc3f163eb8eab16264b378f`.
+Private `.local/multiboot/installation/flash-qualified.json`, SHA
+`f98be57edeb0ef672a15987094388d4174f296486aa9ec4c0a6a042e2e8477fe`, links the
+identity/admission records, original setup failure, flash log and result.
+This establishes the written image and ejection, not a board boot or clock/PM
+qualification. The owner must return the card and power on the GameShell.
+
 ## Remaining acceptance
 
-NEO-208 stays open pending the fresh DEV-spare identity/installation/readback,
-actual vendor U-Boot trial consumption/readback, board directory-root handoff,
+NEO-208 stays open pending actual vendor U-Boot trial consumption/readback,
+board directory-root handoff,
 both management routes, explicit confirmation, subsequent bundle import and
 fixed-recovery/reset behavior. The owner moves the card. Use the existing long
 speaker warning for any later board reboot. Do not run clock/PM captures until

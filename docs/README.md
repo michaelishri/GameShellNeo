@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[301 — MUSB wake ownership through kernel IRQ traversal](301-musb-wake-irq-kernel-qualification.md)
+records the isolated wake/startup KUnit suite, real Linux global IRQ traversal,
+source control, retained original failures and separate DPM/physical gates.
+
 [298 — USB removal producer and backend lifetime](298-usb-removal-producer-lifetime.md)
 records the Sun4i detector generation guard, offline qualification and separate
 remaining provider/backend and physical gates.

@@ -11,8 +11,15 @@ CASES = ('wake_initialization_test', 'wake_unsupported_irq_test',
          'wake_peer_first_test', 'wake_peer_last_test',
          'wake_arm_error_test', 'wake_disarm_error_test',
          'wake_runtime_resume_error_test')
-CONTROL_FAILURES = ('wake_unsupported_irq_test', 'wake_policy_disabled_test',
-                    'wake_peer_first_test', 'wake_peer_last_test')
+CONTROL_ASSERTIONS = {
+    'wake_unsupported_irq_test': ('musb_suspend(f->device) == -6',),
+    'wake_policy_disabled_test': ('before.armed == 1', 'after.references == 1'),
+    'wake_peer_first_test': ('state.references == 2',),
+    'wake_peer_last_test': ('state.references == 2',),
+    'wake_disarm_error_test': ('wake_snapshot(f).references == 1', 'f->arms == 3',
+                               'Expected f->musb.irq_wake to be false, but is true'),
+}
+CONTROL_FAILURES = tuple(CONTROL_ASSERTIONS)
 PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch',
            '0026-musb-wake-irq-policy.patch', '0029-musb-startup-runtime-pm.patch',
            '0030-musb-gadget-callback-lifetime.patch', '0033-musb-sleep-session-retirement.patch',
@@ -20,7 +27,8 @@ PATCHES = ('0011-musb-sunxi-context.patch', '0025-musb-system-sleep-pullup.patch
 LIMITS = ('Separate exact wake/startup profile under single-CPU UML/KASAN/lockdep. '
           'Actual MUSB wake initialization and system-PM callbacks, Linux shared IRQ '
           'actions, wake reference accounting and global suspend_device_irqs/resume_device_irqs '
-          'traversal. Only a guest-local level irqchip and register bank are substituted. '
+          'traversal. A guest-local level irqchip, register bank and counting shared '
+          'handlers model the hardware boundary; the physical MUSB ISR is not invoked. '
           'No full device-DPM walk, allocation/sysfs race, terminal destruction, retirement '
           'composition, physical IRQ/MMIO, deep sleep, SMP or board qualification.')
 
@@ -49,9 +57,21 @@ def checked_control(report, log):
             any(c.get('status') != ('FAIL' if c.get('name') in CONTROL_FAILURES else 'PASS')
                 for c in cases)):
         raise ValueError('Wrong or incomplete wake source control failures')
-    if (any(name not in log for name in CASES) or
-            any(text not in log for text in ('wake_policy_disabled_test', 'before.armed', 'after.references'))):
-        raise ValueError('Source control did not reach policy-disabled IRQ/reference assertions')
+    if any(name not in log for name in CASES):
+        raise ValueError('Kernel log missing requested control output')
+    blocks = {name: [] for name in CONTROL_ASSERTIONS}
+    current = None
+    for line in log.splitlines():
+        failure = re.match(r'\s*#\s*(\w+_test): (?:ASSERTION|EXPECTATION) FAILED', line)
+        if failure:
+            current = failure[1]
+        elif re.match(r'\s*(?:not )?ok\s+\d+', line):
+            current = None
+        if current in blocks:
+            blocks[current].append(line)
+    for name, required in CONTROL_ASSERTIONS.items():
+        if any(text not in '\n'.join(blocks[name]) for text in required):
+            raise ValueError('Missing source-justified control assertion: ' + name)
     return cases
 
 

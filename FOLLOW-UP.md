@@ -85,8 +85,10 @@ cleanup in 0026 must be reconciled before a combined source/image queue can
 be qualified. Preserve both candidates and original evidence. Historical
 teardown audit success reproduces old defects and is not a current removal
 safety claim. [Report 291](docs/291-legacy-musb-source-integration.md) maps all
-five old branch histories. NEO-98 retains whole-kernel PM/IRQ traversal and
-allocation/sysfs concurrency limits; NEO-106 retains caller/global-accessor,
+five old branch histories. [NEO-218](docs/301-musb-wake-irq-kernel-qualification.md)
+adds the separate profile's real global IRQ traversal qualification; NEO-98
+retains full device-DPM traversal, allocation/sysfs concurrency and terminal
+wake-debt/composition limits. NEO-106 retains caller/global-accessor,
 other backend/DMA and inaccessible-hardware software work. These are separate
 from the new-image/card installation and matching-board wake/unbind/rebind
 qualification that need physical access and fresh clock admission.

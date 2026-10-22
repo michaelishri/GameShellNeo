@@ -93,9 +93,31 @@ class WakeControl(unittest.TestCase):
         self.report = dict(name='KUnit Test Group', arch='um', misc=counts, test_cases=[],
             sub_groups=[dict(name='musb-wake', arch='um', misc=counts, sub_groups=[], test_cases=[
                 dict(name=name, status='FAIL' if name in CONTROL_FAILURES else 'PASS') for name in CASES])])
-        self.log = 'musb-wake\n' + '\n'.join(CASES) + '\nbefore.armed\nafter.references'
+        self.log = 'musb-wake\n' + '\n'.join(CASES) + '''
+    # wake_unsupported_irq_test: ASSERTION FAILED at fixture.c:1
+        musb_suspend(f->device) == -6
+    not ok 2 wake_unsupported_irq_test
+    # wake_policy_disabled_test: EXPECTATION FAILED at fixture.c:2
+        before.armed == 1
+        after.references == 1
+    not ok 5 wake_policy_disabled_test
+    # wake_peer_first_test: EXPECTATION FAILED at fixture.c:3
+        state.references == 2
+    not ok 7 wake_peer_first_test
+    # wake_peer_last_test: EXPECTATION FAILED at fixture.c:4
+        state.references == 2
+    not ok 8 wake_peer_last_test
+    # wake_disarm_error_test: EXPECTATION FAILED at fixture.c:5
+        wake_snapshot(f).references == 1
+        f->arms == 3
+    Expected f->musb.irq_wake to be false, but is true
+    not ok 10 wake_disarm_error_test
+'''
 
     def test_executed_expected_control_is_distinct_from_success(self):
+        self.assertEqual(set(CONTROL_FAILURES), {
+            'wake_unsupported_irq_test', 'wake_policy_disabled_test', 'wake_peer_first_test',
+            'wake_peer_last_test', 'wake_disarm_error_test'})
         self.assertEqual(len(checked_control(self.report, self.log)), len(CASES))
         with self.assertRaises(ValueError):
             checked_cases(self.report, self.log)
@@ -124,6 +146,8 @@ class WakeControl(unittest.TestCase):
 
     def test_control_requires_actual_irq_assertions_without_kernel_faults(self):
         for text in (self.log.replace('before.armed', ''), self.log.replace('after.references', ''),
+                     self.log.replace('f->arms == 3', 'f->arms == 2'),
+                     self.log.replace('# wake_disarm_error_test:', '# wake_arm_error_test:'),
                      self.log + 'WARNING:', self.log + 'BUG:', self.log + 'Kernel panic'):
             with self.subTest(log=text[-50:]), self.assertRaises(ValueError):
                 checked_control(self.report, text)

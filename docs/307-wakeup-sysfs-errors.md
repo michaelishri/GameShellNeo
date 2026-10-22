@@ -5,10 +5,14 @@ from published main `02c633a` in `work/wakeup-sysfs-errors`. Candidate 0071 chan
 only the frontend's observable errno/idempotency contract. It is not registered
 in `kernel_candidates.py` or selected for an image.
 
-This source checkpoint adopts accepted published `0886549`. It is prepared for
-pre-integration source/evidence review; qualification against the later accepted
-combined base and final whole-ticket review/publication remain queued after
-NEO-220. No current-main acceptance or hardware result is inferred here.
+The original source checkpoint adopts accepted published `0886549` and is
+retained at `bcb3cf1`. A separate final-admission checkout preserves that history
+and adopts exact NEO-226 context `08aa1993c789678268c0d299860b1285aab6458f`.
+NEO-220 `a2688ac` is now accepted and published; the included NEO-222/226 tips
+remain provisional and unpublished. The current combined host check passes.
+Fresh final review may inspect this fixed context, but whole-ticket acceptance,
+publication and closure require the identical dependencies to be accepted and
+published. No hardware result is inferred here.
 
 ## Source contract
 
@@ -232,9 +236,73 @@ is `.local/build/neo223-preintegration-host-check.log` (SHA-256
 `15312b2e07ef87e80db37496e8d79a06eff349f9b00acc731caca8a30ec537f4`);
 its saved receipt records the same clean head before and after. Subsequent
 review preparation changes only this report; qualified code and all admitted
-kernel/native/object inputs remain unchanged. This prepares source
-pre-integration review only. Final adopted-base qualification and an entirely
-fresh whole-ticket pair remain queued after NEO-220.
+kernel/native/object inputs remain unchanged. This remains the original-base
+source/pre-integration execution; it is not relabeled as a later current-context
+run.
+
+## Provisional combined context and evidence equivalence
+
+The separate `wakeup-sysfs-final-admission` checkout first preserves both
+original `bcb3cf1` and provisional upstream `8f56a29` histories at `178f2ef`.
+It then merges exact `08aa1993c789678268c0d299860b1285aab6458f` at clean
+`e045f87c5b1a87002a608742cfdc6ce0aff40248`. That second adoption changes only
+FOLLOW-UP and reports 306/310; all other 937 tracked files retain exact bytes.
+The thirteen exclusive candidate, fixture, configuration, extraction, runner,
+oracle and regression files remain identical to `bcb3cf1`. The adoption proof
+is `.local/audit/neo223-final-upstream-adoption.json`, SHA-256
+`6395150fce63807b6f97fb8cd9b9e68b67fd2e6826474ceb5df29d4486feb72d`.
+
+The independent actual-source closure audit reconstructs the selected production
+33 patches plus explicit 0071, all five extracted frontend variants and both
+generated kernel test patches/full manifests. They match the actual original
+native/ARM/object and positive/control source. The fifteen local Python import
+inputs match except the explicitly mapped whole registry-file change: two
+additive, unselected profiles coexist with unchanged existing profiles/functions.
+This sysfs route reads the production queue directly and does not select those
+profiles. Both own Task bodies and the global Task prefix remain exact; the
+whole Task file differs because of sibling tasks. Thus the historical thirteen
+native and sixteen kernel maintained-input receipts are not called current
+whole-file receipts, and their strict admission guards are not relaxed. The
+closure proof is `.local/audit/neo223-provisional-closure.json`, SHA-256
+`e46116b82ce47c5a9c9ac47072fc81740f1cd8b592b280c3698b07c5b3f275c1`.
+
+All four complete original source inventories are independently rehashed once:
+97,302 files each for the rejected original positive, repaired positive and
+control, and 97,300 for the native/ARM/object tree. A separate artifact audit
+verifies fifteen original native/sanitizer/ARM binaries, all three ARM objects,
+original managed outcomes/released ownership and genuine kernel binaries,
+configurations and logs. It applies the unchanged current pure validators to
+the original observations without manufacturing current execution receipts.
+The first private observer failed after the four inventories because it assumed
+that a retained receipt's sibling directory contained its original binary. The
+next observer corrected the pinned path but incorrectly expected a 32-bit UML
+binary. Both failures are retained separately. The final read-only correction
+uses the receipt/manifest's actual original ELF64 x86-64 UML paths and verifies
+their exact hashes, configurations and job provenance. No replacement artifact,
+inventory rescan, build or test execution is used to repair these observers.
+Its receipt is `.local/audit/neo223-provisional-original-artifacts-corrected.json`,
+SHA-256 `25917dacc384b23db07cf8e45b55b78471d7129039a57b488e7a44dcec32b68d`.
+The original ptrace/LeakSanitizer attempt, lockdep rejection and old-oracle
+rejection remain inconclusive or rejected at their actual historical sources.
+
+One current `task check` runs at clean `e045f87`, original session **40919**,
+Task PID **1283013** and supervisor **1283009**, and exits zero. It passes
+**24 runtime and 1,428 tooling tests**, nine existing opt-in skips, both compiled
+C guards, Bash syntax and ShellCheck. All 940 tracked input hashes match before
+and after. The original log is `.local/build/neo223-final-host-check.log`,
+SHA-256 `9b994da8a2e0ec2ad8340e449496819f6a3789badb7468cc75f75dd14bdf7684`;
+receipt `.local/audit/neo223-final-host.json`, SHA-256
+`896537e7846efadd9b0488e3de3e2ad5d3eb63f48a408789f2ae577c2f222d26`.
+Only this report and the own FOLLOW-UP result wording change afterward. No
+native, ARM or kernel execution is repeated for proven unchanged executable
+closure, and all genuine original execution provenance remains explicit.
+
+An entirely fresh final Standards/Spec pair must inspect this complete fixed
+source, contract and evidence. Whole-ticket acceptance, integration, publication
+and closure additionally require identical upstream NEO-222/226 acceptance and
+publication plus a separate serialized grant. A changed dependency invalidates
+the fixed context until remapped and requalified as required. No main, device,
+image or physical acceptance is provided by this preparation.
 
 MUSB IRQ timing/device-DPM traversal, terminal destruction/composition, image
 selection and physical hardware behavior remain separate. NEO-98 stays open.

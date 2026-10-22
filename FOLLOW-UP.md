@@ -115,8 +115,11 @@ five old branch histories. [NEO-218](docs/301-musb-wake-irq-kernel-qualification
 adds the separate profile's real global IRQ traversal qualification.
 [NEO-223](docs/307-wakeup-sysfs-errors.md) adds an isolated frontend errno and
 idempotency candidate with bounded stable-capability allocation/kernfs/SRCU
-lifetime qualification. Its current checkpoint is pre-integration. NEO-98
-retains full device-DPM traversal, other allocation/sysfs concurrency, manual
+lifetime qualification. Its isolated final context retains the original source
+and actual execution provenance; one current combined host check passes 24
+runtime/1,428 tooling tests, nine skipped, C guards and shell lint. Fresh final
+reviews and identical upstream acceptance/publication remain required. NEO-98
+retains broader device-DPM coverage, other allocation/sysfs concurrency, manual
 capability/driver-unbind and terminal wake-debt/composition limits. NEO-106 retains caller/global-accessor,
 other backend/DMA and inaccessible-hardware software work. These are separate
 from the new-image/card installation and matching-board wake/unbind/rebind

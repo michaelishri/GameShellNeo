@@ -13,6 +13,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import struct
 import subprocess
@@ -250,6 +251,41 @@ def _block_size(part):
         os.close(descriptor)
 
 
+def writer_handles(devices, *, process_root=Path('/proc')):
+    """Reject observable raw writers even when they ignore advisory locks.
+
+    A nonexclusive writable block descriptor can predate our O_EXCL claim.
+    Match its actual device number, including aliases, rather than its name.
+    Exiting processes/descriptors are harmless; unreadable or malformed live
+    records remain an admission failure. Only this worker's own claims are
+    excluded. Filesystem utilities have exited at every caller boundary.
+    """
+    for process in process_root.iterdir():
+        if not process.name.isdecimal() or int(process.name) == os.getpid():
+            continue
+        try:
+            entries = list((process / 'fd').iterdir())
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        for entry in entries:
+            try:
+                info = entry.stat()
+                if not stat.S_ISBLK(info.st_mode) or device_number(info.st_rdev) not in devices:
+                    continue
+                fields = [line.split(maxsplit=1)[1:] for line in
+                          (process / 'fdinfo' / entry.name).read_text().splitlines()
+                          if line.startswith('flags:')]
+                require(len(fields) == 1 and len(fields[0]) == 1 and
+                        re.fullmatch('[0-7]+', fields[0][0]) is not None,
+                        'Cannot verify access mode of an existing raw card descriptor')
+                flags = int(fields[0][0], 8)
+                require(flags & os.O_ACCMODE == os.O_RDONLY,
+                        'A process has the card or one of its partitions open for raw writing' +
+                        ' (PID ' + process.name + ', FD ' + entry.name + ')')
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+
+
 def assert_unmounted(admitted):
     parts = admitted['partitions']
     blocked = {parts[name]['device'] for name in ('boot', 'store')} | {admitted['parent']['device']}
@@ -263,6 +299,7 @@ def assert_unmounted(admitted):
         info = path.stat()
         number = device_number(info.st_rdev if stat.S_ISBLK(info.st_mode) else info.st_dev)
         require(number not in blocked, 'Boot or store is in use as swap')
+    writer_handles({admitted['parent']['device'], *(part['device'] for part in parts.values())})
 
 
 def assert_geometry(admitted, *, grown=False):

@@ -286,6 +286,38 @@ def other_namespace_mount(node, point, log):
         require(process.returncode == 0, 'Fixture race mount did not cleanly unmount')
 
 
+@contextlib.contextmanager
+def ordinary_raw_writer(node, log):
+    """Hold a normal writable descriptor; never write to the disposable loop."""
+    require(str(node).startswith('/dev/loop'), 'Raw-writer fixture accepts only its new loop')
+    code = '''import fcntl,json,os,sys
+descriptor = os.open(sys.argv[1], os.O_RDWR | os.O_NOFOLLOW)
+print(json.dumps(dict(pid=os.getpid(), descriptor=descriptor, node=sys.argv[1],
+                      flags=fcntl.fcntl(descriptor, fcntl.F_GETFL))), flush=True)
+try:
+    sys.stdin.buffer.read(1)
+finally:
+    os.close(descriptor)
+'''
+    process = subprocess.Popen([sys.executable, '-c', code, str(node)], stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE, stderr=log)
+    try:
+        require(select.select([process.stdout], [], [], 10)[0], 'Raw-writer child did not become ready')
+        identity = json.loads(process.stdout.readline())
+        require(identity['pid'] == process.pid and identity['node'] == str(node) and
+                identity['flags'] & os.O_ACCMODE == os.O_RDWR,
+                'Fixture child did not hold the intended ordinary writable descriptor')
+        yield identity
+    finally:
+        try:
+            process.communicate(input=b'!', timeout=15)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            raise
+        require(process.returncode == 0, 'Raw-writer fixture child did not close and exit cleanly')
+
+
 def fixture_case(work, grow, *, race=False):
     from dev_card import attached
     from dev_systems import Card
@@ -342,6 +374,7 @@ def fixture_case(work, grow, *, race=False):
             (work / 'backup-receipt.json').write_text(json.dumps(backup, indent=2, sort_keys=True) + '\n')
             operation = FixtureOperation(work / 'operation')
             attempts = []
+            raw_writer_rejections = []
             original_command = grow.command
             @contextlib.contextmanager
             def command_observer():
@@ -360,6 +393,36 @@ def fixture_case(work, grow, *, race=False):
                     grow.command = original_command
             with mounted(grow, node + 'p2', work / 'recovery', log, readonly=True):
                 if not race:
+                    for kind, raw_node in (('store', node + 'p3'), ('parent', node)):
+                        rejected = FixtureOperation(work / ('raw-' + kind + '-rejected-operation'))
+                        try:
+                            with ordinary_raw_writer(raw_node, log) as identity:
+                                command_count = len(attempts)
+                                with command_observer():
+                                    try:
+                                        grow.execute_growth(admitted, backup, rejected)
+                                    except ValueError as error:
+                                        failure_message = str(error)
+                                        require(str(identity['pid']) in failure_message and 'writ' in failure_message.lower(),
+                                                'Raw-writer fixture rejected for an unrelated reason: ' + failure_message)
+                                        rejected.update('fixture-expected-raw-writer-rejection',
+                                                        writer=identity, error=failure_message)
+                                    else:
+                                        raise ValueError('Existing ordinary raw writer was admitted for growth')
+                                require(not rejected.record.get('write_started') and
+                                        not rejected.record.get('completed') and len(attempts) == command_count,
+                                        'Raw-writer rejection ran a utility or started a write')
+                                require(grow.read_mbr(node) == before_mbr, 'Raw-writer rejection changed the MBR')
+                                require(range_hash(image, regions['store']['offset_bytes'], regions['store']['raw_bytes']) ==
+                                        regions['store']['raw_sha256'], 'Raw-writer rejection changed p3')
+                                raw_writer_rejections.append(dict(kind=kind, writer=identity, before_write=True,
+                                    commands_executed=0, mbr_and_store_unchanged=True, error=failure_message))
+                            require(not Path('/proc', str(identity['pid'])).exists(),
+                                    'Fixture raw-writer child remains alive after descriptor handoff')
+                        finally:
+                            rejected.close()
+                    (work / 'raw-writer-rejections.json').write_text(json.dumps(raw_writer_rejections,
+                        indent=2, sort_keys=True) + '\n')
                     primary, alias = work / 'primary-store-mount', work / 'store-bind-alias'
                     primary.mkdir()
                     alias.mkdir()
@@ -453,6 +516,7 @@ def fixture_case(work, grow, *, race=False):
                 metadata_entries=len(metadata_before['entries']),
                 metadata_and_content_preserved=True, two_releases_verified=True,
                 mounted_bind_alias_rejected_before_write=True,
+                ordinary_raw_writers_rejected=raw_writer_rejections,
                 security_capability_preserved=True, posix_acl_preserved=True,
                 bounded_write_read_delete_bytes=256 * 1024)
     finally:

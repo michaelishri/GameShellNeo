@@ -437,6 +437,116 @@ class BusyDevices(unittest.TestCase):
                     grow.assert_unmounted(self.admitted)
 
 
+class RawBlockWriters(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.devices = {'179:' + str(number) for number in range(4)}
+        self.descriptors = {}
+        self.actual_stat = Path.stat
+
+    def handle(self, number, flags, *, pid=None, mode=stat.S_IFBLK):
+        process = self.root / str(os.getpid() + 100000 if pid is None else pid)
+        (process / 'fd').mkdir(parents=True, exist_ok=True)
+        (process / 'fdinfo').mkdir(exist_ok=True)
+        entry = process / 'fd' / str(len(self.descriptors) + 3)
+        # The visible name is an alias; only st_rdev identifies the card.
+        entry.symlink_to('/dev/disk/by-id/development-card-alias')
+        self.descriptors[entry] = types.SimpleNamespace(st_mode=mode, st_rdev=number)
+        (process / 'fdinfo' / entry.name).write_text('pos:\t0\nflags:\t' + flags + '\n')
+        return entry
+
+    def scan(self):
+        def descriptor_stat(path, *args, **kwargs):
+            return self.descriptors[path] if path in self.descriptors else self.actual_stat(path, *args, **kwargs)
+        with patch.object(Path, 'stat', descriptor_stat):
+            grow.writer_handles(self.devices, process_root=self.root)
+
+    def test_nonexclusive_writable_parent_and_all_partition_aliases_reject(self):
+        for number in range(4):
+            for access in (os.O_WRONLY, os.O_RDWR):
+                with self.subTest(device=number, access=access):
+                    entry = self.handle(os.makedev(179, number), oct(os.O_CLOEXEC | access)[2:])
+                    with self.assertRaisesRegex(ValueError, 'raw writing.*PID.*FD'):
+                        self.scan()
+                    self.descriptors.pop(entry)
+                    entry.unlink()
+
+    def test_readonly_aliases_other_devices_regular_files_and_only_own_claims_are_allowed(self):
+        for number in range(4):
+            self.handle(os.makedev(179, number), oct(os.O_CLOEXEC | os.O_RDONLY)[2:])
+        self.handle(os.makedev(8, 0), '2')
+        self.handle(os.makedev(179, 3), '2', mode=stat.S_IFREG)
+        self.handle(os.makedev(179, 3), '2', pid=os.getpid())
+        (self.root / 'self').mkdir()
+        self.scan()
+
+    def test_missing_or_malformed_live_fdinfo_fails_closed(self):
+        for flags in ('', 'not-octal', '8', '0\nflags:\t0'):
+            entry = self.handle(os.makedev(179, 3), flags)
+            with self.subTest(flags=flags), self.assertRaisesRegex(ValueError, 'Cannot verify access mode'):
+                self.scan()
+            self.descriptors.pop(entry)
+            entry.unlink()
+        entry = self.handle(os.makedev(179, 3), '2')
+        original_read = Path.read_text
+        def unreadable(path, *args, **kwargs):
+            if path == entry.parent.parent / 'fdinfo' / entry.name:
+                raise PermissionError('live fdinfo denied')
+            return original_read(path, *args, **kwargs)
+        with patch.object(Path, 'read_text', unreadable), self.assertRaisesRegex(PermissionError, 'denied'):
+            self.scan()
+
+    def test_process_descriptor_or_fdinfo_disappearance_does_not_admit_another_live_writer(self):
+        for stage in ('process', 'descriptor', 'fdinfo'):
+            with self.subTest(stage=stage):
+                vanished = self.handle(os.makedev(179, 3), '2')
+                live = self.handle(os.makedev(179, 0), '2', pid=os.getpid() + 100001)
+                original_iterdir, original_read = Path.iterdir, Path.read_text
+                def entries(path):
+                    if stage == 'process' and path == vanished.parent:
+                        raise ProcessLookupError('process exited')
+                    return original_iterdir(path)
+                def descriptor_stat(path, *args, **kwargs):
+                    if stage == 'descriptor' and path == vanished:
+                        raise FileNotFoundError('descriptor closed')
+                    return self.descriptors[path] if path in self.descriptors else self.actual_stat(path, *args, **kwargs)
+                def info(path, *args, **kwargs):
+                    if stage == 'fdinfo' and path == vanished.parent.parent / 'fdinfo' / vanished.name:
+                        raise FileNotFoundError('descriptor closed before fdinfo read')
+                    return original_read(path, *args, **kwargs)
+                with patch.object(Path, 'iterdir', entries), patch.object(Path, 'stat', descriptor_stat), \
+                        patch.object(Path, 'read_text', info), \
+                        self.assertRaisesRegex(ValueError, 'PID ' + live.parent.parent.name + ', FD ' + live.name):
+                    grow.writer_handles(self.devices, process_root=self.root)
+                for entry in (vanished, live):
+                    self.descriptors.pop(entry)
+                    entry.unlink()
+
+    def test_unreadable_live_process_fd_directory_fails_closed(self):
+        entry = self.handle(os.makedev(179, 3), '2')
+        original = Path.iterdir
+        def denied(path):
+            if path == entry.parent:
+                raise PermissionError('live descriptor directory denied')
+            return original(path)
+        with patch.object(Path, 'iterdir', denied), self.assertRaisesRegex(PermissionError, 'denied'):
+            grow.writer_handles(self.devices, process_root=self.root)
+
+    def test_unmounted_boundaries_scan_parent_and_recovery_as_well_as_boot_and_store(self):
+        admitted = dict(parent={'device': '179:0'}, partitions={name: {'device': '179:' + str(number)}
+            for number, name in enumerate(('boot', 'recovery', 'store'), 1)})
+        original_read = Path.read_text
+        def swaps(path, *args, **kwargs):
+            if str(path) == '/proc/swaps':
+                return 'Filename Type Size Used Priority\n'
+            return original_read(path, *args, **kwargs)
+        with patch.object(grow, 'mounts', return_value=[]), patch.object(Path, 'is_dir', return_value=True), \
+                patch.object(Path, 'iterdir', side_effect=lambda: iter([])), \
+                patch.object(Path, 'read_text', swaps), patch.object(grow, 'writer_handles') as scan:
+            grow.assert_unmounted(admitted)
+        scan.assert_called_once_with(self.devices)
+
+
 class GrowthFailureBoundaries(unittest.TestCase):
     def fixture(self):
         backup = checkpoint()

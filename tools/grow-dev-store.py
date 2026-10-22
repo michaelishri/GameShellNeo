@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import sys
 import uuid
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 LIMIT = 16 * 1024 * 1024
@@ -41,7 +42,7 @@ print(json.dumps({'boot_id':Path('/proc/sys/kernel/random/boot_id').read_text().
 
 SUBMIT = r'''import base64,hashlib,json,os,stat,subprocess,sys
 from pathlib import Path
-v=json.loads(sys.argv[1]);receipt=v['backup'];here=Path(v['remote_directory'])
+v=PAYLOAD;receipt=v['backup'];here=Path(v['remote_directory'])
 if os.geteuid()!=0:raise ValueError('Root staging is required')
 if Path('/proc/sys/kernel/random/boot_id').read_text().strip()!=receipt['root']['boot_id']:raise ValueError('Recovery boot changed before submission')
 root_info=Path('/').stat()
@@ -111,6 +112,16 @@ def save_new(path, value):
         stream.write('\n')
         stream.flush()
         os.fsync(stream.fileno())
+
+
+def submission_source(payload):
+    """Keep worker sources and the backup receipt off argv and sudo's audit log."""
+    packed = base64.b64encode(zlib.compress(json.dumps(payload).encode())).decode('ascii')
+    source = ('import base64,json,zlib\nPAYLOAD_B64=' + repr(packed) +
+              '\nPAYLOAD=json.loads(zlib.decompress(base64.b64decode(PAYLOAD_B64)))\n' + SUBMIT)
+    require(len(source.encode()) <= 1024 * 1024,
+            'Submission exceeds the established SSH stdin helper bound')
+    return source
 
 
 def load_worker():
@@ -236,9 +247,14 @@ def main():
     save_new(directory / 'read-only-plan.json', admission)
     print('Original growth operation:', directory, flush=True)
     payload = dict(submission, backup=backup, sources=sources)
+    source = submission_source(payload)
+    with (directory / 'submission-source.py').open('x') as output:
+        output.write(source)
+        output.flush()
+        os.fsync(output.fileno())
     try:
         with remote.device(config, 'usb') as client, (directory / 'submission-output.json').open('xb') as output:
-            remote.run(client, **remote.python_command(SUBMIT, json.dumps(payload)),
+            remote.run(client, **remote.python_command(source),
                        output=output, display=False, timeout=120)
     except BaseException as error:
         save_new(directory / 'submission-uncertain.json',

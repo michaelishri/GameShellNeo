@@ -1,13 +1,17 @@
 """A stale, unexecuted, running or failed unit must never qualify disk writes."""
 import contextlib
+import ast
+import base64
 from copy import deepcopy
 import importlib.util
 import io
 import json
 from pathlib import Path
+import random
 import tempfile
 from types import SimpleNamespace
 import unittest
+import zlib
 
 SPEC = importlib.util.spec_from_file_location('grow_host_observation',
     Path(__file__).resolve().parents[1] / 'grow-dev-store.py')
@@ -98,6 +102,30 @@ class GrowthObservation(unittest.TestCase):
             (path / 'alias').symlink_to(path / 'real')
             with self.assertRaises(ValueError):
                 HOST.read_json(path / 'alias')
+
+
+class GrowthSubmission(unittest.TestCase):
+    def test_large_receipt_and_sources_are_literal_stdin_data(self):
+        # This realistic receipt exceeds Linux's per-argument bound even before
+        # its staged sources are included. No remote program is executed here.
+        payload = {'backup': {'store_files': {
+            'systems/diag27/root/etc/setting-' + str(index): 'a' * 64
+            for index in range(2500)}},
+            'sources': {'worker.py': {'base64': 'b' * 120000}},
+            'literal': "quotes' and $(commands) `stay data`\n"}
+        self.assertGreater(len(json.dumps(payload).encode()), 131072)
+        source = HOST.submission_source(payload)
+        program = ast.parse(source)
+        packed = ast.literal_eval(program.body[1].value)
+        self.assertEqual(json.loads(zlib.decompress(base64.b64decode(packed))), payload)
+        self.assertEqual(program.body[1].targets[0].id, 'PAYLOAD_B64')
+        self.assertIn('v=PAYLOAD;', source)
+        self.assertNotIn('v=json.loads(sys.argv[1])', source)
+        self.assertLess(len(source.encode()), 1024 * 1024)
+
+    def test_transport_bound_is_checked_before_submission(self):
+        with self.assertRaisesRegex(ValueError, 'SSH stdin helper bound'):
+            HOST.submission_source({'oversized': random.Random(1).randbytes(2 * 1024 * 1024).hex()})
 
 
 if __name__ == '__main__':

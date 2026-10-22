@@ -161,6 +161,25 @@ that permits the existing local socket fixtures.
 Physical expansion has not yet occurred. Independent reviews and final hardware
 receipts must be recorded here after authoritative completion.
 
+Independent reviews of candidate `fdb7a71` found two concrete issues before
+hardware work. The Standards review identified a large source/receipt payload
+passed as one SSH argument, exceeding Linux's per-string limit for normal
+settings receipts and exposing source in command auditing. Submission now
+passes compressed literal JSON through the established bounded stdin source
+interface; large-payload roundtrip and transport-bound rejection tests pass.
+The Spec review identified ordinary writable raw device handles not covered by
+mount claims or advisory locks. Admission now scans process descriptors for
+the actual parent/partition device numbers, rejects writable aliases and fails
+closed on unreadable or malformed descriptor flags.
+
+Follow-up native run `dee61a5209f844838f35bb32a55d7ee4` passed on worker SHA-256
+`48d3281fe7f2217c178f36ff4ea2c4a35a3cb518152932520810dfc2a8172332`.
+Independent children holding ordinary writable p3 and parent descriptors were
+identified and rejected before any utility or write; both children exited
+before the real disposable growth. All earlier preservation/race/full-capacity
+cases still pass. The focused worker suite now has 42 passing tests, alongside
+16 checkpoint/transport and eight host-observation/submission tests.
+
 After successful expansion, separately mount the filesystems, select diag27
 normally and use the established long speaker warning before reboot. Verify
 the actual directory root, exact capability value, both routes, inspected Kiyo

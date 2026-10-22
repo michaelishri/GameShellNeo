@@ -18,6 +18,7 @@ import sys
 import uuid
 
 import paramiko
+from awake_result import admit_capture, save_context
 from private_config import load_env
 from host_timing import phase, ssh_state, observe_forward, forward_state
 import socket_observation
@@ -315,6 +316,7 @@ def device_action(config, action, route):
             remote_dir = stage_helpers(client, 'idle')
             warning_owner = uuid.uuid4().hex
             (directory / 'warning.json').write_text(json.dumps(dict(owner=warning_owner, helper=remote_dir)) + '\n')
+            save_context(directory, 'idle', seconds, remote_dir)
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-idle-sample',
                          '--property=RuntimeMaxSec=' + str(seconds + 120),
@@ -326,11 +328,13 @@ def device_action(config, action, route):
                          '--backlight', backlight]
             with (directory / 'idle-sample.jsonl').open('wb') as output:
                 run(client, shlex.join(arguments), output=output, timeout=90)
+            admit_capture(directory / 'idle-sample.jsonl', operation='idle', seconds=seconds, setting=backlight)
         elif action == 'power-profile':
             seconds = int(os.environ.get('NEO_PROFILE_SECONDS', '120'))
             if not 30 <= seconds <= 300 or seconds % 30:
                 raise ValueError('SECONDS must be a multiple of 30 in 30..300')
             remote_dir = stage_helpers(client, 'power-profile')
+            save_context(directory, 'power-profile', seconds, remote_dir)
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe',
                          '--collect', '--unit=gameshellneo-power-profile',
                          '--description=GameShellNeo awake-power counter profile',
@@ -341,9 +345,7 @@ def device_action(config, action, route):
             print('Capturing private profile:', path, flush=True)
             with path.open('wb') as output:
                 run(client, shlex.join(arguments), output=output, display=False, timeout=seconds + 90)
-            records = [json.loads(line) for line in path.read_text().splitlines()]
-            if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
-                raise ValueError('Incomplete power profile; inspect the private capture')
+            records = admit_capture(path, operation='power-profile', seconds=seconds)
             result = records[-1]
             for key in ('interrupts', 'softirqs', 'processes'):
                 result[key] = result[key][:10]
@@ -407,17 +409,16 @@ def device_action(config, action, route):
             path = directory / 'governor-comparison.jsonl'
             print('Capturing private comparison:', path, flush=True)
             print('Device helper directory (retain on failure for recovery):', remote_dir, flush=True)
+            save_context(directory, 'governor-compare', seconds, remote_dir)
             # Do not remove helpers after a transport error: ExecStopPost may still need them.
             with path.open('wb') as output:
                 run(client, shlex.join(arguments), output=output, display=False,
                     timeout=3 * (seconds + 30) + 90)
+            records = admit_capture(path, operation='governor-compare', seconds=seconds, setting=rate)
             with client.open_sftp() as sftp:
                 for name in names:
                     sftp.remove(remote_dir + '/' + name)
                 sftp.rmdir(remote_dir)
-            records = [json.loads(line) for line in path.read_text().splitlines()]
-            if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
-                raise ValueError('Incomplete governor comparison; inspect the private capture')
             result = records[-1]
             for phase in result['phases']:
                 for key in ('interrupts', 'softirqs', 'processes'):
@@ -444,6 +445,7 @@ def device_action(config, action, route):
                 sftp.chmod(remote_dir + '/perf', 0o700)
             print('Capturing private governor profile:', directory, flush=True)
             print('Device helper directory (retained on failure):', remote_dir, flush=True)
+            save_context(directory, 'governor-profile', seconds, remote_dir)
             arguments = ['sudo', '-n', 'systemd-run', '--quiet', '--wait', '--pipe', '--collect',
                          '--unit=gameshellneo-governor-profile',
                          '--property=RuntimeMaxSec=' + str(seconds + 60),
@@ -462,9 +464,7 @@ def device_action(config, action, route):
                             sftp.get(remote_dir + '/' + name, str(directory / name))
                         except FileNotFoundError:
                             pass
-            records = [json.loads(line) for line in path.read_text().splitlines()]
-            if not records or records[-1].get('event') != 'complete' or not records[-1].get('passed'):
-                raise ValueError('Incomplete governor profile; inspect the private capture')
+            admit_capture(path, operation='governor-profile', seconds=seconds)
             with client.open_sftp() as sftp:
                 for name in (*names, *artifacts, 'perf'):
                     sftp.remove(remote_dir + '/' + name)

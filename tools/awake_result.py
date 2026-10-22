@@ -20,14 +20,18 @@ def require(condition, message):
 
 
 def duration(value, minimum):
-    require(type(value) in (int, float) and math.isfinite(value) and value >= minimum - 1,
-            'invalid or short measurement duration')
+    # Tolerate reported rounding; callers still require full requested raw coverage.
+    try:
+        valid = type(value) in (int, float) and math.isfinite(value) and value >= minimum - 1
+    except OverflowError:
+        valid = False
+    require(valid, 'invalid or short measurement duration')
     return value
 
 
 def save_context(capture, operation, seconds, stage):
     """Retain the owned stage identity before any possibly interrupted command."""
-    require(operation in PREFIXES and re.fullmatch(
+    require(type(operation) is str and operation in PREFIXES and type(stage) is str and re.fullmatch(
         r'/tmp/gameshellneo-' + re.escape(PREFIXES[operation]) + r'\.[A-Za-z0-9]+', stage),
         'unexpected owned helper directory')
     record = dict(schema=1, operation=operation, requested_seconds=seconds,
@@ -43,7 +47,7 @@ def admit(records, *, operation, seconds, setting=None):
     The ready boot is a result-stream identity, not an independently measured
     current device boot. No source/image admission or clock-cause claim follows.
     """
-    require(operation in PREFIXES and type(seconds) is int and seconds > 0,
+    require(type(operation) is str and operation in PREFIXES and type(seconds) is int and seconds > 0,
             'unknown operation or invalid requested duration')
     require(type(records) is list and bool(records) and
             all(type(row) is dict and type(row.get('event')) is str for row in records),
@@ -67,17 +71,18 @@ def admit(records, *, operation, seconds, setting=None):
                     complete.get('backlight_mode') == setting and
                     ready.get('settle_seconds') == 60 and ready.get('interval_seconds') == 10,
                     'idle operation identity differs')
-            minimum = duration(complete['duration_seconds'], seconds) + 60
+            minimum = max(seconds, duration(complete['duration_seconds'], seconds)) + 60
         elif operation == 'power-profile':
             require(ready.get('settle_seconds') == 30 and type(ready.get('capabilities')) is dict,
                     'power-profile operation identity differs')
-            minimum = duration(complete['duration_seconds'], seconds) + 30
+            minimum = max(seconds, duration(complete['duration_seconds'], seconds)) + 30
         elif operation == 'governor-profile':
             require(ready.get('event_name') == 'cpu-clock:k' and
                     ready.get('sample_frequency_hz') == 99 and ready.get('callchains') is False,
                     'governor-profile operation identity differs')
             for key in ('pid', 'start_ticks'):
                 require(type(ready['worker'][key]) is int and ready['worker'][key] > 0 and
+                        type(complete['worker_after'][key]) is int and
                         complete['worker_after'][key] == ready['worker'][key],
                         'governor worker identity changed')
             require(complete['final']['boot_id'] == boot, 'governor profile boot changed')
@@ -88,6 +93,7 @@ def admit(records, *, operation, seconds, setting=None):
             candidate, original = ready['candidate_' + unit], ready['original_' + unit]
             require(type(setting) is int and type(candidate) is int and type(original) is int and
                     candidate == setting and 0 <= original and
+                    type(complete['restored_' + unit]) is int and
                     complete['restored_' + unit] == original,
                     'requested or restored comparison setting differs')
             phases = complete['phases']
@@ -96,24 +102,27 @@ def admit(records, *, operation, seconds, setting=None):
                     [phase['phase'] for phase in phases] == labels,
                     'comparison phases are missing or changed')
             setting_key = 'rate_limit_us' if governor else 'delay_ms'
-            require([phase[setting_key] for phase in phases] == [original, candidate, original],
+            require(all(type(phase[setting_key]) is int for phase in phases) and
+                    [phase[setting_key] for phase in phases] == [original, candidate, original],
                     'comparison setting sequence differs')
             if governor:
                 require(ready.get('settle_seconds') == 30 and ready.get('sample_interval_seconds') == 10,
                         'governor comparison operation identity differs')
-                minimum = sum(duration(phase['counters']['duration_seconds'], seconds) for phase in phases) + 90
+                minimum = sum(max(seconds, duration(phase['counters']['duration_seconds'], seconds))
+                              for phase in phases) + 90
                 for phase in phases:
                     duration(phase['battery']['duration_seconds'], seconds)
             else:
                 require(ready['initial']['health']['boot_id'] == boot and
                         complete['final']['health']['boot_id'] == boot,
                         'RSB comparison boot identity changed')
-                minimum = sum(duration(phase['residency']['seconds'], seconds) for phase in phases) + 45
+                minimum = sum(max(seconds, duration(phase['residency']['seconds'], seconds))
+                              for phase in phases) + 45
         validation = checked_proof(complete.get('awake_proof'), seconds=minimum, boot_id=boot)
     except (KeyError, TypeError, IndexError) as error:
         raise ValueError('Awake result: incomplete operation identity or raw proof') from error
     return dict(schema=1, measurement_operation=operation, boot_id=boot,
-                requested_seconds=seconds, required_coverage_seconds=minimum,
+                requested_seconds=seconds, requested_setting=setting, required_coverage_seconds=minimum,
                 awake_validation=validation, pm_admission=False, clock_reliability_qualified=False)
 
 

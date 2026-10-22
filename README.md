@@ -2656,6 +2656,13 @@ Wi-Fi disconnects, the guard becomes invalid/stale, capacity reaches 20%,
 temperature reaches 80 °C or the kernel is tainted. These stops do not request
 power-off; the existing battery guard continues independently.
 
+The standalone idle, power, governor and RSB host consumers recompute raw
+awake-clock proof before accepting a result or deleting owned helpers. They
+retain raw output and exact helper/unit context on refusal. This checks result
+consistency; current image/health admission and physical preparation remain
+required. [Report 308](docs/308-awake-result-admission.md) records the reproduced
+host gap, finite local qualification and remaining NEO-101/192 gates.
+
 The private `idle-sample.jsonl` records raw software readings, temperature,
 frequency, signal context and timing. Its final summary integrates current and
 voltage using actual sample intervals, reporting **uncalibrated estimates** of

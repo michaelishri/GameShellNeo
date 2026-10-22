@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-101/224 standalone host result admission:** ten retained local baseline
+cases reproduce acceptance of missing or disturbed raw awake proof in five
+actual host consumers, including six helper-stage deletions. The shared host
+admission now recomputes unchanged raw proof before success/deletion and saves
+exact owned helper/unit context. Fifteen methods / 130 local scripted-channel
+cases pass, including duration rounding boundaries, raw retention and original
+error/restoration behavior. No SSH, collector or device operation occurs.
+Final combined host checks and fresh independent review/publication remain
+pending. Parent NEO-101 physical/observer-cost and NEO-192/PM gates stay open.
+[Report 308](docs/308-awake-result-admission.md).
+
 **NEO-211 development-store expansion:** the remote expansion from 4 GiB to
 55.6171875 GiB completed from fixed recovery after a fresh fully verified
 off-device checkpoint, independent Standards/Spec reviews and disposable native

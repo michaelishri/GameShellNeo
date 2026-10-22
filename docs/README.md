@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[308 — Standalone host awake-result admission](308-awake-result-admission.md)
+records reproduced host proof acceptance, raw/context retention, finite local
+consumer qualification and separate physical/clock/PM gates.
+
 [305 — MMIO reference feasibility](305-clock-reference-feasibility.md)
 records the bounded offline STOP outcome, primary ordering/configuration audit,
 conditional native/ARM fixtures and unchanged underlying clock/PM gates.

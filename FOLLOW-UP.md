@@ -6,13 +6,31 @@ Record deferred questions and activities here as they arise.
 directory systems, per-version boot bundles, a one-shot selection flag and
 fixed original recovery root; [report 292](docs/292-development-sd-systems.md)
 records validation. Keep this out of the final release. The initial DEV-spare
-installation, exact vendor U-Boot trial/readback, real board root handoff,
-explicit confirmation/recovery and subsequent SSH image import need matching
-hardware qualification. FAT persistence under power loss and a complete-hang
+installation/readback, actual vendor trial consumption/readback, diagnostic.26
+directory-root handoff, both management routes and automatic return to fixed
+recovery now pass. The SSH bundle import rejected a missing capability xattr;
+NEO-209's capable maintenance bootstrap, complete import and confirmation
+remain open. Development-r3 fixes FAT flags but still has the incapable kernel;
+wait for the new bootstrap artifact before another physical flash, and
+retain the failed uppercase-flag development-r2 and reviewed SSH repair evidence.
+The legacy FAT writer needs unique lowercase flag entries on a `vfat` mount
+with `shortname=mixed`; replacing an existing uppercase entry atomically does
+not migrate its FAT name. FAT persistence under power loss and a complete-hang
 watchdog are not established. Strict clock/PM admission needs an explicit
 development-deployment provenance adapter before NEO-192 captures; do not
 relax it or relabel a directory root as its original flashed image. NEO-192
 and the dependent NEO-191/182 gates remain open.
+
+**NEO-209 ext4 security attributes:** both original diagnostic.25/26 kernels
+disable `CONFIG_EXT4_FS_SECURITY`. The real bundle import preserved its failure
+when `fping` lost `security.capability`; the actual-store probe confirms errno95
+while user xattrs work. Enable the narrow filesystem option, preserve metadata
+and original images, and prepare a newly identified capable maintenance system.
+The early import guard and native metadata regressions pass; the running old
+kernel cannot install the capable system's complete TAR itself. Keep the
+unpublished failed stage/unit and unchanged recovery flags as evidence. Initial
+capable-system installation and subsequent real import/confirmation remain
+NEO-208 gates; this does not admit clock/PM work.
 
 **NEO-207 legacy MUSB branch reconciliation:** source review and offline
 qualification are complete; wider parent gates remain. Exact wake/startup patches

@@ -15,12 +15,23 @@ its own complete root, settings, kernel modules, kernel, DTB and external
 initramfs. Private identities stay on ext4. Games, saves and settings are not
 shared between versions.
 
-The fixed FAT `boot.scr` reads `NEXT.SCR` and `GOOD.SCR`. A different NEXT is a
+The fixed FAT `boot.scr` reads `next.scr` and `good.scr`. A different NEXT is a
 one-shot trial: before executing it, the loader rewrites NEXT from GOOD and
 checks the actual readback. A successful trial must be explicitly confirmed
 from that running root. Normal confirmed boots do not rewrite the flag.
 A missing, damaged or returning descriptor enters the fixed recovery system.
 Recovery uses its own old kernel, DTB and unchanged root partition.
+
+The three flag entries (`next.scr`, `good.scr`, `recover.scr`) must have unique
+lowercase names. Mount the boot partition as `vfat` with `shortname=mixed`;
+the administration tool rejects incompatible mounts and case aliases. The
+2018 writer downcases its lookup but compares directory names case-sensitively,
+so an uppercase-only entry can produce a duplicate instead of a replacement.
+An older development card needs a verified migration or a corrected reflash.
+Migration must move each old entry to a distinct backup name before creating
+its fresh lowercase replacement; atomic replacement alone can retain the old
+uppercase directory entry. Report 292 records the original failure, actual
+writer regression fixture, reviewed migration and board qualification.
 
 A reset after an unconfirmed trial returns to the confirmed system. A complete
 hang still needs a reset or separately qualified watchdog. FAT writes are not
@@ -78,7 +89,8 @@ assuming an old hotspot/network answer is still valid.
 The image places the administration tree at `<store>/admin`. When running a
 directory system, the complete store is mounted at
 `/run/gameshellneo-store`; the boot filesystem must also be mounted read/write
-at an explicit path, such as `/mnt/devboot`. In recovery, mount the store
+as `vfat` with `shortname=mixed` at an explicit path, such as `/mnt/devboot`.
+In recovery, mount the store
 separately using its recorded PARTUUID. Check `DEVBOOT.JSON` on both mounts.
 
 These commands run **on the GameShell** as root through the established pinned
@@ -95,6 +107,13 @@ task dev:bundle -- --image <raw-image> --sha256 <raw-image-sha256> \
 It uses host loop mounts and retains the image's complete metadata.
 The GameShell kernel has loop devices disabled;
 its bundle import needs only Python, GNU tar and the mounted store.
+The running kernel/filesystem must also support every required xattr, including
+`CONFIG_EXT4_FS_SECURITY=y` for Debian file capabilities. The importer probes
+the exact required capability values before extraction. The original
+diagnostic.25/26 kernels lack this option; first bootstrap a capable maintenance
+system through offline card preparation. Older kernels can then be imported
+and tested from that capable system. Keep a capable maintenance version
+available for later full-metadata imports.
 
 ```sh
 python3 /run/gameshellneo-store/admin/tools/dev-systems.py \
@@ -120,7 +139,8 @@ remove an upload only after
 checking its successful import and retained provenance.
 
 Selection never reboots. Use the existing warned `task device:reboot` from the
-hardware-access checkout after the applicable clock/test admission permits it.
+hardware-access checkout for an authorized selector test. Clock/PM captures
+still need their separate deployment and clock admission.
 After observing the correct boot and checking display, inputs and both required
 management routes, `confirm diag27` sets the default. It verifies the running
 root inode, early-userspace marker and exact kernel. `recovery` queues the fixed

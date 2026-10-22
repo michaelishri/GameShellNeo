@@ -4,8 +4,22 @@
 development card, selectable for the next boot, and accepts the initial
 reflash. This is for development only; the final release will not include it.
 The [commands and operational contract](../development/multiboot/README.md)
-describe the opt-in tooling. No device/card write or reboot is part of the
-offline preparation recorded here.
+describe the opt-in tooling. The initial preparation below was offline;
+installation and subsequent board observations are recorded separately.
+
+**Current status:** the physical DEV-card flash is complete. Original r2's
+first trial safely entered recovery after the vendor FAT writer created a
+duplicate uppercase flag. The `ef1fca6` application fix was deployed over SSH;
+diag26's directory boot, actual trial consumption/readback, both SSH routes and
+return to fixed recovery on the next boot without confirmation have passed.
+The remote bundle import rejected a missing filesystem capability attribute;
+NEO-209 is preparing a capable maintenance system and an early destination
+check. Import/select/confirmation acceptance remains open. The clock/PM
+deployment adapter and matching awake qualification
+remain separate, and NEO-192 is unresolved. The corrected r3 image and transfer
+are offline-verified FAT-fix artifacts, but still contain the incapable original
+kernel; wait for the capable maintenance artifact before another flash. Board observations below
+belong to the repaired physical r2 installation.
 
 ## Layout and boot contract
 
@@ -19,7 +33,7 @@ every byte of the recovery root. Source images are mounted read-only.
 | Region | Development use |
 | --- | --- |
 | Reserved first 16 MiB | Existing R16 SPL/U-Boot at 8192 bytes; no environment update |
-| p1, sectors 32768–294911 | Shared fixed dispatcher, 8.3 selection descriptors, versioned kernel/DTB/initramfs bundles |
+| p1, sectors 32768–294911 | Shared fixed dispatcher, lowercase selection descriptors, versioned kernel/DTB/initramfs bundles |
 | p2, sectors 294912–8388607 | Original fixed recovery system with its own kernel and DTB |
 | p3, sector 8388608 onward | Complete `systems/<id>/{root,boot,release.json}` and administration tools |
 
@@ -31,7 +45,9 @@ execute that vendor binary. Its upstream v2018.01-rc1 reference source is
 `9da7fb4a39149c3061cb148bfbaa76b4b52b9008`, not an assertion that the vendor
 fork is byte-for-byte upstream.
 
-`NEXT.SCR` different from `GOOD.SCR` is a trial. The dispatcher validates bounded
+In the corrected layout, `next.scr` different from `good.scr` is a trial;
+`recover.scr` holds fixed recovery. Original r2 used uppercase entries, whose
+replacement defect is recorded below. The dispatcher validates bounded
 legacy ARM script images and CRCs, retains NEXT in RAM, writes GOOD back to NEXT,
 reads it back and compares exact length/bytes before sourcing the trial.
 Unchanged confirmed descriptors incur no write. A returning or invalid path
@@ -153,7 +169,9 @@ byte-identical. The store is `b9dab681-03`, recovery `b9dab681-02` with kernel
 `c88d158d446b6ed14617b815ec17bfd2b3e90fee858ddd30e008ed74640aeb77`
 (recovery diagnostic.25) and
 `a4ba84485e9de96d9b92ce0eb6f5ce1958163188c02a315d7f46d1da161c9df8`
-(selected diagnostic.26). The generated image remains hardware-unqualified.
+(selected diagnostic.26). At this offline checkpoint the generated image was
+hardware-unqualified; its first board trial subsequently failed as recorded
+below.
 
 The complete `task check` passed: 24 runtime and 1150 tooling tests, five
 explicit skips, both compiled selector/mount-guard checks and shell lint.
@@ -190,13 +208,13 @@ Production transfer directories and recovery checkpoints were not selected.
 The consolidated private evidence is `.local/multiboot/qualification.json`, SHA
 `3d397f58f3a4e984aa310a5170c16eadbe8d7428586c97146828e74d1cb4af39`.
 It pins code checkpoint `0d1fd621e48e674f455964daa80e90e119d9f148`, receipts,
-logs, both review axes and the remaining qualification limits. The stage
-ledger is clear; all owned build sessions completed. Canonical main remains
-`a41a0aa` with its original four owner-modified/untracked paths, and the
-protected legacy request-resume audit still hashes to
+logs, both review axes and the remaining qualification limits. At that offline
+checkpoint the stage ledger was clear and all owned build sessions had completed.
+Canonical main was `a41a0aa` with its original four owner-modified/untracked
+paths, and the protected legacy request-resume audit hashed to
 `2e8ed588faa129e9f07edc68d9137e8af684774353ed34233bb9b3932c35310a`.
-This feature branch remains open for the physical acceptance below; its saved
-worktree, failed first image and original logs are retained.
+At that checkpoint the feature branch remained open for physical acceptance;
+its saved worktree, failed first image and original logs are retained.
 
 ## Standards review
 
@@ -208,6 +226,12 @@ SPL admission and recovery manifest/fstab correlation findings are resolved.
 The review distinguishes shell-model/native evidence from the vendor/board
 checks still outstanding.
 
+A second independent Standards review of `a41a0aa...ef1fca6` found zero
+documented violations and zero actionable smells. Its documentation notes
+(lowercase flags, mixed FAT mount and completed installation) are reflected
+here and in the operational handoff. The later capability-guard delta received
+another independent review with zero actionable findings.
+
 ## Spec review
 
 Independent review of the same fixed diff found zero missing requirements,
@@ -217,6 +241,11 @@ preserved recovery, consume/readback, explicit confirmation, loop-free import
 and guarded flash selection. Production inputs stay separate, and development
 roots cannot reuse PM admission. Physical/vendor/board qualification remains
 open. Findings: Standards 0; Spec 0.
+
+The independent Spec review of `a41a0aa...ef1fca6` also found zero source
+findings, while retaining import/select/confirm and clock/PM qualification as
+open gates. The subsequent real import exposed the target-kernel prerequisite
+below; the earlier host review is not evidence that this hardware gate passed.
 
 ## Installation preparation, 22 October
 
@@ -271,18 +300,221 @@ matching the prepared image; the bounded guard was 2168 seconds. Evidence is
 Private `.local/multiboot/installation/flash-qualified.json`, SHA
 `f98be57edeb0ef672a15987094388d4174f296486aa9ec4c0a6a042e2e8477fe`, links the
 identity/admission records, original setup failure, flash log and result.
-This establishes the written image and ejection, not a board boot or clock/PM
-qualification. The owner must return the card and power on the GameShell.
+This established the written image and ejection. Board boot and clock/PM
+qualification were still pending at that checkpoint; the subsequent card
+return and board results follow.
+
+## Original r2 first boot and FAT replacement defect
+
+The first board boot was `7cc3ad19-876c-4042-92ef-f86cc66c5559`, running fixed
+recovery kernel `6.18.54-gameshellneo24` rather than the requested diag26.
+Trial readback rejected the failed flag replacement and entered recovery.
+Ordinary startup fsck found duplicate `NEXT.SCR` entries: the original 2653-byte
+trial and a new 2266-byte recovery descriptor. It renamed the second entry
+`FSCK0000.000`. This is a failed original trial, not a passing diag26 boot.
+
+The original journal, script hashes and complete 128 MiB FAT snapshot remain
+under the hardware checkout's `.local/diagnostics/`. Snapshot
+`20261022T034222.060160Z/post-boot-fat.img` hashes to
+`c55b684afb6c4baf96d0354b95539114bfeacb549edd1b1c7bf616c3fd5a7d51`.
+Private `.local/multiboot/installation/first-boot-recovery.json`, SHA
+`928e7e70a014e910001d07ba22e840d31f2f8cf06244624213ae63b0b1aec277`, pins the
+original failure evidence. No PM/clock fault was cleared or confirmation made.
+
+## Legacy FAT fixture and SSH repair
+
+Published fix `ef1fca6` uses lowercase flag paths and admits only unique
+lowercase directory entries on vfat mounted with `shortname=mixed`. Admission
+rejects case-fold aliases and the alternate `msdos` driver, and is repeated
+under the selection lock before writes and after flag replacement. The old
+writer lowercases its request before a case-sensitive comparison against the
+directory name; the uppercase Linux-created entry did not match.
+
+The native fixture compiles unchanged pinned upstream v2018.01-rc1 FAT code
+with POSIX block-I/O shims. Eight operations reproduce the uppercase duplicate
+and exercise repeated writer/Linux atomic replacements with both lowercase
+short entries (NTRes `0x18`) and lowercase LFNs (NTRes `0`). Linux's mixed
+policy creates the latter. Atomic replacement of an existing uppercase entry
+retains its incompatible presentation; migration must first move it to a
+distinct basename before publishing a fresh lowercase entry. The fixture's
+distinct-backup migration passes. This fixture does not execute the exact
+vendor binary, controller or hush shell; the board trial below supplies the
+separate live evidence.
+
+Fixture result `.local/build/dev-fat-writer/9c8eaf14d335422887a0c2ad5244390c/result.json`
+has SHA `4c862f03bafcac3adf1a3d3464545e3f44fe596f8a596a1f58fc884a10755b88`.
+Managed run `db304206d64f4c6aa8853185c762554f` exited 0 without OOM or stop.
+The fix's full check passes 24 runtime and 1160 tooling tests, five explicit
+skips, compiled C checks and ShellCheck. The earlier 1150-test checkpoint above
+remains its original result.
+
+One recorded SSH repair ran as transient unit
+`gameshellneo-case-repair-35f53c03cdbf477d932fc323fead876b` and completed with
+exit 0 on the original recovery boot. It checked pinned source/card identities,
+held the selection lock and validated the original full catalog. Originals of
+four admin source files, boot files, flags and the FSCK artifact were saved
+under the store's `admin/case-repair-35f53c03cdbf477d932fc323fead876b/`.
+The temporary recovery anchor boots validated recovery and halts if it returns,
+preventing vendor outer-search fallthrough during repair. Uppercase flags were
+moved to distinct `OLD*.BAK` names, fresh lowercase flags were created, and new
+admin/catalog validation completed before publishing the final dispatcher.
+Durable phase/result records remain; the repair itself did not reboot or change
+the selected/confirmed systems.
+
+Repair script SHA is
+`cdd8ec60aa1108e57391bff4b37821e78499d884c45a0e30f40d2f43ab4da854`;
+manifest SHA is
+`ea41336215097e586f43536100ac6ad5fdd0d9bb7b020ea535cdcfd06ab73e41`.
+Unmounted read-only FAT fsck returned 0. The repaired snapshot SHA is
+`e6e99475b9e8c787932e0080674fb2e31291f227f7f871a50d36b4a00363ced6`;
+its raw audit finds one lowercase `next.scr` LFN with NTRes `0`.
+
+## Actual diag26 trial and unconfirmed-boot rollback
+
+The separately warned trial reboot used audio run
+`e4e9a190e1ec4a109b8dc23c6f3e89dc`, capture
+`20261022T040319.872438Z`: three long cues and mixer restoration passed.
+Kiyo capture `20261022T040257.558992Z` retained 398 frames and stopped cleanly.
+Inspected first/restart/startup/final frames show the previous console, restart,
+new startup and readable login; U-Boot text was not readable in those frames.
+
+New boot `6d4ee9eb-1dcd-4adc-af47-1e340e88d123` runs
+`6.18.54-gameshellneo25`. The early-userspace/root markers identify diag26,
+and `/` has the exact device/inode of `systems/diag26/root` in store
+`b9dab681-03`. All three flags now contain recovery: NEXT was consumed and
+read back before the actual directory-system handoff. A subsequent unmounted,
+read-only FAT check returned 0 without duplicate entries. Independent USB
+`20261022T040426.795339Z` and Wi-Fi `20261022T040424.206877Z` checks agree on
+the boot, with no failed services/restarts and taint 0. Strong identity is saved
+in hardware capture `20261022T040531.284745Z/development-boot.json`.
+Private `.local/multiboot/installation/trial-qualification.json` has SHA
+`ed690c45ae4255f8cd3071e3865df69d5d8c4c0f3ed3e23a54fbdabc261a5241`.
+Registered input devices are observed; physical button response is not claimed.
+
+No flag selection or confirmation followed. A second warned reboot, audio run
+`d6507d9003df4b0ea4470afe3e4bdea4` at `20261022T040653.973017Z`, passed the
+warning/restoration gates. Kiyo capture `20261022T040638.910571Z` retained 171
+frames and stopped; inspected first/final frames show a readable login.
+The next boot, `9caf10b6-a94f-4c9b-8ca9-e8e6c1580cab`, runs recovery kernel
+`6.18.54-gameshellneo24` from `/dev/mmcblk0p2`, without a development runtime
+marker. Flags remain recovery. Both USB `20261022T040806.617807Z` and Wi-Fi
+`20261022T040806.262184Z` basic access/service checks pass. This establishes
+automatic selection of fixed recovery after the unconfirmed trial on the next
+separately initiated boot; it does not supply a reset for a hung kernel.
+
+Private `.local/multiboot/installation/bundle-upload-preparation.json`, SHA
+`228909a42cc50ec1053aa6da318189456bd2267c339b671eef073f8fb527078d`, pins that
+rollback identity and a private incoming directory. Upload of the previously
+qualified 678348800-byte diag25 bundle completed with SHA
+`d1b40e7c333e652904c60c9d7df7fb4412f7411b8ca5568a8bda34b8069adaa4`.
+The first device import did not pass; its terminal failure follows below.
+Camera, SSH and selector observations establish neither PM/clock qualification
+nor timing or energy targets.
+
+## Target capability failure and early rejection (NEO-209)
+
+Recorded unit `gameshellneo-bundle-import-8c5876d51cac48de8e6a5d530f8a32ce`
+ran from 04:14:15 to 04:21:59 UTC and exited 1. GNU tar reported unsupported
+`security.capability` on `diag25/root/usr/bin/fping`; the unchanged metadata
+verification then rejected its missing xattr. The original private archive,
+extracted staging tree, operation log, service journal and failed unit remain.
+Nothing was registered as diag25. Postflight confirms the same recovery boot,
+original diag26 catalog and all three recovery flag hashes; the only failed
+unit is this recorded import job, which has not been cleared.
+
+Both original generated kernels disable `CONFIG_EXT4_FS_SECURITY`. A separate
+private regular-file probe on the actual store returned errno 95 for the exact
+20-byte capability value while a `user.*` xattr roundtrip passed. The minimal
+kernel prerequisite is `CONFIG_EXT4_FS_SECURITY=y`; the separate LSM framework
+`CONFIG_SECURITY` is unnecessary. NEO-209 prepares a newly identified
+diagnostic.27 / kernel26 maintenance system, preserving the original images
+and patch queue. The incapable running kernel cannot bootstrap that system's
+full-metadata TAR itself, so its initial installation needs offline card
+preparation and the guarded DEV-card workflow.
+
+Commit `c361728` probes every distinct required capability value on a private
+regular-file descriptor after verified snapshot/hash and safe TAR admission,
+before extraction. Unsupported or changed values reject with maintenance-boot
+guidance. It removes only the probe and retains the failed snapshot/log; all
+existing metadata checks remain. Capability-free bundles need no probe.
+
+The full host check passes 24 runtime and 1166 tooling tests, six explicit
+skips, compiled C checks and ShellCheck. The managed root builder passes 94
+tests with six explicit BusyBox/namespace skips, including actual capability,
+hardlink and original-metadata preservation. Its initial attempt retained a
+missing-Paramiko dependency failure: the root runner now excludes only the
+host SSH transfer suite, which still runs in the mandatory full host check.
+These native results do not qualify the new ARM maintenance kernel or complete
+the on-device import/confirmation gate.
+
+Private failure receipt `.local/multiboot/installation/bundle-import-failure.json`
+has SHA `e783c52c116f1c86f59304db1685a9f95a4fb0856070b40b47fa4929dd49398b`;
+postflight SHA is
+`f8ebe2bc8fb7e7e7262bd02c2cf69cf95b74c3b0bacb56ec3c2a3839ed3817db`.
+The separate destination probe receipt SHA is
+`01e372cf1e9f292df5468c2ba315c883fcf7d50f888fb7b377a061a56eb22afe`.
+
+The exact `c361728` guard was then loaded from a private source copy on the
+actual recovery kernel, without replacing its installed administration tree.
+It hash-checked and parsed the preserved original failed bundle, rejected the
+required capability with errno 95, cleaned its probe and performed no
+extraction or publication. Original failure-log bytes, catalog and flag hashes
+remained unchanged. Receipt
+`.local/multiboot/installation/board-capability-guard-result.json` has SHA
+`bf0ab8c8e3a667eae5f92771d2618b96e37d3772f8b71542190ef886f41f8659`.
+This is the expected rejection case on an incapable target, not a successful
+on-device import.
+
+## Corrected r3 artifact, offline only
+
+Saved `dev:card` and `dev:pack` Tasks built a separate r3 from clean `ef1fca6`,
+using the same two pinned raw source images and authenticated ARM loader.
+Retain r3 as the FAT-fix candidate and original r2 with its failed trial evidence.
+Neither contains the capable maintenance kernel; do not spend another card
+swap flashing r3 while NEO-209's bootstrap artifact is being prepared.
+Managed assembly `97b7fb8352a3442f920894ebcbbd74a2` and independent read-only
+audit `fccd4f33a8574091b0c51acd0de5c970` both exited 0 without OOM/stop.
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `.local/multiboot/card/GameShellNeo-development-r3.img` | 8589934592 | `eeda974bf8c13ef92d1b90043597dba1a190c03146429d25b44686ff7680ee8d` |
+| `.local/multiboot/transfer-r3/GameShellNeo-development-r3.img.gz` | 561055497 | `2c5ad62c500e4b7d8d6cae42ca46369c2877ecf05f7e05ff14158008170656ce` |
+
+The image receipt SHA is
+`b945da05c24aac4aa135c22dd648ac8ee3efac7ac701cfee416a43bc3c4dcb4b`;
+the separate transfer manifest SHA is
+`5bc83f2e700e98e3fc05134ff3cb87878ec240cf22e59424914bc91f171735b7`.
+The audit mounted FAT read-only with `shortname=mixed`; raw FAT checks verify
+one lowercase LFN with NTRes `0` per flag. Copied admin/loader pins and all three
+filesystems pass. Full
+compressed/decompressed transfer verification and the 2168-second guard
+admission pass on Linux. Independent byte comparisons verify the original p2,
+reserved bootloader prefix and exact MBR partition append. Nine source/r2
+artifacts retained their original bytes/mtime, and all 816 frozen tracked inputs
+were unchanged through qualification. No card, Mac, configuration or network
+was accessed for r3.
+
+The consolidated index is
+`.local/multiboot/card/r3-qualification/qualification.json`, SHA
+`9e4ea3c0fc1421204b5e98c2383bc9699dce7b204f925508a712479645c024a1`.
+It pins authoritative managed receipts, original logs, source-only verification
+and preservation evidence. At completion all owned sessions had ended and the
+ledger/lock were clear. R3 has not been flashed or board-qualified; the board
+observations above belong to the physical r2 card after repair.
 
 ## Remaining acceptance
 
-NEO-208 stays open pending actual vendor U-Boot trial consumption/readback,
-board directory-root handoff,
-both management routes, explicit confirmation, subsequent bundle import and
-fixed-recovery/reset behavior. The owner moves the card. Use the existing long
-speaker warning for any later board reboot. Do not run clock/PM captures until
-the explicit deployment adapter and matching admission are ready, and do not
-claim power-cut or total-hang recovery from the selector alone.
+NEO-208 stays open for the capable maintenance-system bootstrap, completed
+on-device bundle import, the subsequent
+version's matched boot/management observations and explicit confirmation.
+Actual diag26 trial consumption/readback, directory-root handoff and
+unconfirmed-boot return to fixed recovery have the bounded board evidence above.
+Physical input response, broader reliability and reset/power-loss behavior
+remain unqualified. Use the existing long speaker warning for any later board
+reboot. Clock/PM provenance admission and matching awake qualification remain
+separate work; preserve NEO-192's original failures and do not use frozen older
+PM runners to bypass development-deployment rejection. The selector alone does
+not establish power-cut safety or a reset for a complete kernel hang.
 
 Primary references: [Linux 6.18 initramfs handoff](https://docs.kernel.org/6.18/filesystems/ramfs-rootfs-initramfs.html),
 [U-Boot legacy bootm arguments](https://docs.u-boot-project.org/en/latest/usage/cmd/bootm.html),

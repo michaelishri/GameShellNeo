@@ -78,7 +78,8 @@ Current worktrees are under the canonical checkout's `.local/worktrees/`:
 | `remaining-legacy-integration` | code through `58eeadd` plus final report commits: independent wake/startup profile, six ARM configurations and mapped older histories; see report 291 |
 | `remaining-legacy-validation` | `58eeadd` (detached): production sleep/callback regression and explicitly historical teardown reproduction |
 | `remaining-final-integration` | final merge documentation and host checks; source/candidate receipts stay in the frozen validation worktrees above |
-| `multiboot-boot-selection` | NEO-208 opt-in development SD systems, original recovery, authenticated ARM loader and loop-free bundle updates; physical qualification remains open |
+| `multiboot-boot-selection` | NEO-208 development SD systems; real directory boot/one-shot/recovery rollback pass; complete-metadata import needs NEO-209's capable maintenance bootstrap |
+| `ext4-security-attributes` | NEO-209: enable ext4 security attributes and prepare diagnostic.27 / kernel26 through managed stages; original hardware worktree remains frozen |
 
 Merged branch references are removed; their worktrees, ignored evidence and
 private configuration remain at their original revisions. Create a branch
@@ -203,8 +204,16 @@ recording is authorized by this workflow. The camera stops after each request.
 - NEO-208 is **development only**; the owner explicitly excludes this card
   selector from the final release. [Report 292](docs/292-development-sd-systems.md)
   and `development/multiboot/README.md` describe the opt-in card/bundle Tasks.
-  The initial reflash is authorized, but fresh DEV-spare identity, physical card
-  movement, current-network transfer check and full guarded readback remain.
+  The initial Samsung DEV-spare reflash, full readback and owner card movement
+  are complete. Diagnostic.26 directory boot, real flag consumption/readback,
+  automatic return to fixed recovery and both SSH routes pass. Remote import
+  failed closed on a missing `security.capability` xattr: both original kernels
+  disable `CONFIG_EXT4_FS_SECURITY`. NEO-209 prepares a capable maintenance
+  system; bootstrap, complete import and confirmation remain open. Consult
+  report 292 and the live
+  evidence before selecting a system. Future flashes still require fresh
+  DEV-spare identity, owner card movement/readiness, a current-network transfer
+  check and full guarded readback.
   Use the new checkout's Mac helper with explicit `NEO_HARDWARE_CHECKOUT` and
   `NEO_DEVELOPMENT_TRANSFER` to retain established credentials/known-host checks;
   do not overwrite private configuration or production transfer/checkpoints.
@@ -212,6 +221,12 @@ recording is authorized by this workflow. The camera stops after each request.
   tooling rejects them; frozen older worktrees retain their historical guards
   and must not be used to bypass this. Flag readback does not establish FAT
   power-cut safety or a reset for a complete kernel hang.
+  Use canonical lowercase `next.scr`, `good.scr`, `recover.scr` on `vfat` with
+  `shortname=mixed`. The initial uppercase-entry failure and SSH repair are
+  preserved. Development-r3 fixes FAT flags but still has the incapable old
+  kernel; wait for the capable bootstrap artifact before another physical
+  flash. Retain development-r2 as the original failed candidate. Do not repair an old uppercase entry with
+  atomic replacement alone: the FAT metadata can retain its uppercase name.
 
 - **NEO-154's SSH-stall investigation was abandoned at the owner's request.**
   Do not reopen it or run the old SSH trace/stall experiments merely because
@@ -221,16 +236,25 @@ recording is authorized by this workflow. The camera stops after each request.
   counters, clamp clocks, reboot past the fault or silently replace runtime
   tools to obtain a pass. Preserve the original failures. NEO-191 camera PM
   qualification and NEO-182 battery RTC trial remain dependent on this work.
-- Diagnostic.26 is built/offline-verified in `musb-restart-integration`;
-  `docs/272-clock-provenance-image.md` records its image/reader/build-ID pins,
-  recovery checkpoint and installation/awake-capture plan. It still needs the
-  intended card installation and matching awake qualification before advancing
-  PM work. Do not infer installation from a normal login banner.
-- Latest access check (21 October): both USB and Wi-Fi SSH worked; Kiyo frames
-  showed a readable login console; the board reported kernel
-  `6.18.54-gameshellneo24`, boot
-  `585a1655-9ace-4bb0-8b45-0373b4d65b5a`. This is historical access evidence, not
-  proof of diagnostic.26 installation or resolution of NEO-192.
+- Diagnostic.26's original raw image remains built/offline-verified in
+  `musb-restart-integration`; `docs/272-clock-provenance-image.md` records its
+  image/reader/build-ID pins and recovery checkpoint. Its extracted root now
+  boots on the DEV card with explicit `development-directory` provenance;
+  report 292 records the exact root inode, markers, source hashes and kernel.
+  This deployment needs its own clock/PM adapter and matching awake admission
+  before advancing NEO-192. Do not infer pristine-image admission from a login
+  banner or reuse the original raw-image checks against the directory root.
+- Latest completed selector checks (22 October): diagnostic.26 boot
+  `6d4ee9eb-1dcd-4adc-af47-1e340e88d123`, kernel
+  `6.18.54-gameshellneo25`, consumed its trial and returned on the next warned
+  reboot to fixed recovery boot `9caf10b6-a94f-4c9b-8ca9-e8e6c1580cab`, kernel
+  `6.18.54-gameshellneo24`. Both USB and Wi-Fi SSH worked and inspected Kiyo
+  frames showed readable login consoles. These are selector/access results,
+  not clock/PM clearance; recheck current boot and any active import job.
+  The import job `gameshellneo-bundle-import-8c5876d51cac48de8e6a5d530f8a32ce`
+  is an expected retained failed unit. Its private staging is unpublished;
+  flags and catalog are unchanged. Do not clear the failure or discard its
+  archive/staging to obtain a clean status.
 - Use the saved PM/RTC/cable test Tasks and their exact matching runtime/image
   admission, original-result ledger, restoration and postflight checks. Keep
   debug stages distinct from actual sleep. The current RTC trial cap is sixty

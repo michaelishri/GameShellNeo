@@ -1,7 +1,8 @@
 # MUSB wake ownership through kernel IRQ traversal (NEO-218)
 
 23 October 2026, Pacific/Auckland. This bounded offline child of NEO-98 starts
-at `5a2f362a39e49415b6a73e732219007ab8f4eb00` in the isolated
+at `5a2f362a39e49415b6a73e732219007ab8f4eb00`, adopting published main
+`5505fd90e9cd98038fef785bfe6ba19e6548a739` after the original writers completed, in the isolated
 `work/musb-wake-irq-qualification` checkout. Qualification is in progress; the
 corrected UML and source-control qualification have not completed. The wider
 parent remains open.
@@ -73,8 +74,14 @@ selects all seven intended MUSB source inputs. The first managed kernel run,
 `dbb46b26278a47fe815246dd96d87340`, exited 1 with a fixture-only compiler error:
 it initialized `resume_work_wait`, which belongs to the separate retirement
 profile. Its authoritative result confirms no stop or OOM and unchanged hashed
-inputs. That initialization is removed; no driver source is changed. Corrected
-kernel execution, source mutation control and independent reviews remain pending.
+inputs. That initialization is removed. The next original run,
+`1c38b5368fe1409c91ec8b93e99d963c`, compiled and executed all eleven cases:
+ten passed, and the enabled-policy setup failed because it tried to enable the
+source already enabled by initialization (`-EEXIST`). The fixture now disables
+the policy before explicitly enabling it. Both original results/logs and the
+second run's kernel, complete KTAP and JSON remain retained. No driver source
+is changed. Corrected kernel execution, source mutation control and independent
+reviews remain pending.
 
 Private logs and receipts are retained under
 `.local/build/musb-wake-kunit/`; the report will record exact managed run and

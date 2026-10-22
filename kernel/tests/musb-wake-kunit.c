@@ -334,7 +334,12 @@ static void wake_policy_test(struct kunit *test, bool enabled)
 	int handled;
 
 	KUNIT_ASSERT_EQ(test, musb_init_wakeup(&f->musb), 0);
-	KUNIT_ASSERT_EQ(test, device_set_wakeup_enable(f->device, enabled), 0);
+	/* init_wakeup already enabled its source; exercise a real policy change
+	 * instead of treating the API's -EEXIST for duplicate enable as success.
+	 */
+	KUNIT_ASSERT_EQ(test, device_set_wakeup_enable(f->device, false), 0);
+	if (enabled)
+		KUNIT_ASSERT_EQ(test, device_set_wakeup_enable(f->device, true), 0);
 	KUNIT_ASSERT_EQ(test, musb_suspend(f->device), 0);
 	KUNIT_EXPECT_EQ(test, atomic_read(&f->device->power.usage_count), 2);
 	KUNIT_EXPECT_EQ(test, wake_snapshot(f).references, enabled ? 1U : 0U);

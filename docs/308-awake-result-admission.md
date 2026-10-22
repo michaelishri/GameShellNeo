@@ -5,8 +5,9 @@ successful completion without independently recomputing its raw awake-clock
 proof. NEO-224 adds this check before host success or removal of the owned
 helper stage. This is a host-only result-consumer correction; it neither
 changes the collectors nor qualifies the unresolved clock fault or PM.
-The focused checks below pass. Required combined checks and fresh independent
-Standards/Spec review remain pending before publication and closure.
+The focused and required combined host checks pass on accepted published
+NEO-225 context. Fresh independent Standards/Spec review remains pending
+before publication and closure.
 
 ## Reproduced original behavior
 
@@ -146,8 +147,24 @@ host files are `remote.device_action` and `check-rsb-runtime.main`. Raw proof
 semantics, all collector restoration and image/runtime sources remain as
 before. No ARM, kernel or image build is relevant to this host-only correction.
 
-Final published-base adoption, required combined host checks and entirely
-fresh independent Standards/Spec review remain pending. Publication and
-closing this focused child require those gates. NEO-101's matching-image long
-runs, controlled physical interruptions and observer cost remain open, as do
-NEO-192 and dependent PM gates. No new physical run is performed or claimed.
+Own checkpoint `1b373f8` adopted accepted published
+`0886549200d21d3b899a95083eaa96bad7391d05` as `742bcf9`. The only conflict was
+report-index navigation; both the accepted report 309 and this report 308 are
+retained, along with the original conflict. All seven focused qualification
+inputs remain byte-identical, as do the accepted dependency's source files
+and the original collector/validator inputs. Neither the baseline nor the
+focused Task is repeated or relabeled because of this context adoption.
+
+One managed `task check` on that combined tree passes **24 runtime tests and
+1,370 tooling tests**, with nine expected skips, both C checks and Bash
+syntax/ShellCheck. Original PID `1172778` / observation session `18172` exited
+zero, with all 894 tracked source inputs unchanged. Evidence remains at
+`.local/awake-result-admission/full-check/7338465430e6432187590434afb521b6/`;
+the log SHA-256 is
+`b486561c53e57866ce2e7861785d52f89aca56f0690e82c35a589c53e28fe8d3`.
+Final documentation edits do not change the qualified host code or Task.
+
+Entirely fresh independent Standards/Spec review and publication remain
+pending before closing this focused child. NEO-101's matching-image long
+runs, controlled physical interruptions and observer cost remain open, as
+do NEO-192 and dependent PM gates. No new physical run is performed or claimed.

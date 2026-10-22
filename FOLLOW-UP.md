@@ -9,8 +9,10 @@ admission now recomputes unchanged raw proof before success/deletion and saves
 exact owned helper/unit context. Fifteen methods / 130 local scripted-channel
 cases pass, including duration rounding boundaries, raw retention and original
 error/restoration behavior. No SSH, collector or device operation occurs.
-Final combined host checks and fresh independent review/publication remain
-pending. Parent NEO-101 physical/observer-cost and NEO-192/PM gates stay open.
+The combined check on accepted NEO-225 context passes 24 runtime / 1370 tooling
+tests (nine expected skips), C and shell checks. Fresh independent review and
+publication remain pending. Parent NEO-101 physical/observer-cost and
+NEO-192/PM gates stay open.
 [Report 308](docs/308-awake-result-admission.md).
 
 **NEO-211 development-store expansion:** the remote expansion from 4 GiB to

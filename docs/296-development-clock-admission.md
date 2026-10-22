@@ -250,7 +250,7 @@ all dependent PM gates remain open. NEO-213's source and actual-capture
 milestone is ready for independent final evidence and combined-tree review,
 then serialized publication/integration and closure.
 
-The isolated branch also incorporates independently accepted published main
+The frozen `d0056fd` checkpoint incorporates independently accepted published main
 `5a2f362a39e49415b6a73e732219007ab8f4eb00`. The only merge conflict was the
 report index; its resolution retains the exact report297 and296 entries in
 that order. All six clock source/test files and clock Task sections remain
@@ -264,6 +264,49 @@ Private `.local/development-clock/final-evidence-index.json`, SHA
 links source-unchanged proof, independent source reviews, both completed host
 checks, managed reader evidence, exact live originals, separately rerun replay,
 camera/status receipts and the terminal ownership/flag postflight.
+
+## Fresh review correction: complete ABI provenance
+
+The additional fresh Standards review of `d0056fd` has zero required findings
+and one optional note about repeated result/replay/cleanup flow. The additional
+fresh Spec review found one required P2: the original archive comparison took
+its required header names from the receipt itself. An empty or matching partial
+map could therefore pass. Both original review reports and the frozen source
+remain preserved; optional refactoring is deferred.
+
+The correction fixes the expected set at all ten headers from the original
+reader's time32/time64, syscall, clocksource and ELF provenance. Empty, partial,
+extra or malformed maps and malformed digests fail before opening the archive;
+the complete map must then match the actual locked archive contents. Four new
+tests cover these cases, including each single missing header, changed contents
+and a missing archive member. All **18 focused tests** pass. Full `task check`
+passes **24 runtime and 1301 tooling tests**, nine expected skips, C checks and
+Bash/ShellCheck. The isolated fix checkout's
+`.local/build/development-clock-abi-check.log` has SHA
+`c71d29a6bf6ade8fcf649ca76832e86b470024d8cddce9b9b1674df3dba36723`.
+
+The actual original receipt already contains all ten correct headers. A fresh
+read-only `dev:clock` plan verifies it against the complete original image,
+kernel artifacts and locked archive. Its contract equals the earlier valid
+contract except for the explicitly changed `development_clock.py` source hash.
+The original reader inputs and binaries remain unchanged. An offline replay of
+the exact pre-fix comparison also reproduces its acceptance of empty and partial
+maps; the fixed validator rejects both.
+
+The hardware capture above executed reviewed source `23c4133` in the preserved
+`d0056fd` lineage. Its original adapter hash and all original receipts remain
+unchanged. The corrected admission code has been verified **offline only**;
+no new hardware capture was requested or performed. The complete original
+receipt preserves the validity and stated limits of the historical capture.
+
+The separate fix checkout retains
+`.local/development-clock-abi/evidence-index.json`, SHA
+`5930fa63e0bafd2938b81d704c60e3d860d1c1b2a8d4b598ea318637f3646783`,
+linking 40 artifacts, including all 29 rehashed original evidence files, both
+fresh reviews, the actual reader receipt, rejection reproduction, real local
+plan and completed host checks. Fresh independent reviews of the corrected tip
+and separate serialized publication remain required. NEO-192 and PM gates
+remain open.
 
 ## Interpretation and next causal work
 

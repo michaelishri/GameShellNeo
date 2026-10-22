@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -45,6 +46,58 @@ def contract():
     d['release_sha256'] = dc.digest(dc.json_bytes(release))
     c['development'] = d
     return c, deployment
+
+
+class ReaderAbiTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.archive = Path(temporary.name) / 'linux.tar.xz'
+        self.files = {name: name.encode() for name in dc.READER_ABI_FILES}
+        self.digests = {name: dc.digest(raw) for name, raw in self.files.items()}
+
+    def write_archive(self):
+        with tarfile.open(self.archive, 'w:xz') as archive:
+            for name, raw in self.files.items():
+                member = tarfile.TarInfo('linux-6.18.54/' + name)
+                member.size = len(raw)
+                archive.addfile(member, io.BytesIO(raw))
+
+    def test_exact_ten_sources_are_read_and_verified(self):
+        self.assertEqual(len(self.digests), 10)
+        self.write_archive()
+        self.assertEqual(dc.verify_reader_abi(self.digests, self.archive, '6.18.54'), self.digests)
+
+    def test_empty_partial_extra_or_malformed_receipt_refused_before_archive_read(self):
+        incomplete = [{}, None, [], list(self.digests)]
+        incomplete.extend({k: v for k, v in self.digests.items() if k != missing}
+                          for missing in self.digests)
+        incomplete.append(dict(self.digests, unexpected='a' * 64))
+        for value in incomplete:
+            with self.subTest(value=value), patch.object(dc.tarfile, 'open') as archive:
+                with self.assertRaisesRegex(ValueError, 'exact ten'):
+                    dc.verify_reader_abi(value, self.archive, '6.18.54')
+                archive.assert_not_called()
+        for value in ('', 'A' * 64, '0' * 63, None, 0):
+            wrong = dict(self.digests)
+            wrong[dc.READER_ABI_FILES[0]] = value
+            with self.subTest(digest=value), patch.object(dc.tarfile, 'open') as archive:
+                with self.assertRaisesRegex(ValueError, 'digest'):
+                    dc.verify_reader_abi(wrong, self.archive, '6.18.54')
+                archive.assert_not_called()
+
+    def test_complete_receipt_with_changed_header_hash_is_refused(self):
+        self.write_archive()
+        wrong = dict(self.digests)
+        wrong[dc.READER_ABI_FILES[0]] = '0' * 64
+        with self.assertRaisesRegex(ValueError, 'headers differ'):
+            dc.verify_reader_abi(wrong, self.archive, '6.18.54')
+
+    def test_missing_archive_header_is_refused_even_with_complete_receipt(self):
+        del self.files[dc.READER_ABI_FILES[-1]]
+        self.write_archive()
+        with self.assertRaisesRegex(ValueError, 'headers differ'):
+            dc.verify_reader_abi(self.digests, self.archive, '6.18.54')
 
 
 class ContractTests(unittest.TestCase):

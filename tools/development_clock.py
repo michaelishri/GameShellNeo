@@ -25,6 +25,11 @@ READER_INPUTS = ('tools/clock-boundary.c', 'tools/clock_boundary.py',
 READER_OUTPUTS = ('clock-boundary.so', 'test-host', 'test-arm', 'reader-readelf.txt',
                   'reader-disassembly.txt', 'build.sh', 'build-output.txt',
                   'host-fixtures.txt', 'arm-fixtures.txt')
+READER_ABI_FILES = ('arch/arm/tools/syscall.tbl', 'include/uapi/linux/time_types.h',
+                    'include/uapi/asm-generic/posix_types.h', 'include/uapi/linux/time.h',
+                    'arch/arm/include/uapi/asm/unistd.h', 'arch/arm/include/asm/elf.h',
+                    'include/uapi/linux/elf.h', 'include/uapi/linux/elf-em.h',
+                    'include/vdso/time32.h', 'include/linux/clocksource_ids.h')
 
 
 def require(value, message):
@@ -97,6 +102,25 @@ def reader_fixtures(text):
     return len(records)
 
 
+def verify_reader_abi(files, archive, version):
+    """The reviewed reader fixes the required headers, not the receipt's keys."""
+    require(isinstance(files, dict) and set(files) == set(READER_ABI_FILES),
+            'Original reader ABI requires the exact ten source files')
+    require(all(isinstance(value, str) and re.fullmatch('[0-9a-f]{64}', value)
+                for value in files.values()), 'Malformed original reader ABI source digest')
+    actual = {}
+    with tarfile.open(archive, 'r|xz') as source:
+        for member in source:
+            name = member.name.removeprefix('linux-' + version + '/')
+            if name in READER_ABI_FILES:
+                require(member.isfile(), 'Original reader ABI source is not a regular file')
+                actual[name] = digest(source.extractfile(member).read())
+            if len(actual) == len(READER_ABI_FILES):
+                break
+    require(actual == files, 'Original reader ABI headers differ from locked Linux')
+    return actual
+
+
 def offline_inputs(image_checkout, reader, runtime, release_path, *, boot_id, cid, store_uuid):
     """Read-only; finish every local artifact check before loading SSH access."""
     image_checkout, reader, runtime = map(lambda p: Path(p).resolve(strict=True),
@@ -158,15 +182,7 @@ def offline_inputs(image_checkout, reader, runtime, release_path, *, boot_id, ci
     version = lock['linux']['tag'][1:]
     archive = image_checkout / '.local/downloads' / ('linux-' + version + '.tar.xz')
     require(sha(archive) == lock['linux']['tarball_sha256'], 'Original Linux ABI archive changed')
-    abi_files = {}
-    with tarfile.open(archive, 'r|xz') as source:
-        for member in source:
-            name = member.name.removeprefix('linux-' + version + '/')
-            if name in receipt['abi']['files']:
-                abi_files[name] = digest(source.extractfile(member).read())
-            if len(abi_files) == len(receipt['abi']['files']):
-                break
-    require(abi_files == receipt['abi']['files'], 'Original reader ABI headers differ from locked Linux')
+    verify_reader_abi(receipt['abi']['files'], archive, version)
     for relative, expected in receipt['inputs'].items():
         require(sha(child(reader, relative)) == expected, 'Original reader input changed: ' + relative)
         if relative != 'build/sources.lock.json':

@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[314 — Pending EAPOL ownership](314-brcmfmac-eapol-ownership.md)
+records the actual timeout/completion baseline, opt-in key-drain candidate,
+finite source qualification and separate radio/image recovery gates.
+
 [312 — Charging inventory host admission](312-charge-inventory-result-admission.md)
 records the original invalid acceptances, raw register/clock/profile replay,
 unchanged collector/transport and separate electrical/clock qualification gates.

@@ -11,6 +11,16 @@ For development-only selectable SD systems, use the opt-in
 recovery system and imports complete diagnostic versions for selection over
 SSH. Normal release images do not include it; board qualification remains open.
 
+NEO-230's EAPOL drain ownership candidate is documented in
+[report 314](docs/314-brcmfmac-eapol-ownership.md). Use
+`task test:brcmfmac-eapol-reference -- --archive /path/to/linux-6.18.54.tar.xz`
+for the source baseline, and `task test:brcmfmac-eapol` with the same archive
+argument for native/sanitizer/control checks. Its `--compile-drivers` mode also
+requires `--native-evidence` naming the retained native attempt; it proves
+executable equivalence before managed ARM/full-driver qualification. The
+950 ms wait stays unchanged; failed drains block key programming. This does
+not attribute NEO-55's outage or select an image patch.
+
 NEO-207 reconciles the old MUSB wake/startup and removal histories in
 [report 291](docs/291-legacy-musb-source-integration.md). Use
 `task test:musb-wake-startup` or `task check:musb-wake-startup-configs` for the

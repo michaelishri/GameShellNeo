@@ -841,6 +841,16 @@ tasks:
     desc: Test isolated Wi-Fi mailbox read/ACK error candidate, native and ARM32
     cmds: [bash tools/run-logged.sh brcmfmac-mailbox python3 tools/check-brcmfmac-mailbox.py]
 
+  test:brcmfmac-eapol-reference:
+    desc: Reproduce pending EAPOL timeout ownership errors in the selected production source
+    cmds:
+      - bash tools/run-logged.sh brcmfmac-eapol-reference python3 tools/check-brcmfmac-eapol.py --reference-only {{.CLI_ARGS}}
+
+  test:brcmfmac-eapol:
+    desc: Test opt-in EAPOL ownership candidate natively with sanitizers and compiling controls
+    cmds:
+      - bash tools/run-logged.sh brcmfmac-eapol python3 tools/check-brcmfmac-eapol.py {{.CLI_ARGS}}
+
   test:axp223-controls:
     desc: Test isolated charger-control diagnostic with real regmap, PM and debugfs in UML
     cmds: [bash tools/run-logged.sh axp223-controls python3 tools/check-axp223-controls.py]

@@ -1,0 +1,37 @@
+From: GameShellNeo maintainers
+Subject: [PATCH] wifi: brcmfmac: preserve pending EAPOL ownership on timeout
+
+A timed-out wait does not own the pending transmit completions. Keep their
+count intact, return -ETIMEDOUT, and refuse to program a key if the drain
+failed. Keep the existing wait deadline and genuine completion path.
+
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/core.c
+@@ -1550,10 +1550,10 @@
+ 
+ 	if (!err) {
+ 		bphy_err(drvr, "Timed out waiting for no pending 802.1x packets\n");
+-		atomic_set(&ifp->pend_8021x_cnt, 0);
+-	}
+-
+-	return !err;
++		return -ETIMEDOUT;
++	}
++
++	return 0;
+ }
+ 
+ void brcmf_bus_change_state(struct brcmf_bus *bus, enum brcmf_bus_state state)
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+@@ -552,7 +552,9 @@
+ 
+ 	convert_key_from_CPU(key, &key_le);
+ 
+-	brcmf_netdev_wait_pend8021x(ifp);
++	err = brcmf_netdev_wait_pend8021x(ifp);
++	if (err)
++		return err;
+ 
+ 	err = brcmf_fil_bsscfg_data_set(ifp, "wsec_key", &key_le,
+ 					sizeof(key_le));

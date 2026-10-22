@@ -2,7 +2,12 @@
 
 23 October 2026, Pacific/Auckland. This bounded offline follow-up starts from
 published main `7120990023cb17ecc152eadefa57f37c19309ed9` in the isolated
-`work/musb-wake-control-exit` checkout. NEO-220's fresh source/pre-integration
+`work/musb-wake-control-exit` checkout. Its `cdf84dc` preparation remains frozen;
+the separate `work/musb-wake-control-exit-final` checkout adopts accepted clock
+main `7e6a081a724c709f928a357928896dd0eaca2cd0` for final context checks. Both
+maintained Python files remain byte-identical to that preparation. The sole
+documentation conflict preserves the new 309 row and the accepted 305/302 rows.
+NEO-220's fresh source/pre-integration
 Spec review found a control admission gap that also exists in the published
 NEO-218 wake runner. No kernel, fixture, configuration, profile, registry,
 production patch, managed helper or image input changes here.
@@ -50,8 +55,13 @@ The focused logged host command passed nineteen tests: fourteen wake tests and
 five accepted managed-result test groups. Its log is
 `.local/build/musb-wake-control-exit-host.log` (SHA-256
 `34327ac1ca03ac2a119366df901c352cfefb08e2bd0be8b0f975d4be28737adf`).
-Complete context checks and fresh independent Standards/Spec reviews remain
-pending adoption of the coordinator's next accepted clock publication base.
+The single final `task check` on accepted clock base `7e6a081` completed with
+exit 0 (original host session 71886): 24 runtime tests and 1,355 tooling tests
+passed with nine expected skips, followed by the C checks, Bash syntax and
+ShellCheck. The retained log is `.local/build/neo225-final-check.log`. The Python
+source and tests were unchanged during and after that operation; final edits
+record only context/evidence documentation. Fresh independent Standards/Spec
+reviews and separate publication authorization remain required.
 
 ## Evidence limits
 

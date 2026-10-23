@@ -24,8 +24,12 @@ UDC/DPM/global-IRQ/SRCU/work/PHY cases and its complete 96-line stream. All
 originals remain retained; six matching selected-object configurations are
 historical read-only evidence. Published916 is adopted with exact executable
 equivalence. The one ordinary final host check passes 24 runtime/1,562 tooling
-tests (nine expected skips), compiled C guards and shell checks. Fresh independent
-review/publication remains pending. No image, backend/DMA/SMP, physical or clock
+tests (nine expected skips), compiled C guards and shell checks. Fixture
+failed-initialization ownership and shared-global restoration are being
+corrected, with three real-KUnit init-error cleanup probes and fresh Linux
+qualification required. The original source/results remain historical;
+new host qualification and fresh independent review/publication are pending.
+No image, backend/DMA/SMP, physical or clock
 clearance follows.
 [Report 318](docs/318-musb-combined-lifecycle-qualification.md).
 

@@ -22,8 +22,9 @@ legacy refusal and bounded host qualification without an image build.
 
 [318 — Joined MUSB lifecycle qualification](318-musb-combined-lifecycle-qualification.md)
 binds fourteen CPI/Sunxi PIO families and two exact controls to the unchanged
-terminal45 source. Native/sanitizer/ARM and real Linux qualification pass with
-retained failed admission, exact current-context mapping and physical limits.
+terminal45 source. Native/sanitizer/ARM and historical Linux results are retained;
+fixture setup-error/global-restoration corrections await fresh Linux qualification.
+Failed admissions, exact current-context mapping and physical limits remain explicit.
 
 [317 — F2 reset ownership](317-brcmfmac-reset-ownership.md)
 records the actual SDIO unbind/reset baseline, bounded F2 binding guard,

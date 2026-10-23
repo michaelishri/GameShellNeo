@@ -22,8 +22,18 @@ SUITES = {
     'positive': ('musb-combined-lifecycle', CASES),
     'terminal-control': ('musb-combined-terminal-control', (CASES[1],)),
     'work-control': ('musb-combined-work-control', (CASES[0],)),
+    'init-failure': ('musb-combined-init-failure', (
+        'combined_init_register_memory_error_test',
+        'combined_init_irq_mapping_error_test',
+        'combined_init_child_driver_error_test')),
 }
-HARD_CAP = 384 * 1024**2
+INIT_PROBES = {
+    'combined_init_register_memory_error_test': (-12, 0),
+    'combined_init_irq_mapping_error_test': (-22, 3),
+    'combined_init_child_driver_error_test': (-5, 31),
+}
+# Aggregate retained original + new remediation outputs, not a per-attempt cap.
+HARD_CAP = 640 * 1024**2
 FLOOR = 3 * 1024**3
 HEADROOM = 128 * 1024**2
 
@@ -286,6 +296,17 @@ def diagnostic_contract(mode):
         '# module: musb_hdrc', '1..' + str(len(cases)))]
     for number, case in enumerate(cases, 1):
         expected.append(re.escape('# ' + case + ': begin joined lifecycle'))
+        if mode == 'init-failure':
+            error, acquired = INIT_PROBES[case]
+            expected.extend(re.escape(line) for line in (
+                f'# {case}: fixture init probe error={error}',
+                f'# {case}: failed to initialize: {error}',
+                f'# {case}: globals restored changed=0',
+                f'# {case}: joined cleanup complete',
+                f'# {case}: failed init cleanup once acquired={acquired} released={acquired} second=noop',
+                f'# {case}.speed: slow',
+                f'not ok {number} {case}'))
+            continue
         expected.extend(FRAMEWORK_MESSAGES.get(case, ()))
         if mode == 'terminal-control':
             for expression in ('f->last.wakeup_initialized', 'f->last.capable', 'f->last.source'):
@@ -294,10 +315,11 @@ def diagnostic_contract(mode):
             expected.extend(failure_lines(case, 'f->last_late_queue'))
         expected.extend(re.escape(line) for line in (
             '# ' + case + ': ' + ownership(case, mode),
+            '# ' + case + ': globals restored changed=1',
             '# ' + case + ': joined cleanup complete',
             '# ' + case + '.speed: slow',
             ('ok' if mode == 'positive' else 'not ok') + f' {number} {case}'))
-    passed, failed = (len(cases), 0) if mode == 'positive' else (0, 1)
+    passed, failed = (len(cases), 0) if mode == 'positive' else (0, len(cases))
     counts = f'pass:{passed} fail:{failed} skip:0 total:{len(cases)}'
     if len(cases) > 1:  # Pinned default kunit.stats_enabled=1.
         expected.extend(re.escape(line) for line in (f'# {suite}: {counts}', f'# Totals: {counts}'))
@@ -308,7 +330,7 @@ def diagnostic_contract(mode):
 
 def checked_cases(report, log, *, mode):
     suite_name, names = SUITES[mode]
-    failed = int(mode != 'positive')
+    failed = 0 if mode == 'positive' else len(names)
     counts = dict(tests=len(names), passed=len(names) - failed, failed=failed,
                   crashed=0, skipped=0, errors=0)
     if (not isinstance(report, dict) or report.get('name') != 'KUnit Test Group' or

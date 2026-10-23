@@ -173,7 +173,7 @@ def execute_kernel(source, view_path, work, view):
         source=view, compiler_sha256=sha256(build / 'compiler.txt'), elf_info_sha256=sha256(build / 'elf-info.txt')))
     outcomes = {}
     # Controls are observed before the positive suite, using the SAME kernel.
-    for mode in ('terminal-control', 'work-control', 'positive'):
+    for mode in ('terminal-control', 'work-control', 'init-failure', 'positive'):
         resources(ROOT, ROOT)
         destination = work / mode
         destination.mkdir()

@@ -22,6 +22,32 @@ struct neo_joined_walk {
 	gfp_t gfp_before, gfp_after;
 };
 
+struct neo_joined_globals {
+	typeof(musb_readb) readb;
+	typeof(musb_writeb) writeb;
+	typeof(musb_clearb) clearb;
+	typeof(musb_readw) readw;
+	typeof(musb_writew) writew;
+	typeof(musb_clearw) clearw;
+	ushort fifo;
+};
+
+enum neo_init_fault {
+	NEO_INIT_NO_FAULT,
+	NEO_INIT_REGISTER_MEMORY,
+	NEO_INIT_IRQ_MAPPING,
+	NEO_INIT_CHILD_DRIVER,
+};
+
+enum neo_fixture_resource {
+	NEO_PARENT = BIT(0),
+	NEO_DOMAIN = BIT(1),
+	NEO_IRQ = BIT(2),
+	NEO_PHY = BIT(3),
+	NEO_SUNXI = BIT(4),
+	NEO_DRIVER = BIT(5),
+};
+
 struct neo_joined_fixture {
 	struct neo_joined_lifetime life;
 	struct platform_device *children[2];
@@ -33,6 +59,7 @@ struct neo_joined_fixture {
 	struct usb_gadget_driver gadget;
 	struct neo_joined_snapshot last;
 	struct neo_joined_walk walk;
+	struct neo_joined_globals globals;
 	struct neo_joined_gate irq_gate;
 	struct completion remove_done;
 	struct task_struct *remove_task;
@@ -45,9 +72,41 @@ struct neo_joined_fixture {
 	bool fail_initial_get, fail_arm, fail_disarm, fail_late;
 	bool foreign_source, terminal_cleanup_control;
 	bool last_late_queue;
+	bool globals_changed;
+	unsigned int acquired, released, cleanup_runs;
 };
 
 struct neo_joined_lifetime *neo_joined_current;
+
+static void neo_save_globals(struct neo_joined_globals *saved)
+{
+	saved->readb = musb_readb;
+	saved->writeb = musb_writeb;
+	saved->clearb = musb_clearb;
+	saved->readw = musb_readw;
+	saved->writew = musb_writew;
+	saved->clearw = musb_clearw;
+	saved->fifo = fifo_mode;
+}
+
+static bool neo_globals_equal(const struct neo_joined_globals *saved)
+{
+	return musb_readb == saved->readb && musb_writeb == saved->writeb &&
+		musb_clearb == saved->clearb && musb_readw == saved->readw &&
+		musb_writew == saved->writew && musb_clearw == saved->clearw &&
+		fifo_mode == saved->fifo;
+}
+
+static void neo_restore_globals(const struct neo_joined_globals *saved)
+{
+	musb_readb = saved->readb;
+	musb_writeb = saved->writeb;
+	musb_clearb = saved->clearb;
+	musb_readw = saved->readw;
+	musb_writew = saved->writew;
+	musb_clearw = saved->clearw;
+	fifo_mode = saved->fifo;
+}
 
 static struct neo_joined_fixture *neo_fixture(struct device *dev)
 {
@@ -160,6 +219,7 @@ static int neo_child_probe(struct platform_device *pdev)
 			return f->probe_result;
 	}
 	f->probe_result = musb_init_controller(&pdev->dev, f->irq, f->life.registers);
+	f->globals_changed |= !neo_globals_equal(&f->globals);
 	musb = dev_get_drvdata(&pdev->dev);
 	if (musb)
 		neo_snapshot(f, musb);
@@ -449,46 +509,84 @@ static void neo_joined_exit(struct kunit *test)
 
 	if (!f)
 		return;
+	/* KUnit invokes .exit even after .init fails. Consume its one claim first. */
+	test->priv = NULL;
+	f->cleanup_runs++;
 	complete_all(&f->life.notifier_gate.release);
 	complete_all(&f->life.work_gate.release);
 	complete_all(&f->life.scan_gate.release);
 	complete_all(&f->irq_gate.release);
-	if (!IS_ERR_OR_NULL(f->remove_task))
+	if (!IS_ERR_OR_NULL(f->remove_task)) {
 		kthread_stop(f->remove_task);
+		f->remove_task = NULL;
+	}
 	WRITE_ONCE(f->fail_disarm, false);
 	WRITE_ONCE(f->fail_arm, false);
-	if (f->gadget_registered)
+	if (f->gadget_registered) {
 		usb_gadget_unregister_driver(&f->gadget);
+		f->gadget_registered = false;
+	}
 	for (i = 0; i < f->children_count; i++) {
 		device_release_driver(&f->children[i]->dev);
 		device_init_wakeup(&f->children[i]->dev, false);
 		platform_device_unregister(f->children[i]);
+		f->children[i] = NULL;
 	}
+	f->children_count = 0;
+	f->life.controller = NULL;
+	f->life.musb = NULL;
 	/* Only fixture debt recovery, using the still-owned original descriptor. */
 	if (f->irq && irq_to_desc(f->irq)->wake_depth > (unsigned int)f->peer_wake)
 		KUNIT_EXPECT_EQ(test, disable_irq_wake(f->irq), 0);
-	if (f->peer_wake)
+	if (f->peer_wake) {
 		KUNIT_EXPECT_EQ(test, disable_irq_wake(f->irq), 0);
-	if (f->peer_action)
+		f->peer_wake = false;
+	}
+	if (f->peer_action) {
 		free_irq(f->irq, f);
+		f->peer_action = false;
+	}
 	neo_joined_sunxi_destroy(&f->life);
+	f->released |= f->acquired & NEO_SUNXI;
 	neo_joined_phy_destroy(&f->life);
-	if (f->driver_registered)
+	f->released |= f->acquired & NEO_PHY;
+	if (f->driver_registered) {
 		platform_driver_unregister(&neo_child_driver);
+		f->driver_registered = false;
+		f->released |= NEO_DRIVER;
+	}
 	if (f->irq) {
 		if (f->original_chip)
 			irq_set_chip(f->irq, f->original_chip);
 		irq_dispose_mapping(f->irq);
+		f->irq = 0;
+		f->original_chip = NULL;
+		f->released |= NEO_IRQ;
 	}
-	if (!IS_ERR_OR_NULL(f->domain))
+	if (!IS_ERR_OR_NULL(f->domain)) {
 		irq_domain_remove_sim(f->domain);
-	if (!IS_ERR_OR_NULL(f->life.parent))
+		f->released |= NEO_DOMAIN;
+	}
+	f->domain = NULL;
+	if (!IS_ERR_OR_NULL(f->life.parent)) {
 		root_device_unregister(f->life.parent);
+		f->released |= NEO_PARENT;
+	}
+	f->life.parent = NULL;
+	/* All child, IRQ, work and detector users have retired before this handoff. */
+	neo_restore_globals(&f->globals);
+	neo_joined_sunxi_restore_globals(&f->life);
+	KUNIT_EXPECT_TRUE(test, neo_globals_equal(&f->globals));
+	if (f->acquired & NEO_DRIVER)
+		KUNIT_EXPECT_TRUE(test, f->globals_changed);
+	KUNIT_EXPECT_EQ(test, f->cleanup_runs, 1U);
+	KUNIT_EXPECT_EQ(test, f->released, f->acquired);
 	neo_joined_current = NULL;
+	kunit_info(test, "globals restored changed=%d", f->globals_changed);
 	kunit_info(test, "joined cleanup complete");
 }
 
-static int neo_joined_init(struct kunit *test)
+static int neo_joined_init_stage(struct kunit *test, enum neo_init_fault fault)
 {
 	struct neo_joined_fixture *f;
 	int ret;
@@ -499,13 +597,9 @@ static int neo_joined_init(struct kunit *test)
 	f = kunit_kzalloc(test, sizeof(*f), GFP_KERNEL);
 	if (!f)
 		return -ENOMEM;
-	test->priv = f;
 	f->life.test = test;
 	f->life.vbus_level = true;
 	f->life.register_bytes = 4096;
-	f->life.registers = (void __iomem *)kunit_kzalloc(test, f->life.register_bytes, GFP_KERNEL);
-	if (!f->life.registers)
-		return -ENOMEM;
 	neo_gate_init(&f->life.notifier_gate);
 	neo_gate_init(&f->life.work_gate);
 	neo_gate_init(&f->life.scan_gate);
@@ -514,23 +608,35 @@ static int neo_joined_init(struct kunit *test)
 	init_completion(&f->life.notifier_retiring);
 	init_completion(&f->life.work_retiring);
 	init_completion(&f->life.irq_retiring);
+	neo_save_globals(&f->globals);
+	/* From this point, every possible .exit has initialized cleanup state. */
+	test->priv = f;
 	neo_joined_current = &f->life;
+	if (fault == NEO_INIT_REGISTER_MEMORY)
+		return -ENOMEM;
+	f->life.registers = (void __iomem *)kunit_kzalloc(test, f->life.register_bytes, GFP_KERNEL);
+	if (!f->life.registers)
+		return -ENOMEM;
 	f->life.parent = root_device_register("musb-combined-parent");
 	if (IS_ERR(f->life.parent)) {
 		ret = PTR_ERR(f->life.parent);
 		goto fail;
 	}
+	f->acquired |= NEO_PARENT;
 	f->life.parent->platform_data = &f->life;
 	f->domain = irq_domain_create_sim(NULL, 1);
 	if (IS_ERR(f->domain)) {
 		ret = PTR_ERR(f->domain);
 		goto fail;
 	}
-	f->irq = irq_create_mapping(f->domain, 0);
+	f->acquired |= NEO_DOMAIN;
+	/* Only these fixture acquisition results are injected, not Linux helpers. */
+	f->irq = fault == NEO_INIT_IRQ_MAPPING ? 0 : irq_create_mapping(f->domain, 0);
 	if (!f->irq) {
 		ret = -EINVAL;
 		goto fail;
 	}
+	f->acquired |= NEO_IRQ;
 	f->original_chip = irq_get_chip(f->irq);
 	f->chip = *f->original_chip;
 	f->chip.name = "musb-combined-lifecycle";
@@ -540,17 +646,117 @@ static int neo_joined_init(struct kunit *test)
 	ret = neo_joined_phy_prepare(&f->life);
 	if (ret)
 		goto fail;
+	f->acquired |= NEO_PHY;
 	ret = neo_joined_sunxi_prepare(&f->life);
 	if (ret)
 		goto fail;
-	ret = platform_driver_register(&neo_child_driver);
+	f->acquired |= NEO_SUNXI;
+	ret = fault == NEO_INIT_CHILD_DRIVER ? -EIO : platform_driver_register(&neo_child_driver);
 	if (ret)
 		goto fail;
 	f->driver_registered = true;
+	f->acquired |= NEO_DRIVER;
 	return 0;
 fail:
-	neo_joined_exit(test);
+	/* The framework owns cleanup, including this failed initialization. */
 	return ret;
+}
+
+static int neo_joined_init(struct kunit *test)
+{
+	return neo_joined_init_stage(test, NEO_INIT_NO_FAULT);
+}
+
+struct neo_init_probe {
+	const char *name;
+	enum neo_init_fault fault;
+	int error;
+	unsigned int acquired;
+};
+
+static const struct neo_init_probe neo_init_probes[] = {
+	{ "combined_init_register_memory_error_test", NEO_INIT_REGISTER_MEMORY, -ENOMEM, 0 },
+	{ "combined_init_irq_mapping_error_test", NEO_INIT_IRQ_MAPPING, -EINVAL,
+	  NEO_PARENT | NEO_DOMAIN },
+	{ "combined_init_child_driver_error_test", NEO_INIT_CHILD_DRIVER, -EIO,
+	  NEO_PARENT | NEO_DOMAIN | NEO_IRQ | NEO_PHY | NEO_SUNXI },
+};
+
+static const struct neo_init_probe *neo_init_probe(struct kunit *test)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(neo_init_probes); i++)
+		if (!strcmp(test->name, neo_init_probes[i].name))
+			return &neo_init_probes[i];
+	return NULL;
+}
+
+static int neo_init_probe_init(struct kunit *test)
+{
+	const struct neo_init_probe *probe = neo_init_probe(test);
+	int ret;
+
+	if (!probe)
+		return -EINVAL;
+	ret = neo_joined_init_stage(test, probe->fault);
+	KUNIT_EXPECT_EQ(test, ret, probe->error);
+	/* The pinned framework, not this wrapper, now invokes the real .exit. */
+	kunit_info(test, "fixture init probe error=%d", ret);
+	return ret;
+}
+
+static void neo_init_probe_exit(struct kunit *test)
+{
+	const struct neo_init_probe *probe = neo_init_probe(test);
+	struct neo_joined_fixture *f = test->priv;
+	unsigned int irq;
+
+	KUNIT_ASSERT_NOT_NULL(test, probe);
+	KUNIT_ASSERT_NOT_NULL(test, f);
+	irq = f->irq;
+	KUNIT_EXPECT_EQ(test, f->acquired, probe->acquired);
+	neo_joined_exit(test);
+	KUNIT_EXPECT_PTR_EQ(test, test->priv, NULL);
+	KUNIT_EXPECT_PTR_EQ(test, neo_joined_current, NULL);
+	KUNIT_EXPECT_PTR_EQ(test, f->life.parent, NULL);
+	KUNIT_EXPECT_PTR_EQ(test, f->domain, NULL);
+	KUNIT_EXPECT_EQ(test, f->irq, 0U);
+	if (irq)
+		KUNIT_EXPECT_PTR_EQ(test, irq_to_desc(irq), NULL);
+	KUNIT_EXPECT_PTR_EQ(test, f->life.phy, NULL);
+	KUNIT_EXPECT_PTR_EQ(test, f->life.extcon, NULL);
+	KUNIT_EXPECT_PTR_EQ(test, f->life.phy_private, NULL);
+	KUNIT_EXPECT_PTR_EQ(test, f->life.sunxi_private, NULL);
+	KUNIT_EXPECT_FALSE(test, f->driver_registered);
+	KUNIT_EXPECT_TRUE(test, completion_done(&f->life.notifier_gate.release));
+	KUNIT_EXPECT_TRUE(test, completion_done(&f->life.work_gate.release));
+	KUNIT_EXPECT_TRUE(test, completion_done(&f->life.scan_gate.release));
+	KUNIT_EXPECT_TRUE(test, completion_done(&f->irq_gate.release));
+	KUNIT_EXPECT_EQ(test, f->released, probe->acquired);
+	KUNIT_EXPECT_EQ(test, f->cleanup_runs, 1U);
+	KUNIT_EXPECT_TRUE(test, neo_globals_equal(&f->globals));
+	/* This deliberately repeated request cannot touch released Linux objects. */
+	neo_joined_exit(test);
+	KUNIT_EXPECT_EQ(test, f->cleanup_runs, 1U);
+	KUNIT_EXPECT_TRUE(test, neo_globals_equal(&f->globals));
+	kunit_info(test, "failed init cleanup once acquired=%u released=%u second=noop",
+		   f->acquired, f->released);
+}
+
+static void combined_init_register_memory_error_test(struct kunit *test)
+{
+	KUNIT_FAIL(test, "failed-init probe body must not execute");
+}
+
+static void combined_init_irq_mapping_error_test(struct kunit *test)
+{
+	KUNIT_FAIL(test, "failed-init probe body must not execute");
+}
+
+static void combined_init_child_driver_error_test(struct kunit *test)
+{
+	KUNIT_FAIL(test, "failed-init probe body must not execute");
 }
 
 static int neo_terminal_control_init(struct kunit *test)
@@ -800,6 +1006,13 @@ static struct kunit_case neo_work_control_cases[] = {
 	{ }
 };
 
+static struct kunit_case neo_init_probe_cases[] = {
+	KUNIT_CASE_SLOW(combined_init_register_memory_error_test),
+	KUNIT_CASE_SLOW(combined_init_irq_mapping_error_test),
+	KUNIT_CASE_SLOW(combined_init_child_driver_error_test),
+	{ }
+};
+
 static struct kunit_suite neo_joined_suite = {
 	.name = "musb-combined-lifecycle",
 	.init = neo_joined_init,
@@ -821,4 +1034,12 @@ static struct kunit_suite neo_work_control_suite = {
 	.test_cases = neo_work_control_cases,
 };
 
-kunit_test_suites(&neo_joined_suite, &neo_terminal_control_suite, &neo_work_control_suite);
+static struct kunit_suite neo_init_probe_suite = {
+	.name = "musb-combined-init-failure",
+	.init = neo_init_probe_init,
+	.exit = neo_init_probe_exit,
+	.test_cases = neo_init_probe_cases,
+};
+
+kunit_test_suites(&neo_joined_suite, &neo_terminal_control_suite,
+		 &neo_work_control_suite, &neo_init_probe_suite);

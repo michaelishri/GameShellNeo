@@ -159,15 +159,24 @@ static int neo_sunxi_exit_dispatch(struct musb *musb)
 
 static struct musb_platform_ops neo_sunxi_test_ops;
 
+struct neo_sunxi_fixture {
+	struct sunxi_glue glue;
+	struct musb *previous_musb;
+	struct musb_platform_ops previous_ops;
+};
+
 int neo_joined_sunxi_prepare(struct neo_joined_lifetime *life)
 {
+	struct neo_sunxi_fixture *fixture;
 	struct sunxi_glue *glue;
 	int ret;
 
-	glue = kunit_kzalloc(life->test, sizeof(*glue), GFP_KERNEL);
-	if (!glue)
+	fixture = kunit_kzalloc(life->test, sizeof(*fixture), GFP_KERNEL);
+	if (!fixture)
 		return -ENOMEM;
-	life->sunxi_private = glue;
+	glue = &fixture->glue;
+	fixture->previous_musb = sunxi_musb;
+	memcpy(&fixture->previous_ops, &neo_sunxi_test_ops, sizeof(neo_sunxi_test_ops));
 	glue->dev = life->parent;
 	glue->phy = life->phy;
 	glue->extcon = life->extcon;
@@ -180,6 +189,8 @@ int neo_joined_sunxi_prepare(struct neo_joined_lifetime *life)
 	set_bit(SUNXI_MUSB_FL_NO_CONFIGDATA, &glue->flags);
 	INIT_WORK(&glue->work, sunxi_musb_work);
 	disable_work(&glue->work);
+	/* A published partial fixture always has safe work-drain state. */
+	life->sunxi_private = glue;
 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
 	glue->usb_phy = usb_phy_generic_register();
 	if (IS_ERR(glue->usb_phy))
@@ -204,11 +215,32 @@ void neo_joined_sunxi_destroy(struct neo_joined_lifetime *life)
 	if (!glue)
 		return;
 	disable_work_sync(&glue->work);
-	if (!IS_ERR_OR_NULL(glue->xceiv))
+	if (!IS_ERR_OR_NULL(glue->xceiv)) {
 		usb_put_phy(glue->xceiv);
-	if (!IS_ERR_OR_NULL(glue->usb_phy))
+		glue->xceiv = NULL;
+	}
+	if (!IS_ERR_OR_NULL(glue->usb_phy)) {
 		usb_phy_generic_unregister(glue->usb_phy);
-	sunxi_musb = NULL;
+		glue->usb_phy = NULL;
+	}
+}
+
+void neo_joined_sunxi_restore_globals(struct neo_joined_lifetime *life)
+{
+	struct sunxi_glue *glue = life->sunxi_private;
+	struct neo_sunxi_fixture *fixture;
+
+	if (!glue)
+		return;
+	fixture = container_of(glue, struct neo_sunxi_fixture, glue);
+	/* Core calls this only after both Sunxi work and PHY detector drainage. */
+	KUNIT_EXPECT_FALSE(life->test, work_pending(&glue->work));
+	sunxi_musb = fixture->previous_musb;
+	memcpy(&neo_sunxi_test_ops, &fixture->previous_ops, sizeof(neo_sunxi_test_ops));
+	KUNIT_EXPECT_PTR_EQ(life->test, sunxi_musb, fixture->previous_musb);
+	KUNIT_EXPECT_MEMEQ(life->test, &neo_sunxi_test_ops, &fixture->previous_ops,
+			   sizeof(neo_sunxi_test_ops));
+	life->sunxi_private = NULL;
 }
 
 const struct musb_platform_ops *neo_joined_sunxi_ops(struct neo_joined_lifetime *life)

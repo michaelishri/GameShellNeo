@@ -12,7 +12,7 @@ import musb_combined_lifecycle_kunit as joined
 
 def report(mode):
     suite, names = joined.SUITES[mode]
-    failed = int(mode != 'positive')
+    failed = 0 if mode == 'positive' else len(names)
     counts = dict(tests=len(names), passed=len(names) - failed, failed=failed,
                   crashed=0, skipped=0, errors=0)
     cases = [dict(name=name, status='PASS' if not failed else 'FAIL') for name in names]
@@ -39,10 +39,46 @@ class JoinedDiagnosticTests(unittest.TestCase):
                 cases = joined.checked_cases(report(mode), log(mode), mode=mode)
                 self.assertEqual(len(cases), len(joined.SUITES[mode][1]))
 
+    def test_failed_init_requires_all_three_framework_errors_and_cleanup_observations(self):
+        mode = 'init-failure'
+        text = log(mode)
+        wrong = (
+            text.replace('failed to initialize: -12', 'failed to initialize: -5', 1),
+            text.replace('fixture init probe error=-22', 'fixture init probe error=0', 1),
+            text.replace('acquired=31 released=31', 'acquired=31 released=15', 1),
+            text.replace('second=noop', 'second=repeated', 1),
+            text.replace('globals restored changed=0', 'globals restored changed=1', 1),
+            text.replace('joined cleanup complete', 'test case cleanup timed out', 1),
+            text.replace('joined cleanup complete', 'failed-init probe body must not execute', 1),
+        )
+        for changed in wrong:
+            with self.subTest(changed=changed):
+                with self.assertRaisesRegex(ValueError, 'entire joined'):
+                    joined.checked_cases(report(mode), changed, mode=mode)
+        for key, value in (('passed', 1), ('failed', 2), ('errors', 1)):
+            changed = report(mode)
+            changed['misc'][key] = value
+            changed['sub_groups'][0]['misc'][key] = value
+            with self.subTest(key=key):
+                with self.assertRaises(ValueError):
+                    joined.checked_cases(changed, text, mode=mode)
+
+    def test_global_restoration_observation_is_required_for_every_actual_controller_case(self):
+        for mode in ('positive', 'terminal-control', 'work-control'):
+            text = log(mode)
+            for changed in (text.replace('globals restored changed=1', 'globals restored changed=0', 1),
+                            '\n'.join(line for line in text.splitlines()
+                                      if 'globals restored' not in line) + '\n',
+                            text.replace('globals restored changed=1',
+                                         'globals restored changed=1\n# unexpected restore diagnostic', 1)):
+                with self.subTest(mode=mode):
+                    with self.assertRaisesRegex(ValueError, 'entire joined'):
+                        joined.checked_cases(report(mode), changed, mode=mode)
+
     def test_cleanup_timeout_and_slow_warning_before_and_after_observation(self):
         for mode in joined.SUITES:
             case = joined.SUITES[mode][1][0]
-            anchor = '# ' + case + ': owned '
+            anchor = '# ' + case + (': failed init cleanup once ' if mode == 'init-failure' else ': owned ')
             text = log(mode)
             ownership = next(line for line in text.splitlines() if line.startswith(anchor))
             for diagnostic in ('test case cleanup timed out', 'Test should be marked slow (runtime: 1.000000000s)',
@@ -142,6 +178,78 @@ class JoinedDiagnosticTests(unittest.TestCase):
 
 
 class JoinedViewTests(unittest.TestCase):
+    def test_actual_global_helpers_restore_six_distinct_dispatches_and_fifo(self):
+        # Execute the maintained helpers with independent pointer/value oracles.
+        # This host model checks helper behavior, not Linux teardown ordering.
+        import subprocess
+        from musb_combined_lifecycle_source import function
+        root = Path(__file__).resolve().parents[2]
+        text = (root / 'kernel/tests/musb-combined-lifecycle-kunit.c').read_text()
+        body = '\n'.join(function(text, name) for name in (
+            'neo_save_globals', 'neo_globals_equal', 'neo_restore_globals'))
+        model = r"""
+#include <stdbool.h>
+#include <stdio.h>
+typedef unsigned short ushort;
+static unsigned char rb_a(void *p, unsigned n) { (void)p; (void)n; return 1; }
+static unsigned char rb_b(void *p, unsigned n) { (void)p; (void)n; return 2; }
+static void wb_a(void *p, unsigned n, unsigned char v) { (void)p; (void)n; (void)v; }
+static void wb_b(void *p, unsigned n, unsigned char v) { (void)p; (void)n; (void)v; }
+static unsigned short rw_a(void *p, unsigned n) { (void)p; (void)n; return 3; }
+static unsigned short rw_b(void *p, unsigned n) { (void)p; (void)n; return 4; }
+static void ww_a(void *p, unsigned n, unsigned short v) { (void)p; (void)n; (void)v; }
+static void ww_b(void *p, unsigned n, unsigned short v) { (void)p; (void)n; (void)v; }
+static unsigned char (*musb_readb)(void *, unsigned);
+static unsigned char (*musb_clearb)(void *, unsigned);
+static void (*musb_writeb)(void *, unsigned, unsigned char);
+static unsigned short (*musb_readw)(void *, unsigned);
+static unsigned short (*musb_clearw)(void *, unsigned);
+static void (*musb_writew)(void *, unsigned, unsigned short);
+static ushort fifo_mode;
+struct neo_joined_globals {
+    typeof(musb_readb) readb;
+    typeof(musb_writeb) writeb;
+    typeof(musb_clearb) clearb;
+    typeof(musb_readw) readw;
+    typeof(musb_writew) writew;
+    typeof(musb_clearw) clearw;
+    ushort fifo;
+};
+"""
+        main = r"""
+int main(void)
+{
+    struct neo_joined_globals saved;
+    musb_readb = rb_a; musb_writeb = wb_a; musb_clearb = rb_b;
+    musb_readw = rw_a; musb_writew = ww_a; musb_clearw = rw_b;
+    fifo_mode = 7;
+    neo_save_globals(&saved);
+    musb_readb = rb_b; musb_writeb = wb_b; musb_clearb = rb_a;
+    musb_readw = rw_b; musb_writew = ww_b; musb_clearw = rw_a;
+    fifo_mode = 4;
+    if (neo_globals_equal(&saved)) return 1;
+    neo_restore_globals(&saved);
+    if (!neo_globals_equal(&saved)) return 2;
+    if (musb_readb != rb_a || musb_writeb != wb_a || musb_clearb != rb_b ||
+        musb_readw != rw_a || musb_writew != ww_a || musb_clearw != rw_b || fifo_mode != 7)
+        return 3;
+    puts("actual global helpers: six dispatches and fifo restored");
+    return 0;
+}
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / 'globals.c'
+            source.write_text(model + body + main)
+            binary = directory / 'globals'
+            compiled = subprocess.run(['cc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+                                       str(source), '-o', str(binary)], text=True, capture_output=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            result = subprocess.run([str(binary)], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.stdout, 'actual global helpers: six dispatches and fifo restored\n')
+            self.assertEqual(result.stderr, '')
+
     def test_actual_preprocessor_preserves_fields_addresses_and_header_macros(self):
         import subprocess
         # The four self-macros and designators reproduce the actual generic I/O

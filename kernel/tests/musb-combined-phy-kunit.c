@@ -135,12 +135,18 @@ void neo_joined_phy_destroy(struct neo_joined_lifetime *life)
 	complete_all(&life->notifier_gate.release);
 	complete_all(&life->work_gate.release);
 	cancel_delayed_work_sync(&fixture->data.detect);
-	if (fixture->registered)
+	if (fixture->registered) {
 		extcon_dev_unregister(fixture->data.extcon);
+		fixture->registered = false;
+	}
 	if (!IS_ERR_OR_NULL(fixture->data.extcon))
 		devm_extcon_dev_free(life->parent, fixture->data.extcon);
+	fixture->data.extcon = NULL;
+	life->extcon = NULL;
 	if (!IS_ERR_OR_NULL(life->phy))
 		phy_destroy(life->phy);
+	life->phy = NULL;
+	life->phy_private = NULL;
 }
 
 void neo_joined_phy_flush(struct neo_joined_lifetime *life)

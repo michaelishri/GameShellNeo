@@ -11,6 +11,39 @@ It does not promote a kernel/image or clear NEO-98/102/103/106, the clock fault,
 physical USB readiness or the separately recorded provider/backend/SMP gates.
 DMA work and unrelated held investigations are outside this qualification.
 
+## Fixture lifecycle correction in progress
+
+The original `521c71c` source, results and sealed evidence remain historical.
+Its passing lifecycle executions did not exercise fixture setup failures and
+did not establish restoration of shared dispatch state. The fixture published
+`test->priv` before all cleanup completions were initialized and manually
+called cleanup on later setup errors, although KUnit calls `.exit` after a
+failed `.init`. Actual controller setup also changed six global I/O dispatch
+pointers and `fifo_mode` without restoring their previous values.
+
+The correction initializes cleanup state before publishing ownership, gives
+framework `.exit` the partial teardown, clears that ownership at cleanup entry
+and consumes released handles. It saves the six typed dispatch pointers,
+`fifo_mode`, the previous Sunxi controller pointer and test operations, and
+restores them after child/IRQ/work/detector retirement. All fourteen lifecycle
+families and both controls now check exact restoration after actual controller
+setup. Three additional fixture-only acquisition probes return `-ENOMEM` for
+the register buffer, `-EINVAL` after parent/domain acquisition and `-EIO` after
+PHY/Sunxi setup. The real KUnit runner must call `.exit` after each failed
+initialization; the probe bodies must not run. Cleanup checks acquired/released
+resources, disposed IRQ descriptors, release completions, global equality and
+a second exit request doing no work.
+
+These three probes require exact init diagnostics, zero assertion failures,
+three KUnit failures, guest exit zero and parser/managed exit one. Unknown
+setup errors, extra diagnostics or a cleanup failure remain inconclusive.
+Fresh Linux qualification is pending on a newly built test46 kernel; the old
+kernel cannot qualify changed fixture C. Native/ARM/context execution remains
+historical and its unchanged source closure will be proved without replay.
+The aggregate retained-artifact budget is now 640 MiB, including every prior
+attempt, with at most 332 MiB reserved for remediation. The original 384 MiB
+contract below remains the limit used for the historical executions.
+
 ## Exact source and execution boundaries
 
 The unchanged production queue has 33 entries. The selected existing terminal

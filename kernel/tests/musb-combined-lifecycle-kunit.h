@@ -63,6 +63,7 @@ bool neo_joined_phy_current_level(struct neo_joined_lifetime *life);
 bool neo_joined_phy_scan_drained(struct neo_joined_lifetime *life);
 int neo_joined_sunxi_prepare(struct neo_joined_lifetime *life);
 void neo_joined_sunxi_destroy(struct neo_joined_lifetime *life);
+void neo_joined_sunxi_restore_globals(struct neo_joined_lifetime *life);
 const struct musb_platform_ops *neo_joined_sunxi_ops(struct neo_joined_lifetime *life);
 const struct musb_hdrc_config *neo_joined_sunxi_config(void);
 void neo_joined_sunxi_flush(struct neo_joined_lifetime *life);

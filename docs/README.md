@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[319 — Completed-kernel verification prerequisites](319-kernel-reuse-verification-preflight.md)
+records real early/late route evidence, schema 2 prerequisite binding, read-only
+legacy refusal and bounded host qualification without an image build.
+
 [315 — Managed wakeup initialization errors](315-managed-wakeup-init-error.md)
 records primary-source API research, the isolated return-preserving candidate,
 finite actual-source controls and separate Linux/image/hardware gates.

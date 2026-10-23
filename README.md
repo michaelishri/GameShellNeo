@@ -894,6 +894,14 @@ Armbian, signature and final image checks remain mandatory.
 | `task image:checkpoint NAME=diagnostic7-before-usb-pm` | Verify the current raw/gzip image and retain its matching metadata before changing build identity; use a new name for each checkpoint |
 | `task mac:stage-recovery NAME=diagnostic8-before-keypad-retention` | Verify and select a checkpoint's matching recovery archive on the Mac; no card write |
 
+`task test:kernel-artifacts` covers completed-kernel reuse admission before
+image-stage entry. Schema 2 completion records include Linux/builder context,
+compiler/package files and exact parsed regulatory certificates; legacy
+records refuse without migration. Existing final image/signature checks and
+rootfs-only independence remain unchanged.
+[Report 319](docs/319-kernel-reuse-verification-preflight.md) records the finite
+route evidence and limits; no full image build is claimed by those checks.
+
 The base-rootfs cache ignores only image-version and kernel local-version
 suffix changes. Builder, snapshots, package/APT hooks, configuration, wrapper
 arguments and all other source-lock fields remain fingerprinted, and the

@@ -126,7 +126,7 @@ Admission requires the complete exact numeric observation plus exactly one
 PASS or declared FAIL line, empty stderr and original integer exit 0 or 1
 respectively. It rejects numeric prefixes, extra/wrong cases or assertions,
 diagnostics, changed saved hashes and an expected-negative result from raw 0.
-Twenty-five focused host checks pass, including real observation-route
+The first 25 focused host checks pass, including real observation-route
 raw-0/extra-failure rejection and distinct fresh executions with identical
 valid negative output.
 
@@ -135,6 +135,12 @@ valid negative output.
 ```sh
 task test:brcmfmac-reset-reference -- --archive /path/to/linux-6.18.54.tar.xz
 task test:brcmfmac-reset -- --archive /path/to/linux-6.18.54.tar.xz
+
+# Managed-only phase: original executions remain historical.
+task test:brcmfmac-reset -- --compile-drivers \
+  --native-evidence /path/to/original/native-attempt \
+  --native-revision b69ec450f0b9226bd3376552039de1a38b2dd348 \
+  --reuse-source-receipt /path/to/report314/full-source.json
 ```
 
 Supply the existing regular locked archive explicitly. No download/copy occurs.
@@ -160,7 +166,26 @@ Attempt 20261023T003014Z-a72b0be9262a48948f44a8c12753738d contains:
 | Original source/member/queue receipt | 1f14ec4d87e8ddb2a1c7b568a12cb18dce1e5af7e063550a32631ef976aac497 |
 | Original native/sanitizer/control result | 3fe74a1d86d010604f63f1d6c5efa2aa1482e42dafacdfc08650963aa2382930 |
 
-ARM/reference and complete normal/debug objects require the separately
+The managed-only host route verifies the historical helper revision against
+its recorded bytes, unchanged native helper functions/contract constants,
+actual C fixture/types/bodies, every saved artifact and all 56 genuine
+baseline/native/sanitizer/control outputs. It does not replay the binaries or
+rewrite that historical receipt. Additional source-view guards test complete
+inventory substitution, explicit read-only mounts, tampered original members,
+missing/extra overlays, source aliases and the truthful new patch stamp.
+
+To avoid another full source copy, the separately leased object phase mounts
+report314's verified production33+0057 source read-only. It verifies the whole
+actual inventory under its existing source lock. Exactly three read-only C
+file overrides remove0057 from core/cfg80211 and add0073 to sdio, plus a new
+read-only stamp records production33+0073. A derived whole-view inventory and
+all 14 actual selected members identify that effective view; the container
+checks its actual mounted bytes before compiling. Neither the retained tree
+nor its original stamp is relabeled or modified. Both output/configuration
+trees are new; no old compiled objects or generated headers are reused.
+The original source inventory is verified again after the owned operation.
+
+ARM/reference and complete normal/debug objects require that separate
 serialized resource lease and are not yet qualified. The final current host
 check and fresh independent Standards/Spec reviews also remain pending.
 No image selection or hardware result follows from the source qualification.

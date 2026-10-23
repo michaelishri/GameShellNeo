@@ -16,6 +16,9 @@ NEO-231's F2 reset admission candidate is documented in
 `task test:brcmfmac-reset-reference -- --archive /path/to/linux-6.18.54.tar.xz`
 for the original-source control and `task test:brcmfmac-reset` with the same
 archive argument for native/sanitizer and compiling-control qualification.
+Its `--compile-drivers` phase requires the original `--native-evidence`, full
+`--native-revision` and verified report314 `--reuse-source-receipt`; it mounts
+the retained source read-only and builds fresh ARM/full-driver outputs.
 Candidate 0073 rejects reset after F2 driver unbind before transport teardown;
 it does not add recovery/reprobe or select an image patch.
 

@@ -1,9 +1,12 @@
 """Regress complete numeric admission on the actual native observation route."""
 import json
+import shutil
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -186,6 +189,143 @@ class ResetSourceBoundaryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'identity mismatch'):
                 checks.prepare(ROOT, archive, directory / 'attempt')
             self.assertFalse((directory / 'attempt').exists())
+
+
+class ResetReadonlyViewTests(unittest.TestCase):
+    def entries(self):
+        return {name: ['file', 0, 'a' * 64] for name in
+                set(checks.OVERLAY_MEMBERS) | {'.gameshellneo-patches.json', 'unchanged.c'}}
+
+    def pins(self):
+        return {name: 'b' * 64 for name in
+                set(checks.OVERLAY_MEMBERS) | {'.gameshellneo-patches.json'}}
+
+    def test_complete_view_preserves_every_other_entry(self):
+        original = self.entries()
+        view = checks.derived_view_inventory(original, self.pins())
+        self.assertEqual(view['unchanged.c'], original['unchanged.c'])
+        self.assertEqual(original[checks.DRIVER + 'sdio.c'][2], 'a' * 64)
+        self.assertEqual(view[checks.DRIVER + 'sdio.c'][2], 'b' * 64)
+
+    def test_old_stamp_cannot_be_omitted(self):
+        pins = self.pins()
+        del pins['.gameshellneo-patches.json']
+        with self.assertRaises(ValueError):
+            checks.derived_view_inventory(self.entries(), pins)
+
+    def test_extra_override_is_rejected(self):
+        pins = self.pins()
+        pins['unrelated.c'] = 'c' * 64
+        with self.assertRaises(ValueError):
+            checks.derived_view_inventory(self.entries(), pins)
+
+    def test_override_cannot_follow_source_link(self):
+        entries = self.entries()
+        entries[checks.DRIVER + 'sdio.c'] = ['link', 'other']
+        with self.assertRaises(ValueError):
+            checks.derived_view_inventory(entries, self.pins())
+
+    def test_source_hash_must_be_complete(self):
+        pins = self.pins()
+        pins[checks.DRIVER + 'sdio.c'] = 'b' * 65
+        with self.assertRaises(ValueError):
+            checks.derived_view_inventory(self.entries(), pins)
+
+    def test_only_new_output_is_writable_and_offline_builder_is_pinned(self):
+        lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
+        mounts = {name: Path('/new/overrides') / name for name in self.pins()}
+        args = checks.stage_arguments(ROOT, Path('/new/output'), Path('/old/source'), mounts, lock)
+        volumes = [args[index + 1] for index, item in enumerate(args) if item == '-v']
+        self.assertEqual([value for value in volumes if not value.endswith(':ro')], ['/new/output:/qualification'])
+        self.assertIn('--pull=never', args)
+        self.assertEqual(args[args.index('--network') + 1], 'none')
+        self.assertEqual(args[args.index('--cpus=1')], '--cpus=1')
+        self.assertIn(lock['builder']['image'], args)
+
+    def test_missing_mount_is_rejected(self):
+        lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
+        with self.assertRaises(ValueError):
+            checks.stage_arguments(ROOT, Path('/new'), Path('/old'), {}, lock)
+
+    def prepare_fixture(self, directory):
+        from kernel_sources import inventory, digest as inventory_digest, source_spec
+        project = directory / 'project'
+        (project / 'build').mkdir(parents=True)
+        shutil.copyfile(ROOT / 'build/sources.lock.json', project / 'build/sources.lock.json')
+        candidates = project / 'kernel/candidates'
+        candidates.mkdir(parents=True)
+        for name in ('0057-brcmfmac-eapol-ownership.patch', '0073-brcmfmac-reset-ownership.patch'):
+            shutil.copyfile(ROOT / 'kernel/candidates' / name, candidates / name)
+        source = directory / 'cache/source'
+        candidate = directory / 'candidate'
+        for name in checks.SOURCE_FILES:
+            for tree in (source, candidate):
+                path = tree / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('unchanged member ' + name)
+        for name in checks.OVERLAY_MEMBERS:
+            (candidate / name).write_text('current native member ' + name)
+        old_extra = candidates / '0057-brcmfmac-eapol-ownership.patch'
+        old_manifest = [dict(name=old_extra.name, sha256=checks.file_hash(old_extra))]
+        (source / '.gameshellneo-patches.json').write_text(json.dumps(old_manifest) + '\n')
+        lock = json.loads((project / 'build/sources.lock.json').read_text())
+        metadata = dict(spec=source_spec(lock, old_manifest), tree_sha256=inventory_digest(inventory(source)))
+        (source.parent / 'metadata.json').write_text(json.dumps(metadata))
+        receipt = directory / 'retained.json'
+        receipt.write_text(json.dumps(dict(path=str(source), metadata=metadata)))
+        output = directory / 'output'
+        output.mkdir()
+        return project, source, candidate, receipt, output, metadata['tree_sha256']
+
+    def prepare(self, fixture):
+        project, source, candidate, receipt, output, expected = fixture
+        with mock.patch.object(checks, 'kernel_inputs', return_value=SimpleNamespace(patches=lambda: [])), \
+                mock.patch.object(checks, 'RETAINED_TREE_SHA256', expected):
+            return checks.prepare_source_view(project, receipt, candidate, output)
+
+    def test_actual_preparation_is_readonly_and_stamp_names_new_profile(self):
+        from kernel_sources import inventory, digest as inventory_digest
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self.prepare_fixture(Path(temporary))
+            source, mounts, proof = self.prepare(fixture)
+            self.assertEqual(inventory_digest(inventory(source)), fixture[-1])
+            stamp = json.loads(mounts['.gameshellneo-patches.json'].read_text())
+            self.assertEqual([item['name'] for item in stamp], ['0073-brcmfmac-reset-ownership.patch'])
+            self.assertNotEqual(proof['base_inventory_sha256'], proof['effective_inventory_sha256'])
+
+    def test_actual_preparation_rejects_changed_retained_member(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self.prepare_fixture(Path(temporary))
+            (fixture[1] / 'lib/klist.c').write_text('tampered retained member')
+            with self.assertRaisesRegex(ValueError, 'actual inventory changed'):
+                self.prepare(fixture)
+
+    def test_actual_preparation_rejects_unmapped_selected_difference(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self.prepare_fixture(Path(temporary))
+            (fixture[2] / 'lib/klist.c').write_text('unmapped native change')
+            with self.assertRaisesRegex(ValueError, 'differs from qualified native'):
+                self.prepare(fixture)
+
+    def test_actual_preparation_rejects_override_symlink(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = self.prepare_fixture(Path(temporary))
+            target = fixture[2] / (checks.DRIVER + 'sdio.c')
+            target.unlink()
+            target.symlink_to(fixture[1] / (checks.DRIVER + 'sdio.c'))
+            with self.assertRaisesRegex(ValueError, 'regular file'):
+                self.prepare(fixture)
+
+    def test_wrong_arm_elf_is_rejected(self):
+        with self.assertRaises(ValueError):
+            checks.check_arm_elf('Class: ELF64\nMachine: AArch64\n')
+
+    def test_compiler_warning_rejects_successful_raw_build(self):
+        with self.assertRaises(ValueError):
+            checks.check_driver_diagnostics('sdio.c:123: warning: unexpected declaration\n')
+
+    def test_intended_config_override_message_is_not_a_compiler_warning(self):
+        checks.check_driver_diagnostics('Value of CONFIG_BRCMDBG is redefined by fragment\n')
 
 
 if __name__ == '__main__':

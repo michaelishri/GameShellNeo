@@ -20,8 +20,9 @@ refined actual-source baseline is 13 PASS/three owner-refusal FAIL. Candidate
 qualification passes 16 native and 16 sanitizer cases, eight exact compiling
 controls and 39 focused host guards. A new read-only source-view operation
 passes 16 ARM cases and complete normal/debug driver objects; the retained
-source inventory is unchanged. Current-host qualification and fresh final
-reviews remain pending. The generic reset worker still ignores
+source inventory is unchanged. One current host check passes 24 runtime and
+1,535 tooling tests (nine expected skips), compiled C guards and shell lint.
+Fresh final reviews/publication remain pending. The generic reset worker still ignores
 the result; no new recovery/reprobe or universal F1/MMC lifetime claim is made.
 Candidate stays outside the image queue; parent58 and physical/clock gates
 remain open. [Report 317](docs/317-brcmfmac-reset-ownership.md).

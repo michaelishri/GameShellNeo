@@ -220,9 +220,15 @@ The original managed result is terminal 0 with no OOM, error, stop request or
 remaining ownership. New phase allocation was 13,029,376 bytes, below 128 MiB;
 5,737,107,456 bytes remained free at terminal observation.
 
-The final current host check and fresh independent Standards/Spec reviews
-remain pending. No image selection or hardware result follows from the
-source qualification.
+The one final current host check, Task session 94797, completed exit 0 at
+clean checkpoint 83edd57f2e8a97ed7d707024f29530b613ddbf01 (terminal observer
+6aa517): 24 runtime and 1,535 tooling tests, nine expected skips, both compiled
+C guards, Bash syntax and ShellCheck passed. Its full log hashes to
+4e7934057e854f54365659dec7e64d6ac7788488380633751a01c8ccceb1075d. Only
+this report and the owned follow-up results change after that check; executable
+qualification inputs remain identical. Fresh independent Standards/Spec
+reviews and separate publication remain pending. No image selection or
+hardware result follows from the source qualification.
 
 The versioned source pages were unavailable to the web fetcher; the exact
 locked local member/function hashes and retained archive identity establish

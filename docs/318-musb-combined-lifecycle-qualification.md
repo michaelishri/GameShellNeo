@@ -11,7 +11,7 @@ It does not promote a kernel/image or clear NEO-98/102/103/106, the clock fault,
 physical USB readiness or the separately recorded provider/backend/SMP gates.
 DMA work and unrelated held investigations are outside this qualification.
 
-## Fixture lifecycle correction in progress
+## Fixture lifecycle ownership and global restoration
 
 The original `521c71c` source, results and sealed evidence remain historical.
 Its passing lifecycle executions did not exercise fixture setup failures and
@@ -27,7 +27,9 @@ and consumes released handles. It saves the six typed dispatch pointers,
 `fifo_mode`, the previous Sunxi controller pointer and test operations, and
 restores them after child/IRQ/work/detector retirement. All fourteen lifecycle
 families and both controls now check exact restoration after actual controller
-setup. Three additional fixture-only acquisition probes return `-ENOMEM` for
+setup. The six pointers are `musb_readb`, `musb_writeb`, `musb_clearb`,
+`musb_readw`, `musb_writew` and `musb_clearw`. Three additional fixture-only
+acquisition probes return `-ENOMEM` for
 the register buffer, `-EINVAL` after parent/domain acquisition and `-EIO` after
 PHY/Sunxi setup. The real KUnit runner must call `.exit` after each failed
 initialization; the probe bodies must not run. Cleanup checks acquired/released
@@ -37,9 +39,12 @@ a second exit request doing no work.
 These three probes require exact init diagnostics, zero assertion failures,
 three KUnit failures, guest exit zero and parser/managed exit one. Unknown
 setup errors, extra diagnostics or a cleanup failure remain inconclusive.
-Fresh Linux qualification is pending on a newly built test46 kernel; the old
-kernel cannot qualify changed fixture C. Native/ARM/context execution remains
-historical and its unchanged source closure will be proved without replay.
+Fresh Linux qualification passes on a newly built test46 kernel; the old
+kernel is retained with its historical results. Native/ARM/context execution
+remains historical. Read-only comparison proves its twelve executable inputs,
+33 selected functions, projected header, original Task behavior and exact
+source45 identity unchanged by the fixture correction. Full genuine native,
+sanitizer and ARM output is admitted again without executing those programs.
 The aggregate retained-artifact budget is now 640 MiB, including every prior
 attempt, with at most 332 MiB reserved for remediation. The original 384 MiB
 contract below remains the limit used for the historical executions.
@@ -149,12 +154,16 @@ object with its SRAM/PHY dependencies. It grants no production Kconfig change,
 board admission or image selection. The effective configuration must prove
 that selection and `MUSB_PIO_ONLY=y`.
 
-The declared incremental disk cap is 384 MiB, with at least 3 GiB free and
-128 MiB independent headroom plus the remaining reservation before a new heavy
-stage. One output/kernel is built serially. The initial two controls and positive
-attempt, plus the separately authorized fresh positive, retain distinct output
-directories and use the same frozen kernel/config. Docker is network-disabled,
-limited to one CPU/2560 MiB and a private 768 MiB UML temporary filesystem.
+The original incremental disk cap was 384 MiB. Corrected fixture qualification
+uses an aggregate 640 MiB cap, including the original outputs and kernel,
+with at most 332 MiB for remediation. At least 3 GiB free, 128 MiB independent
+headroom and the remaining reservation are required before a new heavy stage.
+The corrected run builds one new output/kernel serially and uses that same
+frozen kernel/config for both controls, the three init-error probes and all
+fourteen positive cases. Original directories and their earlier kernel remain
+retained. Docker is network-disabled, limited to one CPU/2560 MiB and a private
+768 MiB UML temporary filesystem. Generated host files have normal private
+permissions; their runtime bind mounts are read-only.
 
 The pinned `kunit.py exec` launcher appends `mem=1G`. The dedicated runner instead
 launches that same frozen UML kernel with explicit `mem=512M`, a single exact
@@ -163,7 +172,71 @@ metadata. Guest argv, raw exit, parser exit, raw log and JSON hashes are retaine
 There is no outer observation deadline, cached-result fallback or automatic
 retry. A lost observation requires inspecting the original managed operation.
 
-## Qualification and retained originals
+## Fresh Linux qualification
+
+The corrected executable checkpoint is
+`e6aed66a0e0fcac5f2582ba1211027cb9f4d54cd`, based on published `9169937`.
+One original operation, `34486`, built the new kernel and ran four separate
+managed filters. The build completed in 582.809 seconds without a compiler
+warning; `CONFIG_WERROR=y` was effective. Both mounted base45 and generated46
+inventories contain 97,301 entries before every build/guest operation.
+The generated46 specification is
+`0f12b82008ebc123125d4bec9d1d406748170fc5c27a036c2c65e2e906720109`,
+the view inventory is
+`1f46d1d13de6a7658c5a151ff400c472ad17602c96259bb8bfdecdeaa35ad574`
+and its test append is
+`e5c56bf9bee59b9a3ca87c07ad6a4817735f1cbca6e69ae6979e2f94dc9b64d5`.
+
+| Filter | Guest / parser / managed exits | Exact admitted result |
+| --- | --- | --- |
+| Terminal control | 0 / 1 / 1 | One case fails only its three declared assertions; 20-line stream |
+| Work control | 0 / 1 / 1 | One case fails only its one declared assertion; 16-line stream |
+| Fixture init failure | 0 / 1 / 1 | Three init errors, three failed cases, zero assertion failures; 34-line stream |
+| Positive | 0 / 0 / 0 | Fourteen passing cases; complete 110-line stream |
+
+The new kernel SHA-256 is
+`3618b79920cbc723f7c67d255d1f9ee342f6f219c7ed0039c25e945c2e84afea`;
+its effective configuration SHA-256 is
+`edd7e94b96b219accff511790b5c7d36ad6173933b77e149f8da6509d9ba139b`.
+Actual configuration selects the MUSB/Sunxi/gadget/PHY/SRAM/regmap/PIO/test
+symbols and sparse IRQ descriptors, while `KUNIT_ALL_TESTS` is disabled.
+Every positive/control case observes changed core dispatch/configuration
+followed by exact saved restoration. The init probes exercise KUnit's actual
+failed-init-to-exit path, including real partial resource teardown and a
+verified no-op second exit request. Their modeled errors are limited to the
+three declared acquisition boundaries; no production allocator or driver
+failure body is replaced.
+
+| Current phase | Retained receipt SHA-256 |
+| --- | --- |
+| Build | `73b27e156312b5e95d0e0bf0cf87d984cae1301c871b5127062d8c9a9a7f5102` |
+| Terminal control | `28ebe917301fdc3ef27da86e1986a3f79ac2beadf9a2bc55a20cd1b1aa13354a` |
+| Work control | `34b3d2ce9691f1d58addf2d2a8f8e63a7d9ea04f171340d318e9f68632fcaccd` |
+| Init failure probes | `15ee039f98b68e292b300e05444ebbc027d6612fb0a8b3aa2b4479945358a296` |
+| Positive fourteen | `cfb40f075484790fad544e6048985378e58d134d910dd31b99ee663b75fb1e63` |
+
+The five managed run IDs, in that order, are
+`045ae25a31f74ea5a1a7de6b3bb3f2e3`, `68808821b9e049699cff38e8e4976199`,
+`d3396eb4cc6e4b28a13a936d304efa02`, `7b63fc309f0049358b43351e461c1232`
+and `7db4449210904c1bbe30a40e0e015e6a`.
+Overall receipt SHA-256 is
+`07f869c46e32f15171969254254d3e3449007fedb4d4073de6bddd3d9949acb8`.
+The outer operation exits zero with all 988 source pins unchanged. Terminal
+inspection confirms released managed ownership and free workflow/qualification
+locks; all 335 historical artifacts still match. Aggregate allocation was
+531,046,400 bytes with 5,180,411,904 bytes free. Twenty-three focused fixture
+and admission checks pass, including execution of the actual save/restore helpers
+against independent host pointer/value oracles. Those host models do not
+replace the real Linux failure/lifetime qualification above.
+
+The v5 operation uses the same saved workflow admission, lock and managed
+checker with a unique log name. A prepare-only Task had rotated the canonical
+historical task-log path; its new output was retained separately and the
+historical path was restored from its verified byte-identical original copy.
+Both that observation and an earlier private evidence-collation error remain
+recorded. They are distinct from the successful kernel/guest execution.
+
+## Historical qualification and retained originals
 
 The original native/sanitizer run at `c39f8b2` passed all fourteen families in
 both builds. Both controls returned exactly1 with the prescribed three/one
@@ -207,8 +280,8 @@ That attempt remains failed admission. Linux `drivers/phy/phy-core.c:244–249`
 emits `phy init failed --> -5` when the actual init operation returns the P05
 injected `-EIO`. The corrected grammar requires that exact PHY identity/message
 once in P05, before the controller/probe errors. Missing, duplicated, misplaced,
-wrong-error, wrong-device and other-case messages are rejected. All 27 focused
-host checks pass; arbitrary extra diagnostics remain inconclusive.
+wrong-error, wrong-device and other-case messages are rejected. At that stage,
+all 27 focused host checks passed; arbitrary extra diagnostics remain inconclusive.
 
 After the corrected 96-line contract was frozen at `7930d4e`, one fresh positive
 operation `23147` passed all fourteen cases and the entire stream. Raw guest,
@@ -243,8 +316,9 @@ terminal/work controls are `d19f924913234816b48606da133b7f25` and
 `d338d3ccfc524f1cac7d294dd4b72087`. The fresh positive run is
 `40b2321c2da24d81a97b1af3c2f1bbbe`. Actual original terminal wrappers,
 logs, ownership results, before/after identities and all failed observations
-are retained in ignored evidence. There was one kernel build and no
-ARM/native/context/control replay for a changed Git ancestry.
+are retained in ignored evidence. That historical qualification used one kernel
+build. The later fixture correction has its own new build and four filters
+above; no native/ARM/context replay was needed for unchanged source or ancestry.
 
 Pre-compilation fixture observations also remain separate: the first extractor
 newline failure, ambiguous opening-anchor failure, saved-flags signature
@@ -263,7 +337,7 @@ normal merge, preserving both histories and shared navigation/Task sections.
 Original native, ARM, kernel and control execution provenance stays tied to
 the revisions above. Exact current executable/function/Task/view comparisons
 account for changed whole-file context pins without relabelling those old
-runs. The one final ordinary `task check` at clean accepted-base checkpoint
+runs. The original ordinary `task check` at clean accepted-base checkpoint
 `7e6b5b8` passed 24 runtime and 1,562 tooling tests (nine expected skips), both
 compiled C guards and Bash/ShellCheck. Original host operation `84697` exited0
 with all 988 source pins unchanged. Its tool observer preserves bounded
@@ -271,6 +345,10 @@ head/tail console output, actual exit and both summaries; no separate complete
 console log was produced, and the check was not rerun. Only this report and
 FOLLOW-UP result prose changed afterward; their pre-host bytes/Git blobs remain
 retained. Host validation is separate from the kernel execution above.
+
+A new final ordinary `task check` of the corrected fixture and completed
+documentation is pending at a clean checkpoint. After it passes, only this
+report and FOLLOW-UP result prose may change before the final source freeze.
 
 Future reproducible heavy qualification uses the saved Tasks with an explicit
 verified terminal45 source path and fresh owned outputs. Default prepared-view

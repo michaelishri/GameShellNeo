@@ -740,6 +740,7 @@ static void combined_detector_exit_rebind_test(struct kunit *test)
 	neo_joined_sunxi_flush(&f->life);
 	neo_joined_phy_flush(&f->life);
 	KUNIT_EXPECT_TRUE(test, neo_joined_phy_current_level(&f->life));
+	KUNIT_EXPECT_TRUE(test, neo_joined_phy_scan_drained(&f->life));
 	KUNIT_EXPECT_EQ(test, atomic_read(&f->life.bad_access), 0);
 	device_release_driver(f->life.controller);
 	neo_expect_settled(test, f, false, 0, false);

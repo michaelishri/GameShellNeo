@@ -122,7 +122,8 @@ static struct sun4i_usb_phy_data *neo_phy_data(void);
 static void neo_phy_access(struct sun4i_usb_phy_data *data);
 static int neo_phy_clock_on(struct clk *clock);
 static void neo_phy_clock_off(struct clk *clock);
-static void neo_phy_after_notification(struct sun4i_usb_phy_data *data);
+static void neo_phy_after_notification(struct sun4i_usb_phy_data *data, u64 generation);
+static void neo_phy_scan_done(struct sun4i_usb_phy_data *data);
 static void neo_phy_after_mode(struct sun4i_usb_phy_data *data);
 static int neo_phy_vbus(struct sun4i_usb_phy_data *data);
 '''
@@ -148,7 +149,18 @@ static int neo_phy_vbus(struct sun4i_usb_phy_data *data);
     text = _replace_function(text, 'sun4i_usb_phy0_id_vbus_det_scan',
         '\t\textcon_set_state_sync(data->extcon, EXTCON_USB_HOST,\n\t\t\t\t\t!id_det);\n',
         '\t\textcon_set_state_sync(data->extcon, EXTCON_USB_HOST,\n\t\t\t\t\t!id_det);\n' +
-        guarded('\t\tneo_phy_after_notification(data);'))
+        guarded('\t\tneo_phy_after_notification(data, generation);'))
+    # The marker stays active through the actual post-notification tail, and is
+    # cleared at both real exits. A subsequent scan may reuse the same worker.
+    text = _replace_function(text, 'sun4i_usb_phy0_id_vbus_det_scan',
+        '\t\tif (!data->phy0_init || data->phy0_generation != generation) {\n'
+        '\t\t\tmutex_unlock(&phy0->mutex);\n\t\t\treturn;\n\t\t}\n',
+        '\t\tif (!data->phy0_init || data->phy0_generation != generation) {\n'
+        '\t\t\tmutex_unlock(&phy0->mutex);\n' + guarded('\t\t\tneo_phy_scan_done(data);') +
+        '\t\t\treturn;\n\t\t}\n')
+    text = _replace_function(text, 'sun4i_usb_phy0_id_vbus_det_scan',
+        '\tmutex_unlock(&phy0->mutex);\n}',
+        '\tmutex_unlock(&phy0->mutex);\n' + guarded('\tneo_phy_scan_done(data);') + '}')
     # Only the simulated electrical settling effect is skipped. Exit/generation
     # checks, generic-PHY mutex, notifications and work calls are not replaced.
     for delay in (200, 1000):

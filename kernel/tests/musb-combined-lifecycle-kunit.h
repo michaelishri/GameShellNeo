@@ -37,6 +37,8 @@ struct neo_joined_lifetime {
 	atomic_t phy_access;
 	atomic_t notification_calls;
 	atomic_t work_calls;
+	struct task_struct *held_scan_task;
+	u64 held_scan_generation;
 	bool fail_phy;
 	bool work_disable_control;
 	bool vbus_level;
@@ -58,6 +60,7 @@ void neo_joined_phy_irq(struct neo_joined_lifetime *life);
 u64 neo_joined_phy_generation(struct neo_joined_lifetime *life);
 bool neo_joined_phy_active(struct neo_joined_lifetime *life);
 bool neo_joined_phy_current_level(struct neo_joined_lifetime *life);
+bool neo_joined_phy_scan_drained(struct neo_joined_lifetime *life);
 int neo_joined_sunxi_prepare(struct neo_joined_lifetime *life);
 void neo_joined_sunxi_destroy(struct neo_joined_lifetime *life);
 const struct musb_platform_ops *neo_joined_sunxi_ops(struct neo_joined_lifetime *life);

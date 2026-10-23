@@ -52,6 +52,11 @@ notification, outside the PHY mutex. Each is released and joined before fixture
 memory is freed, including assertion/error exits. No retirement wait holds the
 MUSB spinlock.
 
+The held detector records the actual source-captured generation and task. Its
+access observer also rejects that old task touching a different, live generation;
+a final correct cable level cannot hide such an access. The marker clears at
+both actual tail exits so reuse of the same worker for a fresh scan remains valid.
+
 ## Finite case and control map
 
 | Case | Joined observation |

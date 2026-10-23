@@ -114,6 +114,73 @@ class JoinedDiagnosticTests(unittest.TestCase):
 
 
 class JoinedViewTests(unittest.TestCase):
+    def test_actual_access_observer_distinguishes_old_live_generation(self):
+        # This one small host check tests only the observation predicate, with
+        # explicit atomic/lock/task boundary models; it is not Linux race proof.
+        import subprocess
+        from musb_combined_lifecycle_source import function
+        root = Path(__file__).resolve().parents[2]
+        body = function((root / 'kernel/tests/musb-combined-phy-kunit.c').read_text(), 'neo_phy_access')
+        model = r"""
+#include <stdio.h>
+#define READ_ONCE(value) (value)
+#define atomic_inc(value) (++*(value))
+#define atomic_read(value) (*(value))
+#define lockdep_assert_held(value) ((void)(value))
+struct task_struct { int identity; };
+struct test_phy { int mutex; };
+struct sun4i_usb_phy_data {
+    struct { struct test_phy *phy; } phys[1];
+    unsigned long long phy0_generation;
+};
+struct neo_joined_lifetime {
+    int phy_access, phy_clock, bad_access;
+    struct task_struct *held_scan_task;
+    unsigned long long held_scan_generation;
+};
+static struct neo_joined_lifetime *neo_joined_current;
+static struct task_struct *current;
+"""
+        main = r"""
+int main(void)
+{
+    struct test_phy phy = {0};
+    struct task_struct held = {1}, fresh = {2};
+    struct sun4i_usb_phy_data data = { .phys = {{&phy}}, .phy0_generation = 2 };
+    struct neo_joined_lifetime life = { .phy_clock = 1,
+        .held_scan_task = &held, .held_scan_generation = 1 };
+    neo_joined_current = &life;
+    current = &held;
+    neo_phy_access(&data);
+    if (life.bad_access != 1) return 1; /* Old task/new live generation. */
+    life.bad_access = 0;
+    current = &fresh;
+    neo_phy_access(&data);
+    if (life.bad_access) return 2; /* Independent fresh scan. */
+    current = &held;
+    data.phy0_generation = 1;
+    neo_phy_access(&data);
+    if (life.bad_access) return 3; /* Same admitted generation. */
+    life.phy_clock = 0;
+    neo_phy_access(&data);
+    if (life.bad_access != 1 || life.phy_access != 4) return 4;
+    puts("actual observation predicate: 4 states passed");
+    return 0;
+}
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / 'observer.c'
+            source.write_text(model + body + main)
+            binary = directory / 'observer'
+            compiled = subprocess.run(['cc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+                                       str(source), '-o', str(binary)], text=True, capture_output=True)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            result = subprocess.run([str(binary)], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.stdout, 'actual observation predicate: 4 states passed\n')
+            self.assertEqual(result.stderr, '')
+
     def test_function_anchor_tolerates_nested_block_but_rejects_ambiguous_token(self):
         source = 'static int sample(void)\n{\n\tif (ready) {\n\t\treturn 1;\n\t}\n\treturn 0;\n}\n'
         changed = joined._replace_function(source, 'sample', '\n{\n', '\n{\n\tobserve();\n')

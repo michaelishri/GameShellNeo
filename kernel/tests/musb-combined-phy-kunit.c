@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Appended to the complete actual Sun4i PHY driver; generic PHY remains real. */
+#include <linux/sched.h>
 #include "musb-combined-lifecycle-kunit.h"
 
 struct neo_phy_fixture {
@@ -22,6 +23,10 @@ static void neo_phy_access(struct sun4i_usb_phy_data *data)
 	lockdep_assert_held(&data->phys[0].phy->mutex);
 	atomic_inc(&life->phy_access);
 	if (!atomic_read(&life->phy_clock))
+		atomic_inc(&life->bad_access);
+	/* A live rebound clock cannot excuse an old admitted scan's access. */
+	if (READ_ONCE(life->held_scan_task) == current &&
+	    life->held_scan_generation != data->phy0_generation)
 		atomic_inc(&life->bad_access);
 }
 
@@ -51,10 +56,25 @@ static void neo_phy_clock_off(struct clk *clock)
 	clk_disable_unprepare(clock);
 }
 
-static void neo_phy_after_notification(struct sun4i_usb_phy_data *data)
+static void neo_phy_after_notification(struct sun4i_usb_phy_data *data, u64 generation)
 {
-	if (data == neo_phy_data())
-		neo_joined_gate_wait(&neo_joined_current->scan_gate);
+	struct neo_joined_lifetime *life = neo_joined_current;
+
+	if (data != neo_phy_data())
+		return;
+	if (atomic_read(&life->scan_gate.armed)) {
+		life->held_scan_generation = generation;
+		WRITE_ONCE(life->held_scan_task, current);
+	}
+	neo_joined_gate_wait(&life->scan_gate);
+}
+
+static void neo_phy_scan_done(struct sun4i_usb_phy_data *data)
+{
+	struct neo_joined_lifetime *life = neo_joined_current;
+
+	if (data == neo_phy_data() && READ_ONCE(life->held_scan_task) == current)
+		WRITE_ONCE(life->held_scan_task, NULL);
 }
 
 static void neo_phy_after_mode(struct sun4i_usb_phy_data *data)
@@ -162,4 +182,9 @@ bool neo_joined_phy_active(struct neo_joined_lifetime *life)
 bool neo_joined_phy_current_level(struct neo_joined_lifetime *life)
 {
 	return extcon_get_state(life->extcon, EXTCON_USB) == READ_ONCE(life->vbus_level);
+}
+
+bool neo_joined_phy_scan_drained(struct neo_joined_lifetime *life)
+{
+	return READ_ONCE(life->held_scan_task) == NULL;
 }

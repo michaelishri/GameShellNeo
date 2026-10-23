@@ -165,6 +165,9 @@ Its test append is
 The original Linux Task `27877` returned 201 (underlying checker exit1). Its
 two controls are valid: each raw guest returned0, parser/managed returned1,
 with exactly the prescribed three/one failures and complete actor cleanup.
+This predeclared UML halt0 is distinct from native/sanitizer/ARM control
+process exit1. A parser/managed0 control, guest error, extra/missing diagnostic
+or unresolved ownership is inconclusive; guest0 alone never admits a control.
 The initial positive guest reported fourteen passing cases, but the frozen
 95-line contract correctly refused an additional real PHY-framework message.
 That attempt remains failed admission. Linux `drivers/phy/phy-core.c:244–249`
@@ -227,8 +230,14 @@ normal merge, preserving both histories and shared navigation/Task sections.
 Original native, ARM, kernel and control execution provenance stays tied to
 the revisions above. Exact current executable/function/Task/view comparisons
 account for changed whole-file context pins without relabelling those old
-runs. One final ordinary `task check` at a clean accepted-base checkpoint is
-pending; it will be recorded separately from kernel qualification.
+runs. The one final ordinary `task check` at clean accepted-base checkpoint
+`7e6b5b8` passed 24 runtime and 1,562 tooling tests (nine expected skips), both
+compiled C guards and Bash/ShellCheck. Original host operation `84697` exited0
+with all 988 source pins unchanged. Its tool observer preserves bounded
+head/tail console output, actual exit and both summaries; no separate complete
+console log was produced, and the check was not rerun. Only this report and
+FOLLOW-UP result prose changed afterward; their pre-host bytes/Git blobs remain
+retained. Host validation is separate from the kernel execution above.
 
 Future reproducible heavy qualification uses the saved Tasks with an explicit
 verified terminal45 source path and fresh owned outputs. Default prepared-view

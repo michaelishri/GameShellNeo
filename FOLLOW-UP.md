@@ -23,8 +23,10 @@ exact grammar correction, one fresh positive run passes all fourteen actual
 UDC/DPM/global-IRQ/SRCU/work/PHY cases and its complete 96-line stream. All
 originals remain retained; six matching selected-object configurations are
 historical read-only evidence. Published916 is adopted with exact executable
-equivalence; the one final host check and fresh review/publication remain
-pending. No image, backend/DMA/SMP, physical or clock clearance follows.
+equivalence. The one ordinary final host check passes 24 runtime/1,562 tooling
+tests (nine expected skips), compiled C guards and shell checks. Fresh independent
+review/publication remains pending. No image, backend/DMA/SMP, physical or clock
+clearance follows.
 [Report 318](docs/318-musb-combined-lifecycle-qualification.md).
 
 **NEO-58/231 F2 reset ownership:** candidate 0073 rejects reset after F2 driver

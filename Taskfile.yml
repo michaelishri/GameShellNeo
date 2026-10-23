@@ -647,6 +647,14 @@ tasks:
     desc: Test combined action/wake cleanup with real Linux IRQ, SRCU and wakeup sources
     cmds: [bash tools/run-logged.sh musb-terminal-wake-kunit python3 tools/check-musb-terminal-wake-kunit.py]
 
+  test:musb-combined-lifecycle:
+    desc: Test fourteen joined actual-source PIO lifecycle families and two exact compiling controls
+    cmds: ['bash tools/run-logged.sh musb-combined-lifecycle python3 tools/check-musb-combined-lifecycle.py {{.CLI_ARGS}}']
+
+  check:musb-combined-lifecycle-context:
+    desc: Verify terminal45 source and historical selected objects without relabeling their executions
+    cmds: ['bash tools/run-logged.sh musb-combined-lifecycle-context python3 tools/check-musb-combined-lifecycle.py --stage context {{.CLI_ARGS}}']
+
   check:musb-irq-drivers:
     desc: Test MUSB IRQ/work teardown and compile five isolated ARM configurations
     cmds: [bash tools/run-logged.sh musb-irq-drivers python3 tools/check-musb-irq.py --compile-drivers]

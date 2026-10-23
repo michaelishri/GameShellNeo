@@ -128,7 +128,8 @@ respectively. It rejects numeric prefixes, extra/wrong cases or assertions,
 diagnostics, changed saved hashes and an expected-negative result from raw 0.
 The first 25 focused host checks pass, including real observation-route
 raw-0/extra-failure rejection and distinct fresh executions with identical
-valid negative output.
+valid negative output. The final focused set has 39 passing checks, adding
+read-only source-view, builder, ELF and unexpected-diagnostic guards.
 
 ## Workflow and current evidence
 
@@ -185,10 +186,43 @@ nor its original stamp is relabeled or modified. Both output/configuration
 trees are new; no old compiled objects or generated headers are reused.
 The original source inventory is verified again after the owned operation.
 
-ARM/reference and complete normal/debug objects require that separate
-serialized resource lease and are not yet qualified. The final current host
-check and fresh independent Standards/Spec reviews also remain pending.
-No image selection or hardware result follows from the source qualification.
+The source checkpoint b69ec450f0b9226bd3376552039de1a38b2dd348 identifies the
+original native helper bytes. Managed-only additions were committed separately,
+then published prerequisite base f261e6741e23ae427ec1545722664ab639849ffd was
+merged normally. The adoption changed only shared Task/documentation context
+within this qualification's dependencies; the production queue, candidate,
+fixture, native functions/types and own Task entries remained unchanged.
+Historical native receipts retain their original identity.
+
+The one new managed Task session 44919 completed exit 0 at clean checkpoint
+f7eae0d4e37955439ad0e9184a5f3fcf706cb2bd, terminal observer aa4af2. Attempt
+20261023T005910Z-26da10b24d134a55a4bdc752a7a0b0cf records managed run
+e5fb7c3cb7a14858ad209d061e67573e. All 16 separately recorded ARM commands
+returned 0 with exact numeric stdout/stderr agreement with the original
+native execution. The ARM fixture and both complete driver objects are
+ELF32, little-endian ARM, EABI5. New normal/debug configurations select
+BRCMFMAC=m, SDIO=y and BRCMDBG=n/y respectively.
+
+| New managed artifact | SHA-256 |
+| --- | --- |
+| ARM fixture | c34f18083e4fe0274a71f98055d6efc7ae4ec6f59c4e15afd4aea7ca3d48673e |
+| Normal complete brcmfmac.o | 7c152810524751a769256bd91a0bbd0d0b54f584d6235a8d489c6d3fbf7cc447 |
+| Debug complete brcmfmac.o | 2484548c08f7345dec9091ad46a82938957d26a32064de4f653731a02b6e6d3c |
+| Source-view receipt | 0189b712b5c805f3b9206421c9ff3487bc41a05ace1fc10bd8e2848488459bc2 |
+| Managed qualification result | cd88a518a5ee1ec995f3232f47cae2c12ea5b120fda2923315b818db5705555e |
+
+The complete retained source inventory contains 97,300 entries. Its original
+hash 0cceb01121f80d4280114743c735e2fb3f8e6b37a88cb2f49f70a6032a617fa4 matches
+before and after the operation. The explicitly derived read-only view hashes
+to 68cae46a52144f3a42b2a4e44d3b527dd36dd631c281481a088182211f03eac3. The
+actual mounted member/stamp observation matches its selected-source pins.
+The original managed result is terminal 0 with no OOM, error, stop request or
+remaining ownership. New phase allocation was 13,029,376 bytes, below 128 MiB;
+5,737,107,456 bytes remained free at terminal observation.
+
+The final current host check and fresh independent Standards/Spec reviews
+remain pending. No image selection or hardware result follows from the
+source qualification.
 
 The versioned source pages were unavailable to the web fetcher; the exact
 locked local member/function hashes and retained archive identity establish

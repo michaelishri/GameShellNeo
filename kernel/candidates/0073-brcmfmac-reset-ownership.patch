@@ -1,0 +1,14 @@
+--- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
++++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/sdio.c
+@@ -4330,6 +4330,11 @@
+ 		goto unlock;
+ 	}
+ 	if (!sdiodev->bus) {
++		ret = -ENODEV;
++		goto unlock;
++	}
++	/* F2 owns the shared transport; an unbound function cannot reset it. */
++	if (!device_is_bound(f2dev)) {
+ 		ret = -ENODEV;
+ 		goto unlock;
+ 	}

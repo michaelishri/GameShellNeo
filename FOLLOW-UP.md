@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-58/231 F2 reset ownership:** candidate 0073 rejects reset after F2 driver
+unbind under the existing F2 lock, before transport/IRQ/MMC teardown. The
+original 14-case hypothesis remains 12 passing/two failed observations; the
+refined actual-source baseline is 13 PASS/three owner-refusal FAIL. Candidate
+qualification passes 16 native and 16 sanitizer cases, eight exact compiling
+controls and 25 focused host guards. ARM/full-driver/current-host qualification
+and fresh final reviews remain pending. The generic reset worker still ignores
+the result; no new recovery/reprobe or universal F1/MMC lifetime claim is made.
+Candidate stays outside the image queue; parent58 and physical/clock gates
+remain open. [Report 317](docs/317-brcmfmac-reset-ownership.md).
+
 **NEO-98/229 managed wakeup initialization:** candidate 0072 returns the exact
 initialization error before registering managed disable cleanup. The five-case
 native/ASan/UBSan/ARM reference passes, with the original wrapper failing exactly

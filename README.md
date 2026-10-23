@@ -6,6 +6,12 @@ The first milestone is a diagnostic image: Linux 6.18.54, minimal Debian 13,
 standard device interfaces, and the bootloader already proven on the owner's
 board. Normal sleep, a launcher, OTA and other board revisions are later work.
 
+NEO-232's dedicated joined startup/wake/Sunxi qualification is documented in
+[report 318](docs/318-musb-combined-lifecycle-qualification.md). Its three
+`musb-combined-lifecycle` Tasks bind the existing terminal45 source without a
+new profile or driver bridge. Native/sanitizer references pass; Linux/ARM and
+final qualification are being prepared. The image and physical gates stay open.
+
 For development-only selectable SD systems, use the opt-in
 [multi-system card tooling](development/multiboot/README.md). It keeps a fixed
 recovery system and imports complete diagnostic versions for selection over

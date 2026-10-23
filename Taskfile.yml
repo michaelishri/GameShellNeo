@@ -655,6 +655,10 @@ tasks:
     desc: Verify terminal45 source and historical selected objects without relabeling their executions
     cmds: ['bash tools/run-logged.sh musb-combined-lifecycle-context python3 tools/check-musb-combined-lifecycle.py --stage context {{.CLI_ARGS}}']
 
+  test:musb-combined-lifecycle-kunit:
+    desc: Qualify joined startup/wake/Sunxi PIO ownership on one exact read-only test view
+    cmds: ['bash tools/run-logged.sh musb-combined-lifecycle-kunit python3 tools/check-musb-combined-lifecycle-kunit.py {{.CLI_ARGS}}']
+
   check:musb-irq-drivers:
     desc: Test MUSB IRQ/work teardown and compile five isolated ARM configurations
     cmds: [bash tools/run-logged.sh musb-irq-drivers python3 tools/check-musb-irq.py --compile-drivers]

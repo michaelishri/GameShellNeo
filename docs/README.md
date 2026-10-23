@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[318 — Joined MUSB lifecycle qualification](318-musb-combined-lifecycle-qualification.md)
+binds fourteen CPI/Sunxi PIO families and two exact controls to the unchanged
+terminal45 source, with explicit actual-framework and physical limits.
+
 [315 — Managed wakeup initialization errors](315-managed-wakeup-init-error.md)
 records primary-source API research, the isolated return-preserving candidate,
 finite actual-source controls and separate Linux/image/hardware gates.

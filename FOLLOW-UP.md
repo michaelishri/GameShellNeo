@@ -2,6 +2,15 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-98/232 joined CPI/Sunxi PIO qualification:** dedicated Tasks bind the
+unchanged terminal45 queue, including existing startup/wake and terminal
+cleanup semantics. Fourteen complete-source native/sanitizer families and both
+exact safe controls pass. The actual Linux UDC/DPM/global-IRQ/SRCU/work/PHY
+joined fixture and its strict whole-stream admission are being prepared in a
+five-file read-only disposable view; ARM/Linux and final review/publication
+remain pending. No image, backend/DMA/SMP, physical or clock clearance follows.
+[Report 318](docs/318-musb-combined-lifecycle-qualification.md).
+
 **NEO-98/229 managed wakeup initialization:** candidate 0072 returns the exact
 initialization error before registering managed disable cleanup. The five-case
 native/ASan/UBSan/ARM reference passes, with the original wrapper failing exactly

@@ -42,7 +42,11 @@ def _fragment(root, name, header):
 
 
 def _aliases(mapping):
-    return '\n'.join('#define ' + name + ' ' + value for name, value in mapping.items()) + '\n'
+    # I/O headers already define self-macros for these function names. Only
+    # calls belong to the seam; structure fields and bare addresses must stay
+    # intact. All declarations/includes precede this temporary alias scope.
+    return ''.join('#undef ' + name + '\n#define ' + name + '(...) ' + value +
+                   '(__VA_ARGS__)\n' for name, value in mapping.items())
 
 
 def _undef(mapping):

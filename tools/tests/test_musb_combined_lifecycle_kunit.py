@@ -114,6 +114,52 @@ class JoinedDiagnosticTests(unittest.TestCase):
 
 
 class JoinedViewTests(unittest.TestCase):
+    def test_actual_preprocessor_preserves_fields_addresses_and_header_macros(self):
+        import subprocess
+        # The four self-macros and designators reproduce the actual generic I/O
+        # header/Sunxi collision. The other names cover every temporary call
+        # seam, including the separate PHY clock aliases. This is preprocessing
+        # evidence only; the real kernel build still checks types/configuration.
+        mappings = (
+            dict(readb='neo_sunxi_readb', readw='neo_sunxi_readw',
+                 writeb='neo_sunxi_writeb', writew='neo_sunxi_writew',
+                 clk_prepare_enable='neo_sunxi_clock_on',
+                 clk_disable_unprepare='neo_sunxi_clock_off',
+                 reset_control_deassert='neo_sunxi_reset_off',
+                 reset_control_assert='neo_sunxi_reset_on',
+                 extcon_register_notifier='neo_sunxi_notifier_register',
+                 extcon_unregister_notifier_sync='neo_sunxi_notifier_unregister',
+                 disable_work_sync='neo_sunxi_work_disable'),
+            dict(clk_prepare_enable='neo_phy_clock_on',
+                 clk_disable_unprepare='neo_phy_clock_off'),
+        )
+        for mapping in mappings:
+            with self.subTest(mapping=mapping):
+                headers = ''.join('#define ' + name + ' ' + name + '\n'
+                                  for name in ('readb', 'readw', 'writeb', 'writew'))
+                observations = []
+                expected = []
+                for name, target in mapping.items():
+                    observations += ['.' + name + ' = original_' + name + ';',
+                                     'take_address(&' + name + ');',
+                                     'take_function(' + name + ');',
+                                     name + '(argument);']
+                    expected += observations[-4:-1] + [target + '(argument);']
+                # Nested argument calls must both pass through their own seam.
+                names = tuple(mapping)
+                observations.append(names[0] + '(' + names[1] + '(argument));')
+                expected.append(mapping[names[0]] + '(' + mapping[names[1]] + '(argument));')
+                text = headers + joined._aliases(mapping) + '\n'.join(observations) + '\n'
+                text += joined._undef(mapping)
+                for name in mapping:
+                    text += name + '(fallback);\n'
+                    expected.append(name + '(fallback);')
+                result = subprocess.run(['cc', '-E', '-P', '-Werror', '-x', 'c', '-'],
+                                        input=text, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, '')
+                self.assertEqual(result.stdout.splitlines(), expected)
+
     def test_actual_access_observer_distinguishes_old_live_generation(self):
         # This one small host check tests only the observation predicate, with
         # explicit atomic/lock/task boundary models; it is not Linux race proof.

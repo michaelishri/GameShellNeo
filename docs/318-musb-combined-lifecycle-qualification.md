@@ -346,9 +346,16 @@ console log was produced, and the check was not rerun. Only this report and
 FOLLOW-UP result prose changed afterward; their pre-host bytes/Git blobs remain
 retained. Host validation is separate from the kernel execution above.
 
-A new final ordinary `task check` of the corrected fixture and completed
-documentation is pending at a clean checkpoint. After it passes, only this
-report and FOLLOW-UP result prose may change before the final source freeze.
+The new final ordinary `task check` at clean corrected-source checkpoint
+`9f68e934` passes 24 runtime and 1,565 tooling tests (nine expected skips),
+both compiled C guards and Bash/ShellCheck. Original host session `67358`
+exits zero with all 988 source pins unchanged. Its complete private console
+SHA-256 is `2d413166a5d6898d24ae5a654c65a834da8769f3a3e6b3742f7794880b2e1383`;
+result receipt SHA-256 is
+`3fce48ab7822c5219e2de402cbd240d9c52edb22c4b95cf5890e3f2815f4694b`.
+Only this report and FOLLOW-UP result prose change afterward; their pre-host
+bytes and Git blobs are retained. No kernel, native, ARM or context replay
+accompanies the final documentation update.
 
 Future reproducible heavy qualification uses the saved Tasks with an explicit
 verified terminal45 source path and fresh owned outputs. Default prepared-view

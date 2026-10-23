@@ -23,15 +23,17 @@ exact grammar correction, one fresh positive run passes all fourteen actual
 UDC/DPM/global-IRQ/SRCU/work/PHY cases and its complete 96-line stream. All
 originals remain retained; six matching selected-object configurations are
 historical read-only evidence. Published916 is adopted with exact executable
-equivalence. The one ordinary final host check passes 24 runtime/1,562 tooling
+equivalence. The original host check passed 24 runtime/1,562 tooling
 tests (nine expected skips), compiled C guards and shell checks. Corrected
 fixture ownership/global restoration now passes a new kernel build, both exact
 controls, three actual KUnit init-error cleanup probes and all fourteen positive
 families. The probes confirm framework cleanup once and a no-op second exit;
 all four complete diagnostic streams meet their predeclared contracts. Earlier
 source/results remain historical; native/ARM/context source closure is unchanged
-and those programs were not replayed. A new final host check and fresh independent
-review/publication are pending. No image, backend/DMA/SMP, physical or clock clearance follows.
+and those programs were not replayed. The new final host check passes
+24 runtime/1,565 tooling tests (nine expected skips), C guards and shell checks,
+with all 988 inputs unchanged and a retained full console. Fresh independent
+review/publication remains pending. No image, backend/DMA/SMP, physical or clock clearance follows.
 [Report 318](docs/318-musb-combined-lifecycle-qualification.md).
 
 **NEO-58/231 F2 reset ownership:** candidate 0073 rejects reset after F2 driver

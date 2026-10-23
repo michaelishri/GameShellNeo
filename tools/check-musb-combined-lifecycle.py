@@ -242,8 +242,11 @@ atomic_json(attempt/'arm-observations.json',dict(observations=records,
     emulator=subprocess.check_output(['qemu-arm','--version'],text=True)))
 '''
     result = execute('musb-combined-lifecycle-arm', ['--pull=never', '--network', 'none',
+        '--cpus=1', '--memory=256m',
         '--user', f'{os.getuid()}:{os.getgid()}', '--platform', builder['platform'],
-        '--entrypoint', 'python3', '-v', f'{ROOT}:/project', '-w', '/project', builder['image'],
+        '--entrypoint', 'python3', '-v', f'{ROOT}:/project:ro',
+        '-v', f'{attempt}:/project/{attempt.relative_to(ROOT).as_posix()}',
+        '-w', '/project', builder['image'],
         '-c', program, attempt.relative_to(ROOT).as_posix(), builder['cross_compile'],
         json.dumps(FLAGS)], attempt / 'managed-arm', timeout=None)
     return dict(managed_result=result, native_admission=admission, reference_native=dict(path=str(native_receipt),

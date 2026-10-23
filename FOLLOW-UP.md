@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-233 completed-kernel verification preflight:** schema 2 binds Linux/builder
+declarations, compiler/package records and the exact parsed regulatory
+certificate set alongside existing artifacts/patches/fragment. Twenty actual
+routes now stop all 18 invalid image cases before stage entry; valid image and
+kernel-independent rootfs controls remain admitted, with real OpenSSL control
+passing. Legacy receipts refuse read-only; final signature/image checks,
+ownership and original stages/caches remain unchanged. Focused checks and one
+combined host check pass (24 runtime/1496 tooling, nine expected skips, C/shell).
+Fresh independent review/publication and broader image/hardware acceptance
+remain pending. [Report 319](docs/319-kernel-reuse-verification-preflight.md).
+
 **NEO-58/231 F2 reset ownership:** candidate 0073 rejects reset after F2 driver
 unbind under the existing F2 lock, before transport/IRQ/MMC teardown. The
 original 14-case hypothesis remains 12 passing/two failed observations; the

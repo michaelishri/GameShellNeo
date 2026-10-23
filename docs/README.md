@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[319 — Completed-kernel verification prerequisites](319-kernel-reuse-verification-preflight.md)
+records real early/late route evidence, schema 2 prerequisite binding, read-only
+legacy refusal and bounded host qualification without an image build.
+
 [317 — F2 reset ownership](317-brcmfmac-reset-ownership.md)
 records the actual SDIO unbind/reset baseline, bounded F2 binding guard,
 finite source qualification and separate reset/image/hardware gates.

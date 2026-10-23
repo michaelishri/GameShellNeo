@@ -16,6 +16,10 @@ The subsequently supplied local Allwinner collection is assessed in **[report 13
 
 ## Reports
 
+[319 — Completed-kernel verification prerequisites](319-kernel-reuse-verification-preflight.md)
+records real early/late route evidence, schema 2 prerequisite binding, read-only
+legacy refusal and bounded host qualification without an image build.
+
 [318 — Joined MUSB lifecycle qualification](318-musb-combined-lifecycle-qualification.md)
 binds fourteen CPI/Sunxi PIO families and two exact controls to the unchanged
 terminal45 source, with explicit actual-framework and physical limits.

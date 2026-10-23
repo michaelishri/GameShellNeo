@@ -2,6 +2,17 @@
 
 Record deferred questions and activities here as they arise.
 
+**NEO-233 completed-kernel verification preflight:** schema 2 binds Linux/builder
+declarations, compiler/package records and the exact parsed regulatory
+certificate set alongside existing artifacts/patches/fragment. Twenty actual
+routes now stop all 18 invalid image cases before stage entry; valid image and
+kernel-independent rootfs controls remain admitted, with real OpenSSL control
+passing. Legacy receipts refuse read-only; final signature/image checks,
+ownership and original stages/caches remain unchanged. Focused checks and one
+combined host check pass (24 runtime/1496 tooling, nine expected skips, C/shell).
+Fresh independent review/publication and broader image/hardware acceptance
+remain pending. [Report 319](docs/319-kernel-reuse-verification-preflight.md).
+
 **NEO-98/232 joined CPI/Sunxi PIO qualification:** dedicated Tasks bind the
 unchanged terminal45 queue, including existing startup/wake and terminal
 cleanup semantics. Fourteen complete-source native/sanitizer families and both

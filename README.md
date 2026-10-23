@@ -17,6 +17,17 @@ For development-only selectable SD systems, use the opt-in
 recovery system and imports complete diagnostic versions for selection over
 SSH. Normal release images do not include it; board qualification remains open.
 
+NEO-231's F2 reset admission candidate is documented in
+[report 317](docs/317-brcmfmac-reset-ownership.md). Use
+`task test:brcmfmac-reset-reference -- --archive /path/to/linux-6.18.54.tar.xz`
+for the original-source control and `task test:brcmfmac-reset` with the same
+archive argument for native/sanitizer and compiling-control qualification.
+Its `--compile-drivers` phase requires the original `--native-evidence`, full
+`--native-revision` and verified report314 `--reuse-source-receipt`; it mounts
+the retained source read-only and builds fresh ARM/full-driver outputs.
+Candidate 0073 rejects reset after F2 driver unbind before transport teardown;
+it does not add recovery/reprobe or select an image patch.
+
 NEO-229's isolated managed-wakeup API candidate is documented in
 [report 315](docs/315-managed-wakeup-init-error.md). Use
 `task test:managed-wakeup-init` for native/sanitizer/ARM references,

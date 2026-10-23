@@ -24,6 +24,10 @@ legacy refusal and bounded host qualification without an image build.
 binds fourteen CPI/Sunxi PIO families and two exact controls to the unchanged
 terminal45 source, with explicit actual-framework and physical limits.
 
+[317 — F2 reset ownership](317-brcmfmac-reset-ownership.md)
+records the actual SDIO unbind/reset baseline, bounded F2 binding guard,
+finite source qualification and separate reset/image/hardware gates.
+
 [315 — Managed wakeup initialization errors](315-managed-wakeup-init-error.md)
 records primary-source API research, the isolated return-preserving candidate,
 finite actual-source controls and separate Linux/image/hardware gates.

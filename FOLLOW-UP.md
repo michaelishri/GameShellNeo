@@ -22,6 +22,20 @@ five-file read-only disposable view; ARM/Linux and final review/publication
 remain pending. No image, backend/DMA/SMP, physical or clock clearance follows.
 [Report 318](docs/318-musb-combined-lifecycle-qualification.md).
 
+**NEO-58/231 F2 reset ownership:** candidate 0073 rejects reset after F2 driver
+unbind under the existing F2 lock, before transport/IRQ/MMC teardown. The
+original 14-case hypothesis remains 12 passing/two failed observations; the
+refined actual-source baseline is 13 PASS/three owner-refusal FAIL. Candidate
+qualification passes 16 native and 16 sanitizer cases, eight exact compiling
+controls and 39 focused host guards. A new read-only source-view operation
+passes 16 ARM cases and complete normal/debug driver objects; the retained
+source inventory is unchanged. One current host check passes 24 runtime and
+1,535 tooling tests (nine expected skips), compiled C guards and shell lint.
+Fresh final reviews/publication remain pending. The generic reset worker still ignores
+the result; no new recovery/reprobe or universal F1/MMC lifetime claim is made.
+Candidate stays outside the image queue; parent58 and physical/clock gates
+remain open. [Report 317](docs/317-brcmfmac-reset-ownership.md).
+
 **NEO-98/229 managed wakeup initialization:** candidate 0072 returns the exact
 initialization error before registering managed disable cleanup. The five-case
 native/ASan/UBSan/ARM reference passes, with the original wrapper failing exactly

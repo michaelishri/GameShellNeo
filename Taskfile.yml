@@ -867,6 +867,16 @@ tasks:
     desc: Test isolated Wi-Fi mailbox read/ACK error candidate, native and ARM32
     cmds: [bash tools/run-logged.sh brcmfmac-mailbox python3 tools/check-brcmfmac-mailbox.py]
 
+  test:brcmfmac-reset-reference:
+    desc: Reproduce reset after F2 unbind with actual SDIO bookkeeping and MMC helpers
+    cmds:
+      - bash tools/run-logged.sh brcmfmac-reset-reference python3 tools/check-brcmfmac-reset.py --reference-only {{.CLI_ARGS}}
+
+  test:brcmfmac-reset:
+    desc: Test opt-in F2 reset ownership, native and sanitizer cases with compiling controls
+    cmds:
+      - bash tools/run-logged.sh brcmfmac-reset python3 tools/check-brcmfmac-reset.py {{.CLI_ARGS}}
+
   test:brcmfmac-eapol-reference:
     desc: Reproduce pending EAPOL timeout ownership errors in the selected production source
     cmds:

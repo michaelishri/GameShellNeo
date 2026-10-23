@@ -112,6 +112,34 @@ class JoinedDiagnosticTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 joined.checked_cases(report('positive'), changed, mode='positive')
 
+    def test_phy_init_diagnostic_is_required_once_at_its_exact_failure_position(self):
+        message = 'phy phy-musb-combined-parent.0: phy init failed --> -5'
+        text = log('positive')
+        self.assertEqual(text.count(message), 1)
+        without = text.replace(message + '\n', '', 1)
+        owned = next(line for line in text.splitlines()
+                     if line.startswith('# combined_phy_init_error_test: owned '))
+        other_case = '# combined_startup_pm_error_test: begin joined lifecycle'
+        changed_streams = (
+            without,
+            text.replace(message, message + '\n' + message, 1),
+            text.replace(message, message.replace('-5', '-12'), 1),
+            text.replace(message, message.replace('parent.0', 'parent.1'), 1),
+            without.replace(owned, owned + '\n' + message, 1),
+            without.replace(other_case, other_case + '\n' + message, 1),
+            text.replace(message, message + '\n# unexpected PHY diagnostic', 1),
+        )
+        for changed in changed_streams:
+            with self.subTest(changed=changed):
+                with self.assertRaisesRegex(ValueError, 'entire joined'):
+                    joined.checked_cases(report('positive'), changed, mode='positive')
+        for mode in ('terminal-control', 'work-control'):
+            anchor = '# ' + joined.SUITES[mode][1][0] + ': begin joined lifecycle'
+            changed = log(mode).replace(anchor, anchor + '\n' + message, 1)
+            with self.subTest(mode=mode):
+                with self.assertRaisesRegex(ValueError, 'entire joined'):
+                    joined.checked_cases(report(mode), changed, mode=mode)
+
 
 class JoinedViewTests(unittest.TestCase):
     def test_actual_preprocessor_preserves_fields_addresses_and_header_macros(self):

@@ -243,7 +243,8 @@ DEVICE = r'musb-combined-child musb-combined-child\.0: '
 FRAMEWORK_MESSAGES = {
     CASES[3]: [DEVICE + r'error -EIO: musb_init_controller failed',
                r'musb-combined-child musb-combined-child\.0: probe with driver musb-combined-child failed with error -5'],
-    CASES[4]: [DEVICE + r'error -EIO: musb_init_controller failed',
+    CASES[4]: [r'phy phy-musb-combined-parent\.0: phy init failed --> -5',
+               DEVICE + r'error -EIO: musb_init_controller failed',
                r'musb-combined-child musb-combined-child\.0: probe with driver musb-combined-child failed with error -5'],
     CASES[5]: [DEVICE + r'error -EEXIST: musb_init_controller failed',
                r'musb-combined-child musb-combined-child\.0: probe with driver musb-combined-child failed with error -17'],

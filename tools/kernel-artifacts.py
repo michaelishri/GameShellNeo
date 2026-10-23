@@ -5,16 +5,43 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
+import ssl
 
 ROOT = Path(__file__).resolve().parents[1]
+SCHEMA = 2
+
+
+def regulatory_certificates(lock):
+    """Check syntax of the exact shipped-key inputs; do not verify a future DB.
+
+    The kernel producer still owns archive/patch verification. These hashes and
+    declarations cannot attest an arbitrarily staged kernel's build history.
+    Final regulatory.db signature/trust verification remains in verify-rootfs.
+    """
+    directory = ROOT / '.local/sources' / ('linux-' + lock['linux']['tag'][1:]) / 'net/wireless/certs'
+    certificates = sorted(directory.glob('*.hex'))
+    if not certificates:
+        raise SystemExit('Missing kernel regulatory certificates; retain the verified source prerequisites')
+    for path in certificates:
+        try:
+            data = bytes(int(value, 16) for value in re.findall(r'0x([0-9a-fA-F]{2})', path.read_text()))
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            context.load_verify_locations(cadata=ssl.DER_cert_to_PEM_cert(data))
+        except (UnicodeError, ValueError, ssl.SSLError):
+            raise SystemExit('Invalid kernel regulatory certificate: ' + str(path)) from None
+    return certificates
 
 
 def inventory():
     spec = importlib.util.spec_from_file_location('inputs', ROOT / 'tools/kernel-inputs.py')
     inputs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(inputs)
+    lock = json.loads((ROOT / 'build/sources.lock.json').read_text())
     kernel = ROOT / '.local/build/kernel'
     release = (kernel / 'include/config/kernel.release').read_text().strip()
+    if release != lock['linux']['tag'][1:] + lock['linux']['localversion']:
+        raise SystemExit('Kernel release differs from the selected Linux inputs')
     modules = ROOT / '.local/kernel-install/lib/modules' / release
     files = [kernel / p for p in ('.config', 'System.map', 'vmlinux', 'include/config/kernel.release',
              'arch/arm/boot/zImage', 'arch/arm/boot/dts/allwinner/sun8i-r16-clockworkpi-cpi3.dtb')]
@@ -22,10 +49,13 @@ def inventory():
     if not installed:
         raise SystemExit('Kernel module installation is incomplete')
     files.extend(installed)
+    files.extend(ROOT / '.local/build' / name for name in ('compiler.txt', 'builder-packages.txt'))
+    files.extend(regulatory_certificates(lock))
     def digest(path):
         with path.open('rb') as stream:
             return hashlib.file_digest(stream, 'sha256').hexdigest()
-    return {'kernel_release': release,
+    return {'schema': SCHEMA, 'kernel_release': release,
+            'linux': lock['linux'], 'builder': lock['builder'],
             'patches': {n: hashlib.sha256(b).hexdigest() for n, b in inputs.patches()},
             'fragment_sha256': digest(ROOT / 'kernel/gameshellneo.config'),
             'files': {str(p.relative_to(ROOT)): digest(p) for p in files}}
@@ -36,10 +66,15 @@ def main():
     parser.add_argument('action', choices=['record', 'check'])
     args = parser.parse_args()
     path = ROOT / '.local/build/kernel-completed.json'
+    previous = None
+    if args.action == 'check':
+        previous = json.loads(path.read_text())
+        if not isinstance(previous, dict) or type(previous.get('schema')) is not int or previous['schema'] != SCHEMA:
+            raise SystemExit('Kernel completion lacks current verification prerequisites; rebuild the kernel stage')
     current = inventory()
     if args.action == 'record':
         path.write_text(json.dumps(current, indent=2) + '\n')
-    elif json.loads(path.read_text()) != current:
+    elif previous != current:
         raise SystemExit('Kernel inputs/artifacts changed; rebuild the kernel stage')
     print(f'Kernel stage {args.action}: {len(current["files"])} files checked')
 

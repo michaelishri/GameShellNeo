@@ -118,8 +118,9 @@ that selection and `MUSB_PIO_ONLY=y`.
 
 The declared incremental disk cap is 384 MiB, with at least 3 GiB free and
 128 MiB independent headroom plus the remaining reservation before a new heavy
-stage. One output/kernel is built serially. Three fresh suite execution
-directories use the same frozen kernel/config. Docker is network-disabled,
+stage. One output/kernel is built serially. The initial two controls and positive
+attempt, plus the separately authorized fresh positive, retain distinct output
+directories and use the same frozen kernel/config. Docker is network-disabled,
 limited to one CPU/2560 MiB and a private 768 MiB UML temporary filesystem.
 
 The pinned `kunit.py exec` launcher appends `mem=1G`. The dedicated runner instead
@@ -129,7 +130,7 @@ metadata. Guest argv, raw exit, parser exit, raw log and JSON hashes are retaine
 There is no outer observation deadline, cached-result fallback or automatic
 retry. A lost observation requires inspecting the original managed operation.
 
-## Current evidence and next gates
+## Qualification and retained originals
 
 The original native/sanitizer run at `c39f8b2` passed all fourteen families in
 both builds. Both controls returned exactly1 with the prescribed three/one
@@ -145,13 +146,102 @@ only in the owned checker and whole Taskfile, with exact original native
 execution/flags/validators and two original Task blocks still unchanged. Every
 changed whole-file pin and original-versus-current provenance is recorded.
 
-Linux/ARM execution and final current-base host qualification are pending.
-The pre-compilation fixture work corrected the saved-flags signature of
-`unlock_system_sleep()` and replaced an ambiguous generator opening anchor;
-neither was an executed kernel result. The full source/view/stream contract
-must be frozen before the separately granted heavy operation. Final integration
-requires accepted dependencies, independent fresh Standards and Spec reviews
-and the root's serialized publication grant. Parents remain open.
+The genuine ARM run at `af72bb2` passed the same fourteen cases and both exact
+controls, matching the native output byte-for-byte. Read-only context operation
+`21127` verifies the six existing terminal45 object/configuration receipts:
+project, host, dual-role, module, PM without sleep and no PM. Those are historical
+builds with exact source/config/ELF pins, not six new executions of this fixture.
+
+The real Linux build at `38fbb2f` completed successfully and selected
+`USB_MUSB_SUNXI=y`, `SUNXI_SRAM=y`, `REGMAP_MMIO=y`, `PHY_SUN4I_USB=y`,
+`MUSB_PIO_ONLY=y` and the dedicated test symbol. The actual mounted base and
+view each have 97,301 entries. The generated46 source specification is
+`ec7a8cb01fb3b979523842d2e6af49288ea3ecc6b52aa3badf43453dd0c62258`;
+the complete view inventory is
+`b90768ef2ccf83cf7104c7516efd826efa1ecd19b5577a5ada97bef8a63e2598`.
+Its test append is
+`5c61a11f8edb301f241509b84a454a7f62bd968a4044d38f7ea6b5efe5e8b52b`.
+
+The original Linux Task `27877` returned 201 (underlying checker exit1). Its
+two controls are valid: each raw guest returned0, parser/managed returned1,
+with exactly the prescribed three/one failures and complete actor cleanup.
+The initial positive guest reported fourteen passing cases, but the frozen
+95-line contract correctly refused an additional real PHY-framework message.
+That attempt remains failed admission. Linux `drivers/phy/phy-core.c:244–249`
+emits `phy init failed --> -5` when the actual init operation returns the P05
+injected `-EIO`. The corrected grammar requires that exact PHY identity/message
+once in P05, before the controller/probe errors. Missing, duplicated, misplaced,
+wrong-error, wrong-device and other-case messages are rejected. All 27 focused
+host checks pass; arbitrary extra diagnostics remain inconclusive.
+
+After the corrected 96-line contract was frozen at `7930d4e`, one fresh positive
+operation `23147` passed all fourteen cases and the entire stream. Raw guest,
+parser and managed exits were0, with no OOM, error, stop or unresolved owner.
+The two original controls were strictly revalidated without replay. The private
+single-positive invocation reused the original read-only view/kernel through
+the existing inside-guest and managed APIs, used one unique fresh destination,
+and had no catch, retry, cached-pass fallback or rebuild. Before execution,
+exact source and function comparisons proved that only host diagnostic
+admission/tests changed; all generated C/Kconfig/patch/stamp bytes and compiled
+kernel/configuration remained identical. Actual mounted inventories were
+checked again before this fresh guest.
+
+The shared kernel SHA-256 is
+`d06c236d830587da417262d61e5de1c66e60e20c9a181353f3be306026fb726c`;
+its effective configuration is
+`edd7e94b96b219accff511790b5c7d36ad6173933b77e149f8da6509d9ba139b`.
+Failed-final-disarm debt in P09 remains explicitly observed as one attempt;
+fixture recovery happens after the observation using its saved valid identity.
+No retry or guessed wake-reference decrement is part of the qualified source.
+
+| Original operation | Retained receipt SHA-256 |
+| --- | --- |
+| Native/sanitizer `97154` | `6f79575e86d8b490d9b23ec7c41c09ceb4c14f228224ef0c2a5426fdc6604db2` |
+| ARM `62180` | `e5e378982fffbbd667454a1d7a88b57dc4f0a403ef280966e79b520d192c6402` |
+| Historical object context `21127` | `6dc65ad86cc7a4ac0660b5cfff1f464ae0440cade81df708e2032f2ab69ff711` |
+| Original Linux `27877` failed admission audit | `424fb29a34c75d1f3d421f9b5444ab8d7ceacd892981216957a425c0beb9d2b3` |
+| Fresh Linux `23147` | `0c2a5530a9d8f1a3af830acd2bb0b7be021b06d668d905f3bf5bfc729882f7a9` |
+
+The original managed build run is `d99fdbea49b3485ab381e1ddcc2e3750`;
+terminal/work controls are `d19f924913234816b48606da133b7f25` and
+`d338d3ccfc524f1cac7d294dd4b72087`. The fresh positive run is
+`40b2321c2da24d81a97b1af3c2f1bbbe`. Actual original terminal wrappers,
+logs, ownership results, before/after identities and all failed observations
+are retained in ignored evidence. There was one kernel build and no
+ARM/native/context/control replay for a changed Git ancestry.
+
+Pre-compilation fixture observations also remain separate: the first extractor
+newline failure, ambiguous opening-anchor failure, saved-flags signature
+correction for `unlock_system_sleep()`, and actual preprocessing that exposed
+four corrupted Sunxi ops designators. Temporary function-like aliases now undef
+existing I/O self-macros, preserve fields/bare function addresses and wrap only
+calls. A real preprocessor guard covers all thirteen Sunxi/PHY aliases; active
+source has no mapped member-call/address use requiring interception. These were
+fixture/preprocessing observations, not failed production kernels. The initial
+two disposable views remain preserved and unexecuted.
+
+## Accepted context and remaining gates
+
+Published dependency `916993715ddceb43b4e03845e4e96a1b3b69aeee` is adopted by
+normal merge, preserving both histories and shared navigation/Task sections.
+Original native, ARM, kernel and control execution provenance stays tied to
+the revisions above. Exact current executable/function/Task/view comparisons
+account for changed whole-file context pins without relabelling those old
+runs. One final ordinary `task check` at a clean accepted-base checkpoint is
+pending; it will be recorded separately from kernel qualification.
+
+Future reproducible heavy qualification uses the saved Tasks with an explicit
+verified terminal45 source path and fresh owned outputs. Default prepared-view
+and native whole-input guards remain strict. The historical native exception
+requires explicit exact originalc39 provenance. The private one-positive route
+is a bounded grant-bound historical invocation, not a new general resume API.
+
+Final integration requires independent fresh Standards and Spec reviews and
+the root's serialized publication grant. No production queue/profile changed,
+no image or device was accessed, and parents NEO-98/102/106 stay open. Other
+platform/backend/provider lifetime, failed-power removal, full-controller/ISR,
+DMA/SMP, image integration, board-clock admission and physical USB/PM gates
+remain separate.
 
 Primary-source authority is the fully pinned Linux6.18.54 source described
 above, including MUSB, Sunxi, Allwinner PHY, UDC, PM, IRQ, extcon and KUnit bodies.

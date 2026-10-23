@@ -15,11 +15,16 @@ remain pending. [Report 319](docs/319-kernel-reuse-verification-preflight.md).
 
 **NEO-98/232 joined CPI/Sunxi PIO qualification:** dedicated Tasks bind the
 unchanged terminal45 queue, including existing startup/wake and terminal
-cleanup semantics. Fourteen complete-source native/sanitizer families and both
-exact safe controls pass. The actual Linux UDC/DPM/global-IRQ/SRCU/work/PHY
-joined fixture and its strict whole-stream admission are being prepared in a
-five-file read-only disposable view; ARM/Linux and final review/publication
-remain pending. No image, backend/DMA/SMP, physical or clock clearance follows.
+cleanup semantics. Fourteen complete-source native/sanitizer/ARM families and
+both exact controls pass. One UML kernel selects real Sunxi/SRAM/PHY/PIO and
+passes the two exact controls; the first positive output remains a failed
+whole-stream admission for an omitted real PHY error line. After a source-backed
+exact grammar correction, one fresh positive run passes all fourteen actual
+UDC/DPM/global-IRQ/SRCU/work/PHY cases and its complete 96-line stream. All
+originals remain retained; six matching selected-object configurations are
+historical read-only evidence. Published916 is adopted with exact executable
+equivalence; the one final host check and fresh review/publication remain
+pending. No image, backend/DMA/SMP, physical or clock clearance follows.
 [Report 318](docs/318-musb-combined-lifecycle-qualification.md).
 
 **NEO-58/231 F2 reset ownership:** candidate 0073 rejects reset after F2 driver

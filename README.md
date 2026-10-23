@@ -9,8 +9,10 @@ board. Normal sleep, a launcher, OTA and other board revisions are later work.
 NEO-232's dedicated joined startup/wake/Sunxi qualification is documented in
 [report 318](docs/318-musb-combined-lifecycle-qualification.md). Its three
 `musb-combined-lifecycle` Tasks bind the existing terminal45 source without a
-new profile or driver bridge. Native/sanitizer references pass; Linux/ARM and
-final qualification are being prepared. The image and physical gates stay open.
+new profile or driver bridge. Native/sanitizer/ARM references, both exact Linux
+controls and fourteen joined Linux cases pass. Original execution provenance
+and separate current-context admission remain explicit; review/publication,
+image and physical gates stay open.
 
 For development-only selectable SD systems, use the opt-in
 [multi-system card tooling](development/multiboot/README.md). It keeps a fixed
